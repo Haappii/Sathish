@@ -1,0 +1,281 @@
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from pathlib import Path
+import shutil
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+
+from app.db import get_db
+from app.models.items import Item
+from app.models.category import Category
+from app.models.stock import Inventory
+from app.schemas.items import ItemCreate, ItemUpdate, ItemResponse
+from app.utils.auth_user import get_current_user
+
+router = APIRouter(prefix="/items", tags=["Items"])
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+ITEM_IMAGES_DIR = PROJECT_ROOT / "frontend" / "src" / "assets" / "items"
+ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".webp"}
+MAX_IMAGE_DIM = 512           # max width/height (px)
+JPEG_QUALITY = 82             # 1..95 (higher = larger file)
+
+
+def resolve_branch(request: Request):
+    header_branch = request.headers.get("x-branch-id")
+    return int(header_branch) if header_branch else 1
+
+
+def _resolve_image_ext(upload: UploadFile) -> str:
+    filename = upload.filename or ""
+    ext = Path(filename).suffix.lower()
+
+    # normalize common JPEG extensions
+    if ext in (".jpeg", ".jpe", ".jfif"):
+        ext = ".jpg"
+
+    if ext in ALLOWED_IMAGE_EXTS:
+        return ext
+
+    # Fallback to content-type (some files come with unexpected extensions)
+    ct = (upload.content_type or "").lower()
+    if ct in ("image/jpeg", "image/jpg", "image/pjpeg"):
+        return ".jpg"
+    if ct == "image/png":
+        return ".png"
+    if ct == "image/webp":
+        return ".webp"
+
+    raise HTTPException(400, "Unsupported image type. Use JPG/JPEG/PNG/WEBP")
+
+
+# ---------- LIST ----------
+@router.get("/", response_model=list[ItemResponse])
+def list_items(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return (
+        db.query(Item)
+        .filter(Item.shop_id == user.shop_id)
+        .order_by(Item.item_name)
+        .all()
+    )
+
+
+# ---------- BY CATEGORY ----------
+@router.get("/by-category/{category_id}", response_model=list[ItemResponse])
+def list_items_by_category(category_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return (
+        db.query(Item)
+        .filter(
+            Item.shop_id == user.shop_id,
+            Item.category_id == category_id,
+            Item.item_status == True
+        )
+        .order_by(Item.item_name)
+        .all()
+    )
+
+
+# ---------- CREATE ----------
+@router.post("/", response_model=ItemResponse)
+def create_item(request_data: ItemCreate, request: Request, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    branch_id = resolve_branch(request)
+
+    category = db.query(Category).filter(
+        Category.category_id == request_data.category_id,
+        Category.shop_id == user.shop_id
+    ).first()
+    if not category:
+        raise HTTPException(400, "Category not found")
+
+    item = Item(
+        shop_id=user.shop_id,
+        item_name=request_data.item_name,
+        category_id=request_data.category_id,
+        item_status=request_data.item_status,
+        price=request_data.price,
+        buy_price=request_data.buy_price or 0,
+        mrp_price=request_data.mrp_price or 0,
+        min_stock=request_data.min_stock,
+        created_by=None
+    )
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    # dummy inventory row (min_stock ignored now)
+    stock = Inventory(
+        shop_id=user.shop_id,
+        item_id=item.item_id,
+        branch_id=branch_id,
+        quantity=0,
+        min_stock=0   # 👈 kept as dummy
+    )
+    db.add(stock)
+    db.commit()
+
+    return item
+
+
+# ---------- UPDATE ----------
+@router.put("/{item_id}", response_model=ItemResponse)
+def update_item(item_id: int, request_data: ItemUpdate, request: Request, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    branch_id = resolve_branch(request)
+
+    item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+
+    if request_data.item_name is not None:
+        item.item_name = request_data.item_name
+
+    if request_data.category_id is not None:
+        item.category_id = request_data.category_id
+
+    if request_data.item_status is not None:
+        item.item_status = request_data.item_status
+
+    if request_data.price is not None:
+        item.price = request_data.price
+    if request_data.buy_price is not None:
+        item.buy_price = request_data.buy_price
+    if request_data.mrp_price is not None:
+        item.mrp_price = request_data.mrp_price
+
+    if request_data.min_stock is not None:
+        item.min_stock = request_data.min_stock   # 👈 now updates here
+
+    db.commit()
+    db.refresh(item)
+
+    # ensure dummy stock row exists (safe)
+    stock = db.query(Inventory).filter(
+        Inventory.item_id == item.item_id,
+        Inventory.branch_id == branch_id,
+        Inventory.shop_id == user.shop_id
+    ).first()
+
+    if not stock:
+        stock = Inventory(
+            shop_id=user.shop_id,
+            item_id=item.item_id,
+            branch_id=branch_id,
+            quantity=0,
+            min_stock=0
+        )
+        db.add(stock)
+        db.commit()
+
+    return item
+
+
+# ---------- UPLOAD ITEM IMAGE ----------
+@router.post("/{item_id}/image")
+def upload_item_image(
+    item_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    item = (
+        db.query(Item)
+        .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(404, "Item not found")
+
+    if not file:
+        raise HTTPException(400, "No file uploaded")
+
+    input_ext = _resolve_image_ext(file)
+
+    ITEM_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Always delete any existing image for this item (including old extensions)
+    for p in ITEM_IMAGES_DIR.glob(f"{item_id}.*"):
+        try:
+            p.unlink()
+        except:
+            pass
+
+    try:
+        # Pillow is required for compression/resizing.
+        from PIL import Image, ImageOps
+    except ImportError:
+        raise HTTPException(
+            500,
+            "Image compression requires Pillow. Install it in backend: pip install Pillow"
+        )
+
+    dest = None
+
+    try:
+        with Image.open(file.file) as img_in:
+            img = ImageOps.exif_transpose(img_in)
+
+            resample = getattr(Image, "Resampling", Image).LANCZOS
+            img.thumbnail((MAX_IMAGE_DIM, MAX_IMAGE_DIM), resample)
+
+            # Keep PNG only if it actually needs alpha; otherwise convert to JPEG for smaller size.
+            has_alpha = (
+                img.mode in ("RGBA", "LA")
+                or (img.mode == "P" and "transparency" in img.info)
+            )
+
+            if input_ext == ".png" and has_alpha:
+                dest = ITEM_IMAGES_DIR / f"{item_id}.png"
+                # Ensure correct mode for PNG output
+                if img.mode == "P":
+                    img = img.convert("RGBA")
+                img.save(dest, format="PNG", optimize=True, compress_level=9)
+            else:
+                dest = ITEM_IMAGES_DIR / f"{item_id}.jpg"
+                # JPEG doesn't support alpha
+                if img.mode in ("RGBA", "LA", "P"):
+                    if img.mode != "RGBA":
+                        img = img.convert("RGBA")
+                    bg = Image.new("RGB", img.size, (255, 255, 255))
+                    bg.paste(img, mask=img.split()[-1])
+                    img = bg
+                else:
+                    img = img.convert("RGB")
+
+                img.save(
+                    dest,
+                    format="JPEG",
+                    quality=JPEG_QUALITY,
+                    optimize=True,
+                    progressive=True
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "Invalid image file. Use JPG/JPEG/PNG/WEBP")
+    finally:
+        try:
+            file.file.close()
+        except:
+            pass
+
+    item.image_filename = dest.name
+    db.commit()
+    db.refresh(item)
+
+    return {
+        "message": "Image uploaded",
+        "item_id": item.item_id,
+        "image_filename": item.image_filename
+    }
+
+
+# ---------- SOFT DELETE ----------
+@router.delete("/{item_id}")
+def delete_item(item_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+
+    item.item_status = False
+    db.commit()
+
+    return {"message": "Item marked inactive"}

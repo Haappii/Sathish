@@ -1,0 +1,163 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.db import get_db
+from app.models.items import Item
+from app.models.stock import Inventory
+from app.models.stock_ledger import StockLedger   # ✅ ADDED
+
+from app.services.inventory_service import (
+    is_inventory_enabled,
+    ensure_stock_row,
+    adjust_stock,
+    update_min_stock,
+    get_branch_stock_rows,
+)
+
+from app.utils.auth_user import get_current_user
+
+router = APIRouter(prefix="/inventory", tags=["Inventory"])
+
+
+def resolve_branch(branch_id_param, user):
+    """
+    Admin  -> may use param OR active session branch
+    Normal -> always forced to own branch
+    """
+    if str(user.role_name).lower() == "admin":
+        return int(branch_id_param or user.branch_id)
+
+    return int(user.branch_id)
+
+
+# =========================
+# LIST STOCK
+# =========================
+@router.get("/list")
+def list_stock(
+    branch_id: int = Query(None),
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    if not is_inventory_enabled(db, user.shop_id):
+        return []
+
+    branch = resolve_branch(branch_id, user)
+
+    rows = get_branch_stock_rows(db, user.shop_id, branch)
+
+    return [
+        {
+            "item_id": r.item_id,
+            "item_name": r.item_name,
+            "quantity": r.quantity,
+            "min_stock": r.min_stock
+        }
+        for r in rows
+    ]
+
+
+# =========================
+# ADD STOCK
+# =========================
+@router.post("/add")
+def add_stock(
+    item_id: int,
+    qty: int,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    if not is_inventory_enabled(db, user.shop_id):
+        raise HTTPException(400, "Inventory mode disabled")
+
+    branch = resolve_branch(branch_id, user)
+
+    ensure_stock_row(db, user.shop_id, item_id, branch)
+    adjust_stock(db, user.shop_id, item_id, branch, qty, "ADD")
+
+    return {"success": True, "message": "Stock increased"}
+
+
+# =========================
+# REMOVE STOCK
+# =========================
+@router.post("/remove")
+def remove_stock(
+    item_id: int,
+    qty: int,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    if not is_inventory_enabled(db, user.shop_id):
+        raise HTTPException(400, "Inventory mode disabled")
+
+    branch = resolve_branch(branch_id, user)
+
+    ensure_stock_row(db, user.shop_id, item_id, branch)
+    ok = adjust_stock(db, user.shop_id, item_id, branch, qty, "REMOVE")
+
+    if not ok:
+        raise HTTPException(400, "Insufficient stock")
+
+    return {"success": True, "message": "Stock reduced"}
+
+
+# =========================
+# UPDATE MIN STOCK
+# =========================
+@router.post("/min-stock")
+def set_min_stock(
+    item_id: int,
+    min_stock: int,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    if not is_inventory_enabled(db, user.shop_id):
+        raise HTTPException(400, "Inventory mode disabled")
+
+    branch = resolve_branch(branch_id, user)
+
+    update_min_stock(db, user.shop_id, item_id, branch, min_stock)
+
+    return {"success": True, "message": "Min stock updated"}
+
+
+# =========================
+# STOCK HISTORY (LEDGER)
+# =========================
+@router.get("/history")
+def stock_history(
+    item_id: int = Query(...),
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    if not is_inventory_enabled(db, user.shop_id):
+        return []
+
+    branch = resolve_branch(branch_id, user)
+
+    rows = (
+        db.query(StockLedger)
+        .filter(
+            StockLedger.item_id == item_id,
+            StockLedger.branch_id == branch,
+            StockLedger.shop_id == user.shop_id
+        )
+        .order_by(StockLedger.created_time.desc())
+        .limit(100)
+        .all()
+    )
+
+    return [
+        {
+            "mode": r.change_type,
+            "qty": r.quantity,
+            "ref_no": r.reference_no,
+            "created_time": r.created_time.strftime("%Y-%m-%d %H:%M")
+        }
+        for r in rows
+    ]

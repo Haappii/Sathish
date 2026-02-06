@@ -1,0 +1,29 @@
+from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey
+from sqlalchemy.sql import func
+from app.db import Base
+
+
+class Branch(Base):
+    __tablename__ = "branch"
+
+    branch_id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+        autoincrement=True  # 👈 add this
+    )
+
+    shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)
+
+    branch_name = Column(String(150), nullable=False)
+    address_line1 = Column(String(255))
+    address_line2 = Column(String(255))
+    city = Column(String(120))
+    state = Column(String(120))
+    country = Column(String(120))
+    pincode = Column(String(20))
+    type = Column(String(20))   # Branch / Head Office
+    status = Column(String(20), default="ACTIVE")
+    branch_close = Column(String(1), default="N")  # Y/N
+    created_date = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    created_by = Column(Integer)
