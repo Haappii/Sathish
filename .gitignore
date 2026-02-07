@@ -1,5 +1,21 @@
-node_modules/
-dist/
-build/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
 .env
-.env.local
+
+# Backend
+backend/venv/
+backend/logs/
+backend/logs/sql.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/venv/
+
+# OS
+.DS_Store
+Thumbs.db

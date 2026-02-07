@@ -8,7 +8,7 @@ import {
 } from "./auth";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: "http://13.60.186.234:8000/api",
   timeout: 20000,
 });
 
