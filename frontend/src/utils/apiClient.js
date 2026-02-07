@@ -1,7 +1,7 @@
 // src/utils/apiClient.js
 
 import axios from "axios";
-import { API_BASE } from "../config/api";
+import { API_BASE, getApiBaseIssue } from "../config/api";
 import {
   getSession,
   clearSession,
@@ -18,6 +18,9 @@ const api = axios.create({
 ========================= */
 api.interceptors.request.use(
   (config) => {
+    const apiIssue = getApiBaseIssue();
+    if (apiIssue) return Promise.reject(new Error(apiIssue));
+
     const session = getSession();
     config.headers = config.headers || {};
 

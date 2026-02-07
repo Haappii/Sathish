@@ -68,7 +68,7 @@ export default function Login() {
       navigate("/dashboard", { replace: true });
 
     } catch (err) {
-      const msg = err?.response?.data?.detail;
+      const msg = err?.response?.data?.detail || err?.message;
       if (msg) {
         setError(msg);
       } else {
