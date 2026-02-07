@@ -69,7 +69,15 @@ export default function Login() {
 
     } catch (err) {
       const msg = err?.response?.data?.detail;
-      setError(msg || "Invalid login credentials");
+      if (msg) {
+        setError(msg);
+      } else {
+        const networkHint =
+          window?.location?.protocol === "https:" ? " (API must be HTTPS)" : "";
+        setError(
+          `Login failed: cannot reach server${networkHint}. Check API URL / network.`
+        );
+      }
     }
 
     setLoading(false);
