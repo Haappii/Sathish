@@ -9,16 +9,10 @@ const envBase =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_BACKEND_URL;
 
-const pageIsHttps =
-  typeof window !== "undefined" &&
-  window.location?.protocol === "https:";
-
-// Fallback:
-// - HTTPS page: default to same-origin `/api` (works if you proxy `/api` -> backend)
-// - HTTP page: allow direct HTTP backend for local/legacy usage
-const fallbackBase = pageIsHttps
-  ? "/api"
-  : "http://13.60.186.234:8000/api";
+// Fallback kept for local/legacy usage.
+// For production HTTPS (Amplify), set `VITE_API_BASE` to an HTTPS endpoint
+// like `https://api.example.com/api` (or `/api` only if you have a proxy).
+const fallbackBase = "http://13.60.186.234:8000/api";
 
 export const API_BASE = normalizeBaseUrl(envBase || fallbackBase);
 
