@@ -74,6 +74,18 @@ app.mount(
     name="item-images"
 )
 
+# ======================================================
+# STATIC FILES (SHOP LOGOS)
+# Stored in: frontend/src/assets/logo/logo_{shop_name}_{shop_id}.png
+# ======================================================
+SHOP_LOGOS_DIR = PROJECT_ROOT / "frontend" / "src" / "assets" / "logo"
+SHOP_LOGOS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/api/shop-logos",
+    StaticFiles(directory=str(SHOP_LOGOS_DIR)),
+    name="shop-logos"
+)
+
 
 # ======================================================
 # CORS

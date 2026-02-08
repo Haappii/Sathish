@@ -3,6 +3,8 @@ import authAxios from "../../api/authAxios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast";
 import { getSession } from "../../utils/auth";
+import defaultLogo from "../../assets/logo.png";
+import { getShopLogoUrl } from "../../utils/shopLogo";
 
 export default function ShopDetails() {
 
@@ -17,6 +19,7 @@ export default function ShopDetails() {
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
+    shop_id: "",
     shop_name: "",
     owner_name: "",
     mobile: "",
@@ -30,6 +33,7 @@ export default function ShopDetails() {
     pincode: "",
 
     gst_number: "",
+    logo_url: "",
     billing_type: "store",
     gst_enabled: false,
     gst_percent: 0,
@@ -37,6 +41,20 @@ export default function ShopDetails() {
 
     inventory_enabled: false
   });
+
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
+
+  useEffect(() => {
+    if (!logoFile) {
+      setLogoPreviewUrl("");
+      return;
+    }
+
+    const url = URL.createObjectURL(logoFile);
+    setLogoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
 
   useEffect(() => {
     let mounted = true;
@@ -55,27 +73,88 @@ export default function ShopDetails() {
   const setField = (key, value) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      setLogoFile(null);
+      return;
+    }
+
+    const okType =
+      file.type === "image/png" ||
+      file.type === "image/jpeg" ||
+      /\.(png|jpe?g)$/i.test(file.name || "");
+
+    if (!okType) {
+      showToast("Logo must be PNG or JPG/JPEG", "error");
+      e.target.value = "";
+      setLogoFile(null);
+      return;
+    }
+
+    setLogoFile(file);
+  };
+
   const saveShop = async () => {
     setSaving(true);
+    const wantsLogoUpload = !!logoFile;
+
+    const uploadLogo = async () => {
+      if (!logoFile) return { ok: true };
+
+      const fd = new FormData();
+      fd.append("file", logoFile);
+
+      try {
+        const res = await authAxios.post("/shop/logo", fd);
+        const logoUrl = res?.data?.logo_url;
+        if (logoUrl) setForm(prev => ({ ...prev, logo_url: logoUrl }));
+        setLogoFile(null);
+        return { ok: true };
+      } catch (err) {
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Logo upload failed";
+        return { ok: false, msg };
+      }
+    };
+
     try {
       await authAxios.post("/shop/", form, {
         headers: { "x-user-role": userRole }
       });
-      showToast("Shop updated successfully", "success");
-    }
-    catch (err) {
+
+      const logoRes = await uploadLogo();
+      if (!logoRes.ok) {
+        showToast(`Shop updated, but logo upload failed: ${logoRes.msg}`, "warning");
+      } else {
+        showToast(
+          wantsLogoUpload ? "Shop updated (logo uploaded)" : "Shop updated successfully",
+          "success"
+        );
+      }
+    } catch (err) {
       if (err?.response?.status === 403)
         showToast("Only Super Admin can change Inventory mode", "error");
       else
         showToast("Failed to update shop details", "error");
-    }
-    finally {
+    } finally {
       setSaving(false);
     }
   };
 
   const input =
     "w-full border rounded-xl px-3 py-2 shadow-sm bg-white focus:outline-none";
+
+  const currentLogoSrc =
+    logoPreviewUrl ||
+    getShopLogoUrl({
+      shop_id: form.shop_id || session?.shop_id,
+      shop_name: form.shop_name,
+      logo_url: form.logo_url
+    }) ||
+    defaultLogo;
 
   if (loading) return <div className="p-6">Loading…</div>;
 
@@ -96,6 +175,31 @@ export default function ShopDetails() {
 
         {/* LEFT PANEL */}
         <div className="border rounded-2xl bg-white p-6 space-y-3">
+
+          <Field label="Shop Logo">
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl border bg-gray-50 overflow-hidden flex items-center justify-center">
+                <img
+                  src={currentLogoSrc}
+                  alt="Shop Logo"
+                  className="w-full h-full object-cover"
+                  onError={e => { e.currentTarget.src = defaultLogo; }}
+                />
+              </div>
+
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className={input}
+                  onChange={handleLogoChange}
+                />
+                <div className="text-[11px] text-gray-500 mt-1">
+                  PNG / JPG / JPEG
+                </div>
+              </div>
+            </div>
+          </Field>
 
           <Field label="Shop Name">
             <input

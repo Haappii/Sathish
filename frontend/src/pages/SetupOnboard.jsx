@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
@@ -37,8 +37,44 @@ export default function SetupOnboard() {
     verification_code: ""
   });
 
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
+
+  useEffect(() => {
+    if (!logoFile) {
+      setLogoPreviewUrl("");
+      return;
+    }
+
+    const url = URL.createObjectURL(logoFile);
+    setLogoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
+
   const update = (k, v) =>
     setForm(prev => ({ ...prev, [k]: v }));
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      setLogoFile(null);
+      return;
+    }
+
+    const okType =
+      file.type === "image/png" ||
+      file.type === "image/jpeg" ||
+      /\.(png|jpe?g)$/i.test(file.name || "");
+
+    if (!okType) {
+      showToast("Logo must be PNG or JPG/JPEG", "error");
+      e.target.value = "";
+      setLogoFile(null);
+      return;
+    }
+
+    setLogoFile(file);
+  };
 
   const validateStep = () => {
     if (step === 0 && !form.shop_name.trim())
@@ -66,7 +102,14 @@ export default function SetupOnboard() {
 
     try {
       setLoading(true);
-      const res = await api.post("/setup/onboard", form);
+
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => {
+        fd.append(k, v ?? "");
+      });
+      if (logoFile) fd.append("logo", logoFile);
+
+      const res = await api.post("/setup/onboard", fd);
       setResult(res.data);
       showToast("Setup completed", "success");
       setTimeout(() => navigate("/"), 1200);
@@ -258,6 +301,30 @@ export default function SetupOnboard() {
               <input placeholder="Email" value={form.mailid} onChange={e => update("mailid", e.target.value)} />
               <input placeholder="City" value={form.city} onChange={e => update("city", e.target.value)} />
               <input placeholder="State" value={form.state} onChange={e => update("state", e.target.value)} />
+              <input type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} />
+            </div>
+
+            <div className="info">
+              {logoPreviewUrl ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <img
+                    src={logoPreviewUrl}
+                    alt="Logo Preview"
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 14,
+                      objectFit: "cover",
+                      background: "rgba(255,255,255,0.10)"
+                    }}
+                  />
+                  <div>
+                    Logo selected{logoFile?.name ? `: ${logoFile.name}` : ""}
+                  </div>
+                </div>
+              ) : (
+                <span>Optional: Upload a shop logo (PNG/JPG/JPEG)</span>
+              )}
             </div>
           </>
         )}

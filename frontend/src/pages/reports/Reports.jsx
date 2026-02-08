@@ -9,7 +9,8 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
-import logo from "../../assets/logo.png";
+import defaultLogo from "../../assets/logo.png";
+import { getShopLogoUrl } from "../../utils/shopLogo";
 
 /* =====================================================
    REPORT DEFINITIONS
@@ -221,12 +222,14 @@ export default function Reports() {
   /* =====================================================
      PDF HEADER (FONT FIX APPLIED)
      ===================================================== */
-  const drawPdfHeader = (doc, headerBranch) => {
+  const drawPdfHeader = (doc, headerBranch, logoDataUrl) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 12;
     const centerX = pageWidth / 2;
 
-    doc.addImage(logo, "PNG", margin, 12, 28, 28);
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", margin, 12, 28, 28);
+    }
 
     let y = 18;
     buildHeaderLines(headerBranch).forEach((line, i) => {
@@ -312,6 +315,33 @@ export default function Reports() {
     if (!data.length) return;
     const headerBranch = await ensureBranchLoaded();
 
+    const blobToDataUrl = (blob) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+    const fetchAsDataUrl = async (url) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to load image (${res.status})`);
+      return blobToDataUrl(await res.blob());
+    };
+
+    const resolveLogoDataUrl = async () => {
+      const shopLogo = getShopLogoUrl(shop);
+      for (const candidate of [shopLogo, defaultLogo]) {
+        if (!candidate) continue;
+        try {
+          return await fetchAsDataUrl(candidate);
+        } catch {}
+      }
+      return null;
+    };
+
+    const logoDataUrl = await resolveLogoDataUrl();
+
     const isInvoiceDetail =
       activeReport?.key === "sales/invoice-details" ||
       activeReport?.key === "sales/customer-invoices";
@@ -320,7 +350,7 @@ export default function Reports() {
       "mm",
       "a4"
     );
-    const startY = drawPdfHeader(doc, headerBranch);
+    const startY = drawPdfHeader(doc, headerBranch, logoDataUrl);
 
     let exportRows = data;
         if (isInvoiceDetail) {

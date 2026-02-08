@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from datetime import datetime
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from app.models.roles import Role
 from app.models.users import User
 from app.models.onboard_codes import OnboardCode
 from app.utils.passwords import encode_password
+from app.utils.shop_logo import save_shop_logo_file
 
 router = APIRouter(prefix="/setup", tags=["Setup Onboard"])
 
@@ -47,7 +48,22 @@ class SetupOnboardRequest(BaseModel):
 
 
 @router.post("/onboard")
-def setup_onboard(payload: SetupOnboardRequest, db: Session = Depends(get_db)):
+async def setup_onboard(request: Request, db: Session = Depends(get_db)):
+    logo_file: UploadFile | None = None
+    ct = (request.headers.get("content-type") or "").lower()
+
+    if ct.startswith("multipart/form-data"):
+        form = await request.form()
+        # `logo` is optional
+        logo_file = form.get("logo")  # type: ignore[assignment]
+        payload_dict = {
+            k: v for k, v in form.items()
+            if k != "logo" and not isinstance(v, UploadFile)
+        }
+        payload = SetupOnboardRequest(**payload_dict)
+    else:
+        payload = SetupOnboardRequest(**(await request.json()))
+
     code_row = db.query(OnboardCode).filter(
         OnboardCode.code == payload.verification_code.strip(),
         OnboardCode.is_used == False  # noqa: E712
@@ -92,6 +108,18 @@ def setup_onboard(payload: SetupOnboardRequest, db: Session = Depends(get_db)):
         db.add(shop)
         db.commit()
         db.refresh(shop)
+
+        # Optional: save logo file to assets/logo and store filename
+        if logo_file:
+            filename = save_shop_logo_file(
+                shop_id=shop.shop_id,
+                shop_name=shop.shop_name,
+                file=logo_file
+            )
+            shop.logo_url = filename
+            db.add(shop)
+            db.commit()
+            db.refresh(shop)
 
         # Create head office branch
         branch = Branch(

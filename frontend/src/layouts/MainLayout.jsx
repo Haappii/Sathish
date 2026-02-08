@@ -12,8 +12,9 @@ import {
   refreshSessionActivity
 } from "../utils/auth";
 
-import logoImage from "../assets/logo.png";
+import defaultLogo from "../assets/logo.png";
 import SupportChat from "../components/SupportChat";
+import { getShopLogoUrl } from "../utils/shopLogo";
 
 import {
   FaChartPie,
@@ -52,6 +53,7 @@ export default function MainLayout({ hideSidebar = false }) {
   const [branchAddress, setBranchAddress] = useState("Loading...");
   const [switching, setSwitching] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [logoSrc, setLogoSrc] = useState(defaultLogo);
 
   const branchId = session?.branch_id ?? null;
   const branchName = session?.branch_name ?? null;
@@ -84,6 +86,11 @@ export default function MainLayout({ hideSidebar = false }) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const url = getShopLogoUrl(shop);
+    setLogoSrc(url || defaultLogo);
+  }, [shop?.shop_id, shop?.shop_name, shop?.logo_url]);
 
   /* ================= BRANCH LIST (ADMIN) ================= */
   useEffect(() => {
@@ -266,7 +273,14 @@ export default function MainLayout({ hideSidebar = false }) {
         {/* HEADER */}
         <header className="px-6 py-3 border-b flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <img src={logoImage} alt="Logo" className="w-10 h-10" />
+            <img
+              src={logoSrc}
+              alt="Logo"
+              className="w-10 h-10"
+              onError={() => {
+                if (logoSrc !== defaultLogo) setLogoSrc(defaultLogo);
+              }}
+            />
             <span className="text-3xl font-extrabold" style={{ color: BLUE }}>
               {shopName}
             </span>
