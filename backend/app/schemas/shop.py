@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import date
 from typing import Optional
 
 class ShopDetailsBase(BaseModel):
@@ -23,7 +24,7 @@ class ShopDetailsBase(BaseModel):
     gst_percent: Optional[float] = 0
     gst_mode: Optional[str] = "inclusive"
 
-    app_date: Optional[str] = None
+    app_date: Optional[date] = None
 
 
 class ShopDetailsResponse(ShopDetailsBase):
