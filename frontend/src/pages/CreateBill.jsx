@@ -71,7 +71,7 @@ export default function CreateBill() {
 
       setGstEnabled(s?.gst_enabled || false);
       setGstPercent(Number(s?.gst_percent || 0));
-      setGstMode(s?.gst_mode || "inclusive");
+      setGstMode(String(s?.gst_mode || "inclusive").toLowerCase());
       setInventoryEnabled(s?.inventory_enabled || false);
 
       const cats = await authAxios.get("/category/");
@@ -215,7 +215,9 @@ export default function CreateBill() {
       ? (subTotal * Number(discount || 0)) / 100
       : Number(discount) || 0;
 
-  const payable = subTotal + tax - discountValue;
+  const grossTotal =
+    gstEnabled && gstMode === "exclusive" ? subTotal + tax : subTotal;
+  const payable = grossTotal - discountValue;
 
   const splitTotal = ["cash", "card", "upi"]
     .map(k => Number(split[k] || 0))

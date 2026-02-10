@@ -169,11 +169,12 @@ export default function SalesHistory() {
     let sub = 0;
     let tax = 0;
     const gstPercent = Number(shop.gst_percent || 0);
+    const gstMode = String(shop.gst_mode || "inclusive").toLowerCase();
     items.forEach(i => {
       const lineTotal = i.price * i.quantity;
       sub += lineTotal;
       if (shop.gst_enabled) {
-        if (shop.gst_mode === "inclusive") {
+        if (gstMode === "inclusive") {
           const base = lineTotal / (1 + gstPercent / 100);
           tax += lineTotal - base;
         } else {
@@ -181,7 +182,9 @@ export default function SalesHistory() {
         }
       }
     });
-    return { sub, tax, total: sub + tax };
+
+    const isExclusive = !!shop.gst_enabled && gstMode === "exclusive";
+    return { sub, tax, total: isExclusive ? sub + tax : sub };
   };
 
   const totals = calculateTotals();

@@ -60,13 +60,14 @@ export default function EditBill() {
     let taxTotal = 0;
 
     const gstPercent = Number(shop.gst_percent || 0);
+    const gstMode = String(shop.gst_mode || "inclusive").toLowerCase();
 
     items.forEach(i => {
       const amount = Number(i.amount || 0);
       subTotal += amount;
 
       if (shop.gst_enabled) {
-        if (shop.gst_mode === "inclusive") {
+        if (gstMode === "inclusive") {
           const base = amount / (1 + gstPercent / 100);
           taxTotal += amount - base;
         } else {
@@ -75,8 +76,9 @@ export default function EditBill() {
       }
     });
 
+    const isExclusive = !!shop.gst_enabled && gstMode === "exclusive";
     return {
-      total: subTotal + taxTotal,
+      total: isExclusive ? subTotal + taxTotal : subTotal,
       tax: taxTotal
     };
   };
