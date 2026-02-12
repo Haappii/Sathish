@@ -10,6 +10,7 @@ from app.models.category import Category
 from app.models.stock import Inventory
 from app.schemas.items import ItemCreate, ItemUpdate, ItemResponse
 from app.utils.auth_user import get_current_user
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -113,6 +114,24 @@ def create_item(request_data: ItemCreate, request: Request, db: Session = Depend
     db.add(stock)
     db.commit()
 
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Items",
+        action="CREATE",
+        record_id=item.item_id,
+        new={
+            "item_name": item.item_name,
+            "category_id": item.category_id,
+            "item_status": item.item_status,
+            "price": item.price,
+            "buy_price": item.buy_price,
+            "mrp_price": item.mrp_price,
+            "min_stock": item.min_stock,
+        },
+        user_id=user.user_id,
+    )
+
     return item
 
 
@@ -124,6 +143,16 @@ def update_item(item_id: int, request_data: ItemUpdate, request: Request, db: Se
     item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
+
+    old = {
+        "item_name": item.item_name,
+        "category_id": item.category_id,
+        "item_status": item.item_status,
+        "price": item.price,
+        "buy_price": item.buy_price,
+        "mrp_price": item.mrp_price,
+        "min_stock": item.min_stock,
+    }
 
     if request_data.item_name is not None:
         item.item_name = request_data.item_name
@@ -165,6 +194,25 @@ def update_item(item_id: int, request_data: ItemUpdate, request: Request, db: Se
         db.add(stock)
         db.commit()
 
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Items",
+        action="UPDATE",
+        record_id=item.item_id,
+        old=old,
+        new={
+            "item_name": item.item_name,
+            "category_id": item.category_id,
+            "item_status": item.item_status,
+            "price": item.price,
+            "buy_price": item.buy_price,
+            "mrp_price": item.mrp_price,
+            "min_stock": item.min_stock,
+        },
+        user_id=user.user_id,
+    )
+
     return item
 
 
@@ -187,6 +235,7 @@ def upload_item_image(
     if not file:
         raise HTTPException(400, "No file uploaded")
 
+    old_filename = item.image_filename
     input_ext = _resolve_image_ext(file)
 
     ITEM_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -261,6 +310,17 @@ def upload_item_image(
     db.commit()
     db.refresh(item)
 
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Items",
+        action="IMAGE_UPLOAD",
+        record_id=item.item_id,
+        old={"image_filename": old_filename},
+        new={"image_filename": item.image_filename},
+        user_id=user.user_id,
+    )
+
     return {
         "message": "Image uploaded",
         "item_id": item.item_id,
@@ -275,7 +335,19 @@ def delete_item(item_id: int, db: Session = Depends(get_db), user=Depends(get_cu
     if not item:
         raise HTTPException(404, "Item not found")
 
+    old = {"item_status": item.item_status}
     item.item_status = False
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Items",
+        action="DELETE",
+        record_id=item.item_id,
+        old=old,
+        new={"item_status": item.item_status},
+        user_id=user.user_id,
+    )
 
     return {"message": "Item marked inactive"}

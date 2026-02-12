@@ -8,6 +8,7 @@ from app.schemas.category import (
     CategoryCreate, CategoryUpdate, CategoryResponse
 )
 from app.utils.auth_user import get_current_user
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/category", tags=["Category"])
 
@@ -45,6 +46,19 @@ def create_category(request: CategoryCreate, db: Session = Depends(get_db), user
     db.add(category)
     db.commit()
     db.refresh(category)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Category",
+        action="CREATE",
+        record_id=category.category_id,
+        new={
+            "category_name": category.category_name,
+            "category_status": category.category_status,
+        },
+        user_id=user.user_id,
+    )
     return category
 
 
@@ -62,6 +76,11 @@ def update_category(category_id: int, request: CategoryUpdate,
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
+    old = {
+        "category_name": category.category_name,
+        "category_status": category.category_status,
+    }
+
     if request.category_name is not None:
         category.category_name = request.category_name
 
@@ -70,6 +89,20 @@ def update_category(category_id: int, request: CategoryUpdate,
 
     db.commit()
     db.refresh(category)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Category",
+        action="UPDATE",
+        record_id=category.category_id,
+        old=old,
+        new={
+            "category_name": category.category_name,
+            "category_status": category.category_status,
+        },
+        user_id=user.user_id,
+    )
     return category
 
 
@@ -99,7 +132,25 @@ def delete_category(category_id: int, db: Session = Depends(get_db), user=Depend
         )
 
     # Soft delete
+    old = {
+        "category_name": category.category_name,
+        "category_status": category.category_status,
+    }
     category.category_status = False
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Category",
+        action="DELETE",
+        record_id=category.category_id,
+        old=old,
+        new={
+            "category_name": category.category_name,
+            "category_status": category.category_status,
+        },
+        user_id=user.user_id,
+    )
 
     return {"message": "Category marked inactive"}

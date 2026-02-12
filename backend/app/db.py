@@ -1,9 +1,16 @@
  
+from pathlib import Path
+import os
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
 import logging
 from logging.handlers import RotatingFileHandler
+
+# Load backend/.env early (if present)
+_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=False)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

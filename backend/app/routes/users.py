@@ -6,6 +6,7 @@ from app.models.users import User
 from app.schemas.users import UserCreate, UserUpdate, UserResponse
 from app.utils.auth_guard import get_current_user   # ✅ FIXED IMPORT
 from app.utils.passwords import encode_password
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -59,6 +60,22 @@ def create_user(
     db.commit()
     db.refresh(user)
 
+    log_action(
+        db,
+        shop_id=current_user.shop_id,
+        module="Users",
+        action="CREATE",
+        record_id=user.user_id,
+        new={
+            "user_name": user.user_name,
+            "name": user.name,
+            "role": user.role,
+            "status": user.status,
+            "branch_id": user.branch_id,
+        },
+        user_id=current_user.user_id,
+    )
+
     return user
 
 
@@ -80,6 +97,14 @@ def update_user(
     if not user:
         raise HTTPException(404, "User not found")
 
+    old = {
+        "user_name": user.user_name,
+        "name": user.name,
+        "role": user.role,
+        "status": user.status,
+        "branch_id": user.branch_id,
+    }
+
     for field, value in request.dict(exclude_unset=True).items():
         if field == "password" and value:
             setattr(user, field, encode_password(value))
@@ -88,6 +113,23 @@ def update_user(
 
     db.commit()
     db.refresh(user)
+
+    log_action(
+        db,
+        shop_id=current_user.shop_id,
+        module="Users",
+        action="UPDATE",
+        record_id=user.user_id,
+        old=old,
+        new={
+            "user_name": user.user_name,
+            "name": user.name,
+            "role": user.role,
+            "status": user.status,
+            "branch_id": user.branch_id,
+        },
+        user_id=current_user.user_id,
+    )
 
     return user
 
@@ -115,7 +157,19 @@ def deactivate_user(
             "Cannot deactivate a user who is currently logged in"
         )
 
+    old_status = user.status
     user.status = False
     db.commit()
+
+    log_action(
+        db,
+        shop_id=current_user.shop_id,
+        module="Users",
+        action="DEACTIVATE",
+        record_id=user.user_id,
+        old={"status": old_status},
+        new={"status": False},
+        user_id=current_user.user_id,
+    )
 
     return {"message": "User marked inactive"}

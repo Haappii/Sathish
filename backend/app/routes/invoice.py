@@ -28,6 +28,7 @@ from app.services.inventory_service import (
 from app.services.gst_service import calculate_gst
 from app.services.day_close_service import is_branch_day_closed
 from app.utils.auth_user import get_current_user
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -122,6 +123,26 @@ def create_invoice(
         invoice.payment_split = payload.payment_split
 
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Invoice",
+        action="CREATE",
+        record_id=invoice.invoice_number,
+        new={
+            "invoice_id": invoice.invoice_id,
+            "branch_id": branch_id,
+            "customer_name": invoice.customer_name,
+            "mobile": invoice.mobile,
+            "total_amount": invoice.total_amount,
+            "tax_amt": invoice.tax_amt,
+            "discounted_amt": invoice.discounted_amt,
+            "payment_mode": invoice.payment_mode,
+            "payment_split": invoice.payment_split,
+        },
+        user_id=user.user_id,
+    )
     return invoice
 
 
@@ -224,6 +245,16 @@ def modify_invoice(
     if is_branch_day_closed(db, user.shop_id, invoice.branch_id, invoice.created_time):
         raise HTTPException(403, "Day closed for this branch")
 
+    old = {
+        "customer_name": invoice.customer_name,
+        "mobile": invoice.mobile,
+        "total_amount": invoice.total_amount,
+        "tax_amt": invoice.tax_amt,
+        "discounted_amt": invoice.discounted_amt,
+        "payment_mode": invoice.payment_mode,
+        "payment_split": invoice.payment_split,
+    }
+
     # 🔹 Archive old invoice
     archive_invoice(
         db,
@@ -292,6 +323,25 @@ def modify_invoice(
         invoice.payment_split = payload.payment_split
 
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Invoice",
+        action="MODIFY",
+        record_id=invoice.invoice_number,
+        old=old,
+        new={
+            "customer_name": invoice.customer_name,
+            "mobile": invoice.mobile,
+            "total_amount": invoice.total_amount,
+            "tax_amt": invoice.tax_amt,
+            "discounted_amt": invoice.discounted_amt,
+            "payment_mode": invoice.payment_mode,
+            "payment_split": invoice.payment_split,
+        },
+        user_id=user.user_id,
+    )
     return {"message": "Invoice modified successfully"}
 
 
@@ -313,6 +363,18 @@ def delete_invoice(
         raise HTTPException(404, "Invoice not found")
     if is_branch_day_closed(db, user.shop_id, invoice.branch_id, invoice.created_time):
         raise HTTPException(403, "Day closed for this branch")
+
+    old = {
+        "invoice_number": invoice.invoice_number,
+        "branch_id": invoice.branch_id,
+        "customer_name": invoice.customer_name,
+        "mobile": invoice.mobile,
+        "total_amount": invoice.total_amount,
+        "tax_amt": invoice.tax_amt,
+        "discounted_amt": invoice.discounted_amt,
+        "payment_mode": invoice.payment_mode,
+        "payment_split": invoice.payment_split,
+    }
 
     # 🔹 Archive invoice
     archive_invoice(
@@ -337,6 +399,17 @@ def delete_invoice(
 
     db.delete(invoice)
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Invoice",
+        action="DELETE",
+        record_id=old.get("invoice_number"),
+        old=old,
+        new={"deleted": True},
+        user_id=user.user_id,
+    )
 
     return {"message": "Invoice deleted"}
 
@@ -441,6 +514,16 @@ def restore_archived_invoice(
     if str(user.role_name).lower() not in ["admin", "manager"]:
         raise HTTPException(403, "Not allowed")
 
+    old = {
+        "invoice_number": archive.invoice_number,
+        "branch_id": archive.branch_id,
+        "customer_name": archive.customer_name,
+        "mobile": archive.mobile,
+        "total_amount": archive.total_amount,
+        "tax_amt": archive.tax_amt,
+        "discounted_amt": archive.discounted_amt,
+    }
+
     # 🔹 Recreate invoice
     invoice = Invoice(
         invoice_number=archive.invoice_number,
@@ -484,5 +567,20 @@ def restore_archived_invoice(
 
     db.delete(archive)
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Invoice",
+        action="RESTORE",
+        record_id=old.get("invoice_number"),
+        old=old,
+        new={
+            "invoice_id": invoice.invoice_id,
+            "invoice_number": invoice.invoice_number,
+            "branch_id": invoice.branch_id,
+        },
+        user_id=user.user_id,
+    )
 
     return {"message": "Deleted invoice restored successfully"}

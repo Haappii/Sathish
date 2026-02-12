@@ -12,6 +12,7 @@ from app.services.branch_service import (
     set_branch_status
 )
 from app.utils.auth_user import get_current_user, AdminOnly
+from app.services.audit_service import log_action
 
 
 router = APIRouter(prefix="/branch", tags=["Branch"])
@@ -68,7 +69,23 @@ def create(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    return create_branch(db, data, user.user_id, user.shop_id)
+    branch = create_branch(db, data, user.user_id, user.shop_id)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Branch",
+        action="CREATE",
+        record_id=branch.branch_id,
+        new={
+            "branch_name": branch.branch_name,
+            "type": branch.type,
+            "status": branch.status,
+        },
+        user_id=user.user_id,
+    )
+
+    return branch
 
 
 # =========================================================
@@ -79,9 +96,38 @@ def update(branch_id: int, data: BranchUpdate,
            db: Session = Depends(get_db),
            user=Depends(get_current_user)):
 
+    existing = (
+        db.query(Branch)
+        .filter(Branch.branch_id == branch_id, Branch.shop_id == user.shop_id)
+        .first()
+    )
+    if not existing:
+        raise HTTPException(404, "Branch not found")
+
+    old = {
+        "branch_name": existing.branch_name,
+        "type": existing.type,
+        "status": existing.status,
+    }
+
     branch = update_branch(db, user.shop_id, branch_id, data)
     if not branch:
         raise HTTPException(404, "Branch not found")
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Branch",
+        action="UPDATE",
+        record_id=branch.branch_id,
+        old=old,
+        new={
+            "branch_name": branch.branch_name,
+            "type": branch.type,
+            "status": branch.status,
+        },
+        user_id=user.user_id,
+    )
 
     return branch
 
@@ -94,8 +140,29 @@ def change_status(branch_id: int, status: str,
                   db: Session = Depends(get_db),
                   user=Depends(get_current_user)):
 
+    existing = (
+        db.query(Branch)
+        .filter(Branch.branch_id == branch_id, Branch.shop_id == user.shop_id)
+        .first()
+    )
+    if not existing:
+        raise HTTPException(404, "Branch not found")
+
+    old_status = existing.status
+
     branch = set_branch_status(db, user.shop_id, branch_id, status)
     if not branch:
         raise HTTPException(404, "Branch not found")
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Branch",
+        action="STATUS",
+        record_id=branch.branch_id,
+        old={"status": old_status},
+        new={"status": branch.status},
+        user_id=user.user_id,
+    )
 
     return {"message": "Updated", "status": status}

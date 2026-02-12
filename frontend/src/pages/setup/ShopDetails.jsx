@@ -136,7 +136,7 @@ export default function ShopDetails() {
       }
     } catch (err) {
       if (err?.response?.status === 403)
-        showToast("Only Super Admin can change Inventory mode", "error");
+        showToast("Only Admin can change Inventory mode", "error");
       else
         showToast("Failed to update shop details", "error");
     } finally {

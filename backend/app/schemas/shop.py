@@ -26,6 +26,9 @@ class ShopDetailsBase(BaseModel):
 
     app_date: Optional[date] = None
 
+    # Stored in system_parameters (not in shop_details table)
+    inventory_enabled: Optional[bool] = None
+
 
 class ShopDetailsResponse(ShopDetailsBase):
     shop_id: int

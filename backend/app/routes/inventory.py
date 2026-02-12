@@ -15,6 +15,7 @@ from app.services.inventory_service import (
 )
 
 from app.utils.auth_user import get_current_user
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -76,6 +77,16 @@ def add_stock(
     ensure_stock_row(db, user.shop_id, item_id, branch)
     adjust_stock(db, user.shop_id, item_id, branch, qty, "ADD")
 
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Inventory",
+        action="STOCK_ADD",
+        record_id=f"{item_id}@{branch}",
+        new={"item_id": item_id, "branch_id": branch, "qty": qty},
+        user_id=user.user_id,
+    )
+
     return {"success": True, "message": "Stock increased"}
 
 
@@ -101,6 +112,16 @@ def remove_stock(
     if not ok:
         raise HTTPException(400, "Insufficient stock")
 
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Inventory",
+        action="STOCK_REMOVE",
+        record_id=f"{item_id}@{branch}",
+        new={"item_id": item_id, "branch_id": branch, "qty": qty},
+        user_id=user.user_id,
+    )
+
     return {"success": True, "message": "Stock reduced"}
 
 
@@ -121,6 +142,16 @@ def set_min_stock(
     branch = resolve_branch(branch_id, user)
 
     update_min_stock(db, user.shop_id, item_id, branch, min_stock)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Inventory",
+        action="MIN_STOCK",
+        record_id=f"{item_id}@{branch}",
+        new={"item_id": item_id, "branch_id": branch, "min_stock": min_stock},
+        user_id=user.user_id,
+    )
 
     return {"success": True, "message": "Min stock updated"}
 

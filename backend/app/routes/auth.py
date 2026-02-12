@@ -8,7 +8,7 @@ from app.models.users import User
 from app.models.roles import Role
 from app.models.branch import Branch
 from app.utils.jwt_token import create_access_token
-from app.utils.passwords import encode_password, verify_password
+from app.utils.passwords import encode_password, verify_password, password_needs_upgrade
 from app.models.shop_details import ShopDetails
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -38,15 +38,14 @@ def login(request: dict, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(400, "User not found")
 
-    # Validate password (base64-encoded)
-    if verify_password(password, user.password):
-        pass
-    elif user.password == password:
-        # Legacy plain-text password -> migrate to encoded
+    # Validate password (bcrypt / legacy base64 / legacy plain-text)
+    if not verify_password(password, user.password):
+        raise HTTPException(400, "Invalid password")
+
+    # Upgrade legacy password to bcrypt on successful login
+    if password_needs_upgrade(user.password):
         user.password = encode_password(password)
         db.commit()
-    else:
-        raise HTTPException(400, "Invalid password")
 
     # Fetch branch safely
     branch_name = None

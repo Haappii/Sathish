@@ -8,6 +8,7 @@ from app.models.branch_expense import BranchExpense
 from app.models.shop_details import ShopDetails
 from app.schemas.expense import ExpenseCreate, ExpenseResponse
 from app.services.day_close_service import is_branch_day_closed
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
@@ -51,6 +52,22 @@ def create_expense(
     db.add(expense)
     db.commit()
     db.refresh(expense)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Expenses",
+        action="CREATE",
+        record_id=expense.expense_id if hasattr(expense, "expense_id") else f"{expense.branch_id}:{expense.expense_date}",
+        new={
+            "branch_id": expense.branch_id,
+            "expense_date": str(expense.expense_date),
+            "amount": expense.amount,
+            "category": expense.category,
+            "payment_mode": expense.payment_mode,
+        },
+        user_id=user.user_id,
+    )
     return expense
 
 

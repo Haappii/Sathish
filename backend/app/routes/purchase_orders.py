@@ -16,6 +16,7 @@ from app.schemas.purchase_order import (
 )
 from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import adjust_stock
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/purchase-orders", tags=["Purchase Orders"])
 
@@ -148,6 +149,23 @@ def create_po(
     db.add(po)
     db.commit()
     db.refresh(po)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="PurchaseOrders",
+        action="CREATE",
+        record_id=po.po_number,
+        new={
+            "po_id": po.po_id,
+            "branch_id": po.branch_id,
+            "supplier_id": po.supplier_id,
+            "status": po.status,
+            "payment_status": po.payment_status,
+            "total_amount": po.total_amount,
+        },
+        user_id=user.user_id,
+    )
     return po
 
 
@@ -198,6 +216,21 @@ def receive_po(
 
     db.commit()
     db.refresh(po)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="PurchaseOrders",
+        action="RECEIVE",
+        record_id=po.po_number,
+        new={
+            "po_id": po.po_id,
+            "branch_id": po.branch_id,
+            "status": po.status,
+            "received_items": len(payload.items or []),
+        },
+        user_id=user.user_id,
+    )
     return po
 
 
@@ -222,4 +255,18 @@ def update_payment(
     po.paid_amount = float(payload.paid_amount or 0)
     db.commit()
     db.refresh(po)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="PurchaseOrders",
+        action="PAYMENT",
+        record_id=po.po_number,
+        new={
+            "po_id": po.po_id,
+            "payment_status": po.payment_status,
+            "paid_amount": po.paid_amount,
+        },
+        user_id=user.user_id,
+    )
     return po

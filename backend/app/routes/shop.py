@@ -11,8 +11,9 @@ router = APIRouter(prefix="/shop", tags=["Shop"])
 
 
 def require_super_admin(role: str | None):
-    if role != "Super Admin":
-        raise HTTPException(403, "Only Super Admin can modify inventory mode")
+    role_l = (role or "").strip().lower()
+    if role_l not in {"admin", "super admin"}:
+        raise HTTPException(403, "Only Admin can modify inventory mode")
 
 
 @router.get("/details")
@@ -44,11 +45,14 @@ def save_shop_details(
     user=Depends(get_current_user)
 ):
 
+    payload = data.dict(exclude_unset=True)
+    shop_payload = {k: v for k, v in payload.items() if k != "inventory_enabled"}
+
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first() or ShopDetails(shop_id=user.shop_id)
 
     prev_shop_name = shop.shop_name
 
-    for k, v in data.dict(exclude_unset=True).items():
+    for k, v in shop_payload.items():
         setattr(shop, k, v)
 
     db.add(shop)
@@ -71,7 +75,7 @@ def save_shop_details(
             pass
 
     # 🔹 handle inventory flag separately
-    if "inventory_enabled" in data.dict():
+    if "inventory_enabled" in payload:
         require_super_admin(x_user_role)
 
         param = db.query(SystemParameter).filter(
@@ -82,7 +86,7 @@ def save_shop_details(
         if not param:
             param = SystemParameter(shop_id=user.shop_id, param_key="inventory_enabled")
 
-        param.param_value = "YES" if data.inventory_enabled else "NO"
+        param.param_value = "YES" if bool(data.inventory_enabled) else "NO"
         db.add(param)
 
     db.commit()

@@ -15,6 +15,7 @@ from app.services.inventory_service import (
 )
 
 from app.utils.auth_user import get_current_user
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/inventory", tags=["Inventory Bulk Upload"])
 
@@ -117,6 +118,21 @@ async def bulk_upload_stock(
 
     db.commit()
     os.remove(temp_path)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Inventory",
+        action="BULK_UPLOAD",
+        record_id=f"branch:{branch}",
+        new={
+            "branch_id": branch,
+            "processed": processed,
+            "failed_count": len(failed),
+            "filename": file.filename,
+        },
+        user_id=user.user_id,
+    )
 
     return {
         "success": True,

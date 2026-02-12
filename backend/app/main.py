@@ -6,6 +6,8 @@ from app.db import engine, Base, SessionLocal
 import os
 from pathlib import Path
 
+from app.utils.passwords import encode_password
+
 # ======================================================
 # MODELS (IMPORT ALL MODELS BEFORE create_all)
 # ======================================================
@@ -19,6 +21,7 @@ import app.models.invoice_archive
 import app.models.shop_details
 import app.models.stock
 import app.models.stock_ledger
+import app.models.system_parameters
 import app.models.branch
 import app.models.day_close
 import app.models.month_close
@@ -26,6 +29,9 @@ import app.models.branch_expense
 import app.models.branch_expense
 import app.models.supplier
 import app.models.purchase_order
+import app.models.onboard_codes
+import app.models.audit_log
+import app.models.support_ticket
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -139,7 +145,7 @@ def seed_defaults():
     if not admin:
         admin = User(
             user_name="admin",
-            password="admin123",     # project convention
+            password=encode_password("admin123"),     # project convention
             name="System Admin",
             role=admin_role.role_id,
             branch_id=1,

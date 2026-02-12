@@ -5,6 +5,7 @@ from app.db import get_db
 from app.utils.auth_user import get_current_user
 from app.models.supplier import Supplier
 from app.schemas.supplier import SupplierCreate, SupplierUpdate, SupplierResponse
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
@@ -71,6 +72,20 @@ def create_supplier(
     db.add(supplier)
     db.commit()
     db.refresh(supplier)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Suppliers",
+        action="CREATE",
+        record_id=supplier.supplier_id,
+        new={
+            "supplier_name": supplier.supplier_name,
+            "branch_id": supplier.branch_id,
+            "status": supplier.status,
+        },
+        user_id=user.user_id,
+    )
     return supplier
 
 
@@ -94,11 +109,36 @@ def update_supplier(
     if str(user.role_name).lower() != "admin" and supplier.branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
 
+    old = {
+        "supplier_name": supplier.supplier_name,
+        "phone": supplier.phone,
+        "email": supplier.email,
+        "gstin": supplier.gstin,
+        "status": supplier.status,
+    }
+
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(supplier, key, value)
 
     db.commit()
     db.refresh(supplier)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Suppliers",
+        action="UPDATE",
+        record_id=supplier.supplier_id,
+        old=old,
+        new={
+            "supplier_name": supplier.supplier_name,
+            "phone": supplier.phone,
+            "email": supplier.email,
+            "gstin": supplier.gstin,
+            "status": supplier.status,
+        },
+        user_id=user.user_id,
+    )
     return supplier
 
 
@@ -121,6 +161,18 @@ def delete_supplier(
     if str(user.role_name).lower() != "admin" and supplier.branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
 
+    old_status = supplier.status
     supplier.status = "INACTIVE"
     db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Suppliers",
+        action="DELETE",
+        record_id=supplier.supplier_id,
+        old={"status": old_status},
+        new={"status": supplier.status},
+        user_id=user.user_id,
+    )
     return {"success": True}
