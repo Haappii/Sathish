@@ -76,7 +76,7 @@ export default function DeletedInvoices() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/dashboard", { replace: true })}
             className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
           >
             &larr; Back
