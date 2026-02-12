@@ -43,6 +43,7 @@ export default function Home() {
   }, []);
 
   const showTableBilling = shopType === "hotel";
+
   const isHeadOfficeClosed =
     Number(branchId) === 1 &&
     String(session?.branch_close || "N").toUpperCase() === "Y";
@@ -53,6 +54,7 @@ export default function Home() {
       showTableBilling,
       isHeadOfficeClosed,
     });
+
     if (!permsEnabled || !permMap) return fallback;
 
     const rbac = buildRbacMenu({
@@ -65,48 +67,64 @@ export default function Home() {
   }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
   return (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl p-6 shadow-md">
-        <h2 className="text-2xl font-bold">Welcome Back</h2>
-        <p className="text-sm opacity-90 mt-1">
-          Role: {session?.role || "User"}
-        </p>
-      </div>
-
-      {/* Menu Grid */}
-      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="p-4">
+      <div className="flex flex-wrap gap-4">
         {menus.map((m) => (
           <Link
             key={m.path}
             to={m.path}
             className="
               group
+              inline-flex
+              items-center
+              gap-3
+              h-14
+              px-6
+              rounded-xl
               bg-white
-              rounded-2xl
-              p-5
+              border border-gray-200
               shadow-sm
-              border
-              hover:shadow-xl
-              hover:-translate-y-1
+              hover:shadow-lg
+              hover:border-purple-400
               transition-all
               duration-300
-              flex flex-col
-              justify-between
+              relative
+              overflow-hidden
             "
           >
-            {/* Icon */}
-            <div className="w-14 h-14 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-              {m.icon}
-            </div>
+            {/* Fancy SaaS Glow Effect */}
+            <span className="
+              absolute inset-0 
+              bg-gradient-to-r 
+              from-green-100 
+              via-purple-100 
+              to-green-100 
+              opacity-0 
+              group-hover:opacity-100 
+              transition-opacity 
+              duration-300
+            " />
 
-            {/* Text */}
-            <div className="mt-4">
-              <div className="text-base font-semibold text-gray-800">
-                {m.name}
+            {/* Content */}
+            <div className="relative flex items-center gap-3 z-10">
+              {/* Icon */}
+              <div className="
+                text-xl 
+                text-green-600 
+                group-hover:text-purple-600 
+                transition-colors
+              ">
+                {m.icon}
               </div>
-              <div className="text-xs text-gray-400 mt-1">
-                Navigate to {m.name}
+
+              {/* Name */}
+              <div className="
+                text-sm 
+                font-semibold 
+                text-gray-800 
+                whitespace-nowrap
+              ">
+                {m.name}
               </div>
             </div>
           </Link>
