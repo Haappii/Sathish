@@ -21,12 +21,12 @@ import {
 } from "recharts";
 
 const COLORS = [
-  "#2563eb",
-  "#16a34a",
+  "#6366f1",
+  "#22c55e",
   "#f59e0b",
-  "#db2777",
-  "#7c3aed",
-  "#0284c7",
+  "#ec4899",
+  "#8b5cf6",
+  "#0ea5e9",
 ];
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
@@ -80,7 +80,7 @@ export default function Home() {
       .then((r) => {
         const s = r?.data || {};
         setShop(s);
-        setShopType((s.shop_type || s.billing_type || "").toString().toLowerCase());
+        setShopType((s.shop_type || s.billing_type || "").toLowerCase());
       })
       .catch(() => {});
   }, []);
@@ -109,7 +109,7 @@ export default function Home() {
     try {
       const res = await api.get("/dashboard/stats");
       setStats(res?.data || null);
-    } catch (err) {
+    } catch {
       setStats(null);
     } finally {
       setStatsLoading(false);
@@ -120,13 +120,10 @@ export default function Home() {
     setCatsLoading(true);
     try {
       const res = await api.get("/reports/category-sales", {
-        params: {
-          mode: "today",
-          branch_id: branchId ?? undefined,
-        },
+        params: { mode: "today", branch_id: branchId ?? undefined },
       });
       setCategorySales(res?.data || []);
-    } catch (err) {
+    } catch {
       setCategorySales([]);
     } finally {
       setCatsLoading(false);
@@ -144,20 +141,11 @@ export default function Home() {
     String(session?.branch_close || "N").toUpperCase() === "Y";
 
   const menus = useMemo(() => {
-    const fallback = buildRoleMenu({
-      roleLower,
-      showTableBilling,
-      isHeadOfficeClosed,
-    });
+    const fallback = buildRoleMenu({ roleLower, showTableBilling, isHeadOfficeClosed });
     if (!permsEnabled || !permMap) return fallback;
 
-    const rbac = buildRbacMenu({
-      permMap,
-      showTableBilling,
-      isHeadOfficeClosed,
-    });
-
-    return rbac && rbac.length ? rbac : fallback;
+    const rbac = buildRbacMenu({ permMap, showTableBilling, isHeadOfficeClosed });
+    return rbac?.length ? rbac : fallback;
   }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
   const menuCards = useMemo(
@@ -184,10 +172,10 @@ export default function Home() {
     }
 
     const out = MENU_GROUPS
-      .map((g) => ({ ...g, items: bucket.get(g.key) || [] }))
+      .map((g) => ({ key: g.key, title: g.title, items: bucket.get(g.key) || [] }))
       .filter((g) => g.items.length > 0);
 
-    if (other.length) out.push({ key: "other", title: "Other", paths: [], items: other });
+    if (other.length) out.push({ key: "other", title: "Other", items: other });
     return out;
   }, [menuCards]);
 
@@ -201,233 +189,162 @@ export default function Home() {
     setExpenseSaving(true);
     try {
       await api.post("/expenses/", {
-        expense_date: (shop?.app_date || isoToday()).toString().slice(0, 10),
+        expense_date: (shop?.app_date || isoToday()).slice(0, 10),
         amount: Number(expenseForm.amount),
-        category: String(expenseForm.category || "").trim(),
+        category: expenseForm.category.trim(),
         payment_mode: expenseForm.payment_mode,
-        note: String(expenseForm.note || "").trim() || null,
+        note: expenseForm.note.trim() || null,
         branch_id: branchId ?? null,
       });
+
       showToast("Expense saved", "success");
       setExpenseForm({ amount: "", category: "", payment_mode: "cash", note: "" });
-      await loadStats();
+      loadStats();
     } catch (err) {
-      const msg = err?.response?.data?.detail || "Failed to save expense";
-      showToast(msg, "error");
+      showToast(err?.response?.data?.detail || "Failed to save expense", "error");
     } finally {
       setExpenseSaving(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* MENUS (75%) */}
-        <div className="lg:col-span-3">
-          {menuCards.length ? (
-            <div className="space-y-4">
-              {groupedMenus.map((g, idx) => (
-                <details
-                  key={g.key}
-                  className="rounded-2xl border bg-white/70 backdrop-blur-lg shadow-sm overflow-hidden"
-                  defaultOpen={idx === 0}
-                >
-                  <summary className="cursor-pointer select-none px-4 py-3 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-slate-700">
-                      {g.title}
-                    </div>
-                    <div className="text-[12px] text-slate-500">
-                      {g.items.length}
-                    </div>
-                  </summary>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-sky-50 to-purple-100 p-6 relative overflow-hidden">
+      
+      {/* Glow background */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-300 opacity-30 blur-3xl rounded-full"></div>
+      <div className="absolute top-40 -right-40 w-96 h-96 bg-blue-300 opacity-30 blur-3xl rounded-full"></div>
 
-                  <div className="px-4 pb-4">
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                      {g.items.map((m) => (
-                        <Link
-                          key={m.path}
-                          to={m.path}
-                          className="
-                            group relative overflow-hidden
-                            rounded-2xl
-                            bg-white/70 backdrop-blur-lg
-                            border border-gray-200
-                            p-5
-                            shadow-sm
-                            hover:shadow-xl
-                            hover:-translate-y-1
-                            transition-all duration-300
-                          "
-                        >
-                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-r from-blue-100 to-indigo-100 blur-xl" />
+      <div className="relative grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-                          <div className="relative z-10 flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md group-hover:scale-110 transition-transform duration-300">
-                              {m.icon}
-                            </div>
+        {/* MENUS */}
+        <div className="lg:col-span-3 space-y-6">
+          {groupedMenus.map((g) => (
+            <div key={g.key} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-gray-700">
+                  {g.title}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {g.items.length}
+                </div>
+              </div>
 
-                            <div className="min-w-0">
-                              <div className="text-base font-semibold text-gray-800 group-hover:text-blue-600 transition truncate">
-                                {m.name}
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {g.items.map((m) => (
+                  <Link
+                    key={m.path}
+                    to={m.path}
+                    className="
+                      group relative overflow-hidden
+                      rounded-3xl
+                      bg-white/30 backdrop-blur-2xl
+                      border border-white/30
+                      p-6
+                      shadow-lg
+                      hover:shadow-2xl
+                      hover:-translate-y-2
+                      hover:scale-[1.02]
+                      transition-all duration-500
+                    "
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="
+                        w-16 h-16 rounded-2xl
+                        bg-gradient-to-br from-indigo-500 via-blue-500 to-purple-600
+                        text-white flex items-center justify-center text-xl
+                        shadow-lg group-hover:rotate-6 transition-all duration-500
+                      ">
+                        {m.icon}
+                      </div>
+                      <div className="text-lg font-semibold text-gray-800 group-hover:text-indigo-600 transition">
+                        {m.name}
+                      </div>
                     </div>
-                  </div>
-                </details>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="rounded-xl border bg-white p-6 text-sm text-gray-600">
-              No menus available for this account.
-            </div>
-          )}
+          ))}
         </div>
 
-        {/* DASHBOARD WIDGETS (25%) */}
-        <aside className="lg:col-span-1 space-y-4">
-          <div className="rounded-2xl border bg-white/70 backdrop-blur-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-700">Today Summary</div>
+        {/* DASHBOARD */}
+        <aside className="lg:col-span-1 space-y-6">
+
+          {/* Today Summary */}
+          <div className="rounded-3xl bg-white/30 backdrop-blur-2xl border border-white/30 p-5 shadow-lg">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-gray-700">Today Summary</h3>
               <button
-                onClick={() => {
-                  loadStats();
-                  loadCategorySales();
-                }}
-                className="text-[12px] px-2 py-1 rounded border bg-white hover:bg-slate-50"
-                type="button"
+                onClick={() => { loadStats(); loadCategorySales(); }}
+                className="px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md hover:scale-105 transition"
               >
                 Refresh
               </button>
             </div>
 
-            {statsLoading ? (
-              <div className="mt-3 text-sm text-gray-500">Loading...</div>
-            ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-slate-900 text-white p-3">
-                  <div className="text-[11px] opacity-70">Sales</div>
-                  <div className="text-lg font-bold">
-                    Rs. {Number(stats?.today_sales || 0).toFixed(2)}
-                  </div>
-                </div>
-                <div className="rounded-xl bg-emerald-600 text-white p-3">
-                  <div className="text-[11px] opacity-80">Bills</div>
-                  <div className="text-lg font-bold">{Number(stats?.today_bills || 0)}</div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white p-4 shadow-lg">
+                <div className="text-xs opacity-80">Sales</div>
+                <div className="text-xl font-bold">
+                  Rs. {Number(stats?.today_sales || 0).toFixed(2)}
                 </div>
               </div>
-            )}
-
-            <div className="mt-3 flex flex-col gap-2">
-              <Link
-                to="/sales/history"
-                className="text-[12px] px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-slate-700 font-semibold"
-              >
-                Billing History
-              </Link>
-              <Link
-                to="/expenses"
-                className="text-[12px] px-3 py-2 rounded-lg border bg-white hover:bg-slate-50 text-slate-700 font-semibold"
-              >
-                Expenses
-              </Link>
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-4 shadow-lg">
+                <div className="text-xs opacity-80">Bills</div>
+                <div className="text-xl font-bold">
+                  {Number(stats?.today_bills || 0)}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-white/70 backdrop-blur-lg p-4 shadow-sm">
-            <div className="text-sm font-semibold text-slate-700">Category Sales</div>
-            <div className="mt-3 h-56">
-              {catsLoading ? (
-                <div className="text-sm text-gray-500">Loading...</div>
-              ) : categorySales.length === 0 ? (
-                <div className="text-sm text-gray-500">No sales data</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categorySales}
-                      dataKey="total_sales"
-                      nameKey="category_name"
-                      innerRadius={40}
-                      outerRadius={80}
-                      paddingAngle={3}
-                    >
-                      {categorySales.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => `Rs. ${v}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
+          {/* Category Sales */}
+          <div className="rounded-3xl bg-white/30 backdrop-blur-2xl border border-white/30 p-5 shadow-lg">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Category Sales</h3>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categorySales} dataKey="total_sales" nameKey="category_name" innerRadius={40} outerRadius={80}>
+                    {categorySales.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => `Rs. ${v}`} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-
-            {categorySales.length > 0 && (
-              <div className="mt-2 space-y-1 text-[12px]">
-                {categorySales.slice(0, 5).map((c, i) => (
-                  <div key={c.category_id || c.category_name || i} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                      />
-                      <span className="truncate text-slate-700">{c.category_name}</span>
-                    </div>
-                    <span className="text-slate-600">
-                      {Number(c.total_sales || 0).toFixed(0)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
+          {/* Quick Expense */}
           {canExpenseWrite && (
-            <div className="rounded-2xl border bg-white/70 backdrop-blur-lg p-4 shadow-sm">
-              <div className="text-sm font-semibold text-slate-700">Quick Expense</div>
-              <div className="mt-3 grid grid-cols-1 gap-2 text-[12px]">
-                <input
-                  type="number"
-                  className="border rounded-lg px-2 py-2 bg-white"
-                  placeholder="Amount"
-                  value={expenseForm.amount}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                />
-                <input
-                  className="border rounded-lg px-2 py-2 bg-white"
-                  placeholder="Category (e.g. Tea)"
-                  value={expenseForm.category}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                />
-                <select
-                  className="border rounded-lg px-2 py-2 bg-white"
-                  value={expenseForm.payment_mode}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, payment_mode: e.target.value })}
-                >
-                  <option value="cash">Cash</option>
-                  <option value="upi">UPI</option>
-                  <option value="card">Card</option>
-                  <option value="bank">Bank</option>
-                </select>
-                <input
-                  className="border rounded-lg px-2 py-2 bg-white"
-                  placeholder="Note (optional)"
-                  value={expenseForm.note}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })}
-                />
-                <button
-                  onClick={saveQuickExpense}
-                  disabled={expenseSaving}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-[12px] disabled:opacity-60"
-                  type="button"
-                >
-                  {expenseSaving ? "Saving..." : "Save Expense"}
-                </button>
-              </div>
+            <div className="rounded-3xl bg-white/30 backdrop-blur-2xl border border-white/30 p-5 shadow-lg space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700">Quick Expense</h3>
+
+              <input
+                type="number"
+                placeholder="Amount"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                className="w-full rounded-xl border border-white/40 bg-white/40 backdrop-blur-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+
+              <input
+                placeholder="Category"
+                value={expenseForm.category}
+                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                className="w-full rounded-xl border border-white/40 bg-white/40 backdrop-blur-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+
+              <button
+                onClick={saveQuickExpense}
+                disabled={expenseSaving}
+                className="w-full py-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm shadow-lg hover:scale-105 transition disabled:opacity-60"
+              >
+                {expenseSaving ? "Saving..." : "Save Expense"}
+              </button>
             </div>
           )}
+
         </aside>
       </div>
     </div>
