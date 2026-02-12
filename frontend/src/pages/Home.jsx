@@ -17,6 +17,7 @@ export default function Home() {
 
   const [shopType, setShopType] = useState("");
   const [permMap, setPermMap] = useState(null);
+  const [permsEnabled, setPermsEnabled] = useState(false);
 
   useEffect(() => {
     api.get("/shop/details")
@@ -29,8 +30,14 @@ export default function Home() {
 
   useEffect(() => {
     api.get("/permissions/my")
-      .then((r) => setPermMap(modulesToPermMap(r?.data?.modules)))
-      .catch(() => setPermMap(null));
+      .then((r) => {
+        setPermsEnabled(Boolean(r?.data?.enabled));
+        setPermMap(modulesToPermMap(r?.data?.modules));
+      })
+      .catch(() => {
+        setPermsEnabled(false);
+        setPermMap(null);
+      });
   }, []);
 
   const showTableBilling = shopType === "hotel";
@@ -39,11 +46,11 @@ export default function Home() {
 
   const menus = useMemo(() => {
     const fallback = buildRoleMenu({ roleLower, showTableBilling, isHeadOfficeClosed });
-    if (!permMap) return fallback;
+    if (!permsEnabled || !permMap) return fallback;
 
     const rbac = buildRbacMenu({ permMap, showTableBilling, isHeadOfficeClosed });
     return rbac && rbac.length ? rbac : fallback;
-  }, [permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
+  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
   return (
     <div className="space-y-4">

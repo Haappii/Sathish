@@ -52,6 +52,7 @@ export default function MainLayout({ hideSidebar = false }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [logoSrc, setLogoSrc] = useState(defaultLogo);
   const [permMap, setPermMap] = useState(null);
+  const [permsEnabled, setPermsEnabled] = useState(false);
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -91,8 +92,14 @@ export default function MainLayout({ hideSidebar = false }) {
   /* ================= PERMISSIONS (RBAC) ================= */
   useEffect(() => {
     api.get("/permissions/my")
-      .then(res => setPermMap(modulesToPermMap(res?.data?.modules)))
-      .catch(() => setPermMap(null));
+      .then(res => {
+        setPermsEnabled(Boolean(res?.data?.enabled));
+        setPermMap(modulesToPermMap(res?.data?.modules));
+      })
+      .catch(() => {
+        setPermsEnabled(false);
+        setPermMap(null);
+      });
   }, []);
 
   useEffect(() => {
@@ -200,7 +207,7 @@ export default function MainLayout({ hideSidebar = false }) {
       isHeadOfficeClosed,
     });
 
-    if (!permMap) return fallback;
+    if (!permsEnabled || !permMap) return fallback;
 
     const rbac = buildRbacMenu({
       permMap,
@@ -208,7 +215,7 @@ export default function MainLayout({ hideSidebar = false }) {
       isHeadOfficeClosed,
     });
     return rbac && rbac.length ? rbac : fallback;
-  }, [permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
+  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
   useEffect(() => {
     if (!sidebarEnabled) {
