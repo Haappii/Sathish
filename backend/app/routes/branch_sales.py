@@ -6,9 +6,15 @@ from datetime import datetime, date
 from app.db import get_db
 from app.models.invoice import Invoice
 from app.models.branch import Branch
+from app.models.shop_details import ShopDetails
 from app.utils.auth_user import get_current_user
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+
+def get_business_date(db: Session, shop_id: int) -> date:
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    return shop.app_date if shop and shop.app_date else datetime.utcnow().date()
 
 
 @router.get("/branch-sales")
@@ -20,15 +26,15 @@ def branch_sales(
     user=Depends(get_current_user)
 ):
 
-    today = date.today()
+    biz_date = get_business_date(db, user.shop_id)
     conditions = []
 
     if mode == "today":
-        conditions.append(func.date(Invoice.created_time) == today)
+        conditions.append(func.date(Invoice.created_time) == biz_date)
 
     elif mode == "month":
-        conditions.append(func.extract("year", Invoice.created_time) == today.year)
-        conditions.append(func.extract("month", Invoice.created_time) == today.month)
+        conditions.append(func.extract("year", Invoice.created_time) == biz_date.year)
+        conditions.append(func.extract("month", Invoice.created_time) == biz_date.month)
 
     elif mode == "custom":
         if not from_date or not to_date:
@@ -36,7 +42,10 @@ def branch_sales(
 
         start = datetime.strptime(from_date, "%Y-%m-%d")
         end   = datetime.strptime(to_date, "%Y-%m-%d")
+        end = end.replace(hour=23, minute=59, second=59, microsecond=999999)
         conditions.append(Invoice.created_time.between(start, end))
+    else:
+        raise HTTPException(400, "Invalid mode")
 
     rows = (
         db.query(

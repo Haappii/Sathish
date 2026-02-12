@@ -55,6 +55,7 @@ export default function Home() {
   const session = getSession() || {};
   const roleLower = (session?.role || "").toString().toLowerCase();
   const branchId = session?.branch_id ?? null;
+  const isAdmin = roleLower === "admin";
 
   const [openGroups, setOpenGroups] = useState({});
 
@@ -68,6 +69,9 @@ export default function Home() {
 
   const [catsLoading, setCatsLoading] = useState(false);
   const [categorySales, setCategorySales] = useState([]);
+
+  const [branchSalesLoading, setBranchSalesLoading] = useState(false);
+  const [branchSales, setBranchSales] = useState([]);
 
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
@@ -132,10 +136,30 @@ export default function Home() {
     }
   };
 
+  const loadBranchSales = async () => {
+    if (!isAdmin) {
+      setBranchSales([]);
+      return;
+    }
+    setBranchSalesLoading(true);
+    try {
+      const res = await api.get("/reports/branch-sales", {
+        params: { mode: "today" },
+      });
+      const rows = (res?.data || []).slice().sort((a, b) => Number(b?.total_sales || 0) - Number(a?.total_sales || 0));
+      setBranchSales(rows);
+    } catch {
+      setBranchSales([]);
+    } finally {
+      setBranchSalesLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadStats();
     loadCategorySales();
-  }, [branchId]);
+    loadBranchSales();
+  }, [branchId, isAdmin]);
 
   const showTableBilling = shopType === "hotel";
   const isHeadOfficeClosed =
@@ -308,7 +332,7 @@ export default function Home() {
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-semibold text-gray-700">Today Summary</h3>
               <button
-                onClick={() => { loadStats(); loadCategorySales(); }}
+                onClick={() => { loadStats(); loadCategorySales(); loadBranchSales(); }}
                 className="px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md hover:scale-105 transition"
               >
                 Refresh
@@ -347,6 +371,52 @@ export default function Home() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Branch Sales (Admin) */}
+          {isAdmin && (
+            <div className="rounded-3xl bg-white/30 backdrop-blur-2xl border border-white/30 p-5 shadow-lg">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">Branch Sales</h3>
+              <div className="h-56">
+                {branchSalesLoading ? (
+                  <div className="text-sm text-gray-600">Loading...</div>
+                ) : branchSales.length === 0 ? (
+                  <div className="text-sm text-gray-600">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={branchSales} dataKey="total_sales" nameKey="branch_name" innerRadius={40} outerRadius={80}>
+                        {branchSales.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => `Rs. ${v}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {branchSales.length > 0 && (
+                <div className="mt-3 space-y-1 text-xs">
+                  {branchSales.slice(0, 6).map((b, i) => (
+                    <div key={b.branch_id || i} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                        />
+                        <span className="truncate text-gray-700">
+                          {b.branch_name}
+                        </span>
+                      </div>
+                      <span className="text-gray-600">
+                        {Number(b.total_sales || 0).toFixed(0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quick Expense */}
           {canExpenseWrite && (
