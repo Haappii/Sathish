@@ -67,66 +67,35 @@ export default function Home() {
   }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
   return (
-    <div className="p-4">
-      <div className="flex flex-wrap gap-4">
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-wrap gap-3">
         {menus.map((m) => (
           <Link
             key={m.path}
             to={m.path}
             className="
-              group
               inline-flex
               items-center
               gap-3
-              h-14
-              px-6
-              rounded-xl
-              bg-white
-              border border-gray-200
-              shadow-sm
-              hover:shadow-lg
-              hover:border-purple-400
-              transition-all
-              duration-300
-              relative
-              overflow-hidden
+              h-12
+              px-5
+              rounded-lg
+              bg-gray-100
+              text-gray-700
+              text-sm
+              font-medium
+              hover:bg-white
+              hover:shadow-sm
+              hover:text-gray-900
+              transition
+              whitespace-nowrap
             "
           >
-            {/* Fancy SaaS Glow Effect */}
-            <span className="
-              absolute inset-0 
-              bg-gradient-to-r 
-              from-green-100 
-              via-purple-100 
-              to-green-100 
-              opacity-0 
-              group-hover:opacity-100 
-              transition-opacity 
-              duration-300
-            " />
+            <span className="text-base opacity-80">
+              {m.icon}
+            </span>
 
-            {/* Content */}
-            <div className="relative flex items-center gap-3 z-10">
-              {/* Icon */}
-              <div className="
-                text-xl 
-                text-green-600 
-                group-hover:text-purple-600 
-                transition-colors
-              ">
-                {m.icon}
-              </div>
-
-              {/* Name */}
-              <div className="
-                text-sm 
-                font-semibold 
-                text-gray-800 
-                whitespace-nowrap
-              ">
-                {m.name}
-              </div>
-            </div>
+            <span>{m.name}</span>
           </Link>
         ))}
       </div>
