@@ -230,7 +230,7 @@ def get_invoice(
             item_id=r.item_id,
             item_name=r.item_name,
             quantity=r.quantity,
-            price=float(r.price),
+            price=(float(r.amount or 0) / int(r.quantity or 1)) if int(r.quantity or 0) else float(r.price or 0),
             amount=float(r.amount)
         )
         for r in details

@@ -24,6 +24,9 @@ class PurchaseOrderCreate(BaseModel):
 class PurchaseOrderItemReceive(BaseModel):
     item_id: int
     qty_received: int
+    batch_no: Optional[str] = None
+    expiry_date: Optional[str] = None  # YYYY-MM-DD
+    serial_numbers: Optional[List[str]] = None
 
 
 class PurchaseOrderReceive(BaseModel):

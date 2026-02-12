@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { getSession } from "../../utils/auth";
+import * as XLSX from "xlsx";
+import { API_BASE } from "../../config/api";
 
 export default function PurchaseOrders() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const session = getSession();
   const isAdmin = (session?.role || "").toLowerCase() === "admin";
+  const apiOrigin = String(API_BASE || "").replace(/\/api\/?$/, "");
 
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState(session?.branch_id || "");
@@ -24,6 +27,10 @@ export default function PurchaseOrders() {
     payment_status: "UNPAID",
     paid_amount: ""
   });
+
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachments, setAttachments] = useState([]);
+  const [attachUploading, setAttachUploading] = useState(false);
 
   const [form, setForm] = useState({
     supplier_id: "",
@@ -154,6 +161,116 @@ export default function PurchaseOrders() {
       paid_amount: po.paid_amount || ""
     });
     setPaymentOpen(true);
+  };
+
+  const importExcel = async file => {
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      if (!rows || rows.length === 0) {
+        showToast("Excel is empty", "error");
+        return;
+      }
+
+      const normalize = obj => {
+        const out = {};
+        for (const [k, v] of Object.entries(obj || {})) {
+          out[String(k || "").trim().toLowerCase()] = v;
+        }
+        return out;
+      };
+
+      const byName = name => {
+        const n = String(name || "").trim().toLowerCase();
+        if (!n) return null;
+        return items.find(i => String(i.item_name || "").trim().toLowerCase() === n) || null;
+      };
+
+      const imported = [];
+      for (const raw of rows) {
+        const r = normalize(raw);
+        const itemIdRaw = r.item_id ?? r.itemid ?? r["item id"];
+        const itemNameRaw = r.item_name ?? r.itemname ?? r["item name"];
+        const qtyRaw = r.qty ?? r.quantity ?? r["qty ordered"];
+        const costRaw = r.unit_cost ?? r.unitcost ?? r.cost ?? r["unit cost"];
+
+        let itemId = itemIdRaw ? Number(itemIdRaw) : null;
+        if (!itemId && itemNameRaw) {
+          const match = byName(itemNameRaw);
+          itemId = match ? Number(match.item_id) : null;
+        }
+
+        const qty = Number(qtyRaw || 0);
+        const unitCost = costRaw === "" ? "" : Number(costRaw || 0);
+
+        if (!itemId || !qty || qty <= 0) continue;
+        imported.push({
+          item_id: String(itemId),
+          qty: qty,
+          unit_cost: unitCost && unitCost > 0 ? String(unitCost) : ""
+        });
+      }
+
+      if (imported.length === 0) {
+        showToast("No valid rows. Expected columns: item_id or item_name, qty, unit_cost", "error");
+        return;
+      }
+
+      setPoItems(imported);
+      showToast(`Imported ${imported.length} rows`, "success");
+    } catch {
+      showToast("Excel import failed", "error");
+    }
+  };
+
+  const loadAttachments = async po => {
+    if (!po?.po_id) return;
+    try {
+      const res = await authAxios.get(`/purchase-orders/${po.po_id}/attachments`);
+      setAttachments(res.data || []);
+    } catch {
+      setAttachments([]);
+    }
+  };
+
+  const openAttachments = async po => {
+    setActivePo(po);
+    setAttachOpen(true);
+    setAttachments([]);
+    await loadAttachments(po);
+  };
+
+  const uploadAttachment = async file => {
+    if (!activePo?.po_id || !file) return;
+    setAttachUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await authAxios.post(`/purchase-orders/${activePo.po_id}/attachments`, fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      showToast("Uploaded", "success");
+      await loadAttachments(activePo);
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Upload failed", "error");
+    } finally {
+      setAttachUploading(false);
+    }
+  };
+
+  const deleteAttachment = async attachmentId => {
+    if (!activePo?.po_id || !attachmentId) return;
+    try {
+      await authAxios.delete(`/purchase-orders/${activePo.po_id}/attachments/${attachmentId}`);
+      showToast("Deleted", "success");
+      await loadAttachments(activePo);
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Delete failed", "error");
+    }
   };
 
   const submitReceive = async () => {
@@ -304,6 +421,25 @@ export default function PurchaseOrders() {
             <span className="font-semibold">Total: Rs. {totalAmount.toFixed(2)}</span>
           </div>
 
+          <div className="pt-2">
+            <label className="text-[11px] text-slate-600">
+              Import items from Excel (.xlsx)
+            </label>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              className="block mt-1 text-[11px]"
+              onChange={async e => {
+                const file = e.target.files?.[0];
+                if (file) await importExcel(file);
+                e.target.value = "";
+              }}
+            />
+            <div className="text-[10px] text-slate-500 mt-1">
+              Columns: item_id or item_name, qty, unit_cost
+            </div>
+          </div>
+
           <button
             onClick={savePO}
             className="w-full mt-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-[12px]"
@@ -343,6 +479,12 @@ export default function PurchaseOrders() {
                   className="px-2 py-1 border rounded-lg text-[11px]"
                 >
                   Payment
+                </button>
+                <button
+                  onClick={() => openAttachments(p)}
+                  className="px-2 py-1 border rounded-lg text-[11px]"
+                >
+                  Attachments
                 </button>
               </div>
             </div>
@@ -448,6 +590,113 @@ export default function PurchaseOrders() {
                 className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-[12px]"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {attachOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-2xl">
+            <div className="flex justify-between mb-3">
+              <h3 className="text-sm font-semibold">
+                Attachments {activePo?.po_number ? `- ${activePo.po_number}` : ""}
+              </h3>
+              <button
+                onClick={() => {
+                  setAttachOpen(false);
+                  setAttachments([]);
+                  setActivePo(null);
+                }}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="space-y-2 text-[12px]">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls"
+                  disabled={attachUploading}
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (file) await uploadAttachment(file);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => loadAttachments(activePo)}
+                  className="px-2 py-1 border rounded-lg text-[11px]"
+                >
+                  Refresh
+                </button>
+                {attachUploading && (
+                  <span className="text-[11px] text-slate-500">Uploading...</span>
+                )}
+              </div>
+
+              {attachments.length === 0 ? (
+                <div className="text-slate-500">No attachments</div>
+              ) : (
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="min-w-[900px] w-full text-left text-[12px]">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-2">File</th>
+                        <th className="p-2 text-right">Size</th>
+                        <th className="p-2">View</th>
+                        <th className="p-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attachments.map(a => (
+                        <tr key={a.attachment_id} className="border-t">
+                          <td className="p-2 font-semibold">{a.original_filename}</td>
+                          <td className="p-2 text-right">
+                            {a.size_bytes ? `${(a.size_bytes / 1024).toFixed(1)} KB` : "-"}
+                          </td>
+                          <td className="p-2">
+                            {a.url ? (
+                              <a
+                                href={`${apiOrigin}${a.url}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 underline"
+                              >
+                                Open
+                              </a>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td className="p-2">
+                            <button
+                              onClick={() => deleteAttachment(a.attachment_id)}
+                              className="px-2 py-1 border rounded-lg text-[11px] text-rose-600"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => {
+                  setAttachOpen(false);
+                  setAttachments([]);
+                  setActivePo(null);
+                }}
+                className="px-3 py-1 border rounded-lg text-[12px]"
+              >
+                Close
               </button>
             </div>
           </div>

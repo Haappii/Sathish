@@ -17,6 +17,7 @@ import { getShopLogoUrl } from "../../utils/shopLogo";
    ===================================================== */
 const REPORTS = [
   { key: "sales/summary", label: "Sales Summary" },
+  { key: "gst/summary", label: "GST Summary" },
   { key: "sales/invoice-details", label: "Invoice Detail Report" },
   { key: "sales/customer-invoices", label: "Customer Invoice Details" },
   { key: "sales/items", label: "Item-wise Sales" },
@@ -97,6 +98,7 @@ export default function Reports() {
     "suppliers",
     "po-aging",
     "payables-summary",
+    "gst/summary",
     "sales/customer-invoices",
   ]);
 
@@ -287,7 +289,18 @@ export default function Reports() {
         : activeReport.key;
 
       const r = await api.get(`/reports/${reportKey}`, { params });
-      const rows = r.data || [];
+      const raw = r.data;
+      const rows = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+
+      if (activeReport?.key === "gst/summary") {
+        const obj = raw && !Array.isArray(raw) ? raw : {};
+        const normalized = Object.entries(obj || {}).map(([k, v]) => ({
+          metric: k,
+          amount: Number(v || 0),
+        }));
+        setData(normalized);
+        return;
+      }
       if (activeReport?.key === "sales/summary") {
         const normalized = rows.map(row => {
           const sub = Number(row.sub_total || 0);

@@ -10,12 +10,27 @@ import {
   FaUsers,
   FaBell,
   FaLifeRing,
+  FaCashRegister,
+  FaGift,
+  FaTags,
+  FaRupeeSign,
+  FaBook,
+  FaClipboardCheck,
+  FaBarcode,
+  FaCloudUploadAlt,
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
 const MENU_CATALOG = [
   { key: "home", name: "Home", path: "/home", icon: <FaHome /> },
   { key: "dashboard", name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
+  {
+    key: "cash_drawer",
+    name: "Cash Drawer",
+    path: "/cash-drawer",
+    icon: <FaCashRegister />,
+    perm: { module: "cash_drawer", action: "read" },
+  },
   {
     key: "trends",
     name: "Trends",
@@ -35,6 +50,13 @@ const MENU_CATALOG = [
     name: "Sales Billing",
     path: "/sales/create",
     icon: <FaShoppingCart />,
+    perm: { module: "billing", action: "write" },
+  },
+  {
+    key: "offline_sync",
+    name: "Offline Sync",
+    path: "/offline-sync",
+    icon: <FaCloudUploadAlt />,
     perm: { module: "billing", action: "write" },
   },
   {
@@ -64,6 +86,48 @@ const MENU_CATALOG = [
     path: "/customers",
     icon: <FaUsers />,
     perm: { module: "customers", action: "read" },
+  },
+  {
+    key: "loyalty",
+    name: "Loyalty",
+    path: "/loyalty",
+    icon: <FaGift />,
+    perm: { module: "loyalty", action: "read" },
+  },
+  {
+    key: "coupons",
+    name: "Coupons",
+    path: "/coupons",
+    icon: <FaTags />,
+    perm: { module: "coupons", action: "read" },
+  },
+  {
+    key: "pricing",
+    name: "Pricing",
+    path: "/pricing",
+    icon: <FaRupeeSign />,
+    perm: { module: "pricing", action: "read" },
+  },
+  {
+    key: "supplier_ledger",
+    name: "Supplier Ledger",
+    path: "/supplier-ledger",
+    icon: <FaBook />,
+    perm: { module: "supplier_ledger", action: "read" },
+  },
+  {
+    key: "stock_audit",
+    name: "Stock Audit",
+    path: "/stock-audit",
+    icon: <FaClipboardCheck />,
+    perm: { module: "stock_audit", action: "read" },
+  },
+  {
+    key: "item_lots",
+    name: "Item Lots",
+    path: "/item-lots",
+    icon: <FaBarcode />,
+    perm: { module: "item_lots", action: "read" },
   },
   {
     key: "transfers",
@@ -107,6 +171,13 @@ const MENU_CATALOG = [
     path: "/reorder-alerts",
     icon: <FaBell />,
     perm: { module: "inventory", action: "read" },
+  },
+  {
+    key: "alerts",
+    name: "Alerts",
+    path: "/alerts",
+    icon: <FaBell />,
+    perm: { module: "alerts", action: "read" },
   },
   {
     key: "support_tickets",
@@ -180,7 +251,10 @@ export const buildRoleMenu = ({
       { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
+      { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
+      { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       ...(showTableBilling
         ? [
             {
@@ -197,11 +271,19 @@ export const buildRoleMenu = ({
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
+      { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
       { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
       { name: "Customers", path: "/customers", icon: <FaUsers /> },
+      { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
+      { name: "Coupons", path: "/coupons", icon: <FaTags /> },
+      { name: "Pricing", path: "/pricing", icon: <FaRupeeSign /> },
+      { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
+      { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
+      { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       ...(showTableBilling
         ? [
@@ -220,6 +302,7 @@ export const buildRoleMenu = ({
       },
       { name: "Inventory", path: "/inventory", icon: <FaBoxes /> },
       { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
+      { name: "Alerts", path: "/alerts", icon: <FaBell /> },
     ];
   } else if (roleLower === "admin") {
     menuItems = [
@@ -227,13 +310,22 @@ export const buildRoleMenu = ({
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
+      { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
       { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
       { name: "Customers", path: "/customers", icon: <FaUsers /> },
+      { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
+      { name: "Coupons", path: "/coupons", icon: <FaTags /> },
+      { name: "Pricing", path: "/pricing", icon: <FaRupeeSign /> },
+      { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
+      { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
+      { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
+      { name: "Alerts", path: "/alerts", icon: <FaBell /> },
       ...(showTableBilling
         ? [
             {
@@ -265,4 +357,3 @@ export const buildRoleMenu = ({
 
   return menuItems;
 };
-

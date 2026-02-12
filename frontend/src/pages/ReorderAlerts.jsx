@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { modulesToPermMap } from "../utils/navigationMenu";
 
 export default function ReorderAlerts() {
   const navigate = useNavigate();
@@ -12,7 +13,16 @@ export default function ReorderAlerts() {
 
   const roleLower = String(session?.role || session?.role_name || "").toLowerCase();
   const isAdmin = roleLower === "admin";
-  const canView = roleLower === "admin" || roleLower === "manager";
+  const [allowed, setAllowed] = useState(null);
+
+  useEffect(() => {
+    authAxios.get("/permissions/my")
+      .then((r) => {
+        const map = modulesToPermMap(r?.data?.modules);
+        setAllowed(Boolean(map?.inventory?.can_read));
+      })
+      .catch(() => setAllowed(false));
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
@@ -47,17 +57,25 @@ export default function ReorderAlerts() {
   };
 
   useEffect(() => {
-    if (!canView) return;
+    if (!allowed) return;
     loadBranches();
     load();
-  }, [canView, isAdmin]);
+  }, [allowed, isAdmin]);
 
   useEffect(() => {
-    if (!canView) return;
+    if (!allowed) return;
     load();
-  }, [branchId, canView]);
+  }, [branchId, allowed]);
 
-  if (!canView) {
+  if (allowed === null) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!allowed) {
     return (
       <div className="mt-10 text-center text-sm font-medium text-red-600">
         You are not authorized to access this page
@@ -139,4 +157,3 @@ export default function ReorderAlerts() {
     </div>
   );
 }
-

@@ -21,6 +21,7 @@ from app.models.table_billing import TableMaster, Order
 from app.models.branch_expense import BranchExpense
 from app.models.supplier import Supplier
 from app.models.purchase_order import PurchaseOrder
+from app.services.financials_service import calc_period_financials
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -95,20 +96,20 @@ def sales_summary(
         group_col.label(label),
         Branch.branch_name.label("branch"),
         func.count(func.distinct(Invoice.invoice_id)).label("bills"),
-        func.sum(InvoiceDetail.quantity * Item.price).label("sub_total"),
-        func.sum(Invoice.tax_amt).label("gst"),
-        func.sum(Invoice.discounted_amt).label("discount"),
-        func.sum(
-            (InvoiceDetail.quantity * Item.price)
-            + Invoice.tax_amt
-            - Invoice.discounted_amt
+        func.coalesce(
+            func.sum(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.tax_amt, 0)),
+            0,
+        ).label("sub_total"),
+        func.coalesce(func.sum(func.coalesce(Invoice.tax_amt, 0)), 0).label("gst"),
+        func.coalesce(func.sum(func.coalesce(Invoice.discounted_amt, 0)), 0).label("discount"),
+        func.coalesce(
+            func.sum(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0)),
+            0,
         ).label("grand_total"),
     ]
 
     q = (
         db.query(*cols)
-        .join(InvoiceDetail, InvoiceDetail.invoice_id == Invoice.invoice_id)
-        .join(Item, Item.item_id == InvoiceDetail.item_id)
         .outerjoin(User, User.user_id == Invoice.created_user)
         .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
         .filter(Invoice.shop_id == user.shop_id)
@@ -140,6 +141,41 @@ def sales_summary(
         }
         for r in rows
     ]
+
+
+# =====================================================
+# GST SUMMARY (NET OF RETURNS)
+# =====================================================
+@router.get("/gst/summary")
+def gst_summary(
+    from_date: str,
+    to_date: str,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    f, t = parse_dates(from_date, to_date)
+    bid = _force_branch(branch_id, user)
+
+    fin = calc_period_financials(
+        db,
+        shop_id=user.shop_id,
+        branch_id=bid,
+        from_dt=f.date(),
+        to_dt=t.date(),
+    )
+
+    return {
+        "invoice_sales_ex_tax": float(fin.get("invoice_sales_ex_tax", 0) or 0),
+        "invoice_gst": float(fin.get("invoice_gst", 0) or 0),
+        "invoice_discount": float(fin.get("invoice_discount", 0) or 0),
+        "returns_sales_ex_tax": float(fin.get("returns_sales_ex_tax", 0) or 0),
+        "returns_tax": float(fin.get("returns_tax", 0) or 0),
+        "returns_discount": float(fin.get("returns_discount", 0) or 0),
+        "net_sales_ex_tax": float(fin.get("sales_ex_tax", 0) or 0),
+        "net_gst": float(fin.get("gst", 0) or 0),
+        "net_discount": float(fin.get("discount", 0) or 0),
+    }
 
 
 # =====================================================

@@ -39,6 +39,15 @@ import app.models.sales_return
 import app.models.stock_transfer
 import app.models.invoice_draft
 import app.models.role_permission
+import app.models.cash_drawer
+import app.models.supplier_ledger
+import app.models.purchase_order_attachment
+import app.models.stock_audit
+import app.models.item_price
+import app.models.coupon
+import app.models.loyalty
+import app.models.invoice_discount
+import app.models.item_lot
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -175,12 +184,20 @@ from app.routes import (
     users,
     category,
     items,
+    pricing,
     invoice,
     dashboard,
     shop,
     reports,
     roles,
     analytics,
+    alerts,
+    cash_drawer,
+    coupons,
+    loyalty,
+    supplier_ledger,
+    stock_audits,
+    item_lots,
     inventory,
     parameter,
     customers,
@@ -218,6 +235,7 @@ app.include_router(auth.router,       prefix="/api")
 app.include_router(users.router,      prefix="/api")
 app.include_router(category.router,   prefix="/api")
 app.include_router(items.router,      prefix="/api")
+app.include_router(pricing.router,    prefix="/api")
 app.include_router(invoice.router,    prefix="/api")
 app.include_router(dashboard.router,  prefix="/api")
 app.include_router(shop.router,       prefix="/api")
@@ -225,6 +243,13 @@ app.include_router(reports.router,    prefix="/api")
 app.include_router(roles.router,      prefix="/api")
 app.include_router(analytics.router,  prefix="/api")
 app.include_router(permissions.router, prefix="/api")
+app.include_router(alerts.router,     prefix="/api")
+app.include_router(cash_drawer.router, prefix="/api")
+app.include_router(coupons.router,     prefix="/api")
+app.include_router(loyalty.router,     prefix="/api")
+app.include_router(supplier_ledger.router, prefix="/api")
+app.include_router(stock_audits.router, prefix="/api")
+app.include_router(item_lots.router,   prefix="/api")
 app.include_router(inventory.router,  prefix="/api")
 app.include_router(parameter.router,  prefix="/api")
 app.include_router(inventory_bulk.router, prefix="/api")

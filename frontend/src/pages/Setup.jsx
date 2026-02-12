@@ -12,7 +12,12 @@ import {
   FaUsers,
   FaBell,
   FaLifeRing,
-  FaUserShield
+  FaUserShield,
+  FaRupeeSign,
+  FaTags,
+  FaBook,
+  FaClipboardCheck,
+  FaBarcode
 } from "react-icons/fa";
 import api from "../utils/apiClient";
 import { getSession } from "../utils/auth";
@@ -116,6 +121,41 @@ export default function Setup() {
       desc: "Create and receive POs",
       icon: FaClipboardList,
       color: "text-purple-600"
+    },
+    {
+      title: "Pricing / Price Levels",
+      link: "/pricing",
+      desc: "Retail / wholesale price levels",
+      icon: FaRupeeSign,
+      color: "text-emerald-700"
+    },
+    {
+      title: "Coupons / Offers",
+      link: "/coupons",
+      desc: "Discount codes and validation",
+      icon: FaTags,
+      color: "text-indigo-700"
+    },
+    {
+      title: "Supplier Ledger",
+      link: "/supplier-ledger",
+      desc: "Aging, statements, payments",
+      icon: FaBook,
+      color: "text-slate-700"
+    },
+    {
+      title: "Stock Audit",
+      link: "/stock-audit",
+      desc: "Cycle count and adjustments",
+      icon: FaClipboardCheck,
+      color: "text-rose-700"
+    },
+    {
+      title: "Item Lots",
+      link: "/item-lots",
+      desc: "Batch / expiry / serial tracking",
+      icon: FaBarcode,
+      color: "text-sky-700"
     },
     {
       title: "Customers",

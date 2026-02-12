@@ -7,6 +7,19 @@ import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 
 const DEFAULT_MOBILE = "9999999999";
+const OFFLINE_BILLS_KEY = "offline_bills_v1";
+
+const pushOfflineBill = (payload) => {
+  try {
+    const existing = JSON.parse(localStorage.getItem(OFFLINE_BILLS_KEY) || "[]");
+    const rows = Array.isArray(existing) ? existing : [];
+    const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    rows.unshift({ id, createdAt: new Date().toISOString(), payload });
+    localStorage.setItem(OFFLINE_BILLS_KEY, JSON.stringify(rows));
+  } catch {
+    // ignore
+  }
+};
 
 export default function CreateBill() {
   const { showToast } = useToast();
@@ -36,6 +49,13 @@ export default function CreateBill() {
 
   const [discountType, setDiscountType] = useState("flat");
   const [discount, setDiscount] = useState(0);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState("");
+
+  const [priceLevel, setPriceLevel] = useState("BASE");
+  const [priceLevels, setPriceLevels] = useState(["BASE"]);
+  const [priceMap, setPriceMap] = useState({});
   const paymentModes = ["cash", "card", "upi", "credit"];
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
@@ -79,6 +99,31 @@ export default function CreateBill() {
 
       const items = await authAxios.get("/items/");
       setItemsData(items.data || []);
+
+      // Pricing / price levels (optional, RBAC-controlled)
+      try {
+        const [lvlRes, allRes] = await Promise.all([
+          authAxios.get("/pricing/levels"),
+          authAxios.get("/pricing/all"),
+        ]);
+        const lvls = (lvlRes.data || [])
+          .map(x => String(x?.level || "").trim().toUpperCase())
+          .filter(Boolean);
+        setPriceLevels(["BASE", ...lvls]);
+
+        const map = {};
+        for (const r of allRes.data || []) {
+          const id = String(r.item_id);
+          const lvl = String(r.level || "").trim().toUpperCase();
+          if (!id || !lvl) continue;
+          if (!map[id]) map[id] = {};
+          map[id][lvl] = Number(r.price || 0);
+        }
+        setPriceMap(map);
+      } catch {
+        setPriceLevels(["BASE"]);
+        setPriceMap({});
+      }
 
       if (s?.inventory_enabled && branch_id) {
         const stock = await authAxios.get("/inventory/list", {
@@ -176,7 +221,17 @@ export default function CreateBill() {
         return prev.map(x =>
           x.item_id === item.item_id ? { ...x, qty: x.qty + 1 } : x
         );
-      return [...prev, { ...item, qty: 1 }];
+      const unitPrice = getPriceForItem(item);
+      return [
+        ...prev,
+        {
+          ...item,
+          base_price: Number(item.price || 0),
+          price_level: String(priceLevel || "BASE").toUpperCase(),
+          price: unitPrice,
+          qty: 1
+        }
+      ];
     });
   };
 
@@ -199,6 +254,61 @@ export default function CreateBill() {
 
   const removeItem = id => setCart(cart.filter(x => x.item_id !== id));
 
+  const getPriceForItem = item => {
+    const base = Number(item?.base_price ?? item?.price ?? 0);
+    const lvl = String(priceLevel || "BASE").toUpperCase();
+    if (!lvl || lvl === "BASE") return base;
+    const custom = priceMap?.[String(item?.item_id)]?.[lvl];
+    return custom !== undefined && custom !== null && custom !== ""
+      ? Number(custom)
+      : base;
+  };
+
+  const applyPriceLevelToCart = () => {
+    setCart(prev =>
+      prev.map(x => ({
+        ...x,
+        price_level: String(priceLevel || "BASE").toUpperCase(),
+        price: getPriceForItem(x)
+      }))
+    );
+  };
+
+  const applyCoupon = async () => {
+    const code = String(couponCode || "").trim();
+    if (!code) {
+      setCouponDiscount(0);
+      setCouponMsg("");
+      return;
+    }
+    try {
+      const res = await authAxios.get(`/coupons/validate/${encodeURIComponent(code)}`, {
+        params: { amount: grossTotal }
+      });
+      const data = res.data || {};
+      if (!data.valid) {
+        setCouponDiscount(0);
+        setCouponMsg(data.message || "Invalid coupon");
+        showToast(data.message || "Invalid coupon", "error");
+        return;
+      }
+      const disc = Number(data.discount_amount || 0);
+      setCouponDiscount(disc);
+      setCouponMsg("Applied");
+      showToast(`Coupon applied: -₹${disc.toFixed(2)}`, "success");
+    } catch (e) {
+      setCouponDiscount(0);
+      setCouponMsg("");
+      showToast(e?.response?.data?.detail || "Coupon validate failed", "error");
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponMsg("");
+  };
+
   /* ---------------- TOTALS ---------------- */
   const subTotal = cart.reduce((t, x) => t + x.price * x.qty, 0);
 
@@ -210,13 +320,19 @@ export default function CreateBill() {
         : subTotal - subTotal / (1 + gstPercent / 100);
   }
 
-  const discountValue =
+  const manualDiscountValue =
     discountType === "percent"
       ? (subTotal * Number(discount || 0)) / 100
       : Number(discount) || 0;
 
   const grossTotal =
     gstEnabled && gstMode === "exclusive" ? subTotal + tax : subTotal;
+
+  const discountValue = Math.min(
+    grossTotal,
+    Math.max(0, manualDiscountValue + Number(couponDiscount || 0))
+  );
+
   const payable = grossTotal - discountValue;
 
   const splitTotal = ["cash", "card", "upi"]
@@ -383,12 +499,33 @@ export default function CreateBill() {
       setCart([]);
       setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
       setDiscount(0);
+      setCouponCode("");
+      setCouponDiscount(0);
+      setCouponMsg("");
       setPaymentMode("cash");
       setSplitEnabled(false);
       setSplit({ cash: "", card: "", upi: "" });
       await loadData();
-    } catch {
-      showToast("Save failed", "error");
+    } catch (err) {
+      const isNetworkError = !err?.response || !navigator.onLine;
+      if (isNetworkError) {
+        pushOfflineBill(payload);
+        showToast("Saved offline. Sync later from Offline Sync.", "warning");
+
+        setCart([]);
+        setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
+        setDiscount(0);
+        setCouponCode("");
+        setCouponDiscount(0);
+        setCouponMsg("");
+        setPaymentMode("cash");
+        setSplitEnabled(false);
+        setSplit({ cash: "", card: "", upi: "" });
+        return;
+      }
+
+      const msg = err?.response?.data?.detail || "Save failed";
+      showToast(msg, "error");
     }
   };
 
@@ -429,6 +566,9 @@ export default function CreateBill() {
       setCart([]);
       setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
       setDiscount(0);
+      setCouponCode("");
+      setCouponDiscount(0);
+      setCouponMsg("");
       setPaymentMode("cash");
       setSplitEnabled(false);
       setSplit({ cash: "", card: "", upi: "" });
@@ -561,7 +701,9 @@ export default function CreateBill() {
                         <div className="font-semibold text-[13px] whitespace-normal break-words leading-snug">
                           {item.item_name}
                         </div>
-                        <div className="text-[12px] mt-1 font-medium">RS.{Number(item.price).toFixed(0)}</div>
+                        <div className="text-[12px] mt-1 font-medium">
+                          RS.{Number(getPriceForItem(item)).toFixed(0)}
+                        </div>
                         {inventoryEnabled && (
                           <div className={`text-[11px] mt-1 ${getStockColor(stock)}`}>
                             Stock - {stock}
@@ -579,6 +721,32 @@ export default function CreateBill() {
         {/* ITEMS BILLING */}
         <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col overflow-hidden text-[11px]">
           <h2 className="text-sm font-bold text-center mb-2">ITEMS BILLING</h2>
+
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label className="text-[9px] text-gray-600">Price Level</label>
+              <select
+                className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                value={priceLevel}
+                onChange={e => setPriceLevel(e.target.value)}
+              >
+                {priceLevels.map(l => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end justify-end">
+              <button
+                onClick={applyPriceLevelToCart}
+                className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[11px] hover:bg-gray-50"
+                type="button"
+              >
+                Apply to Cart
+              </button>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-2 mb-2">
             <div>
@@ -667,6 +835,35 @@ export default function CreateBill() {
 
             {showTotals && (
               <div className="px-3 pb-3 pt-1 text-[11px] space-y-1">
+                <div className="grid grid-cols-[1fr_70px_70px] gap-2 mb-2">
+                  <input
+                    className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                    placeholder="Coupon code"
+                    value={couponCode}
+                    onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                  />
+                  <button
+                    onClick={applyCoupon}
+                    className="border rounded-lg px-2 py-1 text-[11px] hover:bg-gray-50"
+                    type="button"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={clearCoupon}
+                    className="border rounded-lg px-2 py-1 text-[11px] hover:bg-gray-50"
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                {couponMsg && (
+                  <div className="text-[10px] text-slate-600 -mt-1 mb-1">
+                    Coupon: <span className="font-semibold">{couponMsg}</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2 mb-1">
                   <select
                     className="border rounded-lg px-2 py-1 w-full text-[11px]"
@@ -687,7 +884,9 @@ export default function CreateBill() {
 
                 <p>Subtotal: ₹ {subTotal.toFixed(2)}</p>
                 {gstEnabled && <p>GST: ₹ {tax.toFixed(2)}</p>}
-                <p>Discount: ₹ {discountValue.toFixed(2)}</p>
+                <p>Manual Discount: ₹ {manualDiscountValue.toFixed(2)}</p>
+                <p>Coupon Discount: ₹ {Number(couponDiscount || 0).toFixed(2)}</p>
+                <p className="font-semibold">Total Discount: ₹ {discountValue.toFixed(2)}</p>
               </div>
             )}
           </div>

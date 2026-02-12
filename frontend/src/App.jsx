@@ -22,6 +22,15 @@ import Drafts from "./pages/Drafts";
 import Customers from "./pages/Customers";
 import ReorderAlerts from "./pages/ReorderAlerts";
 import SupportTickets from "./pages/SupportTickets";
+import Alerts from "./pages/Alerts";
+import CashDrawer from "./pages/CashDrawer";
+import Loyalty from "./pages/Loyalty";
+import Coupons from "./pages/Coupons";
+import Pricing from "./pages/Pricing";
+import SupplierLedger from "./pages/SupplierLedger";
+import StockAudit from "./pages/StockAudit";
+import ItemLots from "./pages/ItemLots";
+import OfflineSync from "./pages/OfflineSync";
 
 import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
@@ -85,6 +94,15 @@ export default function App() {
             <Route path="/customers" element={<Customers />} />
             <Route path="/reorder-alerts" element={<ReorderAlerts />} />
             <Route path="/support-tickets" element={<SupportTickets />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/cash-drawer" element={<CashDrawer />} />
+            <Route path="/loyalty" element={<Loyalty />} />
+            <Route path="/coupons" element={<Coupons />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/supplier-ledger" element={<SupplierLedger />} />
+            <Route path="/stock-audit" element={<StockAudit />} />
+            <Route path="/item-lots" element={<ItemLots />} />
+            <Route path="/offline-sync" element={<OfflineSync />} />
 
             {/* DELETED INVOICES (🔥 NOT IN REPORTS) */}
             <Route
