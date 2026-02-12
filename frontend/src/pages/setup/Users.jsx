@@ -120,7 +120,7 @@ export default function Users() {
       {/* HEADER */}
       <div className="flex justify-between items-center">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
         >
           &larr; Back

@@ -601,7 +601,7 @@ export default function CreateBill() {
       {/* Back button - no extra margin/padding above */}
       <div className="px-4 pt-2 pb-1">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
         >
           &larr; Back

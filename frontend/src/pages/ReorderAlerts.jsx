@@ -87,7 +87,7 @@ export default function ReorderAlerts() {
     <div className="bg-gray-100 min-h-screen p-3 space-y-3 text-[11px]">
       <div className="flex items-center justify-between bg-white border rounded-lg px-3 py-2">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="text-gray-600 hover:text-black"
         >
           &larr; Back

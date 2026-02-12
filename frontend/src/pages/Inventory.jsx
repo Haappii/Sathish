@@ -113,7 +113,7 @@ export default function Inventory() {
       {/* HEADER */}
       <div className="flex items-center justify-between bg-white border rounded-lg px-3 py-2">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="flex items-center gap-1 text-gray-600 hover:text-black"
         >
           ← Back

@@ -142,7 +142,7 @@ export default function CashDrawer() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
         >
           &larr; Back
@@ -340,4 +340,3 @@ export default function CashDrawer() {
     </div>
   );
 }
-

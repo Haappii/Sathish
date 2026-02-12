@@ -364,7 +364,7 @@ export default function TableOrder() {
         }
       `}</style>
       <div className="flex items-center justify-between mb-3">
-        <button onClick={() => navigate("/dashboard", { replace: true })} className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]">&larr; Back</button>
+        <button onClick={() => navigate("/home", { replace: true })} className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]">&larr; Back</button>
       </div>
       <div className="w-full h-full grid grid-cols-[200px_3fr_2fr]">
 

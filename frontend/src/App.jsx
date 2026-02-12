@@ -7,7 +7,6 @@ import MainLayout from "./layouts/MainLayout";
 
 import Login from "./pages/Login";
 import Home from "./pages/Home";
-import Dashboard from "./pages/Dashboard";
 import Trends from "./pages/Trends";
 import Analytics from "./pages/Analytics";
 import DayClose from "./pages/DayClose";
@@ -31,6 +30,7 @@ import SupplierLedger from "./pages/SupplierLedger";
 import StockAudit from "./pages/StockAudit";
 import ItemLots from "./pages/ItemLots";
 import OfflineSync from "./pages/OfflineSync";
+import Expenses from "./pages/Expenses";
 
 import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
@@ -73,7 +73,7 @@ export default function App() {
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>
             <Route path="/home" element={<Home />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Navigate to="/home" replace />} />
             <Route path="/trends" element={<Trends />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/day-close" element={<DayClose />} />
@@ -103,6 +103,7 @@ export default function App() {
             <Route path="/stock-audit" element={<StockAudit />} />
             <Route path="/item-lots" element={<ItemLots />} />
             <Route path="/offline-sync" element={<OfflineSync />} />
+            <Route path="/expenses" element={<Expenses />} />
 
             {/* DELETED INVOICES (🔥 NOT IN REPORTS) */}
             <Route

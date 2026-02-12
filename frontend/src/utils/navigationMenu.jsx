@@ -1,6 +1,5 @@
 import {
   FaHome,
-  FaChartPie,
   FaChartLine,
   FaChartBar,
   FaShoppingCart,
@@ -14,6 +13,8 @@ import {
   FaGift,
   FaTags,
   FaRupeeSign,
+  FaMoneyBillWave,
+  FaHistory,
   FaBook,
   FaClipboardCheck,
   FaBarcode,
@@ -23,7 +24,6 @@ import { MdTableRestaurant } from "react-icons/md";
 
 const MENU_CATALOG = [
   { key: "home", name: "Home", path: "/home", icon: <FaHome /> },
-  { key: "dashboard", name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
   {
     key: "cash_drawer",
     name: "Cash Drawer",
@@ -53,6 +53,13 @@ const MENU_CATALOG = [
     perm: { module: "billing", action: "write" },
   },
   {
+    key: "billing_history",
+    name: "Billing History",
+    path: "/sales/history",
+    icon: <FaHistory />,
+    perm: { module: "billing", action: "read" },
+  },
+  {
     key: "offline_sync",
     name: "Offline Sync",
     path: "/offline-sync",
@@ -79,6 +86,13 @@ const MENU_CATALOG = [
     path: "/dues",
     icon: <FaFileInvoice />,
     perm: { module: "dues", action: "read" },
+  },
+  {
+    key: "expenses",
+    name: "Expenses",
+    path: "/expenses",
+    icon: <FaMoneyBillWave />,
+    perm: { module: "expenses", action: "read" },
   },
   {
     key: "customers",
@@ -249,10 +263,10 @@ export const buildRoleMenu = ({
   if (roleLower === "cashier") {
     menuItems = [
       { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       ...(showTableBilling
@@ -268,15 +282,16 @@ export const buildRoleMenu = ({
   } else if (roleLower === "manager") {
     menuItems = [
       { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
       { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
+      { name: "Expenses", path: "/expenses", icon: <FaMoneyBillWave /> },
       { name: "Customers", path: "/customers", icon: <FaUsers /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       { name: "Coupons", path: "/coupons", icon: <FaTags /> },
@@ -307,15 +322,16 @@ export const buildRoleMenu = ({
   } else if (roleLower === "admin") {
     menuItems = [
       { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
       { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
+      { name: "Expenses", path: "/expenses", icon: <FaMoneyBillWave /> },
       { name: "Customers", path: "/customers", icon: <FaUsers /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       { name: "Coupons", path: "/coupons", icon: <FaTags /> },

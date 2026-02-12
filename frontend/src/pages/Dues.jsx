@@ -90,7 +90,7 @@ export default function Dues() {
 
       <div className="flex items-center justify-between bg-white border rounded-lg px-3 py-2">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/home", { replace: true })}
           className="text-gray-600 hover:text-black"
         >
           &larr; Back
@@ -216,4 +216,3 @@ export default function Dues() {
     </div>
   );
 }
-
