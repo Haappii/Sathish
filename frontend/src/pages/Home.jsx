@@ -1,22 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import authAxios from "../api/authAxios";
+import api from "../utils/apiClient";
 import { getSession } from "../utils/auth";
 
 import {
-  FaChartPie,
-  FaChartLine,
-  FaChartBar,
-  FaShoppingCart,
-  FaFileInvoice,
-  FaTools,
-  FaBoxes,
-  FaUsers,
-  FaBell,
-  FaLifeRing,
-} from "react-icons/fa";
-import { MdTableRestaurant } from "react-icons/md";
+  buildRbacMenu,
+  buildRoleMenu,
+  modulesToPermMap,
+} from "../utils/navigationMenu";
 
 export default function Home() {
   const session = getSession() || {};
@@ -24,10 +16,11 @@ export default function Home() {
   const branchId = session?.branch_id ?? null;
 
   const [shopType, setShopType] = useState("");
+  const [permMap, setPermMap] = useState(null);
+  const [permsEnabled, setPermsEnabled] = useState(false);
 
   useEffect(() => {
-    authAxios
-      .get("/shop/details")
+    api.get("/shop/details")
       .then((r) => {
         const s = r?.data || {};
         setShopType((s.shop_type || s.billing_type || "").toString().toLowerCase());
@@ -35,125 +28,91 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    api.get("/permissions/my")
+      .then((r) => {
+        setPermsEnabled(Boolean(r?.data?.enabled));
+        setPermMap(modulesToPermMap(r?.data?.modules));
+      })
+      .catch(() => {
+        setPermsEnabled(false);
+        setPermMap(null);
+      });
+  }, []);
+
   const showTableBilling = shopType === "hotel";
   const isHeadOfficeClosed =
-    Number(branchId) === 1 && String(session?.branch_close || "N").toUpperCase() === "Y";
-
-  const iconFor = (path) => {
-    const map = {
-      "/dashboard": <FaChartPie />,
-      "/trends": <FaChartLine />,
-      "/analytics": <FaChartBar />,
-      "/sales/create": <FaShoppingCart />,
-      "/sales/history": <FaFileInvoice />,
-      "/drafts": <FaFileInvoice />,
-      "/returns": <FaFileInvoice />,
-      "/dues": <FaFileInvoice />,
-      "/customers": <FaUsers />,
-      "/stock-transfers": <FaBoxes />,
-      "/reports": <FaFileInvoice />,
-      "/deleted-invoices": <FaFileInvoice />,
-      "/inventory": <FaBoxes />,
-      "/reorder-alerts": <FaBell />,
-      "/support-tickets": <FaLifeRing />,
-      "/setup": <FaTools />,
-      "/table-billing": <MdTableRestaurant />,
-    };
-    return map[path] || <FaChartPie />;
-  };
+    Number(branchId) === 1 &&
+    String(session?.branch_close || "N").toUpperCase() === "Y";
 
   const menus = useMemo(() => {
-    let menuItems = [];
+    const fallback = buildRoleMenu({
+      roleLower,
+      showTableBilling,
+      isHeadOfficeClosed,
+    });
+    if (!permsEnabled || !permMap) return fallback;
 
-    if (roleLower === "cashier") {
-      menuItems = [
-        { name: "Dashboard", path: "/dashboard" },
-        { name: "Trends", path: "/trends" },
-        { name: "Sales Billing", path: "/sales/create" },
-        ...(showTableBilling ? [{ name: "Table Billing", path: "/table-billing" }] : []),
-      ];
-    } else if (roleLower === "manager") {
-      menuItems = [
-        { name: "Dashboard", path: "/dashboard" },
-        { name: "Trends", path: "/trends" },
-        { name: "Analytics", path: "/analytics" },
-        { name: "Sales Billing", path: "/sales/create" },
-        { name: "Draft Bills", path: "/drafts" },
-        { name: "Returns", path: "/returns" },
-        { name: "Dues", path: "/dues" },
-        { name: "Customers", path: "/customers" },
-        { name: "Transfers", path: "/stock-transfers" },
-        ...(showTableBilling ? [{ name: "Table Billing", path: "/table-billing" }] : []),
-        { name: "Reports", path: "/reports" },
-        { name: "Deleted Invoice", path: "/deleted-invoices" },
-        { name: "Inventory", path: "/inventory" },
-        { name: "Reorder Alerts", path: "/reorder-alerts" },
-      ];
-    } else if (roleLower === "admin") {
-      menuItems = [
-        { name: "Dashboard", path: "/dashboard" },
-        { name: "Trends", path: "/trends" },
-        { name: "Analytics", path: "/analytics" },
-        { name: "Sales Billing", path: "/sales/create" },
-        { name: "Draft Bills", path: "/drafts" },
-        { name: "Returns", path: "/returns" },
-        { name: "Dues", path: "/dues" },
-        { name: "Customers", path: "/customers" },
-        { name: "Transfers", path: "/stock-transfers" },
-        { name: "Reorder Alerts", path: "/reorder-alerts" },
-        ...(showTableBilling ? [{ name: "Table Billing", path: "/table-billing" }] : []),
-        { name: "Reports", path: "/reports" },
-        { name: "Deleted Invoice", path: "/deleted-invoices" },
-        { name: "Support Tickets", path: "/support-tickets" },
-        { name: "Admin", path: "/setup" },
-      ];
-    }
+    const rbac = buildRbacMenu({
+      permMap,
+      showTableBilling,
+      isHeadOfficeClosed,
+    });
 
-    if (isHeadOfficeClosed) {
-      menuItems = [
-        { name: "Reports", path: "/reports" },
-        { name: "Analytics", path: "/analytics" },
-        { name: "Admin", path: "/setup" },
-      ];
-    }
+    return rbac && rbac.length ? rbac : fallback;
+  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
-    return menuItems;
-  }, [roleLower, showTableBilling, isHeadOfficeClosed]);
+  const menuCards = useMemo(
+    () => menus.filter((m) => m?.path && m.path !== "/home"),
+    [menus]
+  );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-semibold text-gray-700">Home</h2>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-6">
+      
 
-      <div className="flex flex-wrap gap-3">
-        {menus.map((m) => (
-          <Link
-            key={m.path}
-            to={m.path}
-            className="
-              w-full
-              sm:w-[calc(50%-0.75rem)]
-              lg:w-[calc(33.333%-0.75rem)]
-              flex items-center gap-3
-              rounded-lg border bg-white
-              px-3 py-3
-              hover:bg-gray-50 hover:shadow-sm
-              transition
-            "
-          >
-            <div className="w-11 h-11 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-lg">
-              {iconFor(m.path)}
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-gray-800 truncate">
-                {m.name}
+      {menuCards.length ? (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {menuCards.map((m) => (
+            <Link
+              key={m.path}
+              to={m.path}
+              className="
+                group relative overflow-hidden
+                rounded-2xl
+                bg-white/70 backdrop-blur-lg
+                border border-gray-200
+                p-5
+                shadow-sm
+                hover:shadow-xl
+                hover:-translate-y-1
+                transition-all duration-300
+              "
+            >
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-r from-blue-100 to-indigo-100 blur-xl" />
+
+              <div className="relative z-10 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md group-hover:scale-110 transition-transform duration-300">
+                  {m.icon}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-base font-semibold text-gray-800 group-hover:text-blue-600 transition truncate">
+                    {m.name}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 truncate">
+                    {m.path}
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-gray-500 truncate">{m.path}</div>
-            </div>
-          </Link>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-white p-6 text-sm text-gray-600">
+          No menus available for this account.
+        </div>
+      )}
     </div>
   );
 }
