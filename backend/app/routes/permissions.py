@@ -5,7 +5,7 @@ from app.db import get_db
 from app.models.roles import Role
 from app.models.role_permission import RolePermission
 from app.schemas.permissions import PermissionModule, RolePermissionUpsert, RolePermissionResponse
-from app.utils.auth_user import AdminOnly
+from app.utils.auth_user import AdminOnly, get_current_user
 from app.utils.permissions import (
     PERMISSION_MODULES,
     DEFAULT_ROLE_PERMISSIONS,
@@ -19,6 +19,63 @@ router = APIRouter(prefix="/permissions", tags=["Permissions"])
 @router.get("/modules", response_model=list[PermissionModule])
 def list_modules(user=Depends(AdminOnly)):
     return PERMISSION_MODULES
+
+
+@router.get("/my")
+def get_my_permissions(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    role_lower = str(getattr(user, "role_name", "") or "").strip().lower()
+    enabled = permissions_enabled(db, shop_id=int(user.shop_id))
+
+    # Build module -> permissions map
+    by_module: dict[str, dict[str, bool]] = {}
+
+    if role_lower == "admin":
+        by_module = {m["key"]: {"can_read": True, "can_write": True} for m in PERMISSION_MODULES}
+    elif enabled:
+        rows = (
+            db.query(RolePermission)
+            .filter(
+                RolePermission.shop_id == user.shop_id,
+                RolePermission.role_id == user.role,
+            )
+            .all()
+        )
+        for r in rows:
+            by_module[str(r.module or "").strip().lower()] = {
+                "can_read": bool(r.can_read),
+                "can_write": bool(r.can_write),
+            }
+    else:
+        for m in PERMISSION_MODULES:
+            key = m["key"]
+            rules = DEFAULT_ROLE_PERMISSIONS.get(key, {})
+            by_module[key] = {
+                "can_read": role_lower in (rules.get("read") or set()),
+                "can_write": role_lower in (rules.get("write") or set()),
+            }
+
+    modules = []
+    for m in PERMISSION_MODULES:
+        key = m["key"]
+        row = by_module.get(key) or {"can_read": False, "can_write": False}
+        modules.append(
+            {
+                "key": key,
+                "label": m["label"],
+                "can_read": bool(row.get("can_read")),
+                "can_write": bool(row.get("can_write")),
+            }
+        )
+
+    return {
+        "enabled": enabled,
+        "role_id": int(getattr(user, "role", 0) or 0),
+        "role_name": str(getattr(user, "role_name", "") or ""),
+        "modules": modules,
+    }
 
 
 @router.get("/enabled")

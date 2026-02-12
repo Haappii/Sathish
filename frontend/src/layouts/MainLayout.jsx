@@ -1,6 +1,6 @@
 // src/layouts/MainLayout.jsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Outlet, useNavigate, useLocation, NavLink } from "react-router-dom";
 import api from "../utils/apiClient";
 
@@ -16,20 +16,12 @@ import defaultLogo from "../assets/logo.png";
 import SupportChat from "../components/SupportChat";
 import { getShopLogoUrl } from "../utils/shopLogo";
 
+import { FaBars, FaThumbtack } from "react-icons/fa";
 import {
-  FaHome,
-  FaChartPie,
-  FaChartBar,
-  FaShoppingCart,
-  FaFileInvoice,
-  FaTools,
-  FaBoxes,
-  FaChartLine,
-  FaUsers,
-  FaBell,
-  FaLifeRing
-} from "react-icons/fa";
-import { MdTableRestaurant } from "react-icons/md";
+  buildRbacMenu,
+  buildRoleMenu,
+  modulesToPermMap,
+} from "../utils/navigationMenu";
 
 const BLUE = "#0B3C8C";
 const APP_VERSION = "1.0.0";
@@ -59,6 +51,10 @@ export default function MainLayout({ hideSidebar = false }) {
   const [switching, setSwitching] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [logoSrc, setLogoSrc] = useState(defaultLogo);
+  const [permMap, setPermMap] = useState(null);
+
+  const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const branchId = session?.branch_id ?? null;
   const branchName = session?.branch_name ?? null;
@@ -90,6 +86,13 @@ export default function MainLayout({ hideSidebar = false }) {
         setShop(data);
       })
       .catch(() => {});
+  }, []);
+
+  /* ================= PERMISSIONS (RBAC) ================= */
+  useEffect(() => {
+    api.get("/permissions/my")
+      .then(res => setPermMap(modulesToPermMap(res?.data?.modules)))
+      .catch(() => setPermMap(null));
   }, []);
 
   useEffect(() => {
@@ -179,125 +182,151 @@ export default function MainLayout({ hideSidebar = false }) {
   };
 
   /* ================= SIDEBAR MENU ================= */
+  const sidebarEnabled =
+    !hideSidebar && !location.pathname.startsWith("/sales/create");
+
   const shopType = (shop?.shop_type || shop?.billing_type || "")
     .toString()
     .toLowerCase();
 
   const showTableBilling = shopType === "hotel";
-  let menuItems = [];
   const isHeadOfficeClosed =
     Number(branchId) === 1 && String(session?.branch_close || "N").toUpperCase() === "Y";
 
-  // ===== CASHIER (❌ Deleted Invoice NOT visible) =====
-  if (roleLower === "cashier") {
-    menuItems = [
-      { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
-      { name: "Trends", path: "/trends", icon: <FaChartLine /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
-      ...(showTableBilling
-        ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
-        : [])
-    ];
-  }
+  const menuItems = useMemo(() => {
+    const fallback = buildRoleMenu({
+      roleLower,
+      showTableBilling,
+      isHeadOfficeClosed,
+    });
 
-  // ===== MANAGER (✅ Deleted Invoice visible) =====
-  else if (roleLower === "manager") {
-    menuItems = [
-      { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
-      { name: "Trends", path: "/trends", icon: <FaChartLine /> },
-      { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
-      { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
-      { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
-      { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
-      { name: "Customers", path: "/customers", icon: <FaUsers /> },
-      { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
-      ...(showTableBilling
-        ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
-        : []),
-      { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
-      { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
-      { name: "Inventory", path: "/inventory", icon: <FaBoxes /> },
-      { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> }
-    ];
-  }
+    if (!permMap) return fallback;
 
-  // ===== ADMIN (✅ Deleted Invoice visible) =====
-  else if (roleLower === "admin") {
-    menuItems = [
-      { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
-      { name: "Trends", path: "/trends", icon: <FaChartLine /> },
-      { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
-      { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
-      { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
-      { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
-      { name: "Customers", path: "/customers", icon: <FaUsers /> },
-      { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
-      { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
-      ...(showTableBilling
-        ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
-        : []),
-      { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
-      { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
-      { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },
-      { name: "Admin", path: "/setup", icon: <FaTools /> }
-    ];
-  }
+    const rbac = buildRbacMenu({
+      permMap,
+      showTableBilling,
+      isHeadOfficeClosed,
+    });
+    return rbac && rbac.length ? rbac : fallback;
+  }, [permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
-  if (isHeadOfficeClosed) {
-    menuItems = [
-      { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
-      { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
-      { name: "Admin", path: "/setup", icon: <FaTools /> }
-    ];
-  }
+  useEffect(() => {
+    if (!sidebarEnabled) {
+      setSidebarPinned(false);
+      setSidebarOpen(false);
+    }
+  }, [sidebarEnabled]);
+
+  const sidebarVisible = sidebarEnabled && (sidebarOpen || sidebarPinned);
+  const openSidebar = () => sidebarEnabled && setSidebarOpen(true);
+  const closeSidebar = () => {
+    if (!sidebarPinned) setSidebarOpen(false);
+  };
+  const togglePin = () => {
+    if (!sidebarEnabled) return;
+    setSidebarPinned(prev => {
+      const next = !prev;
+      setSidebarOpen(next);
+      return next;
+    });
+  };
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="h-screen bg-white relative">
 
       {/* ================= SIDEBAR ================= */}
-      {!hideSidebar && !location.pathname.startsWith("/sales/create") && (
-        <aside className="w-56 flex flex-col shadow-2xl" style={{ background: BLUE }}>
-          <div className="pt-10 pb-4 px-6 text-white text-center">
-            <p className="text-4xl font-extrabold">HAAPPII</p>
-            <p className="text-4xl font-extrabold -mt-1">BILLING</p>
-            <div className="w-16 h-[3px] bg-white mx-auto mt-3 rounded-full" />
-          </div>
+      {sidebarEnabled && (
+        <>
+          {/* Hover/click handle */}
+          <div
+            className="fixed inset-y-0 left-0 w-3 z-40 cursor-pointer bg-gradient-to-r from-black/10 to-transparent"
+            onMouseEnter={openSidebar}
+            onClick={togglePin}
+            title="Menu"
+          />
 
-           <nav className="px-3 mt-2 space-y-1 text-white flex-1 min-h-0 overflow-y-auto pb-3">
-             {menuItems.map(m => (
-               <NavLink
-                 key={m.path}
-                 to={m.path}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold
-                  ${isActive ? "bg-white/25" : "hover:bg-white/10"}`
-                }
+          {/* Mobile backdrop (tap to close) */}
+          {sidebarVisible && !sidebarPinned && (
+            <div
+              className="fixed inset-0 bg-black/30 z-30 sm:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          <aside
+            className={`fixed inset-y-0 left-0 w-56 flex flex-col shadow-2xl z-50 transform transition-transform duration-200 ${
+              sidebarVisible ? "translate-x-0" : "-translate-x-full"
+            }`}
+            style={{ background: BLUE }}
+            onMouseEnter={openSidebar}
+            onMouseLeave={closeSidebar}
+          >
+            <div className="pt-10 pb-4 px-6 text-white text-center relative">
+              <button
+                onClick={togglePin}
+                className={`absolute top-3 right-3 p-2 rounded hover:bg-white/10 ${
+                  sidebarPinned ? "bg-white/15" : ""
+                }`}
+                title={sidebarPinned ? "Unpin menu" : "Pin menu"}
+                type="button"
               >
-                <span className="text-lg">{m.icon}</span>
-                <span>{m.name}</span>
-              </NavLink>
-            ))}
-          </nav>
+                <FaThumbtack
+                  className={`text-white ${sidebarPinned ? "rotate-45" : ""}`}
+                />
+              </button>
 
-          <div className="px-6 py-3 text-xs text-white/90">
-            <p>Version {APP_VERSION}</p>
-            <p>Build {BUILD_CODE}</p>
-          </div>
-        </aside>
+              <p className="text-4xl font-extrabold">HAAPPII</p>
+              <p className="text-4xl font-extrabold -mt-1">BILLING</p>
+              <div className="w-16 h-[3px] bg-white mx-auto mt-3 rounded-full" />
+            </div>
+
+            <nav className="px-3 mt-2 space-y-1 text-white flex-1 min-h-0 overflow-y-auto pb-3">
+              {menuItems.map(m => (
+                <NavLink
+                  key={m.path}
+                  to={m.path}
+                  onClick={() => {
+                    if (!sidebarPinned) setSidebarOpen(false);
+                  }}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold
+                    ${isActive ? "bg-white/25" : "hover:bg-white/10"}`
+                  }
+                >
+                  <span className="text-lg">{m.icon}</span>
+                  <span>{m.name}</span>
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="px-6 py-3 text-xs text-white/90">
+              <p>Version {APP_VERSION}</p>
+              <p>Build {BUILD_CODE}</p>
+            </div>
+          </aside>
+        </>
       )}
 
       {/* ================= RIGHT SIDE ================= */}
-      <div className="flex-1 flex flex-col">
+      <div
+        className={`h-screen flex flex-col transition-[padding] duration-200 ${
+          sidebarEnabled && sidebarPinned ? "pl-56" : ""
+        }`}
+      >
 
         {/* HEADER */}
         <header className="px-6 py-3 border-b flex justify-between items-center">
           <div className="flex items-center gap-3">
+            {sidebarEnabled && (
+              <button
+                onClick={togglePin}
+                className="border rounded px-2 py-2 hover:bg-gray-50"
+                title={sidebarPinned ? "Hide menu" : "Show menu"}
+                type="button"
+              >
+                <FaBars />
+              </button>
+            )}
             <img
               src={logoSrc}
               alt="Logo"

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FaList,
@@ -13,18 +14,38 @@ import {
   FaLifeRing,
   FaUserShield
 } from "react-icons/fa";
+import api from "../utils/apiClient";
 import { getSession } from "../utils/auth";
+import { modulesToPermMap } from "../utils/navigationMenu";
 
 export default function Setup() {
   const navigate = useNavigate();
   const session = getSession();
+  const [allowed, setAllowed] = useState(null);
   const isHeadOffice =
     (session?.branch_type || "").toLowerCase().includes("head") ||
     (session?.branch_name || "").toLowerCase().includes("head") ||
     Number(session?.branch_id) === 1;
 
-  // 🚫 Not Admin → kick out
-  if (session?.role !== "Admin") {
+  useEffect(() => {
+    api.get("/permissions/my")
+      .then((r) => {
+        const map = modulesToPermMap(r?.data?.modules);
+        setAllowed(Boolean(map?.setup?.can_read));
+      })
+      .catch(() => setAllowed(false));
+  }, []);
+
+  if (allowed === null) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading...
+      </div>
+    );
+  }
+
+  // 🚫 Not allowed → kick out
+  if (!allowed) {
     return (
       <div className="mt-10 text-center text-sm font-medium text-red-600">
         You are not authorized to access this page

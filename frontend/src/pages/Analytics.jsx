@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { modulesToPermMap } from "../utils/navigationMenu";
 
 export default function Analytics() {
   const { showToast } = useToast();
@@ -10,8 +11,7 @@ export default function Analytics() {
 
   const roleLower = (session?.role || "").toString().toLowerCase();
   const isAdmin = roleLower === "admin";
-  const isManager = roleLower === "manager";
-  const allowed = isAdmin || isManager;
+  const [allowed, setAllowed] = useState(null);
 
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState("");
@@ -79,6 +79,15 @@ export default function Analytics() {
   };
 
   useEffect(() => {
+    authAxios.get("/permissions/my")
+      .then((r) => {
+        const map = modulesToPermMap(r?.data?.modules);
+        setAllowed(Boolean(map?.analytics?.can_read));
+      })
+      .catch(() => setAllowed(false));
+  }, []);
+
+  useEffect(() => {
     if (!allowed) return;
     loadBranches();
     loadDefaultDates();
@@ -88,6 +97,14 @@ export default function Analytics() {
     if (!allowed) return;
     loadSummary();
   }, [allowed, fromDate, toDate, branchId]);
+
+  if (allowed === null) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading...
+      </div>
+    );
+  }
 
   if (!allowed) {
     return (
@@ -194,4 +211,3 @@ export default function Analytics() {
     </div>
   );
 }
-
