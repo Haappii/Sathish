@@ -43,7 +43,6 @@ export default function Home() {
   }, []);
 
   const showTableBilling = shopType === "hotel";
-
   const isHeadOfficeClosed =
     Number(branchId) === 1 &&
     String(session?.branch_close || "N").toUpperCase() === "Y";
@@ -68,7 +67,7 @@ export default function Home() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-4">
         {menus.map((m) => (
           <Link
             key={m.path}
@@ -80,21 +79,24 @@ export default function Home() {
               h-12
               px-5
               rounded-lg
-              bg-gray-100
+              bg-white
+              border border-gray-200
               text-gray-700
               text-sm
               font-medium
-              hover:bg-white
-              hover:shadow-sm
-              hover:text-gray-900
+              shadow-sm
+              hover:bg-gray-100
+              hover:border-gray-300
               transition
               whitespace-nowrap
             "
           >
-            <span className="text-base opacity-80">
+            {/* Icon */}
+            <span className="text-lg text-gray-600">
               {m.icon}
             </span>
 
+            {/* Name */}
             <span>{m.name}</span>
           </Link>
         ))}
