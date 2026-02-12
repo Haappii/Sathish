@@ -56,6 +56,8 @@ export default function Home() {
   const roleLower = (session?.role || "").toString().toLowerCase();
   const branchId = session?.branch_id ?? null;
 
+  const [openGroups, setOpenGroups] = useState({});
+
   const [shop, setShop] = useState(null);
   const [shopType, setShopType] = useState("");
   const [permMap, setPermMap] = useState(null);
@@ -220,49 +222,80 @@ export default function Home() {
         <div className="lg:col-span-3 space-y-6">
           {groupedMenus.map((g) => (
             <div key={g.key} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-gray-700">
-                  {g.title}
+              <button
+                type="button"
+                onClick={() => setOpenGroups((prev) => ({ ...prev, [g.key]: !prev?.[g.key] }))}
+                aria-expanded={Boolean(openGroups?.[g.key])}
+                className="
+                  w-full flex items-center justify-between
+                  rounded-3xl
+                  bg-white/30 backdrop-blur-2xl
+                  border border-white/30
+                  px-6 py-4
+                  shadow-lg
+                  hover:shadow-2xl
+                  transition-all duration-500
+                "
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-800">
+                    {g.title}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    ({g.items.length})
+                  </span>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {g.items.length}
-                </div>
-              </div>
 
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {g.items.map((m) => (
-                  <Link
-                    key={m.path}
-                    to={m.path}
-                    className="
-                      group relative overflow-hidden
-                      rounded-3xl
-                      bg-white/30 backdrop-blur-2xl
-                      border border-white/30
-                      p-6
-                      shadow-lg
-                      hover:shadow-2xl
-                      hover:-translate-y-2
-                      hover:scale-[1.02]
-                      transition-all duration-500
-                    "
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="
-                        w-16 h-16 rounded-2xl
-                        bg-gradient-to-br from-indigo-500 via-blue-500 to-purple-600
-                        text-white flex items-center justify-center text-xl
-                        shadow-lg group-hover:rotate-6 transition-all duration-500
-                      ">
-                        {m.icon}
+                <svg
+                  className={`h-5 w-5 text-gray-600 transition-transform duration-300 ${openGroups?.[g.key] ? "rotate-180" : ""}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              {openGroups?.[g.key] && (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {g.items.map((m) => (
+                    <Link
+                      key={m.path}
+                      to={m.path}
+                      className="
+                        group relative overflow-hidden
+                        rounded-3xl
+                        bg-white/30 backdrop-blur-2xl
+                        border border-white/30
+                        p-6
+                        shadow-lg
+                        hover:shadow-2xl
+                        hover:-translate-y-2
+                        hover:scale-[1.02]
+                        transition-all duration-500
+                      "
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="
+                          w-16 h-16 rounded-2xl
+                          bg-gradient-to-br from-indigo-500 via-blue-500 to-purple-600
+                          text-white flex items-center justify-center text-xl
+                          shadow-lg group-hover:rotate-6 transition-all duration-500
+                        ">
+                          {m.icon}
+                        </div>
+                        <div className="text-lg font-semibold text-gray-800 group-hover:text-indigo-600 transition">
+                          {m.name}
+                        </div>
                       </div>
-                      <div className="text-lg font-semibold text-gray-800 group-hover:text-indigo-600 transition">
-                        {m.name}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
