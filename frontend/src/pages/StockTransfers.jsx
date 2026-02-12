@@ -247,7 +247,7 @@ export default function StockTransfers() {
                         </>
                       )}
 
-                      {(isAdmin || isManager) && t.status === "APPROVED" && (
+                      {(isAdmin || (isManager && Number(t.from_branch_id) === currentBranchId)) && t.status === "APPROVED" && (
                         <button
                           onClick={() => action(t.transfer_id, () => authAxios.post(`/stock-transfers/${t.transfer_id}/dispatch`))}
                           className="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow"
@@ -256,7 +256,7 @@ export default function StockTransfers() {
                         </button>
                       )}
 
-                      {(isAdmin || isManager) && t.status === "DISPATCHED" && (
+                      {(isAdmin || (isManager && Number(t.to_branch_id) === currentBranchId)) && t.status === "DISPATCHED" && (
                         <button
                           onClick={() => action(t.transfer_id, () => authAxios.post(`/stock-transfers/${t.transfer_id}/receive`))}
                           className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow"
@@ -285,4 +285,3 @@ export default function StockTransfers() {
     </div>
   );
 }
-
