@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import MainLayout from "./layouts/MainLayout";
 
 import Login from "./pages/Login";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Trends from "./pages/Trends";
 import Analytics from "./pages/Analytics";
@@ -62,11 +63,11 @@ export default function App() {
 
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>
+            <Route path="/home" element={<Home />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/trends" element={<Trends />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/day-close" element={<DayClose />} />
-            <Route path="/home" element={<Navigate to="/dashboard" replace />} />
 
             {/* SALES */}
             <Route path="/sales/create" element={<CreateBill />} />

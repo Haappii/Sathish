@@ -28,7 +28,7 @@ export default function Login() {
     const s = getSession();
     if (s?.token && !isSessionExpired()) {
       refreshSessionActivity();
-      navigate("/dashboard", { replace: true });
+      navigate("/home", { replace: true });
     }
   }, []);
 
@@ -65,7 +65,7 @@ export default function Login() {
         branch_type: res.data.branch_type
       });
 
-      navigate("/dashboard", { replace: true });
+      navigate("/home", { replace: true });
 
     } catch (err) {
       const msg = err?.response?.data?.detail || err?.message;

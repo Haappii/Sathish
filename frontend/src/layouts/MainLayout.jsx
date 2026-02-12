@@ -17,6 +17,7 @@ import SupportChat from "../components/SupportChat";
 import { getShopLogoUrl } from "../utils/shopLogo";
 
 import {
+  FaHome,
   FaChartPie,
   FaChartBar,
   FaShoppingCart,
@@ -190,6 +191,7 @@ export default function MainLayout({ hideSidebar = false }) {
   // ===== CASHIER (❌ Deleted Invoice NOT visible) =====
   if (roleLower === "cashier") {
     menuItems = [
+      { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
@@ -202,6 +204,7 @@ export default function MainLayout({ hideSidebar = false }) {
   // ===== MANAGER (✅ Deleted Invoice visible) =====
   else if (roleLower === "manager") {
     menuItems = [
+      { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
@@ -224,6 +227,7 @@ export default function MainLayout({ hideSidebar = false }) {
   // ===== ADMIN (✅ Deleted Invoice visible) =====
   else if (roleLower === "admin") {
     menuItems = [
+      { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
@@ -246,6 +250,7 @@ export default function MainLayout({ hideSidebar = false }) {
 
   if (isHeadOfficeClosed) {
     menuItems = [
+      { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> }
@@ -264,11 +269,11 @@ export default function MainLayout({ hideSidebar = false }) {
             <div className="w-16 h-[3px] bg-white mx-auto mt-3 rounded-full" />
           </div>
 
-          <nav className="px-3 mt-2 space-y-1 text-white flex-1">
-            {menuItems.map(m => (
-              <NavLink
-                key={m.path}
-                to={m.path}
+           <nav className="px-3 mt-2 space-y-1 text-white flex-1 min-h-0 overflow-y-auto pb-3">
+             {menuItems.map(m => (
+               <NavLink
+                 key={m.path}
+                 to={m.path}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold
                   ${isActive ? "bg-white/25" : "hover:bg-white/10"}`
