@@ -31,6 +31,25 @@ const COLORS = [
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
 
+const MENU_GROUPS = [
+  { key: "billing", title: "Billing", paths: ["/sales/create", "/sales/history", "/drafts", "/deleted-invoices"] },
+  { key: "customers", title: "Customers & Receivables", paths: ["/customers", "/dues"] },
+  { key: "returns", title: "Returns", paths: ["/returns"] },
+  { key: "expenses", title: "Expenses", paths: ["/expenses"] },
+  { key: "inventory", title: "Inventory", paths: ["/inventory", "/reorder-alerts", "/stock-transfers", "/item-lots", "/stock-audit"] },
+  { key: "suppliers", title: "Purchase & Suppliers", paths: ["/supplier-ledger"] },
+  { key: "cash_drawer", title: "Cash Drawer / Shift", paths: ["/cash-drawer"] },
+  { key: "loyalty", title: "Loyalty & Coupons", paths: ["/loyalty", "/coupons"] },
+  { key: "pricing", title: "Pricing", paths: ["/pricing"] },
+  { key: "analytics", title: "Analytics & Trends", paths: ["/analytics", "/trends"] },
+  { key: "reports", title: "Reports", paths: ["/reports"] },
+  { key: "alerts", title: "Alerts", paths: ["/alerts"] },
+  { key: "support", title: "Support", paths: ["/support-tickets"] },
+  { key: "offline", title: "Offline / Sync", paths: ["/offline-sync"] },
+  { key: "tables", title: "Table Billing", paths: ["/table-billing"] },
+  { key: "admin", title: "Admin & Setup", paths: ["/setup"] },
+];
+
 export default function Home() {
   const { showToast } = useToast();
   const session = getSession() || {};
@@ -146,6 +165,32 @@ export default function Home() {
     [menus]
   );
 
+  const groupedMenus = useMemo(() => {
+    const pathToGroup = new Map();
+    for (const g of MENU_GROUPS) {
+      for (const p of g.paths) {
+        pathToGroup.set(p, g.key);
+      }
+    }
+
+    const bucket = new Map();
+    for (const g of MENU_GROUPS) bucket.set(g.key, []);
+
+    const other = [];
+    for (const m of menuCards) {
+      const k = pathToGroup.get(m.path);
+      if (k && bucket.has(k)) bucket.get(k).push(m);
+      else other.push(m);
+    }
+
+    const out = MENU_GROUPS
+      .map((g) => ({ ...g, items: bucket.get(g.key) || [] }))
+      .filter((g) => g.items.length > 0);
+
+    if (other.length) out.push({ key: "other", title: "Other", paths: [], items: other });
+    return out;
+  }, [menuCards]);
+
   const saveQuickExpense = async () => {
     if (expenseSaving) return;
     if (!expenseForm.amount || !expenseForm.category) {
@@ -180,37 +225,58 @@ export default function Home() {
         {/* MENUS (75%) */}
         <div className="lg:col-span-3">
           {menuCards.length ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {menuCards.map((m) => (
-                <Link
-                  key={m.path}
-                  to={m.path}
-                  className="
-                    group relative overflow-hidden
-                    rounded-2xl
-                    bg-white/70 backdrop-blur-lg
-                    border border-gray-200
-                    p-5
-                    shadow-sm
-                    hover:shadow-xl
-                    hover:-translate-y-1
-                    transition-all duration-300
-                  "
+            <div className="space-y-4">
+              {groupedMenus.map((g, idx) => (
+                <details
+                  key={g.key}
+                  className="rounded-2xl border bg-white/70 backdrop-blur-lg shadow-sm overflow-hidden"
+                  defaultOpen={idx === 0}
                 >
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-r from-blue-100 to-indigo-100 blur-xl" />
-
-                  <div className="relative z-10 flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md group-hover:scale-110 transition-transform duration-300">
-                      {m.icon}
+                  <summary className="cursor-pointer select-none px-4 py-3 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-slate-700">
+                      {g.title}
                     </div>
+                    <div className="text-[12px] text-slate-500">
+                      {g.items.length}
+                    </div>
+                  </summary>
 
-                    <div className="min-w-0">
-                      <div className="text-base font-semibold text-gray-800 group-hover:text-blue-600 transition truncate">
-                        {m.name}
-                      </div>
+                  <div className="px-4 pb-4">
+                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      {g.items.map((m) => (
+                        <Link
+                          key={m.path}
+                          to={m.path}
+                          className="
+                            group relative overflow-hidden
+                            rounded-2xl
+                            bg-white/70 backdrop-blur-lg
+                            border border-gray-200
+                            p-5
+                            shadow-sm
+                            hover:shadow-xl
+                            hover:-translate-y-1
+                            transition-all duration-300
+                          "
+                        >
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-r from-blue-100 to-indigo-100 blur-xl" />
+
+                          <div className="relative z-10 flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md group-hover:scale-110 transition-transform duration-300">
+                              {m.icon}
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="text-base font-semibold text-gray-800 group-hover:text-blue-600 transition truncate">
+                                {m.name}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
                   </div>
-                </Link>
+                </details>
               ))}
             </div>
           ) : (
