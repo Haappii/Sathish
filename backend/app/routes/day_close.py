@@ -15,6 +15,7 @@ from app.models.month_close import BranchMonthClose, ShopMonthClose
 from app.models.branch import Branch
 from app.models.stock import Inventory
 from app.models.date_wise_stock import DateWiseStock
+from app.models.sales_return import SalesReturn, SalesReturnItem
 
 router = APIRouter(prefix="/day-close", tags=["Day Close"])
 
@@ -35,41 +36,108 @@ def parse_date(d: str) -> date:
 def calc_totals(db: Session, shop_id: int, branch_id: int | None, from_dt: date, to_dt: date):
     inv_q = db.query(Invoice).filter(
         func.date(Invoice.created_time).between(from_dt, to_dt),
-        Invoice.shop_id == shop_id
+        Invoice.shop_id == shop_id,
     )
-    if branch_id:
+    if branch_id is not None:
         inv_q = inv_q.filter(Invoice.branch_id == branch_id)
 
-    inv_ids = [i.invoice_id for i in inv_q.all()]
+    inv_sales_ex_tax_row = inv_q.with_entities(
+        func.coalesce(
+            func.sum(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.tax_amt, 0)),
+            0,
+        ).label("sales_ex_tax"),
+        func.coalesce(func.sum(func.coalesce(Invoice.tax_amt, 0)), 0).label("gst"),
+        func.coalesce(func.sum(func.coalesce(Invoice.discounted_amt, 0)), 0).label("discount"),
+    ).first()
 
-    sales = 0.0
-    profit_base = 0.0
-    if inv_ids:
-        row = (
-            db.query(
-                func.sum(InvoiceDetail.amount).label("sales"),
-                func.sum(
-                    (InvoiceDetail.amount - (InvoiceDetail.buy_price * InvoiceDetail.quantity))
-                ).label("profit_base"),
-            )
-            .filter(InvoiceDetail.invoice_id.in_(inv_ids))
-            .first()
+    invoice_sales_ex_tax = float(getattr(inv_sales_ex_tax_row, "sales_ex_tax", 0) or 0)
+    invoice_gst = float(getattr(inv_sales_ex_tax_row, "gst", 0) or 0)
+    invoice_discount = float(getattr(inv_sales_ex_tax_row, "discount", 0) or 0)
+
+    # COGS for invoices in date range
+    cogs_q = (
+        db.query(func.coalesce(func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity), 0))
+        .join(Invoice, Invoice.invoice_id == InvoiceDetail.invoice_id)
+        .filter(
+            Invoice.shop_id == shop_id,
+            func.date(Invoice.created_time).between(from_dt, to_dt),
         )
-        sales = float(row.sales or 0)
-        profit_base = float(row.profit_base or 0)
+    )
+    if branch_id is not None:
+        cogs_q = cogs_q.filter(Invoice.branch_id == branch_id)
+    invoice_cogs = float(cogs_q.scalar() or 0)
 
-    gst = float(inv_q.with_entities(func.sum(Invoice.tax_amt)).scalar() or 0)
-    discount = float(inv_q.with_entities(func.sum(Invoice.discounted_amt)).scalar() or 0)
+    # Returns (reduce sales/GST/discount and reverse COGS)
+    ret_q = db.query(SalesReturn).filter(
+        SalesReturn.shop_id == shop_id,
+        SalesReturn.status != "CANCELLED",
+        func.date(SalesReturn.created_on).between(from_dt, to_dt),
+    )
+    if branch_id is not None:
+        ret_q = ret_q.filter(SalesReturn.branch_id == branch_id)
+
+    ret_row = ret_q.with_entities(
+        func.coalesce(func.sum(func.coalesce(SalesReturn.tax_amount, 0)), 0).label("ret_tax"),
+        func.coalesce(func.sum(func.coalesce(SalesReturn.discount_amount, 0)), 0).label("ret_discount"),
+        func.coalesce(func.sum(func.coalesce(SalesReturn.refund_amount, 0)), 0).label("ret_refund"),
+        func.coalesce(
+            func.sum(
+                func.coalesce(SalesReturn.refund_amount, 0)
+                + func.coalesce(SalesReturn.discount_amount, 0)
+                - func.coalesce(SalesReturn.tax_amount, 0)
+            ),
+            0,
+        ).label("ret_sales_ex_tax"),
+    ).first()
+
+    ret_tax = float(getattr(ret_row, "ret_tax", 0) or 0)
+    ret_discount = float(getattr(ret_row, "ret_discount", 0) or 0)
+    ret_sales_ex_tax = float(getattr(ret_row, "ret_sales_ex_tax", 0) or 0)
+
+    inv_cost_sq = (
+        db.query(
+            InvoiceDetail.invoice_id.label("invoice_id"),
+            InvoiceDetail.item_id.label("item_id"),
+            func.max(InvoiceDetail.buy_price).label("buy_price"),
+        )
+        .filter(InvoiceDetail.shop_id == shop_id)
+        .group_by(InvoiceDetail.invoice_id, InvoiceDetail.item_id)
+        .subquery()
+    )
+    ret_cogs_q = (
+        db.query(
+            func.coalesce(func.sum(SalesReturnItem.quantity * inv_cost_sq.c.buy_price), 0)
+        )
+        .join(SalesReturn, SalesReturn.return_id == SalesReturnItem.return_id)
+        .join(
+            inv_cost_sq,
+            (inv_cost_sq.c.invoice_id == SalesReturn.invoice_id)
+            & (inv_cost_sq.c.item_id == SalesReturnItem.item_id),
+        )
+        .filter(
+            SalesReturn.shop_id == shop_id,
+            SalesReturn.status != "CANCELLED",
+            func.date(SalesReturn.created_on).between(from_dt, to_dt),
+        )
+    )
+    if branch_id is not None:
+        ret_cogs_q = ret_cogs_q.filter(SalesReturn.branch_id == branch_id)
+    ret_cogs = float(ret_cogs_q.scalar() or 0)
+
+    sales = invoice_sales_ex_tax - ret_sales_ex_tax
+    gst = invoice_gst - ret_tax
+    discount = invoice_discount - ret_discount
 
     exp_q = db.query(func.sum(BranchExpense.amount)).filter(
         BranchExpense.expense_date.between(from_dt, to_dt),
         BranchExpense.shop_id == shop_id
     )
-    if branch_id:
+    if branch_id is not None:
         exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
     expense = float(exp_q.scalar() or 0)
 
-    profit = profit_base - discount - expense
+    cogs_net = invoice_cogs - ret_cogs
+    profit = (sales - discount) - cogs_net - expense
     return {
         "total_sales": sales,
         "total_gst": gst,

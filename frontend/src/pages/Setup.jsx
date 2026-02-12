@@ -7,7 +7,10 @@ import {
   FaBoxes,
   FaCalendarAlt,
   FaTruck,
-  FaClipboardList
+  FaClipboardList,
+  FaUsers,
+  FaBell,
+  FaLifeRing
 } from "react-icons/fa";
 import { getSession } from "../utils/auth";
 
@@ -84,6 +87,27 @@ export default function Setup() {
       desc: "Create and receive POs",
       icon: FaClipboardList,
       color: "text-purple-600"
+    },
+    {
+      title: "Customers",
+      link: "/customers",
+      desc: "Customer profiles & dues",
+      icon: FaUsers,
+      color: "text-slate-700"
+    },
+    {
+      title: "Reorder Alerts",
+      link: "/reorder-alerts",
+      desc: "Items below minimum stock",
+      icon: FaBell,
+      color: "text-rose-600"
+    },
+    {
+      title: "Support Tickets",
+      link: "/support-tickets",
+      desc: "View and update tickets",
+      icon: FaLifeRing,
+      color: "text-orange-600"
     },
     {
       title: "Day Close",

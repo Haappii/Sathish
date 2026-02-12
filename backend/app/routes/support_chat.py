@@ -7,7 +7,7 @@ import smtplib
 import uuid
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -253,3 +253,31 @@ def update_ticket_status(
     db.commit()
     db.refresh(row)
     return {"success": True, "ticket_id": row.ticket_id, "status": row.status}
+
+
+@router.get("/tickets/{ticket_id}/attachment")
+def download_ticket_attachment(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(AdminOnly),
+):
+    row = db.query(SupportTicket).filter(SupportTicket.ticket_id == ticket_id).first()
+    if not row or not row.attachment_path:
+        raise HTTPException(404, "Attachment not found")
+
+    p = Path(row.attachment_path)
+    try:
+        resolved = p.resolve()
+        resolved.relative_to(SUPPORT_UPLOADS_DIR.resolve())
+    except Exception:
+        raise HTTPException(400, "Invalid attachment path")
+
+    if not resolved.exists():
+        raise HTTPException(404, "Attachment file missing")
+
+    mime_type, _ = guess_type(str(resolved))
+    return FileResponse(
+        str(resolved),
+        filename=(row.attachment_filename or resolved.name),
+        media_type=(mime_type or "application/octet-stream"),
+    )

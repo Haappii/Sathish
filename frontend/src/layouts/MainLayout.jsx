@@ -22,7 +22,10 @@ import {
   FaFileInvoice,
   FaTools,
   FaBoxes,
-  FaChartLine
+  FaChartLine,
+  FaUsers,
+  FaBell,
+  FaLifeRing
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
@@ -204,13 +207,15 @@ export default function MainLayout({ hideSidebar = false }) {
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
       { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
+      { name: "Customers", path: "/customers", icon: <FaUsers /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       ...(showTableBilling
         ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
         : []),
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
-      { name: "Inventory", path: "/inventory", icon: <FaBoxes /> }
+      { name: "Inventory", path: "/inventory", icon: <FaBoxes /> },
+      { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> }
     ];
   }
 
@@ -223,12 +228,15 @@ export default function MainLayout({ hideSidebar = false }) {
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
       { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
+      { name: "Customers", path: "/customers", icon: <FaUsers /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
+      { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
       ...(showTableBilling
         ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
         : []),
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
+      { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> }
     ];
   }

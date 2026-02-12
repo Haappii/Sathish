@@ -39,6 +39,10 @@ def _get_business_date(db: Session, shop_id: int):
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
     return shop.app_date if shop and shop.app_date else datetime.utcnow().date()
 
+def _get_business_datetime(db: Session, shop_id: int) -> datetime:
+    business_date = _get_business_date(db, shop_id)
+    return datetime.combine(business_date, datetime.now().time())
+
 
 def _new_return_number() -> str:
     return f"RET-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
@@ -123,6 +127,7 @@ def create_return(
     business_date = _get_business_date(db, user.shop_id)
     if invoice.branch_id and is_branch_day_closed(db, user.shop_id, invoice.branch_id, business_date):
         raise HTTPException(403, "Day closed for this branch")
+    business_dt = _get_business_datetime(db, user.shop_id)
 
     details = (
         db.query(InvoiceDetail)
@@ -237,6 +242,7 @@ def create_return(
         reason=payload.reason,
         status="COMPLETED",
         created_by=user.user_id,
+        created_on=business_dt,
     )
     db.add(row)
     db.flush()

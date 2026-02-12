@@ -17,6 +17,9 @@ import Dues from "./pages/Dues";
 import Returns from "./pages/Returns";
 import StockTransfers from "./pages/StockTransfers";
 import Drafts from "./pages/Drafts";
+import Customers from "./pages/Customers";
+import ReorderAlerts from "./pages/ReorderAlerts";
+import SupportTickets from "./pages/SupportTickets";
 
 import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
@@ -75,6 +78,9 @@ export default function App() {
             <Route path="/returns" element={<Returns />} />
             <Route path="/stock-transfers" element={<StockTransfers />} />
             <Route path="/drafts" element={<Drafts />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/reorder-alerts" element={<ReorderAlerts />} />
+            <Route path="/support-tickets" element={<SupportTickets />} />
 
             {/* DELETED INVOICES (🔥 NOT IN REPORTS) */}
             <Route
