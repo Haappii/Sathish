@@ -36,7 +36,7 @@ export default function CreateBill() {
 
   const [discountType, setDiscountType] = useState("flat");
   const [discount, setDiscount] = useState(0);
-  const paymentModes = ["cash", "card", "upi"];
+  const paymentModes = ["cash", "card", "upi", "credit"];
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({
