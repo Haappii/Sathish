@@ -11,6 +11,7 @@ from app.models.invoice_payment import InvoicePayment
 from app.schemas.dues import DuePaymentCreate, DueSummary
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 from app.services.credit_service import (
     as_decimal,
     get_paid_amount,
@@ -20,12 +21,6 @@ from app.services.credit_service import (
 )
 
 router = APIRouter(prefix="/dues", tags=["Customer Dues"])
-
-
-def _require_collection_role(user):
-    role = str(getattr(user, "role_name", "") or "").lower()
-    if role not in {"admin", "manager", "cashier"}:
-        raise HTTPException(403, "Not allowed")
 
 
 def _resolve_branch(branch_id: int | None, user):
@@ -74,9 +69,8 @@ def list_open_dues(
     q: str | None = Query(None),
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("dues", "read")),
 ):
-    _require_collection_role(user)
     bid = _resolve_branch(branch_id, user)
 
     query = db.query(InvoiceDue).filter(
@@ -116,9 +110,8 @@ def list_open_dues(
 def get_due_by_invoice(
     invoice_number: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("dues", "read")),
 ):
-    _require_collection_role(user)
 
     due = (
         db.query(InvoiceDue)
@@ -139,9 +132,8 @@ def get_due_by_invoice(
 def pay_due(
     payload: DuePaymentCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("dues", "write")),
 ):
-    _require_collection_role(user)
 
     amt = Decimal(str(payload.amount or 0))
     if amt <= 0:

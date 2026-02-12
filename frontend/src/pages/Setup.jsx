@@ -10,7 +10,8 @@ import {
   FaClipboardList,
   FaUsers,
   FaBell,
-  FaLifeRing
+  FaLifeRing,
+  FaUserShield
 } from "react-icons/fa";
 import { getSession } from "../utils/auth";
 
@@ -59,6 +60,13 @@ export default function Setup() {
       desc: "Create & manage users",
       icon: FaUsersCog,
       color: "text-teal-600"
+    },
+    {
+      title: "Permissions",
+      link: "/setup/permissions",
+      desc: "Module access by role",
+      icon: FaUserShield,
+      color: "text-indigo-700"
     },
     {
       title: "Branch Management",

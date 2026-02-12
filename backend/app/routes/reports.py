@@ -4,7 +4,7 @@ from sqlalchemy import func, cast, Integer
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.utils.auth_guard import get_current_user
+from app.utils.permissions import require_permission
 
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
@@ -23,6 +23,25 @@ from app.models.supplier import Supplier
 from app.models.purchase_order import PurchaseOrder
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+
+def _is_admin(user) -> bool:
+    return str(getattr(user, "role_name", "") or "").strip().lower() == "admin"
+
+
+def _force_branch(branch_id: int | None, user) -> int | None:
+    if _is_admin(user):
+        if branch_id is None:
+            return None
+        try:
+            return int(branch_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
+
+    try:
+        return int(getattr(user, "branch_id", None))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 # =====================================================
@@ -66,9 +85,10 @@ def sales_summary(
     branch_id: int | None = None,
     payment_mode: str | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
     group_col, label = resolve_group_by(group_by)
 
     cols = [
@@ -131,9 +151,10 @@ def item_wise_sales(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -175,9 +196,10 @@ def invoice_detail_report(
     branch_id: int | None = None,
     payment_mode: str | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     total_items = func.sum(InvoiceDetail.quantity).over(
         partition_by=Invoice.invoice_id
@@ -257,12 +279,13 @@ def customer_invoice_details(
     customer_number: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     if not customer_number:
         raise HTTPException(400, "Customer number is required")
 
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     total_items = func.sum(InvoiceDetail.quantity).over(
         partition_by=Invoice.invoice_id
@@ -338,11 +361,11 @@ def category_sales(
     from_date: str,
     to_date: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
 
-    rows = (
+    q = (
         db.query(
             Category.category_name.label("category"),
             Branch.branch_name.label("branch"),
@@ -355,7 +378,13 @@ def category_sales(
         .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
         .filter(Invoice.shop_id == user.shop_id)
         .filter(Invoice.created_time.between(f, t))
-        .group_by(Category.category_name, Branch.branch_name)
+    )
+
+    if not _is_admin(user):
+        q = q.filter(Invoice.branch_id == user.branch_id)
+
+    rows = (
+        q.group_by(Category.category_name, Branch.branch_name)
         .order_by(func.sum(InvoiceDetail.amount).desc())
         .all()
     )
@@ -380,9 +409,10 @@ def profit_item_wise(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -428,9 +458,10 @@ def profit_category_wise(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -474,9 +505,10 @@ def profit_date_wise(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -518,9 +550,10 @@ def expense_report(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -560,11 +593,11 @@ def user_sales(
     from_date: str,
     to_date: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
 
-    rows = (
+    q = (
         db.query(
             User.user_name.label("user"),
             Branch.branch_name.label("branch"),
@@ -575,7 +608,13 @@ def user_sales(
         .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
         .filter(Invoice.shop_id == user.shop_id)
         .filter(Invoice.created_time.between(f, t))
-        .group_by(User.user_name, Branch.branch_name)
+    )
+
+    if not _is_admin(user):
+        q = q.filter(Invoice.branch_id == user.branch_id)
+
+    rows = (
+        q.group_by(User.user_name, Branch.branch_name)
         .order_by(func.sum(Invoice.total_amount).desc())
         .all()
     )
@@ -598,8 +637,9 @@ def user_sales(
 def inventory_current(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
+    branch_id = _force_branch(branch_id, user)
     q = (
         db.query(
             Item.item_name.label("item"),
@@ -636,11 +676,11 @@ def inventory_movement(
     from_date: str,
     to_date: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
 
-    rows = (
+    q = (
         db.query(
             Item.item_name.label("item"),
             Branch.branch_name.label("branch"),
@@ -654,8 +694,12 @@ def inventory_movement(
         .filter(StockLedger.shop_id == user.shop_id)
         .filter(StockLedger.created_time.between(f, t))
         .order_by(StockLedger.created_time.desc())
-        .all()
     )
+
+    if not _is_admin(user):
+        q = q.filter(StockLedger.branch_id == user.branch_id)
+
+    rows = q.all()
 
     return [
         {
@@ -679,9 +723,10 @@ def inventory_date_wise(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -721,11 +766,11 @@ def deleted_invoices(
     from_date: str,
     to_date: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
 
-    rows = (
+    q = (
         db.query(
             InvoiceArchive.invoice_number.label("invoice"),
             Branch.branch_name.label("branch"),
@@ -742,8 +787,12 @@ def deleted_invoices(
         .filter(InvoiceArchive.shop_id == user.shop_id)
         .filter(InvoiceArchive.deleted_time.between(f, t))
         .order_by(InvoiceArchive.deleted_time.desc())
-        .all()
     )
+
+    if not _is_admin(user):
+        q = q.filter(InvoiceArchive.branch_id == user.branch_id)
+
+    rows = q.all()
 
     return [
         {
@@ -766,7 +815,7 @@ def audit_logs(
     from_date: str,
     to_date: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
 
@@ -806,9 +855,10 @@ def table_usage(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     rows = (
         db.query(
@@ -825,7 +875,7 @@ def table_usage(
         .filter(Order.opened_at.between(f, t))
     )
 
-    if branch_id:
+    if branch_id is not None:
         rows = rows.filter(Order.branch_id == branch_id)
 
     rows = rows.order_by(Order.opened_at.desc()).all()
@@ -860,10 +910,11 @@ def supplier_report(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
     t_end = t + timedelta(days=1)
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -885,7 +936,7 @@ def supplier_report(
         .order_by(Supplier.created_at.desc())
     )
 
-    if branch_id:
+    if branch_id is not None:
         q = q.filter(Supplier.branch_id == branch_id)
 
     return [
@@ -914,10 +965,11 @@ def po_aging(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
     ref_date = t.date()
+    branch_id = _force_branch(branch_id, user)
 
     q = (
         db.query(
@@ -938,7 +990,7 @@ def po_aging(
         .order_by(PurchaseOrder.order_date.desc())
     )
 
-    if branch_id:
+    if branch_id is not None:
         q = q.filter(PurchaseOrder.branch_id == branch_id)
 
     rows = q.all()
@@ -976,9 +1028,10 @@ def payables_summary(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("reports", "read")),
 ):
     f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
 
     total_amount = func.sum(PurchaseOrder.total_amount).label("total_amount")
     paid_amount = func.sum(PurchaseOrder.paid_amount).label("paid_amount")
@@ -1000,7 +1053,7 @@ def payables_summary(
         .order_by(outstanding.desc())
     )
 
-    if branch_id:
+    if branch_id is not None:
         q = q.filter(PurchaseOrder.branch_id == branch_id)
 
     rows = q.all()

@@ -14,8 +14,8 @@ from app.services.inventory_service import (
     get_branch_stock_rows,
 )
 
-from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -25,10 +25,16 @@ def resolve_branch(branch_id_param, user):
     Admin  -> may use param OR active session branch
     Normal -> always forced to own branch
     """
-    if str(user.role_name).lower() == "admin":
-        return int(branch_id_param or user.branch_id)
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        branch_raw = branch_id_param if branch_id_param not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
 
-    return int(user.branch_id)
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 # =========================
@@ -38,7 +44,7 @@ def resolve_branch(branch_id_param, user):
 def list_stock(
     branch_id: int = Query(None),
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "read"))
 ):
     if not is_inventory_enabled(db, user.shop_id):
         return []
@@ -67,7 +73,7 @@ def add_stock(
     qty: int,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "write"))
 ):
     if not is_inventory_enabled(db, user.shop_id):
         raise HTTPException(400, "Inventory mode disabled")
@@ -99,7 +105,7 @@ def remove_stock(
     qty: int,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "write"))
 ):
     if not is_inventory_enabled(db, user.shop_id):
         raise HTTPException(400, "Inventory mode disabled")
@@ -134,7 +140,7 @@ def set_min_stock(
     min_stock: int,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "write"))
 ):
     if not is_inventory_enabled(db, user.shop_id):
         raise HTTPException(400, "Inventory mode disabled")
@@ -164,7 +170,7 @@ def stock_history(
     item_id: int = Query(...),
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "read"))
 ):
     if not is_inventory_enabled(db, user.shop_id):
         return []
@@ -201,7 +207,7 @@ def stock_history(
 def reorder_alerts(
     branch_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "read"))
 ):
     if not is_inventory_enabled(db, user.shop_id):
         return []

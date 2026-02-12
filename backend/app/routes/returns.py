@@ -19,14 +19,9 @@ from app.services.credit_service import as_decimal, normalize_mobile, upsert_cus
 from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import is_inventory_enabled, adjust_stock, get_stock
 from app.utils.auth_user import get_current_user
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/returns", tags=["Sales Returns"])
-
-
-def _require_return_role(user):
-    role = str(getattr(user, "role_name", "") or "").lower()
-    if role not in {"admin", "manager"}:
-        raise HTTPException(403, "Manager/Admin access required")
 
 
 def _require_admin(user):
@@ -58,10 +53,8 @@ def list_returns(
     to_date: str,
     branch_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("returns", "read")),
 ):
-    _require_return_role(user)
-
     try:
         f = datetime.strptime(from_date, "%Y-%m-%d").date()
         t = datetime.strptime(to_date, "%Y-%m-%d").date()
@@ -87,10 +80,8 @@ def list_returns(
 def get_return(
     return_number: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("returns", "read")),
 ):
-    _require_return_role(user)
-
     row = db.query(SalesReturn).filter(
         SalesReturn.shop_id == user.shop_id,
         SalesReturn.return_number == return_number,
@@ -109,10 +100,8 @@ def get_return(
 def create_return(
     payload: SalesReturnCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("returns", "write")),
 ):
-    _require_return_role(user)
-
     invoice = (
         db.query(Invoice)
         .filter(
@@ -288,7 +277,7 @@ def create_return(
 def cancel_return(
     return_number: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("returns", "delete")),
 ):
     _require_admin(user)
 

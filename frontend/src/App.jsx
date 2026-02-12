@@ -8,6 +8,7 @@ import MainLayout from "./layouts/MainLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Trends from "./pages/Trends";
+import Analytics from "./pages/Analytics";
 import DayClose from "./pages/DayClose";
 import CreateBill from "./pages/CreateBill";
 import SalesHistory from "./pages/SalesHistory";
@@ -33,6 +34,7 @@ import Branches from "./pages/setup/Branches";
 import ManageTables from "./pages/setup/ManageTables";
 import Suppliers from "./pages/setup/Suppliers";
 import PurchaseOrders from "./pages/setup/PurchaseOrders";
+import Permissions from "./pages/setup/Permissions";
 import SetupOnboard from "./pages/SetupOnboard";
 import About from "./pages/About";
 
@@ -62,6 +64,7 @@ export default function App() {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/trends" element={<Trends />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/day-close" element={<DayClose />} />
             <Route path="/home" element={<Navigate to="/dashboard" replace />} />
 
@@ -99,6 +102,7 @@ export default function App() {
             <Route path="/setup/branches" element={<Branches />} />
             <Route path="/setup/suppliers" element={<Suppliers />} />
             <Route path="/setup/purchase-orders" element={<PurchaseOrders />} />
+            <Route path="/setup/permissions" element={<Permissions />} />
             <Route
               path="/setup/branches/:branchId/tables"
               element={<ManageTables />}

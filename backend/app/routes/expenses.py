@@ -3,20 +3,27 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.db import get_db
-from app.utils.auth_user import get_current_user
 from app.models.branch_expense import BranchExpense
 from app.models.shop_details import ShopDetails
 from app.schemas.expense import ExpenseCreate, ExpenseResponse
 from app.services.day_close_service import is_branch_day_closed
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 
-def manager_or_admin(user):
-    role = str(user.role_name or "").lower()
-    if role not in ["manager", "admin"]:
-        raise HTTPException(403, "Manager/Admin access required")
+def resolve_branch(branch_id_param, user) -> int:
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        branch_raw = branch_id_param if branch_id_param not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 def get_business_date(db: Session, shop_id: int):
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
@@ -27,12 +34,10 @@ def get_business_date(db: Session, shop_id: int):
 def create_expense(
     payload: ExpenseCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("expenses", "write")),
 ):
-    manager_or_admin(user)
-
-    branch_id = payload.branch_id or user.branch_id
-    if not branch_id:
+    branch_id = resolve_branch(payload.branch_id, user)
+    if branch_id is None:
         raise HTTPException(400, "Branch required")
     business_date = get_business_date(db, user.shop_id)
     if is_branch_day_closed(db, user.shop_id, branch_id, business_date):
@@ -77,25 +82,26 @@ def list_expenses(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("expenses", "read")),
 ):
-    manager_or_admin(user)
-
     try:
         f = datetime.strptime(from_date, "%Y-%m-%d").date()
         t = datetime.strptime(to_date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(400, "Invalid date format YYYY-MM-DD")
 
-    bid = branch_id or user.branch_id
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    bid = resolve_branch(branch_id, user) if role != "admin" or branch_id is not None else None
 
-    return (
+    q = (
         db.query(BranchExpense)
         .filter(
-            BranchExpense.branch_id == bid,
+            BranchExpense.shop_id == user.shop_id,
             BranchExpense.expense_date.between(f, t),
-            BranchExpense.shop_id == user.shop_id
         )
         .order_by(BranchExpense.expense_date.desc())
-        .all()
     )
+    if bid is not None:
+        q = q.filter(BranchExpense.branch_id == bid)
+
+    return q.all()

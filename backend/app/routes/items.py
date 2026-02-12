@@ -11,6 +11,7 @@ from app.models.stock import Inventory
 from app.schemas.items import ItemCreate, ItemUpdate, ItemResponse
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -77,7 +78,12 @@ def list_items_by_category(category_id: int, db: Session = Depends(get_db), user
 
 # ---------- CREATE ----------
 @router.post("/", response_model=ItemResponse)
-def create_item(request_data: ItemCreate, request: Request, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def create_item(
+    request_data: ItemCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("items", "write")),
+):
     branch_id = resolve_branch(request)
 
     category = db.query(Category).filter(
@@ -137,7 +143,13 @@ def create_item(request_data: ItemCreate, request: Request, db: Session = Depend
 
 # ---------- UPDATE ----------
 @router.put("/{item_id}", response_model=ItemResponse)
-def update_item(item_id: int, request_data: ItemUpdate, request: Request, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def update_item(
+    item_id: int,
+    request_data: ItemUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("items", "write")),
+):
     branch_id = resolve_branch(request)
 
     item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
@@ -222,7 +234,7 @@ def upload_item_image(
     item_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("items", "write"))
 ):
     item = (
         db.query(Item)
@@ -330,7 +342,11 @@ def upload_item_image(
 
 # ---------- SOFT DELETE ----------
 @router.delete("/{item_id}")
-def delete_item(item_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def delete_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("items", "write")),
+):
     item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
     if not item:
         raise HTTPException(404, "Item not found")

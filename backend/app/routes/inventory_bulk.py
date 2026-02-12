@@ -14,20 +14,27 @@ from app.services.inventory_service import (
     adjust_stock,
 )
 
-from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/inventory", tags=["Inventory Bulk Upload"])
 
 
 def resolve_branch(branch_id_param, user):
-    if str(user.role_name).lower() == "admin":
-        return int(branch_id_param or user.branch_id)
-    return int(user.branch_id)
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        branch_raw = branch_id_param if branch_id_param not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 @router.get("/bulk-template")
-def download_bulk_template():
+def download_bulk_template(user=Depends(require_permission("inventory", "write"))):
     os.makedirs("uploads", exist_ok=True)
 
     wb = Workbook()
@@ -53,7 +60,7 @@ async def bulk_upload_stock(
     file: UploadFile = File(...),
     branch_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("inventory", "write")),
 ):
 
     if not is_inventory_enabled(db, user.shop_id):

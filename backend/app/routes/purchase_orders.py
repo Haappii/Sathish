@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.db import get_db
-from app.utils.auth_user import get_current_user
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 from app.models.supplier import Supplier
 from app.models.items import Item
@@ -17,20 +16,22 @@ from app.schemas.purchase_order import (
 from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import adjust_stock
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/purchase-orders", tags=["Purchase Orders"])
 
 
-def manager_or_admin(user):
-    role = str(user.role_name or "").lower()
-    if role not in ["manager", "admin"]:
-        raise HTTPException(403, "Manager/Admin access required")
-
-
 def resolve_branch(branch_id_param, user):
-    if str(user.role_name).lower() == "admin":
-        return int(branch_id_param or user.branch_id)
-    return int(user.branch_id)
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        branch_raw = branch_id_param if branch_id_param not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 def get_business_date(db: Session, shop_id: int):
@@ -46,9 +47,8 @@ def generate_po_number():
 def list_pos(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("purchase_orders", "read")),
 ):
-    manager_or_admin(user)
     bid = resolve_branch(branch_id, user)
     rows = (
         db.query(PurchaseOrder)
@@ -63,9 +63,8 @@ def list_pos(
 def get_po(
     po_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("purchase_orders", "read")),
 ):
-    manager_or_admin(user)
     po = db.query(PurchaseOrder).filter(
         PurchaseOrder.po_id == po_id,
         PurchaseOrder.shop_id == user.shop_id
@@ -81,9 +80,8 @@ def get_po(
 def create_po(
     payload: PurchaseOrderCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("purchase_orders", "write")),
 ):
-    manager_or_admin(user)
     bid = resolve_branch(payload.branch_id, user)
     business_date = get_business_date(db, user.shop_id)
     if is_branch_day_closed(db, user.shop_id, bid, business_date):
@@ -174,9 +172,8 @@ def receive_po(
     po_id: int,
     payload: PurchaseOrderReceive,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("purchase_orders", "write")),
 ):
-    manager_or_admin(user)
     po = db.query(PurchaseOrder).filter(
         PurchaseOrder.po_id == po_id,
         PurchaseOrder.shop_id == user.shop_id
@@ -239,9 +236,8 @@ def update_payment(
     po_id: int,
     payload: PurchaseOrderPayment,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("purchase_orders", "write")),
 ):
-    manager_or_admin(user)
     po = db.query(PurchaseOrder).filter(
         PurchaseOrder.po_id == po_id,
         PurchaseOrder.shop_id == user.shop_id

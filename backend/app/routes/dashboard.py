@@ -327,13 +327,33 @@ def get_trend_metric(
             for r in rows
         }
     elif metric in ["profit"]:
-        from app.models.invoice_details import InvoiceDetail
+        from sqlalchemy import and_
         from app.models.branch_expense import BranchExpense
-        sales_rows = (
+        from app.models.sales_return import SalesReturn, SalesReturnItem
+
+        inv_sum_rows = (
             db.query(
                 group_key(Invoice.created_time).label("k"),
-                func.sum(InvoiceDetail.amount).label("sales"),
-                func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity).label("cost")
+                func.sum(
+                    func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.tax_amt, 0)
+                ).label("sales_ex_tax"),
+                func.sum(func.coalesce(Invoice.discounted_amt, 0)).label("discount"),
+            )
+            .filter(
+                Invoice.shop_id == user.shop_id,
+                Invoice.branch_id == branch_id,
+                func.date(Invoice.created_time).between(start, end)
+            )
+            .group_by(group_key(Invoice.created_time))
+            .order_by(group_key(Invoice.created_time))
+            .all()
+        )
+        inv_cogs_rows = (
+            db.query(
+                group_key(Invoice.created_time).label("k"),
+                func.sum(
+                    func.coalesce(InvoiceDetail.buy_price, 0) * func.coalesce(InvoiceDetail.quantity, 0)
+                ).label("cogs"),
             )
             .join(InvoiceDetail, InvoiceDetail.invoice_id == Invoice.invoice_id)
             .filter(
@@ -345,6 +365,62 @@ def get_trend_metric(
             .order_by(group_key(Invoice.created_time))
             .all()
         )
+        ret_sum_rows = (
+            db.query(
+                group_key(SalesReturn.created_on).label("k"),
+                func.sum(
+                    func.coalesce(SalesReturn.refund_amount, 0)
+                    + func.coalesce(SalesReturn.discount_amount, 0)
+                    - func.coalesce(SalesReturn.tax_amount, 0)
+                ).label("sales_ex_tax"),
+                func.sum(func.coalesce(SalesReturn.discount_amount, 0)).label("discount"),
+            )
+            .filter(
+                SalesReturn.shop_id == user.shop_id,
+                SalesReturn.branch_id == branch_id,
+                SalesReturn.status != "CANCELLED",
+                func.date(SalesReturn.created_on).between(start, end)
+            )
+            .group_by(group_key(SalesReturn.created_on))
+            .order_by(group_key(SalesReturn.created_on))
+            .all()
+        )
+
+        inv_cost_sq = (
+            db.query(
+                InvoiceDetail.invoice_id.label("invoice_id"),
+                InvoiceDetail.item_id.label("item_id"),
+                func.max(InvoiceDetail.buy_price).label("buy_price"),
+            )
+            .filter(InvoiceDetail.shop_id == user.shop_id)
+            .group_by(InvoiceDetail.invoice_id, InvoiceDetail.item_id)
+            .subquery()
+        )
+        ret_cogs_rows = (
+            db.query(
+                group_key(SalesReturn.created_on).label("k"),
+                func.sum(SalesReturnItem.quantity * inv_cost_sq.c.buy_price).label("cogs"),
+            )
+            .join(SalesReturn, SalesReturn.return_id == SalesReturnItem.return_id)
+            .join(
+                inv_cost_sq,
+                and_(
+                    inv_cost_sq.c.invoice_id == SalesReturn.invoice_id,
+                    inv_cost_sq.c.item_id == SalesReturnItem.item_id,
+                ),
+            )
+            .filter(
+                SalesReturnItem.shop_id == user.shop_id,
+                SalesReturn.shop_id == user.shop_id,
+                SalesReturn.branch_id == branch_id,
+                SalesReturn.status != "CANCELLED",
+                func.date(SalesReturn.created_on).between(start, end),
+            )
+            .group_by(group_key(SalesReturn.created_on))
+            .order_by(group_key(SalesReturn.created_on))
+            .all()
+        )
+
         expense_rows = (
             db.query(
                 group_key(BranchExpense.expense_date).label("k"),
@@ -359,25 +435,47 @@ def get_trend_metric(
             .order_by(group_key(BranchExpense.expense_date))
             .all()
         )
-        sales_map = {
-            (r.k.date() if hasattr(r.k, "date") else r.k): r
-            for r in sales_rows
-        }
-        expense_map = {
-            (r.k.date() if hasattr(r.k, "date") else r.k): r
-            for r in expense_rows
-        }
+
+        def norm_k(val):
+            return val.date() if hasattr(val, "date") else val
+
+        inv_sum_map = {norm_k(r.k): r for r in inv_sum_rows}
+        inv_cogs_map = {norm_k(r.k): r for r in inv_cogs_rows}
+        ret_sum_map = {norm_k(r.k): r for r in ret_sum_rows}
+        ret_cogs_map = {norm_k(r.k): r for r in ret_cogs_rows}
+        expense_map = {norm_k(r.k): r for r in expense_rows}
+
+        keys = set()
+        keys.update(inv_sum_map.keys())
+        keys.update(inv_cogs_map.keys())
+        keys.update(ret_sum_map.keys())
+        keys.update(ret_cogs_map.keys())
+        keys.update(expense_map.keys())
+
         data_map = {}
-        for k in set(list(sales_map.keys()) + list(expense_map.keys())):
-            s = sales_map.get(k)
-            e = expense_map.get(k)
-            sales = float(s.sales or 0) if s else 0.0
-            cost = float(s.cost or 0) if s else 0.0
-            expense = float(e.expense or 0) if e else 0.0
-            data_map[k] = {
-                "k": k,
-                "v": sales - cost - expense
-            }
+        for k in keys:
+            inv_sum = inv_sum_map.get(k)
+            inv_cogs = inv_cogs_map.get(k)
+            ret_sum = ret_sum_map.get(k)
+            ret_cogs = ret_cogs_map.get(k)
+            exp = expense_map.get(k)
+
+            inv_sales_ex_tax = float(getattr(inv_sum, "sales_ex_tax", 0) or 0)
+            inv_discount = float(getattr(inv_sum, "discount", 0) or 0)
+            inv_cogs_amt = float(getattr(inv_cogs, "cogs", 0) or 0)
+
+            ret_sales_ex_tax = float(getattr(ret_sum, "sales_ex_tax", 0) or 0)
+            ret_discount = float(getattr(ret_sum, "discount", 0) or 0)
+            ret_cogs_amt = float(getattr(ret_cogs, "cogs", 0) or 0)
+
+            expense = float(getattr(exp, "expense", 0) or 0)
+
+            sales = inv_sales_ex_tax - ret_sales_ex_tax
+            discount = inv_discount - ret_discount
+            cogs_net = inv_cogs_amt - ret_cogs_amt
+
+            profit = (sales - discount) - cogs_net - expense
+            data_map[k] = {"k": k, "v": profit}
     else:
         data_map = {}
 

@@ -18,6 +18,7 @@ import { getShopLogoUrl } from "../utils/shopLogo";
 
 import {
   FaChartPie,
+  FaChartBar,
   FaShoppingCart,
   FaFileInvoice,
   FaTools,
@@ -203,6 +204,7 @@ export default function MainLayout({ hideSidebar = false }) {
     menuItems = [
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
+      { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
@@ -224,6 +226,7 @@ export default function MainLayout({ hideSidebar = false }) {
     menuItems = [
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
+      { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
@@ -244,6 +247,7 @@ export default function MainLayout({ hideSidebar = false }) {
   if (isHeadOfficeClosed) {
     menuItems = [
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
+      { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> }
     ];
   }

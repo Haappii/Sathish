@@ -27,18 +27,26 @@ from app.services.inventory_service import (
 )
 from app.services.gst_service import calculate_gst
 from app.services.day_close_service import is_branch_day_closed
-from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
 from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
 
 def resolve_branch(user, override_branch=None):
-    if str(user.role_name).lower() == "admin":
-        return int(override_branch or user.branch_id)
-    return int(user.branch_id)
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+
+    if role == "admin":
+        branch_raw = override_branch if override_branch not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 def get_business_datetime(db: Session, shop_id: int) -> datetime:
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
@@ -56,7 +64,7 @@ def create_invoice(
     payload: InvoiceCreate,
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "write")),
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
     business_dt = get_business_datetime(db, user.shop_id)
@@ -171,7 +179,7 @@ def create_invoice(
 def list_invoices(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "read")),
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
     return (
@@ -189,7 +197,7 @@ def list_invoices(
 def get_invoice(
     invoice_number: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "read")),
 ):
     invoice = db.query(Invoice).filter(
         Invoice.invoice_number == invoice_number,
@@ -251,8 +259,11 @@ def modify_invoice(
     invoice_id: int,
     payload: InvoiceUpdate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "write")),
 ):
+    if str(getattr(user, "role_name", "") or "").lower() == "cashier":
+        raise HTTPException(403, "Manager/Admin access required")
+
     invoice = db.query(Invoice).filter(
         Invoice.invoice_id == invoice_id,
         Invoice.shop_id == user.shop_id
@@ -386,8 +397,11 @@ def modify_invoice(
 def delete_invoice(
     invoice_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "delete")),
 ):
+    if str(getattr(user, "role_name", "") or "").lower() == "cashier":
+        raise HTTPException(403, "Manager/Admin access required")
+
     invoice = db.query(Invoice).filter(
         Invoice.invoice_id == invoice_id,
         Invoice.shop_id == user.shop_id
@@ -466,7 +480,7 @@ def delete_invoice(
 def list_archived_invoices(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "read")),
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
 
@@ -489,7 +503,7 @@ def get_latest_customer_by_mobile(
     mobile: str,
     request: Request,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user=Depends(require_permission("billing", "read")),
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
 
@@ -543,7 +557,7 @@ def get_latest_customer_by_mobile(
 def restore_archived_invoice(
     archive_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("billing", "write")),
 ):
     archive = db.query(InvoiceArchive).filter(
         InvoiceArchive.archive_id == archive_id,

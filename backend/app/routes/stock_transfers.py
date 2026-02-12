@@ -14,18 +14,13 @@ from app.schemas.stock_transfer import StockTransferCreate, StockTransferOut, St
 from app.services.audit_service import log_action
 from app.services.inventory_service import is_inventory_enabled, get_stock, adjust_stock
 from app.utils.auth_user import get_current_user
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/stock-transfers", tags=["Stock Transfers"])
 
 
 def _role(user) -> str:
     return str(getattr(user, "role_name", "") or "").lower()
-
-
-def _require_manager_or_admin(user):
-    if _role(user) not in {"admin", "manager"}:
-        raise HTTPException(403, "Manager/Admin access required")
-
 
 def _require_admin(user):
     if _role(user) != "admin":
@@ -59,10 +54,8 @@ def list_transfers(
     branch_id: int | None = Query(None),
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "read")),
 ):
-    _require_manager_or_admin(user)
-
     query = db.query(StockTransfer).filter(StockTransfer.shop_id == user.shop_id)
 
     role = _role(user)
@@ -87,10 +80,8 @@ def list_transfers(
 def get_transfer(
     transfer_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "read")),
 ):
-    _require_manager_or_admin(user)
-
     row = (
         db.query(StockTransfer)
         .filter(StockTransfer.shop_id == user.shop_id, StockTransfer.transfer_id == transfer_id)
@@ -110,10 +101,8 @@ def get_transfer(
 def create_transfer(
     payload: StockTransferCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "write")),
 ):
-    _require_manager_or_admin(user)
-
     if not is_inventory_enabled(db, user.shop_id):
         raise HTTPException(400, "Inventory mode disabled")
 
@@ -189,7 +178,7 @@ def approve_transfer(
     transfer_id: int,
     payload: StockTransferAction | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "write")),
 ):
     _require_admin(user)
 
@@ -230,7 +219,7 @@ def reject_transfer(
     transfer_id: int,
     payload: StockTransferAction | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "write")),
 ):
     _require_admin(user)
 
@@ -271,10 +260,8 @@ def dispatch_transfer(
     transfer_id: int,
     payload: StockTransferAction | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "write")),
 ):
-    _require_manager_or_admin(user)
-
     if not is_inventory_enabled(db, user.shop_id):
         raise HTTPException(400, "Inventory mode disabled")
 
@@ -337,10 +324,8 @@ def receive_transfer(
     transfer_id: int,
     payload: StockTransferAction | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "write")),
 ):
-    _require_manager_or_admin(user)
-
     if not is_inventory_enabled(db, user.shop_id):
         raise HTTPException(400, "Inventory mode disabled")
 
@@ -395,10 +380,8 @@ def cancel_transfer(
     transfer_id: int,
     payload: StockTransferAction | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("stock_transfers", "delete")),
 ):
-    _require_manager_or_admin(user)
-
     row = (
         db.query(StockTransfer)
         .filter(StockTransfer.shop_id == user.shop_id, StockTransfer.transfer_id == transfer_id)

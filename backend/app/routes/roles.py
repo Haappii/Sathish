@@ -4,17 +4,25 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.roles import Role
 from app.schemas.roles import RoleCreate, RoleUpdate, RoleResponse
+from app.utils.auth_user import AdminOnly
 
 router = APIRouter(prefix="/roles", tags=["Roles"])
 
 
 @router.get("/", response_model=list[RoleResponse])
-def list_roles(db: Session = Depends(get_db)):
+def list_roles(
+    db: Session = Depends(get_db),
+    user=Depends(AdminOnly),
+):
     return db.query(Role).order_by(Role.role_name).all()
 
 
 @router.post("/", response_model=RoleResponse)
-def create_role(request: RoleCreate, db: Session = Depends(get_db)):
+def create_role(
+    request: RoleCreate,
+    db: Session = Depends(get_db),
+    user=Depends(AdminOnly),
+):
     exists = db.query(Role).filter(Role.role_name == request.role_name).first()
     if exists:
         raise HTTPException(status_code=400, detail="Role already exists")
@@ -27,7 +35,12 @@ def create_role(request: RoleCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{role_id}", response_model=RoleResponse)
-def update_role(role_id: int, request: RoleUpdate, db: Session = Depends(get_db)):
+def update_role(
+    role_id: int,
+    request: RoleUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(AdminOnly),
+):
     role = db.query(Role).filter(Role.role_id == role_id).first()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")

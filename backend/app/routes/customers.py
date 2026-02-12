@@ -8,6 +8,7 @@ from app.schemas.customers import CustomerCreate, CustomerUpdate, CustomerRespon
 from app.utils.auth_user import get_current_user
 from app.services.credit_service import normalize_mobile
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
@@ -17,7 +18,7 @@ def search_customers(
     q: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("customers", "read")),
 ):
     query = db.query(Customer).filter(Customer.shop_id == user.shop_id)
 
@@ -37,7 +38,7 @@ def search_customers(
 def get_customer(
     customer_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("customers", "read")),
 ):
     row = (
         db.query(Customer)
@@ -53,7 +54,7 @@ def get_customer(
 def get_customer_by_mobile(
     mobile: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("customers", "read")),
 ):
     m = normalize_mobile(mobile)
     if not m:
@@ -73,7 +74,7 @@ def get_customer_by_mobile(
 def create_customer(
     payload: CustomerCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("customers", "write")),
 ):
     m = normalize_mobile(payload.mobile)
     if not m:
@@ -163,7 +164,7 @@ def update_customer(
     customer_id: int,
     payload: CustomerUpdate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("customers", "write")),
 ):
     row = (
         db.query(Customer)

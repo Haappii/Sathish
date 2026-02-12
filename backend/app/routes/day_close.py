@@ -1,30 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import datetime, date, timedelta
 
 from app.db import get_db
-from app.utils.auth_user import get_current_user
-from app.models.invoice import Invoice
-from app.models.invoice_details import InvoiceDetail
 from app.models.branch import Branch
 from app.models.table_billing import Order
-from app.models.branch_expense import BranchExpense
 from app.models.day_close import BranchDayClose, ShopDayClose
 from app.models.month_close import BranchMonthClose, ShopMonthClose
-from app.models.branch import Branch
 from app.models.stock import Inventory
 from app.models.date_wise_stock import DateWiseStock
-from app.models.sales_return import SalesReturn, SalesReturnItem
+from app.services.financials_service import calc_day_close_totals
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/day-close", tags=["Day Close"])
-
-
-def admin_or_manager(user):
-    role = str(user.role_name).lower()
-    if role not in ["admin", "manager"]:
-        raise HTTPException(403, "Admin/Manager access required")
-
 
 def parse_date(d: str) -> date:
     try:
@@ -34,117 +22,13 @@ def parse_date(d: str) -> date:
 
 
 def calc_totals(db: Session, shop_id: int, branch_id: int | None, from_dt: date, to_dt: date):
-    inv_q = db.query(Invoice).filter(
-        func.date(Invoice.created_time).between(from_dt, to_dt),
-        Invoice.shop_id == shop_id,
+    return calc_day_close_totals(
+        db,
+        shop_id=shop_id,
+        branch_id=branch_id,
+        from_dt=from_dt,
+        to_dt=to_dt,
     )
-    if branch_id is not None:
-        inv_q = inv_q.filter(Invoice.branch_id == branch_id)
-
-    inv_sales_ex_tax_row = inv_q.with_entities(
-        func.coalesce(
-            func.sum(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.tax_amt, 0)),
-            0,
-        ).label("sales_ex_tax"),
-        func.coalesce(func.sum(func.coalesce(Invoice.tax_amt, 0)), 0).label("gst"),
-        func.coalesce(func.sum(func.coalesce(Invoice.discounted_amt, 0)), 0).label("discount"),
-    ).first()
-
-    invoice_sales_ex_tax = float(getattr(inv_sales_ex_tax_row, "sales_ex_tax", 0) or 0)
-    invoice_gst = float(getattr(inv_sales_ex_tax_row, "gst", 0) or 0)
-    invoice_discount = float(getattr(inv_sales_ex_tax_row, "discount", 0) or 0)
-
-    # COGS for invoices in date range
-    cogs_q = (
-        db.query(func.coalesce(func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity), 0))
-        .join(Invoice, Invoice.invoice_id == InvoiceDetail.invoice_id)
-        .filter(
-            Invoice.shop_id == shop_id,
-            func.date(Invoice.created_time).between(from_dt, to_dt),
-        )
-    )
-    if branch_id is not None:
-        cogs_q = cogs_q.filter(Invoice.branch_id == branch_id)
-    invoice_cogs = float(cogs_q.scalar() or 0)
-
-    # Returns (reduce sales/GST/discount and reverse COGS)
-    ret_q = db.query(SalesReturn).filter(
-        SalesReturn.shop_id == shop_id,
-        SalesReturn.status != "CANCELLED",
-        func.date(SalesReturn.created_on).between(from_dt, to_dt),
-    )
-    if branch_id is not None:
-        ret_q = ret_q.filter(SalesReturn.branch_id == branch_id)
-
-    ret_row = ret_q.with_entities(
-        func.coalesce(func.sum(func.coalesce(SalesReturn.tax_amount, 0)), 0).label("ret_tax"),
-        func.coalesce(func.sum(func.coalesce(SalesReturn.discount_amount, 0)), 0).label("ret_discount"),
-        func.coalesce(func.sum(func.coalesce(SalesReturn.refund_amount, 0)), 0).label("ret_refund"),
-        func.coalesce(
-            func.sum(
-                func.coalesce(SalesReturn.refund_amount, 0)
-                + func.coalesce(SalesReturn.discount_amount, 0)
-                - func.coalesce(SalesReturn.tax_amount, 0)
-            ),
-            0,
-        ).label("ret_sales_ex_tax"),
-    ).first()
-
-    ret_tax = float(getattr(ret_row, "ret_tax", 0) or 0)
-    ret_discount = float(getattr(ret_row, "ret_discount", 0) or 0)
-    ret_sales_ex_tax = float(getattr(ret_row, "ret_sales_ex_tax", 0) or 0)
-
-    inv_cost_sq = (
-        db.query(
-            InvoiceDetail.invoice_id.label("invoice_id"),
-            InvoiceDetail.item_id.label("item_id"),
-            func.max(InvoiceDetail.buy_price).label("buy_price"),
-        )
-        .filter(InvoiceDetail.shop_id == shop_id)
-        .group_by(InvoiceDetail.invoice_id, InvoiceDetail.item_id)
-        .subquery()
-    )
-    ret_cogs_q = (
-        db.query(
-            func.coalesce(func.sum(SalesReturnItem.quantity * inv_cost_sq.c.buy_price), 0)
-        )
-        .join(SalesReturn, SalesReturn.return_id == SalesReturnItem.return_id)
-        .join(
-            inv_cost_sq,
-            (inv_cost_sq.c.invoice_id == SalesReturn.invoice_id)
-            & (inv_cost_sq.c.item_id == SalesReturnItem.item_id),
-        )
-        .filter(
-            SalesReturn.shop_id == shop_id,
-            SalesReturn.status != "CANCELLED",
-            func.date(SalesReturn.created_on).between(from_dt, to_dt),
-        )
-    )
-    if branch_id is not None:
-        ret_cogs_q = ret_cogs_q.filter(SalesReturn.branch_id == branch_id)
-    ret_cogs = float(ret_cogs_q.scalar() or 0)
-
-    sales = invoice_sales_ex_tax - ret_sales_ex_tax
-    gst = invoice_gst - ret_tax
-    discount = invoice_discount - ret_discount
-
-    exp_q = db.query(func.sum(BranchExpense.amount)).filter(
-        BranchExpense.expense_date.between(from_dt, to_dt),
-        BranchExpense.shop_id == shop_id
-    )
-    if branch_id is not None:
-        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
-    expense = float(exp_q.scalar() or 0)
-
-    cogs_net = invoice_cogs - ret_cogs
-    profit = (sales - discount) - cogs_net - expense
-    return {
-        "total_sales": sales,
-        "total_gst": gst,
-        "total_discount": discount,
-        "total_expense": expense,
-        "total_profit": profit,
-    }
 
 
 def snapshot_stock(db: Session, shop_id: int, branch_id: int, stock_date: date):
@@ -173,9 +57,8 @@ def snapshot_stock(db: Session, shop_id: int, branch_id: int, stock_date: date):
 def day_close_status(
     date_str: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("day_close", "read")),
 ):
-    admin_or_manager(user)
     d = parse_date(date_str)
     branches = db.query(Branch).filter(
         Branch.status == "ACTIVE",
@@ -197,9 +80,8 @@ def close_branch_day(
     date_str: str,
     branch_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("day_close", "write")),
 ):
-    admin_or_manager(user)
     d = parse_date(date_str)
 
     open_orders = (
@@ -277,9 +159,8 @@ def close_branch_month(
     month: str,
     branch_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("day_close", "write")),
 ):
-    admin_or_manager(user)
     # YYYY-MM
     try:
         start = datetime.strptime(month + "-01", "%Y-%m-%d").date()
@@ -345,9 +226,9 @@ def close_branch_month(
 def close_shop_day(
     date_str: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("day_close", "write")),
 ):
-    admin_or_manager(user)
+    # Permission already checked by dependency.
 
     head_branch = db.query(Branch).filter(
         Branch.branch_id == user.branch_id,

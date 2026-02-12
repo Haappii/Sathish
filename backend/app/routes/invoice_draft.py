@@ -20,7 +20,7 @@ from app.services.day_close_service import is_branch_day_closed
 from app.services.gst_service import calculate_gst
 from app.services.invoice_service import generate_invoice_number
 from app.services.inventory_service import is_inventory_enabled, adjust_stock
-from app.utils.auth_user import get_current_user
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/invoice/draft", tags=["Invoice Drafts"])
 
@@ -30,9 +30,16 @@ def _role(user) -> str:
 
 
 def resolve_branch(user, override_branch=None):
-    if _role(user) == "admin":
-        return int(override_branch or user.branch_id)
-    return int(user.branch_id)
+    role = _role(user)
+    if role == "admin":
+        branch_raw = override_branch if override_branch not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 def _new_draft_number() -> str:
@@ -50,7 +57,7 @@ def create_draft(
     payload: DraftCreate,
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("drafts", "write")),
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
 
@@ -120,7 +127,7 @@ def list_drafts(
     branch_id: int | None = Query(None),
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("drafts", "read")),
 ):
     query = db.query(InvoiceDraft).filter(
         InvoiceDraft.shop_id == user.shop_id,
@@ -139,7 +146,7 @@ def list_drafts(
 def get_draft(
     draft_number: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("drafts", "read")),
 ):
     row = (
         db.query(InvoiceDraft)
@@ -163,7 +170,7 @@ def get_draft(
 def delete_draft(
     draft_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("drafts", "delete")),
 ):
     row = (
         db.query(InvoiceDraft)
@@ -198,7 +205,7 @@ def convert_draft_to_invoice(
     draft_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_permission("drafts", "write")),
 ):
     draft = (
         db.query(InvoiceDraft)

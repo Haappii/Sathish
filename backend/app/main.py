@@ -38,6 +38,7 @@ import app.models.invoice_payment
 import app.models.sales_return
 import app.models.stock_transfer
 import app.models.invoice_draft
+import app.models.role_permission
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -179,6 +180,7 @@ from app.routes import (
     shop,
     reports,
     roles,
+    analytics,
     inventory,
     parameter,
     customers,
@@ -186,6 +188,7 @@ from app.routes import (
     returns,
     stock_transfers,
     invoice_draft,
+    permissions,
 )
 
 from app.routes import inventory_bulk
@@ -220,6 +223,8 @@ app.include_router(dashboard.router,  prefix="/api")
 app.include_router(shop.router,       prefix="/api")
 app.include_router(reports.router,    prefix="/api")
 app.include_router(roles.router,      prefix="/api")
+app.include_router(analytics.router,  prefix="/api")
+app.include_router(permissions.router, prefix="/api")
 app.include_router(inventory.router,  prefix="/api")
 app.include_router(parameter.router,  prefix="/api")
 app.include_router(inventory_bulk.router, prefix="/api")

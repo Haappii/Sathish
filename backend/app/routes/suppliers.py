@@ -2,33 +2,33 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.utils.auth_user import get_current_user
 from app.models.supplier import Supplier
 from app.schemas.supplier import SupplierCreate, SupplierUpdate, SupplierResponse
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
 
-def manager_or_admin(user):
-    role = str(user.role_name or "").lower()
-    if role not in ["manager", "admin"]:
-        raise HTTPException(403, "Manager/Admin access required")
-
-
 def resolve_branch(branch_id_param, user):
-    if str(user.role_name).lower() == "admin":
-        return int(branch_id_param or user.branch_id)
-    return int(user.branch_id)
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        branch_raw = branch_id_param if branch_id_param not in (None, "") else getattr(user, "branch_id", None)
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 @router.get("/", response_model=list[SupplierResponse])
 def list_suppliers(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("suppliers", "read")),
 ):
-    manager_or_admin(user)
     bid = resolve_branch(branch_id, user)
     return (
         db.query(Supplier)
@@ -46,9 +46,8 @@ def list_suppliers(
 def create_supplier(
     payload: SupplierCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("suppliers", "write")),
 ):
-    manager_or_admin(user)
     bid = resolve_branch(payload.branch_id, user)
 
     supplier = Supplier(
@@ -94,9 +93,8 @@ def update_supplier(
     supplier_id: int,
     payload: SupplierUpdate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("suppliers", "write")),
 ):
-    manager_or_admin(user)
     supplier = db.query(Supplier).filter(
         Supplier.supplier_id == supplier_id,
         Supplier.shop_id == user.shop_id
@@ -146,9 +144,8 @@ def update_supplier(
 def delete_supplier(
     supplier_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("suppliers", "write")),
 ):
-    manager_or_admin(user)
     supplier = db.query(Supplier).filter(
         Supplier.supplier_id == supplier_id,
         Supplier.shop_id == user.shop_id

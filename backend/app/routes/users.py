@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.users import User
 from app.schemas.users import UserCreate, UserUpdate, UserResponse
-from app.utils.auth_guard import get_current_user   # ✅ FIXED IMPORT
 from app.utils.passwords import encode_password
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 @router.get("/", response_model=list[UserResponse])
 def list_users(
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),   # ✅ AUTH OK
+    current_user=Depends(require_permission("users", "read")),
 ):
     return (
         db.query(User)
@@ -34,7 +34,7 @@ def list_users(
 def create_user(
     request: UserCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("users", "write")),
 ):
     exists = db.query(User).filter(
         User.user_name == request.user_name,
@@ -87,7 +87,7 @@ def update_user(
     user_id: int,
     request: UserUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("users", "write")),
 ):
     user = db.query(User).filter(
         User.user_id == user_id,
@@ -141,7 +141,7 @@ def update_user(
 def deactivate_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_permission("users", "write")),
 ):
     user = db.query(User).filter(
         User.user_id == user_id,

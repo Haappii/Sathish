@@ -9,6 +9,7 @@ from app.schemas.category import (
 )
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/category", tags=["Category"])
 
@@ -26,7 +27,11 @@ def list_categories(db: Session = Depends(get_db), user=Depends(get_current_user
 
 # ---------- CREATE ----------
 @router.post("/", response_model=CategoryResponse)
-def create_category(request: CategoryCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def create_category(
+    request: CategoryCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("categories", "write")),
+):
 
     exists = db.query(Category).filter(
         Category.category_name == request.category_name,
@@ -66,7 +71,7 @@ def create_category(request: CategoryCreate, db: Session = Depends(get_db), user
 @router.put("/{category_id}", response_model=CategoryResponse)
 def update_category(category_id: int, request: CategoryUpdate,
                     db: Session = Depends(get_db),
-                    user=Depends(get_current_user)):
+                    user=Depends(require_permission("categories", "write"))):
 
     category = db.query(Category).filter(
         Category.category_id == category_id,
@@ -108,7 +113,11 @@ def update_category(category_id: int, request: CategoryUpdate,
 
 # ---------- SOFT DELETE / INACTIVATE ----------
 @router.delete("/{category_id}")
-def delete_category(category_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("categories", "write")),
+):
 
     category = db.query(Category).filter(
         Category.category_id == category_id,
