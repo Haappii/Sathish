@@ -128,7 +128,7 @@ export default function ManageTables() {
       {/* HEADER */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate("/setup/branches", { replace: true })}
           className="px-3 py-2 border rounded-lg text-[12px] hover:bg-gray-50"
         >
           ← Back
