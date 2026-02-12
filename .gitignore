@@ -10,6 +10,7 @@ venv/
 backend/venv/
 backend/logs/
 backend/logs/sql.log
+backend/uploads/support/
 
 # Frontend
 frontend/node_modules/

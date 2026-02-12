@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models.support_ticket import SupportTicket
+from app.utils.auth_user import AdminOnly, get_current_user
 
 router = APIRouter(prefix="/support", tags=["Support Chat"])
 
@@ -216,3 +217,39 @@ Message:
         )
     except Exception as e:
         raise HTTPException(500, f"Demo request failed: {str(e)}")
+
+
+# ========================================================
+#  ADMIN - LIST/UPDATE TICKETS
+# ========================================================
+@router.get("/tickets")
+def list_tickets(
+    ticket_type: str | None = None,
+    status: str | None = None,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    user=Depends(AdminOnly),
+):
+    q = db.query(SupportTicket).order_by(SupportTicket.ticket_id.desc())
+    if ticket_type:
+        q = q.filter(SupportTicket.ticket_type == ticket_type.upper())
+    if status:
+        q = q.filter(SupportTicket.status == status.upper())
+    return q.limit(min(max(int(limit), 1), 500)).all()
+
+
+@router.post("/tickets/{ticket_id}/status")
+def update_ticket_status(
+    ticket_id: int,
+    new_status: str,
+    db: Session = Depends(get_db),
+    user=Depends(AdminOnly),
+):
+    row = db.query(SupportTicket).filter(SupportTicket.ticket_id == ticket_id).first()
+    if not row:
+        raise HTTPException(404, "Ticket not found")
+
+    row.status = (new_status or "").strip().upper() or row.status
+    db.commit()
+    db.refresh(row)
+    return {"success": True, "ticket_id": row.ticket_id, "status": row.status}

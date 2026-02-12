@@ -201,6 +201,10 @@ export default function MainLayout({ hideSidebar = false }) {
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
+      { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
+      { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
+      { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       ...(showTableBilling
         ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
         : []),
@@ -216,6 +220,10 @@ export default function MainLayout({ hideSidebar = false }) {
       { name: "Dashboard", path: "/dashboard", icon: <FaChartPie /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
+      { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
+      { name: "Dues", path: "/dues", icon: <FaFileInvoice /> },
+      { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       ...(showTableBilling
         ? [{ name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> }]
         : []),

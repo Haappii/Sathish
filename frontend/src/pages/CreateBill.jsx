@@ -392,6 +392,53 @@ export default function CreateBill() {
     }
   };
 
+  const saveDraft = async () => {
+    if (!customer.mobile || customer.mobile.length < 10)
+      return showToast("Enter valid 10-digit mobile", "error");
+    if (!customer.name) return showToast("Customer name required", "error");
+    if (!cart.length) return showToast("Cart empty", "error");
+    if (splitEnabled && Math.abs(splitTotal - payable) > 0.01) {
+      return showToast("Split amounts must equal payable total", "error");
+    }
+
+    const payload = {
+      customer_name: customer.name,
+      mobile: customer.mobile,
+      customer_gst: customer.gst_number || null,
+      discounted_amt: discountValue,
+      payment_mode: splitEnabled ? "split" : paymentMode,
+      payment_split: splitEnabled
+        ? {
+            cash: Number(split.cash || 0),
+            card: Number(split.card || 0),
+            upi: Number(split.upi || 0)
+          }
+        : null,
+      items: cart.map(x => ({
+        item_id: x.item_id,
+        quantity: x.qty,
+        amount: x.qty * x.price
+      }))
+    };
+
+    try {
+      const res = await authAxios.post(`/invoice/draft/`, payload);
+      const draftNo = res?.data?.draft_number;
+      showToast(draftNo ? `Draft saved: ${draftNo}` : "Draft saved", "success");
+
+      setCart([]);
+      setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
+      setDiscount(0);
+      setPaymentMode("cash");
+      setSplitEnabled(false);
+      setSplit({ cash: "", card: "", upi: "" });
+      await loadData();
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Draft save failed";
+      showToast(msg, "error");
+    }
+  };
+
   return (
     <>
       <style jsx global>{`
@@ -704,12 +751,18 @@ export default function CreateBill() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className="grid grid-cols-3 gap-2 mt-2">
             <button
               onClick={() => saveInvoice(false)}
               className="bg-blue-600 text-white py-1.5 rounded-lg shadow text-[11px]"
             >
               Save
+            </button>
+            <button
+              onClick={saveDraft}
+              className="bg-gray-600 text-white py-1.5 rounded-lg shadow text-[11px]"
+            >
+              Hold
             </button>
             <button
               onClick={() => saveInvoice(true)}

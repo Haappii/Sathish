@@ -29,6 +29,8 @@ from app.services.gst_service import calculate_gst
 from app.services.day_close_service import is_branch_day_closed
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
+from app.services.credit_service import upsert_customer, ensure_invoice_due
+from app.models.invoice_due import InvoiceDue
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -142,6 +144,22 @@ def create_invoice(
             "payment_split": invoice.payment_split,
         },
         user_id=user.user_id,
+    )
+
+    customer = upsert_customer(
+        db,
+        shop_id=user.shop_id,
+        customer_name=invoice.customer_name,
+        mobile=invoice.mobile,
+        gst_number=invoice.gst_number,
+        created_by=user.user_id,
+    )
+    ensure_invoice_due(
+        db,
+        shop_id=user.shop_id,
+        invoice=invoice,
+        customer=customer,
+        created_by=user.user_id,
     )
     return invoice
 
@@ -342,6 +360,22 @@ def modify_invoice(
         },
         user_id=user.user_id,
     )
+
+    customer = upsert_customer(
+        db,
+        shop_id=user.shop_id,
+        customer_name=invoice.customer_name,
+        mobile=invoice.mobile,
+        gst_number=invoice.gst_number,
+        created_by=user.user_id,
+    )
+    ensure_invoice_due(
+        db,
+        shop_id=user.shop_id,
+        invoice=invoice,
+        customer=customer,
+        created_by=user.user_id,
+    )
     return {"message": "Invoice modified successfully"}
 
 
@@ -365,6 +399,7 @@ def delete_invoice(
         raise HTTPException(403, "Day closed for this branch")
 
     old = {
+        "invoice_id": invoice.invoice_id,
         "invoice_number": invoice.invoice_number,
         "branch_id": invoice.branch_id,
         "customer_name": invoice.customer_name,
@@ -410,6 +445,17 @@ def delete_invoice(
         new={"deleted": True},
         user_id=user.user_id,
     )
+
+    # cancel any open due
+    due = db.query(InvoiceDue).filter(
+        InvoiceDue.shop_id == user.shop_id,
+        InvoiceDue.invoice_id == old.get("invoice_id"),
+        InvoiceDue.status == "OPEN",
+    ).first()
+    if due:
+        due.status = "CANCELLED"
+        due.closed_on = datetime.utcnow()
+        db.commit()
 
     return {"message": "Invoice deleted"}
 

@@ -15,6 +15,7 @@ def archive_invoice(
     reason: str
 ):
     archive = InvoiceArchive(
+        shop_id=invoice.shop_id,
         invoice_id=invoice.invoice_id,
         invoice_number=invoice.invoice_number,
         branch_id=invoice.branch_id,
@@ -34,6 +35,7 @@ def archive_invoice(
 
     for d in invoice.details:
         db.add(InvoiceArchiveDetail(
+            shop_id=invoice.shop_id,
             archive_id=archive.archive_id,
             item_id=d.item_id,
             branch_id=d.branch_id,

@@ -32,6 +32,12 @@ import app.models.purchase_order
 import app.models.onboard_codes
 import app.models.audit_log
 import app.models.support_ticket
+import app.models.customer
+import app.models.invoice_due
+import app.models.invoice_payment
+import app.models.sales_return
+import app.models.stock_transfer
+import app.models.invoice_draft
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -174,7 +180,12 @@ from app.routes import (
     reports,
     roles,
     inventory,
-    parameter
+    parameter,
+    customers,
+    dues,
+    returns,
+    stock_transfers,
+    invoice_draft,
 )
 
 from app.routes import inventory_bulk
@@ -212,6 +223,11 @@ app.include_router(roles.router,      prefix="/api")
 app.include_router(inventory.router,  prefix="/api")
 app.include_router(parameter.router,  prefix="/api")
 app.include_router(inventory_bulk.router, prefix="/api")
+app.include_router(customers.router,  prefix="/api")
+app.include_router(dues.router,       prefix="/api")
+app.include_router(returns.router,    prefix="/api")
+app.include_router(stock_transfers.router, prefix="/api")
+app.include_router(invoice_draft.router, prefix="/api")
 
 # ---------- BRANCH ----------
 app.include_router(branch_routes.router, prefix="/api")

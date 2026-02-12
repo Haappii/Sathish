@@ -192,3 +192,47 @@ def stock_history(
         }
         for r in rows
     ]
+
+
+# =========================
+# REORDER ALERTS
+# =========================
+@router.get("/reorder-alerts")
+def reorder_alerts(
+    branch_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    if not is_inventory_enabled(db, user.shop_id):
+        return []
+
+    branch = resolve_branch(branch_id, user)
+
+    rows = (
+        db.query(
+            Inventory.item_id,
+            Item.item_name,
+            Inventory.quantity,
+            Inventory.min_stock
+        )
+        .join(Item, Item.item_id == Inventory.item_id)
+        .filter(
+            Inventory.shop_id == user.shop_id,
+            Inventory.branch_id == branch,
+            Inventory.min_stock > 0,
+            Inventory.quantity < Inventory.min_stock
+        )
+        .order_by((Inventory.min_stock - Inventory.quantity).desc())
+        .all()
+    )
+
+    return [
+        {
+            "item_id": r.item_id,
+            "item_name": r.item_name,
+            "quantity": r.quantity,
+            "min_stock": r.min_stock,
+            "short_by": int(r.min_stock or 0) - int(r.quantity or 0)
+        }
+        for r in rows
+    ]

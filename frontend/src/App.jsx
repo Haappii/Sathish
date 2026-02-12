@@ -13,6 +13,10 @@ import CreateBill from "./pages/CreateBill";
 import SalesHistory from "./pages/SalesHistory";
 import EditBill from "./pages/EditBill";
 import Inventory from "./pages/Inventory";
+import Dues from "./pages/Dues";
+import Returns from "./pages/Returns";
+import StockTransfers from "./pages/StockTransfers";
+import Drafts from "./pages/Drafts";
 
 import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
@@ -65,6 +69,12 @@ export default function App() {
 
             {/* INVENTORY */}
             <Route path="/inventory" element={<Inventory />} />
+
+            {/* OPERATIONS */}
+            <Route path="/dues" element={<Dues />} />
+            <Route path="/returns" element={<Returns />} />
+            <Route path="/stock-transfers" element={<StockTransfers />} />
+            <Route path="/drafts" element={<Drafts />} />
 
             {/* DELETED INVOICES (🔥 NOT IN REPORTS) */}
             <Route
