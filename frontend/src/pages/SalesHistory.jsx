@@ -128,7 +128,8 @@ export default function SalesHistory() {
   );
 
   /* ================= OPEN BILL ================= */
-  const openBill = async (bill, requestedMode = "view") => {
+  const openBill = async (bill, requestedMode = "view", options = {}) => {
+    const { openDelete = false } = options;
     // Cashier → always force view mode
     const canEditToday = isTodayBill(bill.created_time);
     const actualMode = canEdit && canEditToday ? requestedMode : "view";
@@ -152,7 +153,7 @@ export default function SalesHistory() {
       setBranch(branchData);
       setMode(actualMode);
       setDeleteReason("");
-      setConfirmDelete(false);
+      setConfirmDelete(openDelete && actualMode === "edit");
     } catch (e) {
       if (e?.response?.status === 401) {
         showToast("Session expired. Please login again.", "error");
@@ -404,12 +405,20 @@ export default function SalesHistory() {
                   View
                 </button>
                 {canEdit && isTodayBill(b.created_time) && (
-                  <button
-                    onClick={() => openBill(b, "edit")}
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Edit
-                  </button>
+                  <>
+                    <button
+                      onClick={() => openBill(b, "edit")}
+                      className="px-3 py-1 rounded bg-blue-600 text-white"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => openBill(b, "edit", { openDelete: true })}
+                      className="px-3 py-1 rounded bg-red-600 text-white"
+                    >
+                      Delete
+                    </button>
+                  </>
                 )}
               </div>
             </div>
