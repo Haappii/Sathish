@@ -49,6 +49,7 @@ import app.models.loyalty
 import app.models.invoice_discount
 import app.models.item_lot
 import app.models.online_order
+import app.models.employee
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -203,6 +204,7 @@ from app.routes import (
     inventory,
     parameter,
     customers,
+    employees,
     dues,
     returns,
     stock_transfers,
@@ -257,6 +259,7 @@ app.include_router(inventory.router,  prefix="/api")
 app.include_router(parameter.router,  prefix="/api")
 app.include_router(inventory_bulk.router, prefix="/api")
 app.include_router(customers.router,  prefix="/api")
+app.include_router(employees.router,  prefix="/api")
 app.include_router(dues.router,       prefix="/api")
 app.include_router(returns.router,    prefix="/api")
 app.include_router(stock_transfers.router, prefix="/api")

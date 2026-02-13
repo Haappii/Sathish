@@ -16,3 +16,4 @@ from .sales_return import SalesReturn, SalesReturnItem
 from .stock_transfer import StockTransfer, StockTransferItem
 from .invoice_draft import InvoiceDraft, InvoiceDraftItem
 from .online_order import OnlineOrder, OnlineOrderItem, OnlineOrderEvent
+from .employee import Employee, EmployeeAttendance, EmployeeWagePayment
