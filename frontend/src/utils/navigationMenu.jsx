@@ -61,6 +61,14 @@ const MENU_CATALOG = [
     perm: { module: "billing", action: "read" },
   },
   {
+    key: "table_billing",
+    name: "Table Billing",
+    path: "/table-billing",
+    icon: <MdTableRestaurant />,
+    perm: { module: "billing", action: "write" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
     key: "online_orders",
     name: "Online Orders",
     path: "/online-orders",
@@ -173,14 +181,6 @@ const MENU_CATALOG = [
     perm: { module: "stock_transfers", action: "read" },
   },
   {
-    key: "table_billing",
-    name: "Billing Category",
-    path: "/table-billing",
-    icon: <MdTableRestaurant />,
-    perm: { module: "billing", action: "write" },
-    when: ({ showTableBilling }) => Boolean(showTableBilling),
-  },
-  {
     key: "reports",
     name: "Reports",
     path: "/reports",
@@ -289,18 +289,18 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
-      { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
-      { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
-      { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       ...(showTableBilling
         ? [
             {
-              name: "Billing Category",
+              name: "Table Billing",
               path: "/table-billing",
               icon: <MdTableRestaurant />,
             },
           ]
         : []),
+      { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
+      { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
+      { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
     ];
   } else if (roleLower === "manager") {
     menuItems = [
@@ -310,6 +310,15 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      ...(showTableBilling
+        ? [
+            {
+              name: "Table Billing",
+              path: "/table-billing",
+              icon: <MdTableRestaurant />,
+            },
+          ]
+        : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
@@ -326,15 +335,6 @@ export const buildRoleMenu = ({
       { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
       { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
-      ...(showTableBilling
-        ? [
-            {
-              name: "Billing Category",
-              path: "/table-billing",
-              icon: <MdTableRestaurant />,
-            },
-          ]
-        : []),
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       {
         name: "Deleted Invoice",
@@ -353,6 +353,15 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      ...(showTableBilling
+        ? [
+            {
+              name: "Table Billing",
+              path: "/table-billing",
+              icon: <MdTableRestaurant />,
+            },
+          ]
+        : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
@@ -371,15 +380,6 @@ export const buildRoleMenu = ({
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
-      ...(showTableBilling
-        ? [
-            {
-              name: "Billing Category",
-              path: "/table-billing",
-              icon: <MdTableRestaurant />,
-            },
-          ]
-        : []),
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       {
         name: "Deleted Invoice",

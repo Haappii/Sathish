@@ -55,15 +55,21 @@ export default function SalesHistory() {
 
   const [fromDate, setFromDate] = useState(initialYMD);
   const [toDate, setToDate] = useState(initialYMD);
+  const [appDateYMD, setAppDateYMD] = useState(initialYMD);
 
-  const isTodayBill = (dateValue) => {
+  const toYMD = dateValue => {
     const d = parseToDate(dateValue);
-    if (!d) return false;
-    return d.toDateString() === today.toDateString();
+    if (!d) return "";
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const isAppDateBill = dateValue => {
+    const billYmd = toYMD(dateValue);
+    return !!billYmd && billYmd === appDateYMD;
   };
 
   const isDefaultRange =
-    fromDate === initialYMD && toDate === initialYMD;
+    fromDate === appDateYMD && toDate === appDateYMD;
 
   /* ================= STATE ================= */
   const [bills, setBills] = useState([]);
@@ -91,6 +97,22 @@ export default function SalesHistory() {
 
     const isCashier = role === "cashier" || role.includes("cashier");
     setCanEdit(!isCashier);
+  }, []);
+
+  /* ================= LOAD APP DATE ================= */
+  useEffect(() => {
+    const loadAppDate = async () => {
+      try {
+        const res = await authAxios.get("/shop/details");
+        const ymd = formatAPI(res?.data?.app_date) || initialYMD;
+        setAppDateYMD(ymd);
+        setFromDate(ymd);
+        setToDate(ymd);
+      } catch {
+        setAppDateYMD(initialYMD);
+      }
+    };
+    loadAppDate();
   }, []);
 
   /* ================= LOAD BILLS ================= */
@@ -121,7 +143,7 @@ export default function SalesHistory() {
 
   /* ================= FILTER ================= */
   const filtered = bills.filter(b =>
-    (!isDefaultRange || isTodayBill(b.created_time)) &&
+    (!isDefaultRange || isAppDateBill(b.created_time)) &&
     `${b.invoice_number} ${b.customer_name || ""} ${b.mobile || ""}`
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -131,8 +153,8 @@ export default function SalesHistory() {
   const openBill = async (bill, requestedMode = "view", options = {}) => {
     const { openDelete = false } = options;
     // Cashier → always force view mode
-    const canEditToday = isTodayBill(bill.created_time);
-    const actualMode = canEdit && canEditToday ? requestedMode : "view";
+    const canEditAppDate = isAppDateBill(bill.created_time);
+    const actualMode = canEdit && canEditAppDate ? requestedMode : "view";
 
     try {
       const inv = await authAxios.get(`/invoice/by-number/${bill.invoice_number}`);
@@ -404,7 +426,7 @@ export default function SalesHistory() {
                 >
                   View
                 </button>
-                {canEdit && isTodayBill(b.created_time) && (
+                {canEdit && isAppDateBill(b.created_time) && (
                   <>
                     <button
                       onClick={() => openBill(b, "edit")}
@@ -548,7 +570,7 @@ export default function SalesHistory() {
                 Print
               </button>
 
-              {!isViewOnly && isTodayBill(activeBill?.created_time) && (
+              {!isViewOnly && isAppDateBill(activeBill?.created_time) && (
                 <>
                   <button
                     onClick={saveEdit}

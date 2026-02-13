@@ -32,7 +32,7 @@ const COLORS = [
 const isoToday = () => new Date().toISOString().slice(0, 10);
 
 const MENU_GROUPS = [
-  { key: "billing", title: "Billing", paths: ["/sales/create", "/sales/history", "/online-orders", "/drafts", "/deleted-invoices"] },
+  { key: "billing", title: "Billing", paths: ["/sales/create", "/sales/history", "/table-billing", "/online-orders", "/drafts", "/deleted-invoices"] },
   { key: "customers", title: "Customers & Receivables", paths: ["/customers", "/dues"] },
   { key: "employees", title: "Employees", paths: ["/employees", "/employees/attendance"] },
   { key: "returns", title: "Returns", paths: ["/returns"] },
@@ -47,7 +47,6 @@ const MENU_GROUPS = [
   { key: "alerts", title: "Alerts", paths: ["/alerts"] },
   { key: "support", title: "Support", paths: ["/support-tickets"] },
   { key: "offline", title: "Offline / Sync", paths: ["/offline-sync"] },
-  { key: "tables", title: "Billing Category", paths: ["/table-billing"] },
   { key: "admin", title: "Admin & Setup", paths: ["/setup"] },
 ];
 
