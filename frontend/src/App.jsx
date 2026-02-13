@@ -33,6 +33,7 @@ import OfflineSync from "./pages/OfflineSync";
 import Expenses from "./pages/Expenses";
 import OnlineOrders from "./pages/OnlineOrders";
 import Employees from "./pages/Employees";
+import EmployeeAttendance from "./pages/EmployeeAttendance";
 
 import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
@@ -108,6 +109,7 @@ export default function App() {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/online-orders" element={<OnlineOrders />} />
             <Route path="/employees" element={<Employees />} />
+            <Route path="/employees/attendance" element={<EmployeeAttendance />} />
 
             {/* DELETED INVOICES (🔥 NOT IN REPORTS) */}
             <Route

@@ -34,7 +34,7 @@ const isoToday = () => new Date().toISOString().slice(0, 10);
 const MENU_GROUPS = [
   { key: "billing", title: "Billing", paths: ["/sales/create", "/sales/history", "/online-orders", "/drafts", "/deleted-invoices"] },
   { key: "customers", title: "Customers & Receivables", paths: ["/customers", "/dues"] },
-  { key: "employees", title: "Employees", paths: ["/employees"] },
+  { key: "employees", title: "Employees", paths: ["/employees", "/employees/attendance"] },
   { key: "returns", title: "Returns", paths: ["/returns"] },
   { key: "expenses", title: "Expenses", paths: ["/expenses"] },
   { key: "inventory", title: "Inventory", paths: ["/inventory", "/reorder-alerts", "/stock-transfers", "/item-lots", "/stock-audit"] },
