@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -85,6 +91,10 @@ ALLOWED_NEXT_STATUSES = {
     "DELIVERED": set(),
     "CANCELLED": set(),
     "REJECTED": set(),
+}
+WEBHOOK_SIGNATURE_HEADERS = {
+    "SWIGGY": ["x-swiggy-signature", "x-webhook-signature", "x-signature", "x-hub-signature-256"],
+    "ZOMATO": ["x-zomato-signature", "x-webhook-signature", "x-signature", "x-hub-signature-256"],
 }
 
 
@@ -173,6 +183,175 @@ def _provider_enabled(db: Session, shop_id: int, provider: str) -> bool:
 
 def _provider_partner_id(db: Session, shop_id: int, provider: str) -> str | None:
     return _get_param(db, shop_id, f"{provider.lower()}_partner_id")
+
+
+def _param_yes(db: Session, shop_id: int, key: str, *, default: bool = False) -> bool:
+    v = _get_param(db, shop_id, key)
+    if v is None:
+        return default
+    return str(v).strip().upper() == "YES"
+
+
+def _extract_signature(headers, provider: str) -> str | None:
+    for key in WEBHOOK_SIGNATURE_HEADERS.get(provider, []):
+        value = headers.get(key)
+        if value and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def _strip_sig_prefix(signature_value: str) -> str:
+    s = str(signature_value or "").strip()
+    if not s:
+        return s
+    # Supports formats like: sha256=<hex>, v1=<hex>, or plain hex/base64
+    if "=" in s:
+        left, right = s.split("=", 1)
+        if left.strip().lower() in {"sha256", "v1", "sig"} and right.strip():
+            return right.strip()
+    return s
+
+
+def _verify_hmac_signature(secret: str, body: bytes, signature_value: str) -> bool:
+    if not secret:
+        return False
+    sig = _strip_sig_prefix(signature_value)
+    if not sig:
+        return False
+
+    digest = hmac.new(str(secret).encode("utf-8"), body, hashlib.sha256).digest()
+    expected_hex = digest.hex()
+    expected_b64 = base64.b64encode(digest).decode("utf-8")
+
+    candidate = sig.strip()
+    return hmac.compare_digest(candidate.lower(), expected_hex.lower()) or hmac.compare_digest(
+        candidate, expected_b64
+    )
+
+
+def _webhook_auth_ok(
+    db: Session,
+    *,
+    shop_id: int,
+    provider: str,
+    body: bytes,
+    headers,
+    x_webhook_token: str | None,
+) -> tuple[bool, str]:
+    provider_l = provider.lower()
+    secret = _get_param(db, shop_id, f"{provider_l}_webhook_secret")
+    signature_required = _param_yes(db, shop_id, "online_orders_signature_required", default=False)
+    signature = _extract_signature(headers, provider)
+
+    if secret:
+        if not signature:
+            return False, "Missing webhook signature"
+        if not _verify_hmac_signature(secret, body, signature):
+            return False, "Invalid webhook signature"
+        return True, "hmac"
+
+    if signature_required:
+        return False, "Signature verification is enabled but provider secret is not configured"
+
+    configured_token = _get_param(db, shop_id, "online_orders_webhook_token")
+    if configured_token:
+        if str(x_webhook_token or "").strip() != str(configured_token).strip():
+            return False, "Invalid webhook token"
+        return True, "token"
+
+    # Dev mode fallback: no webhook secret/token configured
+    return True, "open"
+
+
+def _provider_sync_config(db: Session, shop_id: int, provider: str) -> dict[str, Any]:
+    provider_l = provider.lower()
+    timeout_raw = _get_param(db, shop_id, "online_orders_status_sync_timeout_sec")
+    timeout_sec = 8
+    if timeout_raw:
+        try:
+            timeout_sec = int(timeout_raw)
+        except Exception:
+            timeout_sec = 8
+    timeout_sec = max(3, min(timeout_sec, 30))
+
+    return {
+        "enabled": _param_yes(db, shop_id, "online_orders_status_sync_enabled", default=True),
+        "strict": _param_yes(db, shop_id, "online_orders_status_sync_strict", default=False),
+        "url": _get_param(db, shop_id, f"{provider_l}_status_sync_url"),
+        "token": _get_param(db, shop_id, f"{provider_l}_status_sync_token"),
+        "secret": _get_param(db, shop_id, f"{provider_l}_status_sync_secret"),
+        "timeout_sec": timeout_sec,
+    }
+
+
+def _safe_json_loads(raw_text: str | None):
+    if not raw_text:
+        return None
+    try:
+        return json.loads(raw_text)
+    except Exception:
+        return raw_text[:800]
+
+
+def _post_json(url: str, payload: dict[str, Any], *, token: str | None, secret: str | None, timeout: int) -> dict[str, Any]:
+    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    req = urlrequest.Request(url=url, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    if secret:
+        digest = hmac.new(str(secret).encode("utf-8"), body, hashlib.sha256).hexdigest()
+        req.add_header("x-signature", f"sha256={digest}")
+
+    try:
+        with urlrequest.urlopen(req, timeout=timeout) as resp:
+            text = (resp.read() or b"").decode("utf-8", errors="ignore")
+            return {
+                "ok": 200 <= int(resp.status) < 300,
+                "status_code": int(resp.status),
+                "response": _safe_json_loads(text),
+            }
+    except urlerror.HTTPError as e:
+        text = (e.read() or b"").decode("utf-8", errors="ignore")
+        return {
+            "ok": False,
+            "status_code": int(getattr(e, "code", 0) or 0),
+            "response": _safe_json_loads(text),
+            "error": f"HTTP {getattr(e, 'code', 'ERR')}",
+        }
+    except Exception as exc:
+        return {"ok": False, "status_code": 0, "response": None, "error": str(exc)}
+
+
+def _sync_status_to_provider(db: Session, *, order: OnlineOrder, status: str) -> dict[str, Any]:
+    config = _provider_sync_config(db, order.shop_id, order.provider)
+    if not config.get("enabled", True):
+        return {"ok": True, "skipped": True, "reason": "sync_disabled", "strict": bool(config.get("strict"))}
+    url = str(config.get("url") or "").strip()
+    if not url:
+        return {"ok": True, "skipped": True, "reason": "sync_url_missing", "strict": bool(config.get("strict"))}
+
+    payload = {
+        "provider": order.provider,
+        "partner_id": order.partner_id,
+        "provider_order_id": order.provider_order_id,
+        "provider_order_number": order.provider_order_number,
+        "status": str(status or "").upper(),
+        "shop_id": order.shop_id,
+        "branch_id": order.branch_id,
+        "event_time": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    }
+    result = _post_json(
+        url,
+        payload,
+        token=config.get("token"),
+        secret=config.get("secret"),
+        timeout=int(config.get("timeout_sec") or 8),
+    )
+    result["strict"] = bool(config.get("strict"))
+    result["url"] = url
+    return result
 
 
 def _resolve_user_branch(branch_id_param: int | None, user) -> int:
@@ -624,6 +803,51 @@ def update_online_order_status(
         payload={"from_status": current, "to_status": target},
         actor_user_id=user.user_id,
     )
+
+    sync_result = _sync_status_to_provider(db, order=order, status=target)
+    if sync_result.get("skipped"):
+        _add_event(
+            db,
+            order=order,
+            event_type="STATUS_SYNC_SKIPPED",
+            provider_status=target,
+            message=f"Status sync skipped ({sync_result.get('reason')})",
+            payload={"reason": sync_result.get("reason")},
+            actor_user_id=user.user_id,
+        )
+    elif sync_result.get("ok"):
+        _add_event(
+            db,
+            order=order,
+            event_type="STATUS_SYNC_OK",
+            provider_status=target,
+            message="Status synced to provider",
+            payload={
+                "status_code": sync_result.get("status_code"),
+                "url": sync_result.get("url"),
+                "response": sync_result.get("response"),
+            },
+            actor_user_id=user.user_id,
+        )
+    else:
+        _add_event(
+            db,
+            order=order,
+            event_type="STATUS_SYNC_FAILED",
+            provider_status=target,
+            message=f"Status sync failed: {sync_result.get('error') or 'unknown error'}",
+            payload={
+                "status_code": sync_result.get("status_code"),
+                "url": sync_result.get("url"),
+                "response": sync_result.get("response"),
+                "error": sync_result.get("error"),
+            },
+            actor_user_id=user.user_id,
+        )
+        if sync_result.get("strict"):
+            db.rollback()
+            raise HTTPException(502, f"Status sync failed: {sync_result.get('error') or 'provider error'}")
+
     db.commit()
     db.refresh(order)
 
@@ -736,6 +960,77 @@ def cancel_online_order(
         db=db,
         user=user,
     )
+
+
+@router.post("/{online_order_id}/sync-status")
+def sync_online_order_status(
+    online_order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("online_orders", "write")),
+):
+    order = (
+        db.query(OnlineOrder)
+        .filter(OnlineOrder.shop_id == user.shop_id, OnlineOrder.online_order_id == online_order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(404, "Online order not found")
+    _assert_branch_access(order, user)
+
+    target = str(order.status or "NEW").upper()
+    sync_result = _sync_status_to_provider(db, order=order, status=target)
+
+    if sync_result.get("skipped"):
+        _add_event(
+            db,
+            order=order,
+            event_type="STATUS_SYNC_SKIPPED",
+            provider_status=target,
+            message=f"Manual sync skipped ({sync_result.get('reason')})",
+            payload={"reason": sync_result.get("reason")},
+            actor_user_id=user.user_id,
+        )
+    elif sync_result.get("ok"):
+        _add_event(
+            db,
+            order=order,
+            event_type="STATUS_SYNC_OK",
+            provider_status=target,
+            message="Manual status sync successful",
+            payload={
+                "status_code": sync_result.get("status_code"),
+                "url": sync_result.get("url"),
+                "response": sync_result.get("response"),
+            },
+            actor_user_id=user.user_id,
+        )
+    else:
+        _add_event(
+            db,
+            order=order,
+            event_type="STATUS_SYNC_FAILED",
+            provider_status=target,
+            message=f"Manual status sync failed: {sync_result.get('error') or 'unknown error'}",
+            payload={
+                "status_code": sync_result.get("status_code"),
+                "url": sync_result.get("url"),
+                "response": sync_result.get("response"),
+                "error": sync_result.get("error"),
+            },
+            actor_user_id=user.user_id,
+        )
+
+    db.commit()
+
+    if not sync_result.get("ok") and not sync_result.get("skipped"):
+        raise HTTPException(502, f"Status sync failed: {sync_result.get('error') or 'provider error'}")
+
+    return {
+        "success": True,
+        "skipped": bool(sync_result.get("skipped")),
+        "reason": sync_result.get("reason"),
+        "status_code": sync_result.get("status_code"),
+    }
 
 
 @router.post("/{online_order_id}/convert-to-invoice")
@@ -895,10 +1190,10 @@ def convert_online_order_to_invoice(
 
 
 @router.post("/webhook/{provider}/{shop_id}")
-def online_order_webhook(
+async def online_order_webhook(
     provider: str,
     shop_id: int,
-    payload: dict[str, Any],
+    request: Request,
     x_webhook_token: str | None = Header(None),
     db: Session = Depends(get_db),
 ):
@@ -907,11 +1202,26 @@ def online_order_webhook(
     if not _provider_enabled(db, shop_id, provider_u):
         raise HTTPException(403, f"{provider_u} integration is disabled")
 
-    configured_partner = _provider_partner_id(db, shop_id, provider_u)
-    configured_token = _get_param(db, shop_id, "online_orders_webhook_token")
-    if configured_token and str(x_webhook_token or "").strip() != str(configured_token).strip():
-        raise HTTPException(401, "Invalid webhook token")
+    raw_body = await request.body()
+    if not raw_body:
+        raise HTTPException(400, "Empty webhook payload")
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        raise HTTPException(400, "Invalid JSON payload")
 
+    auth_ok, auth_mode = _webhook_auth_ok(
+        db,
+        shop_id=shop_id,
+        provider=provider_u,
+        body=raw_body,
+        headers=request.headers,
+        x_webhook_token=x_webhook_token,
+    )
+    if not auth_ok:
+        raise HTTPException(401, auth_mode)
+
+    configured_partner = _provider_partner_id(db, shop_id, provider_u)
     normalized = _normalize_webhook_payload(provider_u, payload or {})
     if configured_partner and normalized.partner_id and configured_partner != normalized.partner_id:
         raise HTTPException(403, "partner_id mismatch")
@@ -935,7 +1245,7 @@ def online_order_webhook(
         order=order,
         event_type=str(normalized.event or "WEBHOOK_RECEIVED").upper(),
         provider_status=normalized.provider_status,
-        message="Webhook processed",
+        message=f"Webhook processed ({auth_mode})",
         payload=normalized.raw_payload,
         actor_user_id=None,
     )

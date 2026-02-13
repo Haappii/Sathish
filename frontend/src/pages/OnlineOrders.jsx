@@ -218,6 +218,17 @@ export default function OnlineOrders() {
     }
   };
 
+  const syncCurrentStatus = async (order) => {
+    try {
+      await api.post(`/online-orders/${order.online_order_id}/sync-status`);
+      showToast("Status synced to provider", "success");
+      await refreshAll();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Status sync failed", "error");
+      await loadDetail(order.online_order_id);
+    }
+  };
+
   const openCreateForm = () => {
     setTestForm((prev) => ({
       ...prev,
@@ -391,6 +402,11 @@ export default function OnlineOrders() {
           <span className="font-semibold">Zomato: {shop?.zomato_enabled ? "Enabled" : "Disabled"}</span>{" "}
           ({shop?.zomato_partner_id || "-"})
         </div>
+        <div className="text-[11px] text-slate-500">
+          Signature required: {shop?.online_orders_signature_required ? "Yes" : "No"} | Status sync:{" "}
+          {shop?.online_orders_status_sync_enabled ? "Enabled" : "Disabled"}{" "}
+          {shop?.online_orders_status_sync_strict ? "(Strict)" : "(Best effort)"}
+        </div>
         <div className="text-[11px] text-slate-500 break-all">
           Endpoint format: {webhookBase}/{"{PROVIDER}"}/{"{SHOP_ID}"}
         </div>
@@ -553,6 +569,7 @@ export default function OnlineOrders() {
                 {!detail.invoice_id && !["CANCELLED", "REJECTED"].includes(detail.status) && (
                   <ActionBtn label="Create Invoice" onClick={() => convertToInvoice(detail)} />
                 )}
+                <ActionBtn label="Sync Status" onClick={() => syncCurrentStatus(detail)} />
               </div>
 
               <div className="space-y-1">

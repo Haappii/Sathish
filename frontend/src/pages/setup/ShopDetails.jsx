@@ -45,7 +45,19 @@ export default function ShopDetails() {
     swiggy_enabled: false,
     zomato_enabled: false,
     online_orders_auto_accept: false,
-    online_orders_webhook_token: ""
+    online_orders_webhook_token: "",
+    online_orders_signature_required: false,
+    swiggy_webhook_secret: "",
+    zomato_webhook_secret: "",
+    online_orders_status_sync_enabled: true,
+    online_orders_status_sync_strict: false,
+    online_orders_status_sync_timeout_sec: 8,
+    swiggy_status_sync_url: "",
+    zomato_status_sync_url: "",
+    swiggy_status_sync_token: "",
+    zomato_status_sync_token: "",
+    swiggy_status_sync_secret: "",
+    zomato_status_sync_secret: ""
   });
 
   const [logoFile, setLogoFile] = useState(null);
@@ -432,6 +444,126 @@ export default function ShopDetails() {
               className={input}
               value={form.online_orders_webhook_token || ""}
               onChange={e => setField("online_orders_webhook_token", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Require HMAC Signature">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.online_orders_signature_required ? "YES" : "NO"}
+              onChange={e => setField("online_orders_signature_required", e.target.value === "YES")}
+            >
+              <option value="NO">No</option>
+              <option value="YES">Yes</option>
+            </select>
+          </Field>
+
+          <Field label="Swiggy Webhook Secret">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.swiggy_webhook_secret || ""}
+              onChange={e => setField("swiggy_webhook_secret", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Zomato Webhook Secret">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.zomato_webhook_secret || ""}
+              onChange={e => setField("zomato_webhook_secret", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Status Sync Enabled">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.online_orders_status_sync_enabled ? "YES" : "NO"}
+              onChange={e => setField("online_orders_status_sync_enabled", e.target.value === "YES")}
+            >
+              <option value="YES">Enabled</option>
+              <option value="NO">Disabled</option>
+            </select>
+          </Field>
+
+          <Field label="Status Sync Strict Mode">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.online_orders_status_sync_strict ? "YES" : "NO"}
+              onChange={e => setField("online_orders_status_sync_strict", e.target.value === "YES")}
+            >
+              <option value="NO">No</option>
+              <option value="YES">Yes</option>
+            </select>
+          </Field>
+
+          <Field label="Status Sync Timeout (sec)">
+            <input
+              disabled={!isSuperAdmin}
+              type="number"
+              min="3"
+              max="30"
+              className={input}
+              value={form.online_orders_status_sync_timeout_sec || 8}
+              onChange={e => setField("online_orders_status_sync_timeout_sec", Number(e.target.value || 8))}
+            />
+          </Field>
+
+          <Field label="Swiggy Status Sync URL">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.swiggy_status_sync_url || ""}
+              onChange={e => setField("swiggy_status_sync_url", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Swiggy Status Sync Token">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.swiggy_status_sync_token || ""}
+              onChange={e => setField("swiggy_status_sync_token", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Swiggy Status Sync Secret">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.swiggy_status_sync_secret || ""}
+              onChange={e => setField("swiggy_status_sync_secret", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Zomato Status Sync URL">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.zomato_status_sync_url || ""}
+              onChange={e => setField("zomato_status_sync_url", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Zomato Status Sync Token">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.zomato_status_sync_token || ""}
+              onChange={e => setField("zomato_status_sync_token", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Zomato Status Sync Secret">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.zomato_status_sync_secret || ""}
+              onChange={e => setField("zomato_status_sync_secret", e.target.value)}
             />
           </Field>
 
