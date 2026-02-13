@@ -28,6 +28,12 @@ class ShopDetailsBase(BaseModel):
 
     # Stored in system_parameters (not in shop_details table)
     inventory_enabled: Optional[bool] = None
+    swiggy_partner_id: Optional[str] = None
+    zomato_partner_id: Optional[str] = None
+    swiggy_enabled: Optional[bool] = None
+    zomato_enabled: Optional[bool] = None
+    online_orders_auto_accept: Optional[bool] = None
+    online_orders_webhook_token: Optional[str] = None
 
 
 class ShopDetailsResponse(ShopDetailsBase):

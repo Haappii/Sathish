@@ -39,7 +39,13 @@ export default function ShopDetails() {
     gst_percent: 0,
     gst_mode: "inclusive",
 
-    inventory_enabled: false
+    inventory_enabled: false,
+    swiggy_partner_id: "",
+    zomato_partner_id: "",
+    swiggy_enabled: false,
+    zomato_enabled: false,
+    online_orders_auto_accept: false,
+    online_orders_webhook_token: ""
   });
 
   const [logoFile, setLogoFile] = useState(null);
@@ -136,7 +142,7 @@ export default function ShopDetails() {
       }
     } catch (err) {
       if (err?.response?.status === 403)
-        showToast("Only Admin can change Inventory mode", "error");
+        showToast("Only Admin can change protected settings", "error");
       else
         showToast("Failed to update shop details", "error");
     } finally {
@@ -364,6 +370,69 @@ export default function ShopDetails() {
               <option value="NO">Disabled</option>
               <option value="YES">Enabled</option>
             </select>
+          </Field>
+
+          <Field label="Swiggy Partner ID">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.swiggy_partner_id || ""}
+              onChange={e => setField("swiggy_partner_id", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Zomato Partner ID">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.zomato_partner_id || ""}
+              onChange={e => setField("zomato_partner_id", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Swiggy Integration">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.swiggy_enabled ? "YES" : "NO"}
+              onChange={e => setField("swiggy_enabled", e.target.value === "YES")}
+            >
+              <option value="NO">Disabled</option>
+              <option value="YES">Enabled</option>
+            </select>
+          </Field>
+
+          <Field label="Zomato Integration">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.zomato_enabled ? "YES" : "NO"}
+              onChange={e => setField("zomato_enabled", e.target.value === "YES")}
+            >
+              <option value="NO">Disabled</option>
+              <option value="YES">Enabled</option>
+            </select>
+          </Field>
+
+          <Field label="Auto Accept Online Orders">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.online_orders_auto_accept ? "YES" : "NO"}
+              onChange={e => setField("online_orders_auto_accept", e.target.value === "YES")}
+            >
+              <option value="NO">Disabled</option>
+              <option value="YES">Enabled</option>
+            </select>
+          </Field>
+
+          <Field label="Webhook Token">
+            <input
+              disabled={!isSuperAdmin}
+              className={input}
+              value={form.online_orders_webhook_token || ""}
+              onChange={e => setField("online_orders_webhook_token", e.target.value)}
+            />
           </Field>
 
           <button

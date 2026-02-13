@@ -15,3 +15,4 @@ from .invoice_payment import InvoicePayment
 from .sales_return import SalesReturn, SalesReturnItem
 from .stock_transfer import StockTransfer, StockTransferItem
 from .invoice_draft import InvoiceDraft, InvoiceDraftItem
+from .online_order import OnlineOrder, OnlineOrderItem, OnlineOrderEvent

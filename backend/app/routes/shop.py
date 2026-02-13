@@ -9,11 +9,40 @@ from app.utils.shop_logo import SHOP_LOGOS_DIR, build_logo_filename, save_shop_l
 
 router = APIRouter(prefix="/shop", tags=["Shop"])
 
+BOOL_PARAM_KEYS = {
+    "inventory_enabled",
+    "swiggy_enabled",
+    "zomato_enabled",
+    "online_orders_auto_accept",
+}
+TEXT_PARAM_KEYS = {
+    "swiggy_partner_id",
+    "zomato_partner_id",
+    "online_orders_webhook_token",
+}
+SHOP_PARAM_KEYS = BOOL_PARAM_KEYS | TEXT_PARAM_KEYS
+
 
 def require_super_admin(role: str | None):
     role_l = (role or "").strip().lower()
     if role_l not in {"admin", "super admin"}:
-        raise HTTPException(403, "Only Admin can modify inventory mode")
+        raise HTTPException(403, "Only Admin can modify protected shop settings")
+
+
+def _get_param(db: Session, shop_id: int, key: str):
+    return (
+        db.query(SystemParameter)
+        .filter(SystemParameter.shop_id == shop_id, SystemParameter.param_key == key)
+        .first()
+    )
+
+
+def _set_param(db: Session, shop_id: int, key: str, value: str):
+    row = _get_param(db, shop_id, key)
+    if not row:
+        row = SystemParameter(shop_id=shop_id, param_key=key)
+    row.param_value = value
+    db.add(row)
 
 
 @router.get("/details")
@@ -24,16 +53,25 @@ def get_shop_details(
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
 
-    param = db.query(SystemParameter).filter(
-        SystemParameter.shop_id == user.shop_id,
-        SystemParameter.param_key == "inventory_enabled"
-    ).first()
-
-    inventory_enabled = param and param.param_value.upper() == "YES"
+    params = (
+        db.query(SystemParameter)
+        .filter(
+            SystemParameter.shop_id == user.shop_id,
+            SystemParameter.param_key.in_(list(SHOP_PARAM_KEYS)),
+        )
+        .all()
+    )
+    pmap = {str(r.param_key): (r.param_value or "") for r in params}
 
     return {
         **(shop.__dict__ if shop else {}),
-        "inventory_enabled": inventory_enabled
+        "inventory_enabled": str(pmap.get("inventory_enabled", "NO")).upper() == "YES",
+        "swiggy_partner_id": pmap.get("swiggy_partner_id") or None,
+        "zomato_partner_id": pmap.get("zomato_partner_id") or None,
+        "swiggy_enabled": str(pmap.get("swiggy_enabled", "NO")).upper() == "YES",
+        "zomato_enabled": str(pmap.get("zomato_enabled", "NO")).upper() == "YES",
+        "online_orders_auto_accept": str(pmap.get("online_orders_auto_accept", "NO")).upper() == "YES",
+        "online_orders_webhook_token": pmap.get("online_orders_webhook_token") or None,
     }
 
 
@@ -46,7 +84,7 @@ def save_shop_details(
 ):
 
     payload = data.dict(exclude_unset=True)
-    shop_payload = {k: v for k, v in payload.items() if k != "inventory_enabled"}
+    shop_payload = {k: v for k, v in payload.items() if k not in SHOP_PARAM_KEYS}
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first() or ShopDetails(shop_id=user.shop_id)
 
@@ -75,19 +113,16 @@ def save_shop_details(
             pass
 
     # 🔹 handle inventory flag separately
-    if "inventory_enabled" in payload:
+    if any(k in payload for k in SHOP_PARAM_KEYS):
         require_super_admin(x_user_role)
-
-        param = db.query(SystemParameter).filter(
-            SystemParameter.shop_id == user.shop_id,
-            SystemParameter.param_key == "inventory_enabled"
-        ).first()
-
-        if not param:
-            param = SystemParameter(shop_id=user.shop_id, param_key="inventory_enabled")
-
-        param.param_value = "YES" if bool(data.inventory_enabled) else "NO"
-        db.add(param)
+        for key in SHOP_PARAM_KEYS:
+            if key not in payload:
+                continue
+            value = payload.get(key)
+            if key in BOOL_PARAM_KEYS:
+                _set_param(db, user.shop_id, key, "YES" if bool(value) else "NO")
+            else:
+                _set_param(db, user.shop_id, key, str(value or "").strip())
 
     db.commit()
     db.refresh(shop)

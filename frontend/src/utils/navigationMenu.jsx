@@ -19,6 +19,7 @@ import {
   FaClipboardCheck,
   FaBarcode,
   FaCloudUploadAlt,
+  FaMotorcycle,
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
@@ -58,6 +59,13 @@ const MENU_CATALOG = [
     path: "/sales/history",
     icon: <FaHistory />,
     perm: { module: "billing", action: "read" },
+  },
+  {
+    key: "online_orders",
+    name: "Online Orders",
+    path: "/online-orders",
+    icon: <FaMotorcycle />,
+    perm: { module: "online_orders", action: "read" },
   },
   {
     key: "offline_sync",
@@ -267,6 +275,7 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       ...(showTableBilling
@@ -287,6 +296,7 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
@@ -327,6 +337,7 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },

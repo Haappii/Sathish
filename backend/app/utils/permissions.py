@@ -10,6 +10,7 @@ from app.utils.auth_user import get_current_user
 
 PERMISSION_MODULES: list[dict[str, str]] = [
     {"key": "billing", "label": "Billing / Invoices"},
+    {"key": "online_orders", "label": "Online Orders"},
     {"key": "categories", "label": "Categories"},
     {"key": "items", "label": "Items"},
     {"key": "pricing", "label": "Item Pricing / Price Levels"},
@@ -41,6 +42,7 @@ PERMISSION_MODULES: list[dict[str, str]] = [
 
 DEFAULT_ROLE_PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "billing": {"read": {"admin", "manager", "cashier"}, "write": {"admin", "manager", "cashier"}},
+    "online_orders": {"read": {"admin", "manager", "cashier"}, "write": {"admin", "manager", "cashier"}},
     "categories": {"read": {"admin", "manager", "cashier"}, "write": {"admin"}},
     "items": {"read": {"admin", "manager", "cashier"}, "write": {"admin"}},
     "pricing": {"read": {"admin", "manager", "cashier"}, "write": {"admin", "manager"}},

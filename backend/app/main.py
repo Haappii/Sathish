@@ -48,6 +48,7 @@ import app.models.coupon
 import app.models.loyalty
 import app.models.invoice_discount
 import app.models.item_lot
+import app.models.online_order
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -198,6 +199,7 @@ from app.routes import (
     supplier_ledger,
     stock_audits,
     item_lots,
+    online_orders,
     inventory,
     parameter,
     customers,
@@ -250,6 +252,7 @@ app.include_router(loyalty.router,     prefix="/api")
 app.include_router(supplier_ledger.router, prefix="/api")
 app.include_router(stock_audits.router, prefix="/api")
 app.include_router(item_lots.router,   prefix="/api")
+app.include_router(online_orders.router, prefix="/api")
 app.include_router(inventory.router,  prefix="/api")
 app.include_router(parameter.router,  prefix="/api")
 app.include_router(inventory_bulk.router, prefix="/api")
