@@ -174,7 +174,7 @@ const MENU_CATALOG = [
   },
   {
     key: "table_billing",
-    name: "Table Billing",
+    name: "Billing Category",
     path: "/table-billing",
     icon: <MdTableRestaurant />,
     perm: { module: "billing", action: "write" },
@@ -295,7 +295,7 @@ export const buildRoleMenu = ({
       ...(showTableBilling
         ? [
             {
-              name: "Table Billing",
+              name: "Billing Category",
               path: "/table-billing",
               icon: <MdTableRestaurant />,
             },
@@ -329,7 +329,7 @@ export const buildRoleMenu = ({
       ...(showTableBilling
         ? [
             {
-              name: "Table Billing",
+              name: "Billing Category",
               path: "/table-billing",
               icon: <MdTableRestaurant />,
             },
@@ -374,7 +374,7 @@ export const buildRoleMenu = ({
       ...(showTableBilling
         ? [
             {
-              name: "Table Billing",
+              name: "Billing Category",
               path: "/table-billing",
               icon: <MdTableRestaurant />,
             },

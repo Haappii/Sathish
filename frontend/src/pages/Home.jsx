@@ -47,7 +47,7 @@ const MENU_GROUPS = [
   { key: "alerts", title: "Alerts", paths: ["/alerts"] },
   { key: "support", title: "Support", paths: ["/support-tickets"] },
   { key: "offline", title: "Offline / Sync", paths: ["/offline-sync"] },
-  { key: "tables", title: "Table Billing", paths: ["/table-billing"] },
+  { key: "tables", title: "Billing Category", paths: ["/table-billing"] },
   { key: "admin", title: "Admin & Setup", paths: ["/setup"] },
 ];
 
