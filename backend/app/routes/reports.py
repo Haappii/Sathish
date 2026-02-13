@@ -476,18 +476,35 @@ def profit_item_wise(
         q = q.filter(Invoice.branch_id == branch_id)
 
     rows = q.all()
+    exp_q = db.query(func.coalesce(func.sum(BranchExpense.amount), 0)).filter(
+        BranchExpense.shop_id == user.shop_id,
+        BranchExpense.expense_date.between(f.date(), t.date()),
+    )
+    if branch_id:
+        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
+    total_expense = float(exp_q.scalar() or 0)
+    total_sales = sum(float(r.sales_amount or 0) for r in rows)
 
-    return [
-        {
-            "item": r.item,
-            "category": r.category,
-            "quantity": int(r.quantity or 0),
-            "sales_amount": float(r.sales_amount or 0),
-            "cost_amount": float(r.cost_amount or 0),
-            "profit": float((r.sales_amount or 0) - (r.cost_amount or 0)),
-        }
-        for r in rows
-    ]
+    result = []
+    for r in rows:
+        sales = float(r.sales_amount or 0)
+        cost = float(r.cost_amount or 0)
+        gross_profit = sales - cost
+        allocated_expense = (total_expense * sales / total_sales) if total_sales > 0 else 0.0
+        net_profit = gross_profit - allocated_expense
+        result.append(
+            {
+                "item": r.item,
+                "category": r.category,
+                "quantity": int(r.quantity or 0),
+                "sales_amount": float(sales),
+                "cost_amount": float(cost),
+                "gross_profit": float(gross_profit),
+                "allocated_expense": float(allocated_expense),
+                "profit": float(net_profit),
+            }
+        )
+    return result
 
 
 # =====================================================
@@ -528,17 +545,34 @@ def profit_category_wise(
         q = q.filter(Invoice.branch_id == branch_id)
 
     rows = q.all()
+    exp_q = db.query(func.coalesce(func.sum(BranchExpense.amount), 0)).filter(
+        BranchExpense.shop_id == user.shop_id,
+        BranchExpense.expense_date.between(f.date(), t.date()),
+    )
+    if branch_id:
+        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
+    total_expense = float(exp_q.scalar() or 0)
+    total_sales = sum(float(r.sales_amount or 0) for r in rows)
 
-    return [
-        {
-            "category": r.category,
-            "quantity": int(r.quantity or 0),
-            "sales_amount": float(r.sales_amount or 0),
-            "cost_amount": float(r.cost_amount or 0),
-            "profit": float((r.sales_amount or 0) - (r.cost_amount or 0)),
-        }
-        for r in rows
-    ]
+    result = []
+    for r in rows:
+        sales = float(r.sales_amount or 0)
+        cost = float(r.cost_amount or 0)
+        gross_profit = sales - cost
+        allocated_expense = (total_expense * sales / total_sales) if total_sales > 0 else 0.0
+        net_profit = gross_profit - allocated_expense
+        result.append(
+            {
+                "category": r.category,
+                "quantity": int(r.quantity or 0),
+                "sales_amount": float(sales),
+                "cost_amount": float(cost),
+                "gross_profit": float(gross_profit),
+                "allocated_expense": float(allocated_expense),
+                "profit": float(net_profit),
+            }
+        )
+    return result
 
 
 # =====================================================
