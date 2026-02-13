@@ -19,6 +19,7 @@ from app.models.date_wise_stock import DateWiseStock
 from app.models.audit_log import AuditLog
 from app.models.table_billing import TableMaster, Order
 from app.models.branch_expense import BranchExpense
+from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.models.supplier import Supplier
 from app.models.purchase_order import PurchaseOrder
 from app.services.financials_service import calc_period_financials
@@ -449,22 +450,26 @@ def profit_item_wise(
 ):
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
+    sales_expr = func.coalesce(
+        InvoiceDetail.amount,
+        func.coalesce(Item.price, 0) * func.coalesce(InvoiceDetail.quantity, 0),
+    )
 
     q = (
         db.query(
             Item.item_name.label("item"),
             Category.category_name.label("category"),
             func.sum(InvoiceDetail.quantity).label("quantity"),
-            func.sum(InvoiceDetail.amount).label("sales_amount"),
+            func.sum(sales_expr).label("sales_amount"),
             func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity).label("cost_amount"),
         )
         .join(InvoiceDetail, InvoiceDetail.item_id == Item.item_id)
         .join(Invoice, Invoice.invoice_id == InvoiceDetail.invoice_id)
         .outerjoin(Category, Category.category_id == Item.category_id)
         .filter(Invoice.shop_id == user.shop_id)
-        .filter(Invoice.created_time.between(f, t))
+        .filter(func.date(Invoice.created_time).between(f.date(), t.date()))
         .group_by(Item.item_name, Category.category_name)
-        .order_by(func.sum(InvoiceDetail.amount).desc())
+        .order_by(func.sum(sales_expr).desc())
     )
 
     if branch_id:
@@ -498,21 +503,25 @@ def profit_category_wise(
 ):
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
+    sales_expr = func.coalesce(
+        InvoiceDetail.amount,
+        func.coalesce(Item.price, 0) * func.coalesce(InvoiceDetail.quantity, 0),
+    )
 
     q = (
         db.query(
             Category.category_name.label("category"),
             func.sum(InvoiceDetail.quantity).label("quantity"),
-            func.sum(InvoiceDetail.amount).label("sales_amount"),
+            func.sum(sales_expr).label("sales_amount"),
             func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity).label("cost_amount"),
         )
         .join(Item, Item.category_id == Category.category_id)
         .join(InvoiceDetail, InvoiceDetail.item_id == Item.item_id)
         .join(Invoice, Invoice.invoice_id == InvoiceDetail.invoice_id)
         .filter(Invoice.shop_id == user.shop_id)
-        .filter(Invoice.created_time.between(f, t))
+        .filter(func.date(Invoice.created_time).between(f.date(), t.date()))
         .group_by(Category.category_name)
-        .order_by(func.sum(InvoiceDetail.amount).desc())
+        .order_by(func.sum(sales_expr).desc())
     )
 
     if branch_id:
@@ -546,35 +555,84 @@ def profit_date_wise(
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
 
-    q = (
+    qty_q = (
         db.query(
             func.date(Invoice.created_time).label("date"),
-            func.sum(InvoiceDetail.quantity).label("quantity"),
-            func.sum(InvoiceDetail.amount).label("sales_amount"),
-            func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity).label("cost_amount"),
+            func.coalesce(func.sum(InvoiceDetail.quantity), 0).label("sold_qty"),
         )
         .join(InvoiceDetail, InvoiceDetail.invoice_id == Invoice.invoice_id)
         .filter(Invoice.shop_id == user.shop_id)
-        .filter(Invoice.created_time.between(f, t))
+        .filter(func.date(Invoice.created_time).between(f.date(), t.date()))
         .group_by(func.date(Invoice.created_time))
         .order_by(func.date(Invoice.created_time))
     )
 
     if branch_id:
-        q = q.filter(Invoice.branch_id == branch_id)
+        qty_q = qty_q.filter(Invoice.branch_id == branch_id)
 
-    rows = q.all()
+    sold_qty_map = {r.date: int(r.sold_qty or 0) for r in qty_q.all()}
 
-    return [
-        {
-            "date": r.date.strftime("%Y-%m-%d"),
-            "quantity": int(r.quantity or 0),
-            "sales_amount": float(r.sales_amount or 0),
-            "cost_amount": float(r.cost_amount or 0),
-            "profit": float((r.sales_amount or 0) - (r.cost_amount or 0)),
-        }
-        for r in rows
-    ]
+    ret_qty_q = (
+        db.query(
+            func.date(SalesReturn.created_on).label("date"),
+            func.coalesce(func.sum(SalesReturnItem.quantity), 0).label("ret_qty"),
+        )
+        .join(SalesReturnItem, SalesReturnItem.return_id == SalesReturn.return_id)
+        .filter(SalesReturn.shop_id == user.shop_id)
+        .filter(SalesReturn.status != "CANCELLED")
+        .filter(func.date(SalesReturn.created_on).between(f.date(), t.date()))
+        .group_by(func.date(SalesReturn.created_on))
+        .order_by(func.date(SalesReturn.created_on))
+    )
+
+    if branch_id:
+        ret_qty_q = ret_qty_q.filter(SalesReturn.branch_id == branch_id)
+
+    ret_qty_map = {r.date: int(r.ret_qty or 0) for r in ret_qty_q.all()}
+
+    rows = []
+    cur = f.date()
+    end = t.date()
+    while cur <= end:
+        fin = calc_period_financials(
+            db,
+            shop_id=user.shop_id,
+            branch_id=branch_id,
+            from_dt=cur,
+            to_dt=cur,
+        )
+        sold_qty = int(sold_qty_map.get(cur, 0))
+        ret_qty = int(ret_qty_map.get(cur, 0))
+        quantity = sold_qty - ret_qty
+
+        sales_amount = float(fin.get("sales_ex_tax", 0) or 0)
+        discount_amount = float(fin.get("discount_ex_tax", fin.get("discount", 0)) or 0)
+        cost_amount = float(fin.get("cogs_net", 0) or 0)
+        expense_amount = float(fin.get("expense", 0) or 0)
+        gross_profit = (sales_amount - discount_amount) - cost_amount
+        net_profit = float(fin.get("profit", 0) or 0)
+
+        has_activity = any(
+            abs(v) > 1e-9
+            for v in [sales_amount, discount_amount, cost_amount, expense_amount, net_profit]
+        ) or quantity != 0
+
+        if has_activity:
+            rows.append(
+                {
+                    "date": cur.strftime("%Y-%m-%d"),
+                    "quantity": int(quantity),
+                    "sales_amount": float(sales_amount),
+                    "discount_amount": float(discount_amount),
+                    "cost_amount": float(cost_amount),
+                    "expense_amount": float(expense_amount),
+                    "gross_profit": float(gross_profit),
+                    "profit": float(net_profit),
+                }
+            )
+        cur = cur + timedelta(days=1)
+
+    return rows
 
 
 # =====================================================

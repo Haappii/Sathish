@@ -327,17 +327,27 @@ def get_trend_metric(
             for r in rows
         }
     elif metric in ["profit"]:
-        from sqlalchemy import and_
+        from sqlalchemy import and_, case
         from app.models.branch_expense import BranchExpense
         from app.models.sales_return import SalesReturn, SalesReturnItem
+
+        inv_total_expr = func.coalesce(Invoice.total_amount, 0)
+        inv_tax_expr = func.coalesce(Invoice.tax_amt, 0)
+        inv_sales_ex_tax_expr = inv_total_expr - inv_tax_expr
+        inv_discount_ex_tax_expr = case(
+            (
+                inv_total_expr > 0,
+                func.coalesce(Invoice.discounted_amt, 0)
+                * (inv_sales_ex_tax_expr / func.nullif(inv_total_expr, 0)),
+            ),
+            else_=0,
+        )
 
         inv_sum_rows = (
             db.query(
                 group_key(Invoice.created_time).label("k"),
-                func.sum(
-                    func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.tax_amt, 0)
-                ).label("sales_ex_tax"),
-                func.sum(func.coalesce(Invoice.discounted_amt, 0)).label("discount"),
+                func.sum(inv_sales_ex_tax_expr).label("sales_ex_tax"),
+                func.sum(inv_discount_ex_tax_expr).label("discount_ex_tax"),
             )
             .filter(
                 Invoice.shop_id == user.shop_id,
@@ -365,6 +375,18 @@ def get_trend_metric(
             .order_by(group_key(Invoice.created_time))
             .all()
         )
+
+        ret_inv_total_expr = func.coalesce(Invoice.total_amount, 0)
+        ret_inv_tax_expr = func.coalesce(Invoice.tax_amt, 0)
+        ret_inv_sales_ex_tax_expr = ret_inv_total_expr - ret_inv_tax_expr
+        ret_discount_ex_tax_expr = case(
+            (
+                ret_inv_total_expr > 0,
+                func.coalesce(SalesReturn.discount_amount, 0)
+                * (ret_inv_sales_ex_tax_expr / func.nullif(ret_inv_total_expr, 0)),
+            ),
+            else_=0,
+        )
         ret_sum_rows = (
             db.query(
                 group_key(SalesReturn.created_on).label("k"),
@@ -373,7 +395,14 @@ def get_trend_metric(
                     + func.coalesce(SalesReturn.discount_amount, 0)
                     - func.coalesce(SalesReturn.tax_amount, 0)
                 ).label("sales_ex_tax"),
-                func.sum(func.coalesce(SalesReturn.discount_amount, 0)).label("discount"),
+                func.sum(ret_discount_ex_tax_expr).label("discount_ex_tax"),
+            )
+            .join(
+                Invoice,
+                and_(
+                    Invoice.invoice_id == SalesReturn.invoice_id,
+                    Invoice.shop_id == SalesReturn.shop_id,
+                ),
             )
             .filter(
                 SalesReturn.shop_id == user.shop_id,
@@ -461,17 +490,17 @@ def get_trend_metric(
             exp = expense_map.get(k)
 
             inv_sales_ex_tax = float(getattr(inv_sum, "sales_ex_tax", 0) or 0)
-            inv_discount = float(getattr(inv_sum, "discount", 0) or 0)
+            inv_discount_ex_tax = float(getattr(inv_sum, "discount_ex_tax", 0) or 0)
             inv_cogs_amt = float(getattr(inv_cogs, "cogs", 0) or 0)
 
             ret_sales_ex_tax = float(getattr(ret_sum, "sales_ex_tax", 0) or 0)
-            ret_discount = float(getattr(ret_sum, "discount", 0) or 0)
+            ret_discount_ex_tax = float(getattr(ret_sum, "discount_ex_tax", 0) or 0)
             ret_cogs_amt = float(getattr(ret_cogs, "cogs", 0) or 0)
 
             expense = float(getattr(exp, "expense", 0) or 0)
 
             sales = inv_sales_ex_tax - ret_sales_ex_tax
-            discount = inv_discount - ret_discount
+            discount = inv_discount_ex_tax - ret_discount_ex_tax
             cogs_net = inv_cogs_amt - ret_cogs_amt
 
             profit = (sales - discount) - cogs_net - expense
