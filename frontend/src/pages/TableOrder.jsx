@@ -138,20 +138,14 @@ export default function TableOrder() {
     await api.post("/table-billing/order/item/add", null, {
       params: { order_id: orderId, item_id: id, qty: 1 }
     });
-    const added = items.find(x => x.item_id === id);
-    if (added) printKOT(added.item_name, 1);
-    loadOrder();
+    await loadOrder();
   };
 
   const changeQty = async (id, delta) => {
     await api.post("/table-billing/order/item/add", null, {
       params: { order_id: orderId, item_id: id, qty: delta }
     });
-    if (delta > 0) {
-      const added = items.find(x => x.item_id === id);
-      if (added) printKOT(added.item_name, delta);
-    }
-    loadOrder();
+    await loadOrder();
   };
 
   /* ================= PRINT ================= */
@@ -275,7 +269,7 @@ export default function TableOrder() {
     setTimeout(() => window.print(), 300);
   };
 
-  const generateKOTText = (itemName, qty) => {
+  const generateKOTText = kotItems => {
     const WIDTH = 32;
     const NAME_COL = 22;
     const COUNT_COL = 8;
@@ -295,18 +289,29 @@ export default function TableOrder() {
     t += line + "\n";
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
     t += line + "\n";
-    const name = String(itemName || "").slice(0, NAME_COL).padEnd(NAME_COL);
-    const count = String(qty || 0);
-    t += name + rightCol(count, COUNT_COL) + "\n";
+    const rows = Array.isArray(kotItems) ? kotItems : [];
+    rows.forEach(it => {
+      const name = String(it.item_name || "").slice(0, NAME_COL).padEnd(NAME_COL);
+      const count = String(Number(it.quantity || 0));
+      t += name + rightCol(count, COUNT_COL) + "\n";
+    });
     t += line + "\n";
-    t += center(`Total Count - ${qty || 0}`) + "\n";
+    const totalCount = rows.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+    t += center(`Total Count - ${totalCount}`) + "\n";
     t += line + "\n";
     return t;
   };
 
-  const printKOT = (itemName, qty) => {
+  const printKOT = kotItems => {
+    const rows = (Array.isArray(kotItems) ? kotItems : []).filter(
+      it => Number(it.quantity || 0) > 0
+    );
+    if (!rows.length) {
+      showToast("Add items before printing KOT", "warning");
+      return;
+    }
     if (!kotPrintRef.current) return;
-    kotPrintRef.current.textContent = generateKOTText(itemName, qty);
+    kotPrintRef.current.textContent = generateKOTText(rows);
     const w = window.open("", "KOT_PRINT");
     if (!w) {
       showToast("Popup blocked. Allow popups to print KOT.", "warning");
@@ -319,6 +324,24 @@ export default function TableOrder() {
       w.print();
       w.close();
     }, 200);
+  };
+
+  const confirmOrderAndPrintKOT = async () => {
+    try {
+      const confirmPrint = window.confirm("Confirm order and print KOT?");
+      if (!confirmPrint) return;
+      const res = await api.get(`/table-billing/order/by-table/${tableId}`);
+      const latestItems = Array.isArray(res.data?.items) ? res.data.items : [];
+      setOrderItems(latestItems);
+      if (!latestItems.length) {
+        showToast("Add items before confirming order", "warning");
+        return;
+      }
+      printKOT(latestItems);
+      showToast("Order confirmed and KOT printed", "success");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to confirm order"), "error");
+    }
   };
 
   /* ================= COMPLETE ORDER ================= */
@@ -679,6 +702,14 @@ export default function TableOrder() {
             >
               <span className="text-[12px] font-bold text-emerald-700">Payable: ₹ {total.toFixed(2)}</span>
               <span className="text-[10px] text-gray-600">View Details ▼</span>
+            </button>
+
+            <button
+              onClick={confirmOrderAndPrintKOT}
+              disabled={!orderItems.length}
+              className="w-full py-2 rounded-lg text-sm font-bold border border-amber-300 bg-amber-50 text-amber-800 mb-2 disabled:opacity-60"
+            >
+              Confirm Order & Print KOT
             </button>
 
             <div className="grid grid-cols-2 gap-2">
