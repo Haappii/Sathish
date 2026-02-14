@@ -42,7 +42,7 @@ PERMISSION_MODULES: list[dict[str, str]] = [
 
 
 DEFAULT_ROLE_PERMISSIONS: dict[str, dict[str, set[str]]] = {
-    "billing": {"read": {"admin", "manager", "cashier"}, "write": {"admin", "manager", "cashier"}},
+    "billing": {"read": {"admin", "manager", "cashier", "waiter"}, "write": {"admin", "manager", "cashier", "waiter"}},
     "online_orders": {"read": {"admin", "manager", "cashier"}, "write": {"admin", "manager", "cashier"}},
     "categories": {"read": {"admin", "manager", "cashier"}, "write": {"admin"}},
     "items": {"read": {"admin", "manager", "cashier"}, "write": {"admin"}},

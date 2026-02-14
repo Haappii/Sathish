@@ -302,6 +302,22 @@ export const buildRoleMenu = ({
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
     ];
+  } else if (roleLower === "waiter") {
+    menuItems = [
+      { name: "Home", path: "/home", icon: <FaHome /> },
+      { name: "Trends", path: "/trends", icon: <FaChartLine /> },
+      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      ...(showTableBilling
+        ? [
+            {
+              name: "Table Billing",
+              path: "/table-billing",
+              icon: <MdTableRestaurant />,
+            },
+          ]
+        : []),
+    ];
   } else if (roleLower === "manager") {
     menuItems = [
       { name: "Home", path: "/home", icon: <FaHome /> },
