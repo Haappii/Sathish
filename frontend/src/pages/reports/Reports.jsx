@@ -11,6 +11,7 @@ import { saveAs } from "file-saver";
 
 import defaultLogo from "../../assets/logo.png";
 import { getShopLogoUrl } from "../../utils/shopLogo";
+import { isHotelShop } from "../../utils/shopType";
 
 /* =====================================================
    REPORT DEFINITIONS
@@ -87,10 +88,15 @@ export default function Reports() {
   const [branches, setBranches] = useState([]);
 
   const [shop, setShop] = useState({});
+  const [hotelShop, setHotelShop] = useState(false);
   const [branch, setBranch] = useState({});
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const reportOptions = REPORTS.filter(
+    r => hotelShop || r.key !== "table/usage"
+  );
 
   const NO_USER_FILTER_KEYS = new Set([
     "profit",
@@ -114,7 +120,11 @@ export default function Reports() {
      LOAD MASTER DATA
      ===================================================== */
   useEffect(() => {
-    api.get("/shop/details").then(r => setShop(r.data || {}));
+    api.get("/shop/details").then(r => {
+      const shopData = r.data || {};
+      setShop(shopData);
+      setHotelShop(isHotelShop(shopData));
+    });
     api.get("/users/").then(r => setUsers(r.data || []));
     api.get("/branch/active").then(r => setBranches(r.data || []));
   }, []);
@@ -348,7 +358,9 @@ export default function Reports() {
         if (!candidate) continue;
         try {
           return await fetchAsDataUrl(candidate);
-        } catch {}
+        } catch {
+          continue;
+        }
       }
       return null;
     };
@@ -483,7 +495,7 @@ export default function Reports() {
       <div className="p-6 bg-slate-100 min-h-screen">
         <h2 className="text-xl font-semibold mb-4">Reports</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {REPORTS.map(r => (
+          {reportOptions.map(r => (
             <button key={r.key} onClick={() => setActiveReport(r)}
               className="bg-white border rounded-xl p-4 hover:bg-slate-50">
               {r.label}

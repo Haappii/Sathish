@@ -5,6 +5,7 @@ import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { isHotelShop } from "../utils/shopType";
 
 
 const BLUE = "#0B3C8C";
@@ -33,6 +34,7 @@ export default function TableOrder() {
     gst_number: "",
   });
   const [loading, setLoading] = useState(true);
+  const [hotelAllowed, setHotelAllowed] = useState(null);
   const [shop, setShop] = useState({});
   const [branch, setBranch] = useState({});
   const [tableName, setTableName] = useState("");
@@ -52,15 +54,14 @@ export default function TableOrder() {
     setTableName(res.data.table_name || res.data.table?.table_name || "");
   }, [tableId]);
 
-  const loadData = useCallback(async () => {
-    const [c, i, s] = await Promise.all([
+  const loadData = useCallback(async (shopData = null) => {
+    const [c, i] = await Promise.all([
       api.get("/category/"),
       api.get("/items/"),
-      api.get("/shop/details"),
     ]);
     setCategories(c.data || []);
     setItems(i.data || []);
-    setShop(s.data || {});
+    setShop(shopData || {});
     const session = getSession() || {};
     if (session.branch_id) {
       try {
@@ -77,8 +78,18 @@ export default function TableOrder() {
     (async () => {
       setLoading(true);
       try {
-        await Promise.all([loadOrder(), loadData()]);
+        const shopRes = await api.get("/shop/details");
+        const shopData = shopRes.data || {};
+        const allowed = isHotelShop(shopData);
+        if (mounted) {
+          setShop(shopData);
+          setHotelAllowed(allowed);
+        }
+        if (!allowed) return;
+
+        await Promise.all([loadOrder(), loadData(shopData)]);
       } catch (err) {
+        if (mounted) setHotelAllowed(false);
         showToast(errorDetail(err, "Failed to load table order"), "error");
       } finally {
         if (mounted) setLoading(false);
@@ -425,6 +436,22 @@ export default function TableOrder() {
     (t, i) => t + Number(i.price) * i.quantity,
     0
   );
+
+  if (hotelAllowed === false) {
+    return (
+      <div className="mt-10 text-center space-y-3">
+        <p className="text-sm font-medium text-red-600">
+          Table billing is available only for hotel billing type.
+        </p>
+        <button
+          onClick={() => navigate("/home", { replace: true })}
+          className="px-3 py-1.5 rounded-lg border bg-white text-[12px] hover:bg-gray-100"
+        >
+          Back to Home
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

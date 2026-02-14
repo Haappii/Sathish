@@ -19,6 +19,7 @@ from app.services.gst_service import calculate_gst
 
 from app.services.inventory_service import adjust_stock, is_inventory_enabled
 from app.services.day_close_service import is_branch_day_closed
+from app.utils.shop_type import ensure_hotel_billing_type
 
 router = APIRouter(
     prefix="/table-billing",
@@ -71,6 +72,7 @@ def list_tables(
     db: Session = Depends(get_db),
     user = Depends(require_permission("billing", "read"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     tables = (
         db.query(TableMaster)
         .filter(
@@ -132,6 +134,7 @@ def get_or_create_order(
     db: Session = Depends(get_db),
     user = Depends(require_permission("billing", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     table = (
         db.query(TableMaster)
         .filter(
@@ -200,6 +203,7 @@ def add_order_item(
     db: Session = Depends(get_db),
     user = Depends(require_permission("billing", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     if qty == 0:
         raise HTTPException(400, "Quantity cannot be zero")
 
@@ -262,6 +266,7 @@ def checkout_order(
     db: Session = Depends(get_db),
     user = Depends(require_permission("billing", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     business_dt = get_business_datetime(db, user.shop_id)
     if is_branch_day_closed(db, user.shop_id, user.branch_id, business_dt):
         raise HTTPException(403, "Day closed for this branch")
@@ -363,6 +368,7 @@ def cancel_order(
     db: Session = Depends(get_db),
     user = Depends(require_permission("billing", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     order = (
         db.query(Order)
         .filter(
@@ -402,6 +408,7 @@ def latest_invoice_by_mobile(
     db: Session = Depends(get_db),
     user = Depends(require_permission("billing", "read"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     invoice = (
         db.query(Invoice)
         .filter(

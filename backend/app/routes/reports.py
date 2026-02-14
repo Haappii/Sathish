@@ -23,6 +23,7 @@ from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.models.supplier import Supplier
 from app.models.purchase_order import PurchaseOrder
 from app.services.financials_service import calc_period_financials
+from app.utils.shop_type import ensure_hotel_billing_type
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -985,6 +986,7 @@ def table_usage(
     db: Session = Depends(get_db),
     user=Depends(require_permission("reports", "read")),
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
 

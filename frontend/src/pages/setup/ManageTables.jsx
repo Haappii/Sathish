@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
+import { isHotelShop } from "../../utils/shopType";
 import {
   FaPlus,
   FaTrash,
@@ -20,6 +21,7 @@ export default function ManageTables() {
   const [tables, setTables] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [hotelAllowed, setHotelAllowed] = useState(null);
 
   const [form, setForm] = useState({
     table_name: "",
@@ -42,8 +44,28 @@ export default function ManageTables() {
   };
 
   useEffect(() => {
+    let mounted = true;
+    api
+      .get("/shop/details")
+      .then((res) => {
+        if (!mounted) return;
+        setHotelAllowed(isHotelShop(res.data || {}));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setHotelAllowed(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hotelAllowed) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTables();
-  }, [branchId]);
+  }, [branchId, hotelAllowed]);
 
   /* ================= ADD TABLE ================= */
   const addTable = async () => {
@@ -121,6 +143,30 @@ export default function ManageTables() {
       showToast("Cannot delete occupied table", "error");
     }
   };
+
+  if (hotelAllowed === null) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading table setup...
+      </div>
+    );
+  }
+
+  if (!hotelAllowed) {
+    return (
+      <div className="mt-10 text-center space-y-3">
+        <p className="text-sm font-medium text-red-600">
+          Table management is available only for hotel billing type.
+        </p>
+        <button
+          onClick={() => navigate("/setup/branches", { replace: true })}
+          className="px-3 py-1.5 rounded-lg border bg-white text-[12px] hover:bg-gray-100"
+        >
+          Back to Branches
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

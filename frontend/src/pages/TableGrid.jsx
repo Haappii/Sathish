@@ -4,6 +4,7 @@ import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { isHotelShop } from "../utils/shopType";
 
 const BLUE = "#0B3C8C";
 const DEFAULT_MOBILE = "9999999999";
@@ -43,6 +44,7 @@ export default function TableGrid() {
   const [tab, setTab] = useState("IDLE");
   const [confirming, setConfirming] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [hotelAllowed, setHotelAllowed] = useState(null);
 
   // print ref & helpers
   const printTextRef = useRef(null);
@@ -61,6 +63,25 @@ export default function TableGrid() {
   };
 
   useEffect(() => {
+    let mounted = true;
+    api
+      .get("/shop/details")
+      .then((res) => {
+        if (!mounted) return;
+        setHotelAllowed(isHotelShop(res.data || {}));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setHotelAllowed(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hotelAllowed) return;
     loadTables();
 
     // refresh data every 8s (amounts, status)
@@ -76,7 +97,31 @@ export default function TableGrid() {
       clearInterval(apiTimer);
       clearInterval(minuteTimer);
     };
-  }, []);
+  }, [hotelAllowed]);
+
+  if (hotelAllowed === null) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading table billing...
+      </div>
+    );
+  }
+
+  if (!hotelAllowed) {
+    return (
+      <div className="mt-10 text-center space-y-3">
+        <p className="text-sm font-medium text-red-600">
+          Table billing is available only for hotel billing type.
+        </p>
+        <button
+          onClick={() => navigate("/home", { replace: true })}
+          className="px-3 py-1.5 rounded-lg border bg-white text-[12px] hover:bg-gray-100"
+        >
+          Back to Home
+        </button>
+      </div>
+    );
+  }
 
   /* ---------------- PRINT HELPERS ---------------- */
   const parseToDate = v => {

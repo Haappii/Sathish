@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.table_billing import TableMaster
 from app.utils.permissions import require_permission
+from app.utils.shop_type import ensure_hotel_billing_type
 
 router = APIRouter(
     prefix="/tables",
@@ -19,6 +20,7 @@ def list_tables(
     db: Session = Depends(get_db),
     user=Depends(require_permission("setup", "read"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     if str(user.role_name).lower() != "admin" and branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
     return (
@@ -40,6 +42,7 @@ def create_table(
     db: Session = Depends(get_db),
     user=Depends(require_permission("setup", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     if str(user.role_name).lower() != "admin" and payload.get("branch_id") != user.branch_id:
         raise HTTPException(403, "Not allowed")
     table = TableMaster(
@@ -65,6 +68,7 @@ def update_table(
     db: Session = Depends(get_db),
     user=Depends(require_permission("setup", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     table = db.query(TableMaster).filter(
         TableMaster.table_id == table_id,
         TableMaster.shop_id == user.shop_id
@@ -90,6 +94,7 @@ def delete_table(
     db: Session = Depends(get_db),
     user=Depends(require_permission("setup", "write"))
 ):
+    ensure_hotel_billing_type(db, user.shop_id)
     table = db.query(TableMaster).filter(
         TableMaster.table_id == table_id,
         TableMaster.shop_id == user.shop_id

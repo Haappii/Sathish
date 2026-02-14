@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
+import { isHotelShop } from "../../utils/shopType";
 import {
   FaPlus,
   FaEdit,
@@ -17,6 +18,7 @@ export default function Branches() {
 
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [hotelShop, setHotelShop] = useState(false);
 
   const emptyForm = {
     branch_name: "",
@@ -39,7 +41,12 @@ export default function Branches() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadBranches();
+    api
+      .get("/shop/details")
+      .then((res) => setHotelShop(isHotelShop(res.data || {})))
+      .catch(() => setHotelShop(false));
   }, []);
 
   /* ===== SAVE ===== */
@@ -169,14 +176,16 @@ export default function Branches() {
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() =>
-                        navigate(`/setup/branches/${b.branch_id}/tables`)
-                      }
-                      className="px-3 py-1 border rounded-full flex items-center gap-1"
-                    >
-                      <FaTable size={12} /> Tables
-                    </button>
+                    {hotelShop && (
+                      <button
+                        onClick={() =>
+                          navigate(`/setup/branches/${b.branch_id}/tables`)
+                        }
+                        className="px-3 py-1 border rounded-full flex items-center gap-1"
+                      >
+                        <FaTable size={12} /> Tables
+                      </button>
+                    )}
                     <button
                       onClick={() =>
                         toggleStatus(
