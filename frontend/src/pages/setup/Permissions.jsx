@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import authAxios from "../../api/authAxios";
@@ -20,8 +20,10 @@ export default function Permissions() {
   const [selectedRoleId, setSelectedRoleId] = useState("");
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState(null);
+  const [roleBusy, setRoleBusy] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     try {
       setLoading(true);
       const [m, r, e, p] = await Promise.all([
@@ -36,18 +38,24 @@ export default function Permissions() {
       setRoles(roleRows);
       setEnabled(Boolean(e.data?.enabled));
       setPerms(p.data || []);
-      setSelectedRoleId((prev) => prev || String(roleRows?.[0]?.role_id || ""));
+      setSelectedRoleId((prev) => {
+        const existing = roleRows.some(
+          (x) => String(x.role_id) === String(prev)
+        );
+        if (existing) return String(prev);
+        return String(roleRows?.[0]?.role_id || "");
+      });
     } catch {
       showToast("Failed to load permissions", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     if (!isAdmin) return;
     loadAll();
-  }, [isAdmin]);
+  }, [isAdmin, loadAll]);
 
   const permMap = useMemo(() => {
     const map = {};
@@ -101,11 +109,11 @@ export default function Permissions() {
 
     const next = { ...cur };
     if (field === "can_read") {
-      next.can_read = !Boolean(cur.can_read);
+      next.can_read = !cur.can_read;
       if (!next.can_read) next.can_write = false;
     }
     if (field === "can_write") {
-      next.can_write = !Boolean(cur.can_write);
+      next.can_write = !cur.can_write;
       if (next.can_write) next.can_read = true;
     }
 
@@ -137,6 +145,76 @@ export default function Permissions() {
       showToast(e?.response?.data?.detail || "Failed to disable permissions", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createRole = async () => {
+    const roleName = (newRoleName || "").trim();
+    if (!roleName) {
+      showToast("Role name is required", "error");
+      return;
+    }
+    try {
+      setRoleBusy(true);
+      const res = await authAxios.post("/roles/", {
+        role_name: roleName,
+        status: true,
+      });
+      const created = res?.data;
+      setNewRoleName("");
+      showToast("Role created", "success");
+      await loadAll();
+      if (created?.role_id) {
+        setSelectedRoleId(String(created.role_id));
+      }
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to create role", "error");
+    } finally {
+      setRoleBusy(false);
+    }
+  };
+
+  const renameSelectedRole = async () => {
+    if (!selectedRoleId) return;
+    const role = roles.find((r) => String(r.role_id) === String(selectedRoleId));
+    if (!role) return;
+
+    const nextName = window.prompt("Enter new role name", role.role_name || "");
+    const normalized = String(nextName || "").trim();
+    if (!normalized) return;
+    if (normalized === role.role_name) return;
+
+    try {
+      setRoleBusy(true);
+      await authAxios.put(`/roles/${selectedRoleId}`, { role_name: normalized });
+      showToast("Role updated", "success");
+      await loadAll();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to update role", "error");
+    } finally {
+      setRoleBusy(false);
+    }
+  };
+
+  const deleteSelectedRole = async () => {
+    if (!selectedRoleId) return;
+    const role = roles.find((r) => String(r.role_id) === String(selectedRoleId));
+    if (!role) return;
+
+    const ok = window.confirm(
+      `Delete role "${role.role_name}"?\nUsers assigned to this role must be inactive.`
+    );
+    if (!ok) return;
+
+    try {
+      setRoleBusy(true);
+      await authAxios.delete(`/roles/${selectedRoleId}`);
+      showToast("Role deleted", "success");
+      await loadAll();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to delete role", "error");
+    } finally {
+      setRoleBusy(false);
     }
   };
 
@@ -215,6 +293,42 @@ export default function Permissions() {
         </span>
       </div>
 
+      <div className="border rounded bg-white p-3 space-y-3">
+        <div className="text-sm font-semibold text-gray-700">Role Management</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={newRoleName}
+            onChange={(e) => setNewRoleName(e.target.value)}
+            placeholder="New role name"
+            className="border rounded px-2 py-1.5 text-sm min-w-[220px]"
+          />
+          <button
+            onClick={createRole}
+            disabled={roleBusy || loading}
+            className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm disabled:opacity-60"
+          >
+            Create Role
+          </button>
+          <button
+            onClick={renameSelectedRole}
+            disabled={!selectedRoleId || roleBusy || loading}
+            className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
+          >
+            Rename Selected
+          </button>
+          <button
+            onClick={deleteSelectedRole}
+            disabled={!selectedRoleId || roleBusy || loading}
+            className="px-3 py-1.5 rounded bg-rose-600 text-white text-sm disabled:opacity-60"
+          >
+            Delete Selected
+          </button>
+        </div>
+        <div className="text-xs text-gray-500">
+          Create, rename, or delete roles. Then assign module access below.
+        </div>
+      </div>
+
       {!enabled && (
         <div className="text-sm text-gray-600 border rounded bg-white p-3">
           Permissions are not enabled yet. Click{" "}
@@ -274,4 +388,3 @@ export default function Permissions() {
     </div>
   );
 }
-

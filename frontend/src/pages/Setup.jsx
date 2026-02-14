@@ -88,9 +88,9 @@ export default function Setup() {
       color: "text-teal-600"
     },
     {
-      title: "Permissions",
+      title: "Role Management",
       link: "/setup/permissions",
-      desc: "Module access by role",
+      desc: "Create roles and set module access",
       icon: FaUserShield,
       color: "text-indigo-700"
     },

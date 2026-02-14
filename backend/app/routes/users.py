@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.models.roles import Role
 from app.models.users import User
 from app.schemas.users import UserCreate, UserUpdate, UserResponse
 from app.utils.passwords import encode_password
@@ -36,6 +37,14 @@ def create_user(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "write")),
 ):
+    role = (
+        db.query(Role)
+        .filter(Role.role_id == request.role, Role.status == True)  # noqa: E712
+        .first()
+    )
+    if not role:
+        raise HTTPException(400, "Invalid or inactive role")
+
     exists = db.query(User).filter(
         User.user_name == request.user_name,
         User.shop_id == current_user.shop_id
@@ -105,7 +114,17 @@ def update_user(
         "branch_id": user.branch_id,
     }
 
-    for field, value in request.dict(exclude_unset=True).items():
+    payload = request.dict(exclude_unset=True)
+    if "role" in payload:
+        role = (
+            db.query(Role)
+            .filter(Role.role_id == payload.get("role"), Role.status == True)  # noqa: E712
+            .first()
+        )
+        if not role:
+            raise HTTPException(400, "Invalid or inactive role")
+
+    for field, value in payload.items():
         if field == "password" and value:
             setattr(user, field, encode_password(value))
         else:
