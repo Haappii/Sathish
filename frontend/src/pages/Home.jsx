@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
@@ -50,7 +50,19 @@ const MENU_GROUPS = [
   { key: "admin", title: "Admin & Setup", paths: ["/setup"] },
 ];
 
+const SHORTCUT_PATHS = [
+  "/sales/create",
+  "/sales/history",
+  "/customers",
+  "/inventory",
+  "/expenses",
+  "/reports",
+  "/cash-drawer",
+  "/setup",
+];
+
 export default function Home() {
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const session = getSession() || {};
   const roleLower = (session?.role || "").toString().toLowerCase();
@@ -177,6 +189,40 @@ export default function Home() {
     [menus]
   );
 
+  const quickShortcuts = useMemo(() => {
+    const byPath = new Map(menuCards.map((m) => [m.path, m]));
+    return SHORTCUT_PATHS
+      .map((path) => byPath.get(path))
+      .filter(Boolean)
+      .slice(0, 6);
+  }, [menuCards]);
+
+  useEffect(() => {
+    if (!quickShortcuts.length) return;
+
+    const hotkeyMap = new Map(
+      quickShortcuts.map((item, idx) => [String(idx + 1), item.path])
+    );
+
+    const onKeyDown = (e) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const tagName = e.target?.tagName?.toLowerCase();
+      if (tagName === "input" || tagName === "textarea" || tagName === "select") {
+        return;
+      }
+      if (e.target?.isContentEditable) return;
+
+      const path = hotkeyMap.get(String(e.key));
+      if (!path) return;
+
+      e.preventDefault();
+      navigate(path);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [navigate, quickShortcuts]);
+
   const groupedMenus = useMemo(() => {
     const pathToGroup = new Map();
     for (const g of MENU_GROUPS) {
@@ -248,6 +294,43 @@ export default function Home() {
 
         {/* MENUS */}
         <div className="lg:col-span-3 space-y-6">
+          {quickShortcuts.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  Quick Shortcuts
+                </h2>
+                <span className="text-sm text-gray-500">
+                  Use Alt + 1..{quickShortcuts.length}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {quickShortcuts.map((m, idx) => (
+                  <Link
+                    key={`shortcut-${m.path}`}
+                    to={m.path}
+                    className="group rounded-xl border bg-indigo-50 hover:bg-indigo-100 p-4 transition-all hover:shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-base">
+                          {m.icon}
+                        </div>
+                        <div className="text-sm font-medium text-gray-700 group-hover:text-indigo-700">
+                          {m.name}
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-semibold text-indigo-700 bg-white border border-indigo-200 rounded px-2 py-1">
+                        Alt+{idx + 1}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {groupedMenus.map((g) => (
             <div
               key={g.key}
