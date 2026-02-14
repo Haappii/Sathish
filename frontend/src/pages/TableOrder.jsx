@@ -8,7 +8,6 @@ import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { isHotelShop } from "../utils/shopType";
 
 
-const BLUE = "#0B3C8C";
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES = ["cash", "card", "upi"];
 const toAmount = (v) => {
@@ -31,6 +30,7 @@ export default function TableOrder() {
 
   const [activeCat, setActiveCat] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
 
   const [customer, setCustomer] = useState({
     mobile: DEFAULT_MOBILE,
@@ -47,6 +47,7 @@ export default function TableOrder() {
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
   const [serviceCharge, setServiceCharge] = useState("");
+  const [showTotals, setShowTotals] = useState(false);
 
   const errorDetail = (err, fallback) =>
     err?.response?.data?.detail || fallback;
@@ -147,6 +148,9 @@ export default function TableOrder() {
   const filteredItems = items.filter(i =>
     i.item_name.toLowerCase().includes(search.toLowerCase()) &&
     (activeCat === "ALL" || i.category_id === activeCat)
+  );
+  const filteredCategories = categories.filter(c =>
+    String(c.category_name || "").toLowerCase().includes(categorySearch.toLowerCase())
   );
 
   /* ================= ACTIONS ================= */
@@ -456,6 +460,10 @@ export default function TableOrder() {
   );
   const serviceChargeAmount = toAmount(serviceCharge || 0);
   const payableTotal = total + serviceChargeAmount;
+  const splitTotal =
+    Number(split.cash || 0) +
+    Number(split.card || 0) +
+    Number(split.upi || 0);
 
   if (hotelAllowed === false) {
     return (
@@ -485,6 +493,19 @@ export default function TableOrder() {
   return (
     <>
       <style>{`
+        html, body, #root {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+        .no-scroll::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scroll {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
         #bill-print-area {
           display: none;
         }
@@ -504,26 +525,47 @@ export default function TableOrder() {
           }
         }
       `}</style>
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={() => navigate("/table-billing", { replace: true })} className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]">&larr; Back</button>
+
+      <div className="px-4 pt-2 pb-1">
+        <button
+          onClick={() => navigate("/table-billing", { replace: true })}
+          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+        >
+          &larr; Back
+        </button>
       </div>
-      <div className="w-full h-full grid grid-cols-[200px_3fr_2fr]">
+      <div
+        className="grid grid-cols-[200px_3fr_2fr] gap-6 px-4 pb-4 no-scroll"
+        style={{ height: "calc(100vh - 110px)" }}
+      >
 
         {/* ================= CATEGORIES (LEFT) ================= */}
-        <aside className="rounded-2xl border shadow p-3 bg-white text-[11px]">
+        <aside className="rounded-2xl border shadow-xl p-3 bg-white text-[11px] flex flex-col overflow-hidden">
           <h2 className="text-sm font-bold text-center mb-2">CATEGORIES</h2>
-          <div className="flex flex-col gap-2 max-h-[70vh] overflow-auto">
+
+          <input
+            className="border rounded-lg px-2 py-1 mb-2 text-[11px] w-full"
+            placeholder="Search category..."
+            value={categorySearch}
+            onChange={e => setCategorySearch(e.target.value)}
+          />
+
+          <div className="flex-1 overflow-y-auto no-scroll">
             <button
               onClick={() => setActiveCat("ALL")}
-              className={`w-full text-left px-3 py-2 rounded text-[13px] font-semibold ${activeCat === "ALL" ? "bg-blue-600 text-white" : "bg-white"}`}
+              className={`w-full text-left px-3 py-2 rounded mb-1 ${
+                activeCat === "ALL" ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+              }`}
             >
               All
             </button>
-            {categories.map(c => (
+            {filteredCategories.map(c => (
               <button
                 key={c.category_id}
                 onClick={() => setActiveCat(c.category_id)}
-                className={`w-full text-left px-3 py-2 rounded text-[13px] font-semibold ${activeCat === c.category_id ? "bg-blue-600 text-white" : "bg-white"}`}
+                className={`w-full text-left px-3 py-2 rounded mb-1 ${
+                  activeCat === c.category_id ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+                }`}
               >
                 {c.category_name}
               </button>
@@ -544,7 +586,7 @@ export default function TableOrder() {
             />
           </div>
 
-          <div className="overflow-auto flex-1 pr-1">
+          <div className="flex-1 overflow-y-auto no-scroll pr-1">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filteredItems.map(item => {
                 const out = false;
@@ -559,7 +601,7 @@ export default function TableOrder() {
                     onClick={() => addItem(item.item_id)}
                     className={`
                       text-left rounded-lg border shadow-sm bg-white
-                      px-2 py-2 text-[12px] leading-tight text-left
+                      px-2 py-2 text-[12px] leading-tight
                       hover:bg-blue-50
                       ${out ? "bg-red-50 border-red-300 opacity-70" : ""}
                     `}
@@ -600,61 +642,59 @@ export default function TableOrder() {
           <h2 className="text-sm font-bold text-center mb-2">ITEMS BILLING</h2>
 
           <div className="p-3 space-y-2">
-            <div className="mt-3">
-              <div className="text-[10px] text-gray-600 mb-1">Payment Mode</div>
-              <div className="flex flex-wrap gap-2">
-                {PAYMENT_MODES.map(mode => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => {
-                      setPaymentMode(mode);
-                      setSplitEnabled(false);
-                    }}
-                    className={`px-3 py-1 rounded border text-[11px] ${
-                      paymentMode === mode && !splitEnabled
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white"
-                    }`}
-                  >
-                    {mode.toUpperCase()}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={() => setSplitEnabled(v => !v)}
-                  className={`px-3 py-1 rounded border text-[11px] ${
-                    splitEnabled ? "bg-emerald-600 text-white border-emerald-600" : "bg-white"
-                  }`}
-                >
-                  SPLIT
-                </button>
+            <div className="mt-2 rounded-xl border bg-white shadow px-3 py-2 text-[11px] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Payment Mode</span>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={splitEnabled}
+                    onChange={e => setSplitEnabled(e.target.checked)}
+                  />
+                  Split
+                </label>
               </div>
 
+              {!splitEnabled && (
+                <div className="flex flex-wrap gap-3">
+                  {PAYMENT_MODES.map(mode => (
+                    <label
+                      key={mode}
+                      className="flex items-center gap-2 text-[11px] cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMode"
+                        value={mode}
+                        checked={paymentMode === mode}
+                        onChange={() => setPaymentMode(mode)}
+                      />
+                      <span>{mode.toUpperCase()}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
               {splitEnabled && (
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  <input
-                    inputMode="decimal"
-                    placeholder="Cash"
-                    className="border rounded px-2 py-1 text-[11px]"
-                    value={split.cash}
-                    onChange={e => setSplit(s => ({ ...s, cash: e.target.value }))}
-                  />
-                  <input
-                    inputMode="decimal"
-                    placeholder="Card"
-                    className="border rounded px-2 py-1 text-[11px]"
-                    value={split.card}
-                    onChange={e => setSplit(s => ({ ...s, card: e.target.value }))}
-                  />
-                  <input
-                    inputMode="decimal"
-                    placeholder="UPI"
-                    className="border rounded px-2 py-1 text-[11px]"
-                    value={split.upi}
-                    onChange={e => setSplit(s => ({ ...s, upi: e.target.value }))}
-                  />
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_MODES.map(mode => (
+                    <div key={mode}>
+                      <label className="text-[10px] text-gray-600">{mode.toUpperCase()}</label>
+                      <input
+                        inputMode="decimal"
+                        className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                        value={split[mode]}
+                        onChange={e => setSplit(s => ({ ...s, [mode]: e.target.value }))}
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {splitEnabled && (
+                <div className="text-[10px] text-gray-600">
+                  Split Total: Rs. {splitTotal.toFixed(2)} / Payable: Rs. {payableTotal.toFixed(2)}
                 </div>
               )}
             </div>
@@ -713,92 +753,94 @@ export default function TableOrder() {
             </div>
           </div>
 
-          <div className="overflow-auto px-3 flex-1 divide-y">
+          <div className="rounded-xl border bg-white p-2 shadow-inner flex-1 overflow-y-auto no-scroll text-[11px]">
             {!orderItems.length && (
-              <p className="text-center text-slate-400 py-3 text-[10px]">Cart empty — add items</p>
+              <p className="text-center text-slate-400 py-3 text-[10px]">Cart empty - add items</p>
             )}
 
             {orderItems.map(it => (
-              <div key={it.order_item_id} className="py-2 flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-sm truncate" style={{ color: BLUE }}>
-                    {it.item_name}
-                  </div>
-                  <div className="text-xs text-black">
-                    ₹ {it.price}
-                  </div>
-                </div>
-
+              <div key={it.order_item_id} className="flex justify-between border-b py-1 last:border-b-0">
+                <span className="font-medium truncate pr-2">{it.item_name}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => changeQty(it.item_id, -1)}
-                    className="w-7 h-7 border rounded-md text-sm font-bold"
-                    style={{ borderColor: BLUE, color: BLUE }}
+                    className="px-2 rounded-lg border text-[11px]"
                   >
-                    −
+                    -
                   </button>
 
-                  <div className="w-8 text-center text-sm font-extrabold" style={{ color: BLUE }}>
+                  <div className="w-8 text-center text-[11px] font-semibold">
                     {it.quantity}
                   </div>
 
                   <button
                     onClick={() => changeQty(it.item_id, 1)}
-                    className="w-7 h-7 rounded-md text-sm font-bold text-white"
-                    style={{ background: BLUE }}
+                    className="px-2 rounded-lg border text-[11px]"
                   >
                     +
                   </button>
+
+                  <span className="text-[10px] text-slate-600">
+                    Rs.{Number(it.price || 0).toFixed(0)}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-2 rounded-xl border bg-white shadow overflow-hidden p-3">
+          <div className="mt-2 rounded-xl border bg-white shadow overflow-hidden">
             <button
-              className="w-full flex items-center justify-between px-3 py-2 mb-2"
+              onClick={() => setShowTotals(v => !v)}
+              className="w-full flex items-center justify-between px-3 py-2"
+              type="button"
             >
-              <span className="text-[12px] font-bold text-emerald-700">Payable: ₹ {payableTotal.toFixed(2)}</span>
-              <span className="text-[10px] text-gray-600">View Details ▼</span>
+              <span className="text-[12px] font-bold text-emerald-700">
+                Payable: Rs. {payableTotal.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-gray-600">
+                {showTotals ? "Hide Details" : "Show Details"}
+              </span>
             </button>
-            <div className="text-[10px] text-gray-600 mb-2">
-              Base: ₹ {total.toFixed(2)} | Service: ₹ {serviceChargeAmount.toFixed(2)}
-            </div>
 
+            {showTotals && (
+              <div className="px-3 pb-3 pt-1 text-[11px] space-y-1">
+                <p>Subtotal: Rs. {total.toFixed(2)}</p>
+                <p>Service Charge: Rs. {serviceChargeAmount.toFixed(2)}</p>
+                <p className="font-semibold">Payable Total: Rs. {payableTotal.toFixed(2)}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-2">
             <button
               onClick={confirmOrderAndPrintKOT}
-              disabled={!orderItems.length}
-              className="w-full py-2 rounded-lg text-sm font-bold border border-amber-300 bg-amber-50 text-amber-800 mb-2 disabled:opacity-60"
+              disabled={!orderItems.length || completing}
+              className="bg-amber-500 text-white py-1.5 rounded-lg shadow text-[11px] disabled:opacity-60"
             >
-              Confirm Order & Print KOT
+              Confirm KOT
             </button>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => completeOrder(false)}
-                disabled={!orderItems.length || completing}
-                className="w-full py-2 rounded-lg text-sm font-bold text-white bg-blue-600"
-              >
-                {completing ? "Processing…" : "Complete"}
-              </button>
-
-              <button
-                onClick={() => completeOrder(true)}
-                disabled={!orderItems.length || completing}
-                className="w-full py-2 rounded-lg text-sm font-bold text-white"
-                style={{ background: "#16a34a" }}
-              >
-                {completing ? "Processing…" : "Complete & Print"}
-              </button>
-            </div>
-
             <button
-              onClick={cancelTable}
-              className="w-full mt-3 text-xs font-semibold text-black"
+              onClick={() => completeOrder(false)}
+              disabled={!orderItems.length || completing}
+              className="bg-blue-600 text-white py-1.5 rounded-lg shadow text-[11px] disabled:opacity-60"
             >
-              Cancel Table
+              {completing ? "Processing..." : "Complete"}
+            </button>
+            <button
+              onClick={() => completeOrder(true)}
+              disabled={!orderItems.length || completing}
+              className="bg-emerald-600 text-white py-1.5 rounded-lg shadow text-[11px] disabled:opacity-60"
+            >
+              {completing ? "Processing..." : "Complete & Print"}
             </button>
           </div>
+
+          <button
+            onClick={cancelTable}
+            className="w-full mt-2 bg-gray-600 text-white py-1.5 rounded-lg shadow text-[11px]"
+          >
+            Cancel Table
+          </button>
         </section>
       </div>
 
