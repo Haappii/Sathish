@@ -110,7 +110,9 @@ export default function TableGrid() {
         }));
         showToast("Customer loaded from previous bill", "success");
       }
-    } catch {}
+    } catch {
+      setConfirming(c => ({ ...c }));
+    }
   }; 
 
   const generateBillText = (invoice, shop, branch, items) => {
@@ -255,7 +257,9 @@ export default function TableGrid() {
             const br = await api.get(`/branch/${branchId}`);
             branchData = br.data || {};
           }
-        } catch {}
+        } catch {
+          branchData = {};
+        }
 
         const invoice = invRes.data || {};
         const items = invoice.items || [];
@@ -273,7 +277,7 @@ export default function TableGrid() {
       setConfirming(null);
       await loadTables();
     } catch (err) {
-      showToast("Checkout failed", "error");
+      showToast(err?.response?.data?.detail || "Checkout failed", "error");
     }
 
     setCheckoutLoading(false);

@@ -8,7 +8,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from app.db import get_db
-from app.utils.auth_user import get_current_user
+from app.utils.permissions import require_permission
 
 from app.models.table_billing import TableMaster, Order, OrderItem
 from app.models.items import Item
@@ -69,7 +69,7 @@ def generate_invoice_number(db: Session, shop_id: int, branch_id: int) -> str:
 @router.get("/tables")
 def list_tables(
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("billing", "read"))
 ):
     tables = (
         db.query(TableMaster)
@@ -130,7 +130,7 @@ def list_tables(
 def get_or_create_order(
     table_id: int,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("billing", "write"))
 ):
     table = (
         db.query(TableMaster)
@@ -198,7 +198,7 @@ def add_order_item(
     item_id: int,
     qty: int,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("billing", "write"))
 ):
     if qty == 0:
         raise HTTPException(400, "Quantity cannot be zero")
@@ -260,7 +260,7 @@ def checkout_order(
     order_id: int,
     payload: CheckoutRequest,   # ✅ ADDED (frontend already sends this)
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("billing", "write"))
 ):
     business_dt = get_business_datetime(db, user.shop_id)
     if is_branch_day_closed(db, user.shop_id, user.branch_id, business_dt):
@@ -361,7 +361,7 @@ def checkout_order(
 def cancel_order(
     order_id: int,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("billing", "write"))
 ):
     order = (
         db.query(Order)
@@ -400,7 +400,7 @@ def cancel_order(
 def latest_invoice_by_mobile(
     mobile: str,
     db: Session = Depends(get_db),
-    user = Depends(get_current_user)
+    user = Depends(require_permission("billing", "read"))
 ):
     invoice = (
         db.query(Invoice)

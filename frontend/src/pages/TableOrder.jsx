@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import api from "../utils/apiClient";
 import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
@@ -27,7 +27,11 @@ export default function TableOrder() {
   const [activeCat, setActiveCat] = useState("ALL");
   const [search, setSearch] = useState("");
 
-  const [customer, setCustomer] = useState({ mobile: DEFAULT_MOBILE, name: "NA" });
+  const [customer, setCustomer] = useState({
+    mobile: DEFAULT_MOBILE,
+    name: "NA",
+    gst_number: "",
+  });
   const [loading, setLoading] = useState(true);
   const [shop, setShop] = useState({});
   const [branch, setBranch] = useState({});
@@ -37,20 +41,23 @@ export default function TableOrder() {
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
 
+  const errorDetail = (err, fallback) =>
+    err?.response?.data?.detail || fallback;
+
   /* ================= LOAD ================= */
-  const loadOrder = async () => {
-    const res = await api.get(
-      `/table-billing/order/by-table/${tableId}`
-    );
+  const loadOrder = useCallback(async () => {
+    const res = await api.get(`/table-billing/order/by-table/${tableId}`);
     setOrderId(res.data.order_id);
     setOrderItems(res.data.items || []);
     setTableName(res.data.table_name || res.data.table?.table_name || "");
-  };
+  }, [tableId]);
 
-  const loadData = async () => {
-    const c = await api.get("/category/");
-    const i = await api.get("/items/");
-    const s = await api.get("/shop/details");
+  const loadData = useCallback(async () => {
+    const [c, i, s] = await Promise.all([
+      api.get("/category/"),
+      api.get("/items/"),
+      api.get("/shop/details"),
+    ]);
     setCategories(c.data || []);
     setItems(i.data || []);
     setShop(s.data || {});
@@ -59,19 +66,28 @@ export default function TableOrder() {
       try {
         const br = await api.get(`/branch/${session.branch_id}`);
         setBranch(br.data || {});
-      } catch {}
+      } catch {
+        setBranch({});
+      }
     }
-
-
-  };
+  }, []);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
-      await loadOrder();
-      await loadData();
-      setLoading(false);
+      setLoading(true);
+      try {
+        await Promise.all([loadOrder(), loadData()]);
+      } catch (err) {
+        showToast(errorDetail(err, "Failed to load table order"), "error");
+      } finally {
+        if (mounted) setLoading(false);
+      }
     })();
-  }, [tableId]);
+    return () => {
+      mounted = false;
+    };
+  }, [loadOrder, loadData, showToast]);
 
   /* ================= CUSTOMER AUTO FILL ================= */
   const fetchCustomerByMobile = async mobile => {
@@ -139,7 +155,14 @@ export default function TableOrder() {
   };
 
   /* ================= PRINT ================= */
-  const generateBillText = invoiceNo => {
+  const generateBillText = ({
+    invoiceNumber,
+    invoiceCreatedAt,
+    invoiceItems,
+    invoiceTax,
+    invoiceDiscount,
+    invoiceTotal,
+  }) => {
     const WIDTH = 48;
     const line = "-".repeat(WIDTH);
 
@@ -168,8 +191,8 @@ export default function TableOrder() {
     if (shop.gst_number) t += center(`GSTIN: ${shop.gst_number}`) + "\n";
 
     t += line + "\n";
-    t += `Invoice No : ${invoiceNo}\n`;
-    t += `Date       : ${formatDisplayDate(new Date(), false)}\n`;
+    t += `Invoice No : ${invoiceNumber}\n`;
+    t += `Date       : ${formatDisplayDate(invoiceCreatedAt || new Date(), false)}\n`;
     const isPlaceholder = /^9{9,}$/.test(String(customer.mobile || ""));
     if (!isPlaceholder) {
       t += `Customer   : ${customer.name || "Walk-in"}\n`;
@@ -196,36 +219,59 @@ export default function TableOrder() {
 
     t += line + "\n";
 
-    orderItems.forEach(i => {
+    const rows = Array.isArray(invoiceItems) ? invoiceItems : [];
+    rows.forEach(i => {
       const name = i.item_name.slice(0, 22).padEnd(22);
       const qty = String(i.quantity).padStart(4);
-      const rate = i.price.toFixed(2).padStart(10);
-      const total = (i.quantity * i.price).toFixed(2).padStart(12);
+      const rate = Number(i.price || 0).toFixed(2).padStart(10);
+      const total = (Number(i.quantity || 0) * Number(i.price || 0)).toFixed(2).padStart(12);
       t += name + qty + rate + total + "\n";
     });
 
     t += line + "\n";
 
-    const subtotal = orderItems.reduce((s, it) => s + Number(it.price || 0) * Number(it.quantity || 0), 0);
-    const totalItems = orderItems.reduce((s, it) => s + Number(it.quantity || 0), 0);
+    const subtotal = rows.reduce(
+      (s, it) =>
+        s +
+        (it.amount != null
+          ? Number(it.amount || 0)
+          : Number(it.price || 0) * Number(it.quantity || 0)),
+      0
+    );
+    const totalItems = rows.reduce((s, it) => s + Number(it.quantity || 0), 0);
     const leftText = `Items: ${totalItems}`;
     const rightText = `Subtotal : ${subtotal.toFixed(2)}`;
     const gap = Math.max(1, WIDTH - leftText.length - rightText.length);
     t += leftText + " ".repeat(gap) + rightText + "\n";
 
     if (shop?.gst_enabled)
-      t += rightKV(`GST ${shop.gst_percent}%`, (0).toFixed(2)) + "\n";
+      t += rightKV(`GST ${shop.gst_percent}%`, Number(invoiceTax || 0).toFixed(2)) + "\n";
 
-    t += rightKV("Grand Total", (subtotal || 0).toFixed(2)) + "\n";
+    if (invoiceDiscount)
+      t += rightKV("Discount", Number(invoiceDiscount || 0).toFixed(2)) + "\n";
+
+    t += rightKV(
+      "Grand Total",
+      Number(invoiceTotal != null ? invoiceTotal : subtotal).toFixed(2)
+    ) + "\n";
     t += line + "\n";
     t += center("Thank You! Visit Again") + "\n";
 
     return t;
   }; 
 
-  const printInvoice = invoiceNo => {
-    if (!printTextRef.current) return;
-    printTextRef.current.textContent = generateBillText(invoiceNo);
+  const printInvoice = async invoiceNo => {
+    if (!printTextRef.current || !invoiceNo) return;
+    const res = await api.get(`/invoice/by-number/${invoiceNo}`);
+    const invoice = res.data || {};
+    printTextRef.current.textContent = generateBillText({
+      invoiceNumber: invoice.invoice_number || invoiceNo,
+      invoiceCreatedAt: invoice.created_time,
+      invoiceItems: invoice.items || orderItems,
+      invoiceTax: invoice.tax_amt,
+      invoiceDiscount: invoice.discounted_amt,
+      invoiceTotal: invoice.total_amount,
+    });
     setTimeout(() => window.print(), 300);
   };
 
@@ -279,6 +325,18 @@ export default function TableOrder() {
   const completeOrder = async (print = true) => {
     setCompleting(true);
     try {
+      const mobile = String(customer.mobile || "").replace(/\D/g, "");
+      if (mobile.length !== 10) {
+        showToast("Enter a valid 10-digit mobile number", "error");
+        setCompleting(false);
+        return;
+      }
+      if (!String(customer.name || "").trim()) {
+        showToast("Customer name is required", "error");
+        setCompleting(false);
+        return;
+      }
+
       const splitSum =
         Number(split.cash || 0) +
         Number(split.card || 0) +
@@ -299,8 +357,8 @@ export default function TableOrder() {
       const res = await api.post(
         `/table-billing/order/checkout/${orderId}`,
         {
-          customer_name: customer.name || null,
-          mobile: customer.mobile || null,
+          customer_name: String(customer.name || "").trim(),
+          mobile: mobile,
           payment_mode: splitEnabled ? "split" : paymentMode,
           payment_split: splitEnabled
             ? {
@@ -314,7 +372,7 @@ export default function TableOrder() {
 
       if (print) {
         // AUTO PRINT AFTER COMPLETION
-        printInvoice(res.data.invoice_number);
+        await printInvoice(res.data.invoice_number);
         showToast("Order completed and invoice printed", "success");
       } else {
         showToast("Order completed", "success");
@@ -324,17 +382,20 @@ export default function TableOrder() {
         navigate("/table-billing");
       }, 500);
     } catch (err) {
-      showToast("Checkout failed", "error");
+      showToast(errorDetail(err, "Checkout failed"), "error");
     }
 
     setCompleting(false);
   };
 
   const cancelTable = async () => {
-    await api.post(
-      `/table-billing/order/cancel/${orderId}`
-    );
-    navigate("/table-billing");
+    try {
+      await api.post(`/table-billing/order/cancel/${orderId}`);
+      showToast("Table cancelled", "success");
+      navigate("/table-billing");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to cancel table"), "error");
+    }
   };
 
   const total = orderItems.reduce(
@@ -342,12 +403,21 @@ export default function TableOrder() {
     0
   );
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading table order...
+      </div>
+    );
+  }
 
   /* ================= UI ================= */
   return (
     <>
       <style>{`
+        #bill-print-area {
+          display: none;
+        }
         @media print {
           body * { visibility: hidden; }
           #bill-print-area, #bill-print-area * {
@@ -355,6 +425,7 @@ export default function TableOrder() {
             font-family: monospace;
           }
           #bill-print-area {
+            display: block !important;
             position: absolute;
             top: 0;
             left: 0;
@@ -364,7 +435,7 @@ export default function TableOrder() {
         }
       `}</style>
       <div className="flex items-center justify-between mb-3">
-        <button onClick={() => navigate("/home", { replace: true })} className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]">&larr; Back</button>
+        <button onClick={() => navigate("/table-billing", { replace: true })} className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]">&larr; Back</button>
       </div>
       <div className="w-full h-full grid grid-cols-[200px_3fr_2fr]">
 
@@ -406,7 +477,6 @@ export default function TableOrder() {
           <div className="overflow-auto flex-1 pr-1">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filteredItems.map(item => {
-                const stock = 0;
                 const out = false;
                 const imgUrl = item.image_filename
                   ? `${API_BASE}/item-images/${item.image_filename}`
@@ -448,11 +518,6 @@ export default function TableOrder() {
                       </div>
                     </div>
 
-                    {false && (
-                      <div className={`text-[11px] mt-1 ${getStockColor(stock)}`}>
-                        Stock - {stock}
-                      </div>
-                    )}
                   </button>
                 );
               })}

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models.table_billing import TableMaster
-from app.utils.auth_user import get_current_user
+from app.utils.permissions import require_permission
 
 router = APIRouter(
     prefix="/tables",
@@ -17,7 +17,7 @@ router = APIRouter(
 def list_tables(
     branch_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("setup", "read"))
 ):
     if str(user.role_name).lower() != "admin" and branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
@@ -38,7 +38,7 @@ def list_tables(
 def create_table(
     payload: dict,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("setup", "write"))
 ):
     if str(user.role_name).lower() != "admin" and payload.get("branch_id") != user.branch_id:
         raise HTTPException(403, "Not allowed")
@@ -63,7 +63,7 @@ def update_table(
     table_id: int,
     payload: dict,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("setup", "write"))
 ):
     table = db.query(TableMaster).filter(
         TableMaster.table_id == table_id,
@@ -88,7 +88,7 @@ def update_table(
 def delete_table(
     table_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(require_permission("setup", "write"))
 ):
     table = db.query(TableMaster).filter(
         TableMaster.table_id == table_id,
