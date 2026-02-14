@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import api from "../utils/apiClient";
@@ -107,16 +107,16 @@ export default function Home() {
   }, [permsEnabled, permMap, roleLower]);
 
   /* ------------------ LOAD DASHBOARD DATA ------------------ */
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const res = await api.get("/dashboard/stats");
       setStats(res?.data || null);
     } catch {
       setStats(null);
     }
-  };
+  }, []);
 
-  const loadCategorySales = async () => {
+  const loadCategorySales = useCallback(async () => {
     try {
       const res = await api.get("/reports/category-sales", {
         params: { mode: "today", branch_id: branchId ?? undefined },
@@ -125,9 +125,9 @@ export default function Home() {
     } catch {
       setCategorySales([]);
     }
-  };
+  }, [branchId]);
 
-  const loadBranchSales = async () => {
+  const loadBranchSales = useCallback(async () => {
     if (!isAdmin) return;
     try {
       const res = await api.get("/reports/branch-sales", {
@@ -140,13 +140,13 @@ export default function Home() {
     } catch {
       setBranchSales([]);
     }
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
     loadStats();
     loadCategorySales();
     loadBranchSales();
-  }, [branchId, isAdmin]);
+  }, [loadStats, loadCategorySales, loadBranchSales]);
 
   /* ------------------ MENU BUILD ------------------ */
   const showTableBilling = shopType === "hotel";
