@@ -5,48 +5,74 @@ import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { getSession } from "../../utils/auth";
 
+const asId = (value) => String(value || "");
+const errorDetail = (err, fallback) => err?.response?.data?.detail || fallback;
+
 export default function Permissions() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
   const session = getSession() || {};
-  const roleLower = (session?.role || "").toString().toLowerCase();
-  const isAdmin = roleLower === "admin";
+  const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
   const [modules, setModules] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [enabled, setEnabled] = useState(false);
   const [perms, setPerms] = useState([]);
+
   const [selectedRoleId, setSelectedRoleId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [savingKey, setSavingKey] = useState(null);
-  const [roleBusy, setRoleBusy] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
+  const [editRoleName, setEditRoleName] = useState("");
+  const [menuSearch, setMenuSearch] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [roleBusy, setRoleBusy] = useState(false);
+  const [savingKey, setSavingKey] = useState("");
 
   const loadAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [m, r, e, p] = await Promise.all([
+      const [moduleRes, roleRes, enabledRes, permRes] = await Promise.all([
         authAxios.get("/permissions/modules"),
         authAxios.get("/roles/"),
         authAxios.get("/permissions/enabled"),
         authAxios.get("/permissions/"),
       ]);
 
-      const roleRows = (r.data || []).filter((x) => Boolean(x?.status));
-      setModules(m.data || []);
-      setRoles(roleRows);
-      setEnabled(Boolean(e.data?.enabled));
-      setPerms(p.data || []);
+      let roleRows = (roleRes.data || []).filter((x) => Boolean(x?.status));
+      let permRows = permRes.data || [];
+      const moduleRows = moduleRes.data || [];
+
+      if (!enabledRes?.data?.enabled) {
+        try {
+          await authAxios.post("/permissions/bootstrap");
+        } catch (err) {
+          const msg = String(err?.response?.data?.detail || "").toLowerCase();
+          if (!msg.includes("already enabled")) {
+            throw err;
+          }
+        }
+        const [rolesAfterBootstrap, permsAfterBootstrap] = await Promise.all([
+          authAxios.get("/roles/"),
+          authAxios.get("/permissions/"),
+        ]);
+        roleRows = (rolesAfterBootstrap.data || []).filter((x) => Boolean(x?.status));
+        permRows = permsAfterBootstrap.data || [];
+      }
+
+      let nextRoleId = "";
       setSelectedRoleId((prev) => {
-        const existing = roleRows.some(
-          (x) => String(x.role_id) === String(prev)
-        );
-        if (existing) return String(prev);
-        return String(roleRows?.[0]?.role_id || "");
+        const keepCurrent = roleRows.some((r) => asId(r.role_id) === asId(prev));
+        nextRoleId = keepCurrent ? asId(prev) : asId(roleRows?.[0]?.role_id);
+        return nextRoleId;
       });
-    } catch {
-      showToast("Failed to load permissions", "error");
+
+      const nextRole = roleRows.find((r) => asId(r.role_id) === asId(nextRoleId));
+      setEditRoleName(nextRole?.role_name || "");
+      setRoles(roleRows);
+      setModules(moduleRows);
+      setPerms(permRows);
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to load role mappings"), "error");
     } finally {
       setLoading(false);
     }
@@ -59,18 +85,44 @@ export default function Permissions() {
 
   const permMap = useMemo(() => {
     const map = {};
-    for (const p of perms || []) {
-      const roleId = String(p.role_id);
+    for (const row of perms || []) {
+      const roleId = asId(row.role_id);
       map[roleId] = map[roleId] || {};
-      map[roleId][p.module] = p;
+      map[roleId][row.module] = row;
     }
     return map;
   }, [perms]);
 
-  const selectedRole = roles.find((r) => String(r.role_id) === String(selectedRoleId));
-  const selectedRoleName = selectedRole?.role_name || "";
+  const selectedRole = useMemo(
+    () => roles.find((r) => asId(r.role_id) === asId(selectedRoleId)),
+    [roles, selectedRoleId]
+  );
 
-  const upsert = async (moduleKey, next) => {
+  const filteredModules = useMemo(() => {
+    const query = String(menuSearch || "").trim().toLowerCase();
+    if (!query) return modules;
+    return modules.filter((m) =>
+      `${m.label || ""} ${m.key || ""}`.toLowerCase().includes(query)
+    );
+  }, [modules, menuSearch]);
+
+  const mappedModules = useMemo(
+    () =>
+      modules.filter((m) => {
+        const p = permMap?.[asId(selectedRoleId)]?.[m.key];
+        return Boolean(p?.can_read || p?.can_write);
+      }),
+    [modules, permMap, selectedRoleId]
+  );
+
+  const setRoleSelection = (nextId) => {
+    const roleId = asId(nextId);
+    setSelectedRoleId(roleId);
+    const row = roles.find((r) => asId(r.role_id) === roleId);
+    setEditRoleName(row?.role_name || "");
+  };
+
+  const upsertAccess = async (moduleKey, nextAccess) => {
     const roleIdNum = Number(selectedRoleId);
     if (!roleIdNum || !moduleKey) return;
 
@@ -79,130 +131,113 @@ export default function Permissions() {
       const res = await authAxios.post("/permissions/upsert", {
         role_id: roleIdNum,
         module: moduleKey,
-        can_read: Boolean(next.can_read),
-        can_write: Boolean(next.can_write),
+        can_read: Boolean(nextAccess),
+        can_write: Boolean(nextAccess),
       });
 
       const row = res.data;
       setPerms((prev) => {
-        const list = Array.isArray(prev) ? prev.slice() : [];
-        const idx = list.findIndex(
-          (x) => String(x.role_id) === String(row.role_id) && x.module === row.module
+        const next = Array.isArray(prev) ? prev.slice() : [];
+        const idx = next.findIndex(
+          (x) => asId(x.role_id) === asId(row.role_id) && x.module === row.module
         );
-        if (idx >= 0) list[idx] = row;
-        else list.push(row);
-        return list;
+        if (idx >= 0) next[idx] = row;
+        else next.push(row);
+        return next;
       });
-    } catch {
-      showToast("Failed to save permission", "error");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to update menu access"), "error");
     } finally {
-      setSavingKey(null);
+      setSavingKey("");
     }
   };
 
-  const toggle = async (moduleKey, field) => {
-    const cur =
-      permMap?.[String(selectedRoleId)]?.[moduleKey] || {
-        can_read: false,
-        can_write: false,
-      };
-
-    const next = { ...cur };
-    if (field === "can_read") {
-      next.can_read = !cur.can_read;
-      if (!next.can_read) next.can_write = false;
-    }
-    if (field === "can_write") {
-      next.can_write = !cur.can_write;
-      if (next.can_write) next.can_read = true;
-    }
-
-    await upsert(moduleKey, next);
+  const toggleAccess = async (moduleKey) => {
+    const current = permMap?.[asId(selectedRoleId)]?.[moduleKey];
+    const hasAccess = Boolean(current?.can_read || current?.can_write);
+    await upsertAccess(moduleKey, !hasAccess);
   };
 
-  const bootstrap = async () => {
-    if (!window.confirm("Enable permissions using default settings?")) return;
+  const setVisibleModuleAccess = async (nextAccess) => {
+    const roleIdNum = Number(selectedRoleId);
+    if (!roleIdNum || !filteredModules.length) return;
     try {
-      setLoading(true);
-      await authAxios.post("/permissions/bootstrap");
-      showToast("Permissions enabled", "success");
+      setRoleBusy(true);
+      await Promise.all(
+        filteredModules.map((m) =>
+          authAxios.post("/permissions/upsert", {
+            role_id: roleIdNum,
+            module: m.key,
+            can_read: Boolean(nextAccess),
+            can_write: Boolean(nextAccess),
+          })
+        )
+      );
+      showToast(nextAccess ? "Menus mapped" : "Menus unmapped", "success");
       await loadAll();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to enable permissions", "error");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to update menu mapping"), "error");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const disable = async () => {
-    if (!window.confirm("Disable permissions and revert to default role access?")) return;
-    try {
-      setLoading(true);
-      await authAxios.post("/permissions/disable");
-      showToast("Permissions disabled", "success");
-      await loadAll();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to disable permissions", "error");
-    } finally {
-      setLoading(false);
+      setRoleBusy(false);
     }
   };
 
   const createRole = async () => {
-    const roleName = (newRoleName || "").trim();
+    const roleName = String(newRoleName || "").trim();
     if (!roleName) {
       showToast("Role name is required", "error");
       return;
     }
+
     try {
       setRoleBusy(true);
-      const res = await authAxios.post("/roles/", {
-        role_name: roleName,
-        status: true,
-      });
+      const res = await authAxios.post("/roles/", { role_name: roleName, status: true });
       const created = res?.data;
       setNewRoleName("");
       showToast("Role created", "success");
       await loadAll();
       if (created?.role_id) {
-        setSelectedRoleId(String(created.role_id));
+        setRoleSelection(created.role_id);
+        setEditRoleName(created.role_name || "");
       }
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to create role", "error");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to create role"), "error");
     } finally {
       setRoleBusy(false);
     }
   };
 
-  const renameSelectedRole = async () => {
+  const updateRole = async () => {
     if (!selectedRoleId) return;
-    const role = roles.find((r) => String(r.role_id) === String(selectedRoleId));
-    if (!role) return;
 
-    const nextName = window.prompt("Enter new role name", role.role_name || "");
-    const normalized = String(nextName || "").trim();
-    if (!normalized) return;
-    if (normalized === role.role_name) return;
+    const nextName = String(editRoleName || "").trim();
+    if (!nextName) {
+      showToast("Role name is required", "error");
+      return;
+    }
+    if (nextName === String(selectedRole?.role_name || "")) {
+      showToast("No changes to update", "warning");
+      return;
+    }
 
     try {
       setRoleBusy(true);
-      await authAxios.put(`/roles/${selectedRoleId}`, { role_name: normalized });
+      await authAxios.put(`/roles/${selectedRoleId}`, { role_name: nextName });
       showToast("Role updated", "success");
       await loadAll();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to update role", "error");
+      setRoleSelection(selectedRoleId);
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to update role"), "error");
     } finally {
       setRoleBusy(false);
     }
   };
 
-  const deleteSelectedRole = async () => {
-    if (!selectedRoleId) return;
-    const role = roles.find((r) => String(r.role_id) === String(selectedRoleId));
-    if (!role) return;
+  const deleteRole = async () => {
+    if (!selectedRoleId || !selectedRole) return;
 
     const ok = window.confirm(
-      `Delete role "${role.role_name}"?\nUsers assigned to this role must be inactive.`
+      `Delete role "${selectedRole.role_name}"?\nThis is allowed only when no active users are assigned.`
     );
     if (!ok) return;
 
@@ -211,8 +246,8 @@ export default function Permissions() {
       await authAxios.delete(`/roles/${selectedRoleId}`);
       showToast("Role deleted", "success");
       await loadAll();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to delete role", "error");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to delete role"), "error");
     } finally {
       setRoleBusy(false);
     }
@@ -233,157 +268,179 @@ export default function Permissions() {
           onClick={() => navigate("/setup", { replace: true })}
           className="px-3 py-1.5 rounded-lg border bg-white text-[12px] hover:bg-gray-100"
         >
-          ← Back
+          {"<-"} Back
         </button>
-        <h2 className="text-lg font-semibold text-gray-700">Permissions (RBAC)</h2>
+        <h2 className="text-lg font-semibold text-gray-700">Role Management</h2>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`px-2 py-1 rounded text-xs font-semibold ${
-            enabled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"
-          }`}
-        >
-          {enabled ? "Enabled" : "Not enabled"}
-        </span>
-
-        {!enabled ? (
-          <button
-            onClick={bootstrap}
-            disabled={loading}
-            className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm disabled:opacity-60"
-          >
-            Enable (Bootstrap)
-          </button>
-        ) : (
-          <button
-            onClick={disable}
-            disabled={loading}
-            className="px-3 py-1.5 rounded bg-red-600 text-white text-sm disabled:opacity-60"
-          >
-            Disable
-          </button>
-        )}
-
-        <button
-          onClick={loadAll}
-          disabled={loading}
-          className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">Role</label>
-        <select
-          value={selectedRoleId}
-          onChange={(e) => setSelectedRoleId(String(e.target.value))}
-          className="border rounded px-2 py-1"
-        >
-          {roles.map((r) => (
-            <option key={r.role_id} value={r.role_id}>
-              {r.role_name}
-            </option>
-          ))}
-        </select>
-
-        <span className="text-xs text-gray-500">
-          {selectedRoleName ? `Editing: ${selectedRoleName}` : ""}
-        </span>
-      </div>
-
-      <div className="border rounded bg-white p-3 space-y-3">
-        <div className="text-sm font-semibold text-gray-700">Role Management</div>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="border rounded bg-white p-3 space-y-3">
+          <div className="text-sm font-semibold text-gray-700">Create Role</div>
           <input
             value={newRoleName}
             onChange={(e) => setNewRoleName(e.target.value)}
-            placeholder="New role name"
-            className="border rounded px-2 py-1.5 text-sm min-w-[220px]"
+            placeholder="Enter new role name"
+            className="w-full border rounded px-2 py-1.5 text-sm"
           />
           <button
             onClick={createRole}
-            disabled={roleBusy || loading}
+            disabled={loading || roleBusy}
             className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm disabled:opacity-60"
           >
             Create Role
           </button>
-          <button
-            onClick={renameSelectedRole}
-            disabled={!selectedRoleId || roleBusy || loading}
-            className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
-          >
-            Rename Selected
-          </button>
-          <button
-            onClick={deleteSelectedRole}
-            disabled={!selectedRoleId || roleBusy || loading}
-            className="px-3 py-1.5 rounded bg-rose-600 text-white text-sm disabled:opacity-60"
-          >
-            Delete Selected
-          </button>
         </div>
-        <div className="text-xs text-gray-500">
-          Create, rename, or delete roles. Then assign module access below.
+
+        <div className="border rounded bg-white p-3 space-y-3">
+          <div className="text-sm font-semibold text-gray-700">Existing Role</div>
+          <select
+            value={selectedRoleId}
+            onChange={(e) => setRoleSelection(e.target.value)}
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          >
+            {!roles.length && <option value="">No roles found</option>}
+            {roles.map((r) => (
+              <option key={r.role_id} value={r.role_id}>
+                {r.role_name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            value={editRoleName}
+            onChange={(e) => setEditRoleName(e.target.value)}
+            placeholder="Edit selected role name"
+            className="w-full border rounded px-2 py-1.5 text-sm"
+            disabled={!selectedRoleId}
+          />
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={updateRole}
+              disabled={!selectedRoleId || loading || roleBusy}
+              className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
+            >
+              Update Role
+            </button>
+            <button
+              onClick={deleteRole}
+              disabled={!selectedRoleId || loading || roleBusy}
+              className="px-3 py-1.5 rounded bg-rose-600 text-white text-sm disabled:opacity-60"
+            >
+              Delete Role
+            </button>
+          </div>
         </div>
       </div>
 
-      {!enabled && (
-        <div className="text-sm text-gray-600 border rounded bg-white p-3">
-          Permissions are not enabled yet. Click{" "}
-          <span className="font-semibold">Enable (Bootstrap)</span> to create role-module rows.
-        </div>
-      )}
-
-      <div className="border rounded bg-white overflow-hidden">
-        <div className="grid grid-cols-12 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700">
-          <div className="col-span-6">Module</div>
-          <div className="col-span-3 text-center">Read</div>
-          <div className="col-span-3 text-center">Write</div>
-        </div>
-
-        {modules.map((m) => {
-          const moduleKey = m.key;
-          const p = permMap?.[String(selectedRoleId)]?.[moduleKey] || {};
-          const canRead = Boolean(p.can_read);
-          const canWrite = Boolean(p.can_write);
-          const busy = savingKey === `${selectedRoleId}:${moduleKey}`;
-
-          return (
-            <div
-              key={moduleKey}
-              className="grid grid-cols-12 px-3 py-2 border-t items-center"
-            >
-              <div className="col-span-6">
-                <div className="text-sm font-medium text-gray-800">{m.label}</div>
-                <div className="text-xs text-gray-500">{moduleKey}</div>
-              </div>
-
-              <div className="col-span-3 flex justify-center">
-                <input
-                  type="checkbox"
-                  checked={canRead}
-                  disabled={!enabled || busy}
-                  onChange={() => toggle(moduleKey, "can_read")}
-                />
-              </div>
-
-              <div className="col-span-3 flex justify-center">
-                <input
-                  type="checkbox"
-                  checked={canWrite}
-                  disabled={!enabled || busy}
-                  onChange={() => toggle(moduleKey, "can_write")}
-                />
-              </div>
+      <div className="border rounded bg-white p-3 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-semibold text-gray-700">Menu Mapping</div>
+            <div className="text-xs text-gray-500">
+              {selectedRole?.role_name
+                ? `Selected role: ${selectedRole.role_name}`
+                : "Select a role to manage menu access"}
             </div>
-          );
-        })}
+          </div>
+          <button
+            onClick={loadAll}
+            disabled={loading || roleBusy}
+            className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
+          >
+            Refresh
+          </button>
+        </div>
 
-        {loading && (
-          <div className="p-3 text-sm text-gray-600 border-t">Loading…</div>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_auto] gap-2">
+          <input
+            value={menuSearch}
+            onChange={(e) => setMenuSearch(e.target.value)}
+            placeholder="Search menu"
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+          <button
+            onClick={() => setVisibleModuleAccess(true)}
+            disabled={!selectedRoleId || loading || roleBusy || !filteredModules.length}
+            className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
+          >
+            Map Visible Menus
+          </button>
+          <button
+            onClick={() => setVisibleModuleAccess(false)}
+            disabled={!selectedRoleId || loading || roleBusy || !filteredModules.length}
+            className="px-3 py-1.5 rounded border bg-white text-sm hover:bg-gray-50 disabled:opacity-60"
+          >
+            Unmap Visible Menus
+          </button>
+        </div>
+
+        <div className="border rounded p-2 bg-gray-50">
+          <div className="text-xs font-medium text-gray-600 mb-1">
+            Mapped Menus ({mappedModules.length})
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!mappedModules.length && (
+              <span className="text-xs text-gray-500">No menu mapped for this role</span>
+            )}
+            {mappedModules.map((m) => (
+              <span
+                key={m.key}
+                className="px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-700"
+              >
+                {m.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="border rounded overflow-hidden">
+          <div className="grid grid-cols-12 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700">
+            <div className="col-span-8">Menu</div>
+            <div className="col-span-4 text-center">Access</div>
+          </div>
+
+          {filteredModules.map((m) => {
+            const moduleKey = m.key;
+            const p = permMap?.[asId(selectedRoleId)]?.[moduleKey] || {};
+            const hasAccess = Boolean(p.can_read || p.can_write);
+            const busy = savingKey === `${selectedRoleId}:${moduleKey}`;
+
+            return (
+              <div
+                key={moduleKey}
+                className="grid grid-cols-12 px-3 py-2 border-t items-center"
+              >
+                <div className="col-span-8">
+                  <div className="text-sm font-medium text-gray-800">{m.label}</div>
+                  <div className="text-xs text-gray-500">{moduleKey}</div>
+                </div>
+                <div className="col-span-4 flex justify-center items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={hasAccess}
+                    disabled={!selectedRoleId || loading || roleBusy || busy}
+                    onChange={() => toggleAccess(moduleKey)}
+                  />
+                  <span
+                    className={`text-xs font-medium ${
+                      hasAccess ? "text-emerald-700" : "text-gray-500"
+                    }`}
+                  >
+                    {hasAccess ? "Mapped" : "Not mapped"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+
+          {loading && (
+            <div className="p-3 text-sm text-gray-600 border-t">Loading...</div>
+          )}
+          {!loading && !filteredModules.length && (
+            <div className="p-3 text-sm text-gray-600 border-t">No menus found</div>
+          )}
+        </div>
       </div>
     </div>
   );
