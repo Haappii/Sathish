@@ -41,6 +41,7 @@ class CheckoutRequest(BaseModel):
     mobile: Optional[str] = None
     payment_mode: Optional[str] = "cash"
     payment_split: Optional[dict] = None
+    service_charge: Optional[float] = 0
 
 
 # ======================================================
@@ -290,8 +291,19 @@ def checkout_order(
         for it in order.items
     )
 
+    service_charge = Decimal(str(payload.service_charge or 0))
+    if service_charge < 0:
+        raise HTTPException(400, "Service charge cannot be negative")
+    service_charge = service_charge.quantize(Decimal("0.01"))
+
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax_amt, total = calculate_gst(subtotal, shop)
+    grand_total = (total + service_charge).quantize(Decimal("0.01"))
+
+    payment_split = payload.payment_split if isinstance(payload.payment_split, dict) else {}
+    if service_charge > 0:
+        payment_split = dict(payment_split or {})
+        payment_split["service_charge"] = float(service_charge)
 
     invoice = Invoice(
         shop_id=user.shop_id,
@@ -299,7 +311,7 @@ def checkout_order(
         branch_id=order.branch_id,
         created_user=user.user_id,
         created_time=business_dt,
-        total_amount=total,
+        total_amount=grand_total,
         tax_amt=tax_amt,
         discounted_amt=0,
 
@@ -307,7 +319,7 @@ def checkout_order(
         customer_name=payload.customer_name,
         mobile=payload.mobile,
         payment_mode=payload.payment_mode or "cash",
-        payment_split=payload.payment_split
+        payment_split=(payment_split or None)
     )
 
     db.add(invoice)

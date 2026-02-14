@@ -9,6 +9,10 @@ import { isHotelShop } from "../utils/shopType";
 const BLUE = "#0B3C8C";
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES = ["cash", "card", "upi"];
+const toAmount = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 /* =====================================================
    TIME HELPERS — ONLY FROM table_start_time
@@ -234,6 +238,11 @@ export default function TableGrid() {
     if (shop?.gst_enabled)
       t += rightKV(`GST ${shop.gst_percent}%`, (invoice.tax_amt || 0).toFixed(2)) + "\n";
 
+    const serviceCharge = Number(invoice?.payment_split?.service_charge || 0);
+    if (serviceCharge > 0) {
+      t += rightKV("Service Charge", serviceCharge.toFixed(2)) + "\n";
+    }
+
     if (invoice.discounted_amt)
       t += rightKV("Discount", Number(invoice.discounted_amt).toFixed(2)) + "\n";
 
@@ -262,12 +271,18 @@ export default function TableGrid() {
     }
 
     const totalAmount = Number(confirming?.table?.running_total || 0);
+    const serviceCharge = toAmount(confirming?.service_charge || 0);
+    if (serviceCharge < 0) {
+      showToast("Service charge cannot be negative", "error");
+      return;
+    }
+    const payableAmount = totalAmount + serviceCharge;
     if (confirming.split_enabled) {
       const splitSum =
         Number(confirming.split?.cash || 0) +
         Number(confirming.split?.card || 0) +
         Number(confirming.split?.upi || 0);
-      if (totalAmount > 0 && Math.abs(splitSum - totalAmount) > 0.01) {
+      if (payableAmount > 0 && Math.abs(splitSum - payableAmount) > 0.01) {
         showToast("Split total must match payable amount", "error");
         return;
       }
@@ -282,6 +297,7 @@ export default function TableGrid() {
       const res = await api.post(`/table-billing/order/checkout/${confirming.order_id}`, {
         customer_name: confirming.customer_name || null,
         mobile: mobile,
+        service_charge: serviceCharge,
         payment_mode: confirming.split_enabled ? "split" : confirming.payment_mode,
         payment_split: confirming.split_enabled
           ? {
@@ -365,9 +381,17 @@ export default function TableGrid() {
         className="flex items-center justify-between px-4 py-3 border-b"
         style={{ borderColor: BLUE }}
       >
-        <h1 className="text-lg font-extrabold" style={{ color: BLUE }}>
-          TABLE BILLING
-        </h1>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate("/home", { replace: true })}
+            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+          >
+            &larr; Back
+          </button>
+          <h1 className="text-lg font-extrabold" style={{ color: BLUE }}>
+            TABLE BILLING
+          </h1>
+        </div>
 
         <div className="flex border rounded-md overflow-hidden">
           {["IDLE", "RUNNING"].map(x => (
@@ -447,6 +471,7 @@ export default function TableGrid() {
                             table: t,
                             customer_name: t.customer_name || "NA",
                             mobile: t.mobile || DEFAULT_MOBILE,
+                            service_charge: "",
                             payment_mode: "cash",
                             split_enabled: false,
                             split: { cash: "", card: "", upi: "" }
@@ -523,6 +548,17 @@ export default function TableGrid() {
               </div>
 
               <div>
+                <label className="text-sm text-gray-600">Service Charge</label>
+                <input
+                  inputMode="decimal"
+                  className="w-full border rounded px-2 py-1 mt-1"
+                  value={confirming.service_charge ?? ""}
+                  onChange={e => setConfirming(c => ({ ...c, service_charge: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
                 <label className="text-sm text-gray-600">Payment Mode</label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {PAYMENT_MODES.map(mode => (
@@ -595,6 +631,12 @@ export default function TableGrid() {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="text-sm text-gray-700 rounded border bg-gray-50 px-2 py-2">
+                Base: ₹ {toAmount(confirming.table?.running_total || 0).toFixed(2)}{" "}
+                | Service: ₹ {toAmount(confirming.service_charge || 0).toFixed(2)}{" "}
+                | Payable: ₹ {(toAmount(confirming.table?.running_total || 0) + toAmount(confirming.service_charge || 0)).toFixed(2)}
               </div>
 
               <div className="flex justify-end gap-3">

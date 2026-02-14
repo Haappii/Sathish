@@ -11,6 +11,10 @@ import { isHotelShop } from "../utils/shopType";
 const BLUE = "#0B3C8C";
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES = ["cash", "card", "upi"];
+const toAmount = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 export default function TableOrder() {
   const { orderId: tableId } = useParams();
@@ -42,6 +46,7 @@ export default function TableOrder() {
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
+  const [serviceCharge, setServiceCharge] = useState("");
 
   const errorDetail = (err, fallback) =>
     err?.response?.data?.detail || fallback;
@@ -165,6 +170,7 @@ export default function TableOrder() {
     invoiceCreatedAt,
     invoiceItems,
     invoiceTax,
+    invoiceServiceCharge,
     invoiceDiscount,
     invoiceTotal,
   }) => {
@@ -252,6 +258,9 @@ export default function TableOrder() {
     if (shop?.gst_enabled)
       t += rightKV(`GST ${shop.gst_percent}%`, Number(invoiceTax || 0).toFixed(2)) + "\n";
 
+    if (Number(invoiceServiceCharge || 0) > 0)
+      t += rightKV("Service Charge", Number(invoiceServiceCharge || 0).toFixed(2)) + "\n";
+
     if (invoiceDiscount)
       t += rightKV("Discount", Number(invoiceDiscount || 0).toFixed(2)) + "\n";
 
@@ -274,6 +283,7 @@ export default function TableOrder() {
       invoiceCreatedAt: invoice.created_time,
       invoiceItems: invoice.items || orderItems,
       invoiceTax: invoice.tax_amt,
+      invoiceServiceCharge: invoice?.payment_split?.service_charge ?? toAmount(serviceCharge || 0),
       invoiceDiscount: invoice.discounted_amt,
       invoiceTotal: invoice.total_amount,
     });
@@ -375,9 +385,16 @@ export default function TableOrder() {
         Number(split.cash || 0) +
         Number(split.card || 0) +
         Number(split.upi || 0);
+      const serviceChargeValue = toAmount(serviceCharge || 0);
+      if (serviceChargeValue < 0) {
+        showToast("Service charge cannot be negative", "error");
+        setCompleting(false);
+        return;
+      }
+      const payableTotal = total + serviceChargeValue;
 
       if (splitEnabled) {
-        if (Math.abs(splitSum - total) > 0.01) {
+        if (Math.abs(splitSum - payableTotal) > 0.01) {
           showToast("Split total must match payable amount", "error");
           setCompleting(false);
           return;
@@ -393,6 +410,7 @@ export default function TableOrder() {
         {
           customer_name: String(customer.name || "").trim(),
           mobile: mobile,
+          service_charge: serviceChargeValue,
           payment_mode: splitEnabled ? "split" : paymentMode,
           payment_split: splitEnabled
             ? {
@@ -436,6 +454,8 @@ export default function TableOrder() {
     (t, i) => t + Number(i.price) * i.quantity,
     0
   );
+  const serviceChargeAmount = toAmount(serviceCharge || 0);
+  const payableTotal = total + serviceChargeAmount;
 
   if (hotelAllowed === false) {
     return (
@@ -680,6 +700,17 @@ export default function TableOrder() {
                 onChange={e => setCustomer(p => ({ ...p, gst_number: e.target.value }))}
               />
             </div>
+
+            <div>
+              <label className="text-[9px] text-gray-600">Service Charge</label>
+              <input
+                inputMode="decimal"
+                className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                value={serviceCharge}
+                onChange={e => setServiceCharge(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
           </div>
 
           <div className="overflow-auto px-3 flex-1 divide-y">
@@ -727,9 +758,12 @@ export default function TableOrder() {
             <button
               className="w-full flex items-center justify-between px-3 py-2 mb-2"
             >
-              <span className="text-[12px] font-bold text-emerald-700">Payable: ₹ {total.toFixed(2)}</span>
+              <span className="text-[12px] font-bold text-emerald-700">Payable: ₹ {payableTotal.toFixed(2)}</span>
               <span className="text-[10px] text-gray-600">View Details ▼</span>
             </button>
+            <div className="text-[10px] text-gray-600 mb-2">
+              Base: ₹ {total.toFixed(2)} | Service: ₹ {serviceChargeAmount.toFixed(2)}
+            </div>
 
             <button
               onClick={confirmOrderAndPrintKOT}
