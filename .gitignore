@@ -19,6 +19,12 @@ frontend/venv/
 frontend/src/assets/logo/*
 !frontend/src/assets/logo/.gitkeep
 
+# Mobile app
+mobile-app/node_modules/
+mobile-app/.expo/
+mobile-app/dist/
+mobile-app/web-build/
+
 # OS
 .DS_Store
 Thumbs.db
