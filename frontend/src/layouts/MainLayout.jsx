@@ -322,8 +322,8 @@ export default function MainLayout({ hideSidebar = false }) {
       >
 
         {/* HEADER */}
-        <header className="px-6 py-3 border-b flex justify-between items-center">
-          <div className="flex items-center gap-3">
+        <header className="px-3 sm:px-6 py-2 sm:py-3 border-b flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3 flex-1">
             {sidebarEnabled && (
               <button
                 onClick={togglePin}
@@ -337,19 +337,22 @@ export default function MainLayout({ hideSidebar = false }) {
             <img
               src={logoSrc}
               alt="Logo"
-              className="w-10 h-10"
+              className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
               onError={() => {
                 if (logoSrc !== defaultLogo) setLogoSrc(defaultLogo);
               }}
             />
-            <span className="text-3xl font-extrabold" style={{ color: BLUE }}>
+            <span
+              className="text-lg sm:text-2xl lg:text-3xl font-extrabold truncate"
+              style={{ color: BLUE }}
+            >
               {shopName}
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right leading-tight">
-              <div className="text-sm font-semibold text-gray-700">{userName}</div>
+          <div className="w-full sm:w-auto flex items-center justify-end gap-2 sm:gap-4 flex-wrap">
+            <div className="text-right leading-tight min-w-[64px]">
+              <div className="text-xs sm:text-sm font-semibold text-gray-700">{userName}</div>
               <div className="text-xs text-gray-500 capitalize">{roleLower}</div>
             </div>
 
@@ -357,7 +360,7 @@ export default function MainLayout({ hideSidebar = false }) {
               <select
                 value={Number(branchId) || ""}
                 onChange={e => switchBranch(Number(e.target.value))}
-                className="border rounded px-2 py-1"
+                className="border rounded px-2 py-1 text-sm max-w-[150px]"
               >
                 {branches.map(b => (
                   <option key={b.branch_id} value={b.branch_id}>
@@ -367,14 +370,16 @@ export default function MainLayout({ hideSidebar = false }) {
               </select>
             )}
 
-            <span className="border px-2 py-1 rounded">{appDateDisplay}</span>
+            <span className="border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap">
+              {appDateDisplay}
+            </span>
 
             <button
               onClick={() => {
                 clearSession();
                 navigate("/");
               }}
-              className="px-4 py-1 rounded text-white"
+              className="px-3 sm:px-4 py-1 rounded text-sm text-white whitespace-nowrap"
               style={{ backgroundColor: BLUE }}
             >
               Logout
@@ -383,12 +388,15 @@ export default function MainLayout({ hideSidebar = false }) {
         </header>
 
         {/* CONTENT */}
-        <main className="flex-1 overflow-auto p-8">
+        <main className="flex-1 overflow-auto p-3 sm:p-8">
           <Outlet />
         </main>
 
         {/* FOOTER */}
-        <footer className="px-4 py-2 flex justify-between" style={{ background: BLUE, color: "white" }}>
+        <footer
+          className="px-3 sm:px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+          style={{ background: BLUE, color: "white" }}
+        >
           <div>
             <div className="font-bold">{branchName || "No Branch Selected"}</div>
             <div className="text-xs opacity-90">{branchAddress}</div>
@@ -396,7 +404,7 @@ export default function MainLayout({ hideSidebar = false }) {
 
           <button
             onClick={() => setChatOpen(true)}
-            className="bg-white px-2 py-1 rounded text-xs"
+            className="bg-white px-3 py-1 rounded text-xs self-start sm:self-auto"
             style={{ color: BLUE }}
           >
             Support Chat

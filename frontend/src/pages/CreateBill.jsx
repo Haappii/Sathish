@@ -586,7 +586,11 @@ export default function CreateBill() {
           height: 100%;
           margin: 0;
           padding: 0;
-          overflow: hidden;
+        }
+        @media (min-width: 1280px) {
+          html, body, #root {
+            overflow: hidden;
+          }
         }
         /* Hide scrollbar but keep scroll functionality */
         .no-scroll::-webkit-scrollbar {
@@ -599,7 +603,7 @@ export default function CreateBill() {
       `}</style>
 
       {/* Back button - no extra margin/padding above */}
-      <div className="px-4 pt-2 pb-1">
+      <div className="px-2 sm:px-4 pt-2 pb-1">
         <button
           onClick={() => navigate("/home", { replace: true })}
           className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
@@ -610,11 +614,10 @@ export default function CreateBill() {
 
       {/* Main content - full remaining height, no page scroll */}
       <div
-        className="grid grid-cols-[200px_3fr_2fr] gap-6 px-4 pb-4 no-scroll"
-        style={{ height: "calc(100vh - 110px)" }} // ← tuned to remove blank space
+        className="grid grid-cols-1 xl:grid-cols-[200px_3fr_2fr] gap-4 xl:gap-6 px-2 sm:px-4 pb-4 h-auto xl:h-[calc(100vh-110px)]"
       >
         {/* CATEGORIES */}
-        <aside className="rounded-2xl border shadow-xl p-3 bg-white text-[11px] flex flex-col overflow-hidden">
+        <aside className="rounded-2xl border shadow-xl p-3 bg-white text-[11px] flex flex-col xl:overflow-hidden">
           <h2 className="text-sm font-bold text-center mb-2">CATEGORIES</h2>
 
           <input
@@ -624,7 +627,7 @@ export default function CreateBill() {
             onChange={e => setCategorySearch(e.target.value)}
           />
 
-          <div className="flex-1 overflow-y-auto no-scroll">
+          <div className="max-h-52 xl:max-h-none xl:flex-1 overflow-y-auto no-scroll">
             <button
               onClick={() => setSelectedCat("All")}
               className={`w-full text-left px-3 py-2 rounded mb-1 ${
@@ -648,7 +651,7 @@ export default function CreateBill() {
         </aside>
 
         {/* ITEMS */}
-        <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col overflow-hidden text-[11px]">
+        <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col xl:overflow-hidden text-[11px]">
           <h2 className="text-sm font-bold text-center mb-2">ITEMS</h2>
 
           <div className="flex gap-2 mb-2">
@@ -660,8 +663,8 @@ export default function CreateBill() {
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto no-scroll pr-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="max-h-[65vh] xl:max-h-none xl:flex-1 overflow-y-auto no-scroll pr-1">
+            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
               {filteredItems.map(item => {
                 const stock = getEffectiveStock(item.item_id);
                 const out = inventoryEnabled && stock <= 0;
@@ -676,7 +679,7 @@ export default function CreateBill() {
                     onClick={() => addToCart(item)}
                     className={`
                       text-left rounded-lg border shadow-sm bg-white
-                      px-2 py-2 text-[12px] leading-tight
+                      px-2 py-2 text-[11px] sm:text-[12px] leading-tight
                       hover:bg-blue-50
                       ${out ? "bg-red-50 border-red-300 opacity-70 cursor-not-allowed" : ""}
                     `}
@@ -719,10 +722,10 @@ export default function CreateBill() {
         </div>
 
         {/* ITEMS BILLING */}
-        <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col overflow-hidden text-[11px]">
+        <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col xl:overflow-hidden text-[11px]">
           <h2 className="text-sm font-bold text-center mb-2">ITEMS BILLING</h2>
 
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
             <div>
               <label className="text-[9px] text-gray-600">Price Level</label>
               <select
@@ -748,7 +751,7 @@ export default function CreateBill() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
             <div>
               <label className="text-[9px] text-gray-600">Mobile *</label>
               <input
@@ -780,7 +783,7 @@ export default function CreateBill() {
             />
           </div>
 
-          <div className="rounded-xl border bg-white p-2 shadow-inner flex-1 overflow-y-auto no-scroll text-[11px]">
+          <div className="rounded-xl border bg-white p-2 shadow-inner min-h-[220px] xl:min-h-0 flex-1 overflow-y-auto no-scroll text-[11px]">
             {!cart.length && (
               <p className="text-center text-slate-400 py-3 text-[10px]">
                 Cart empty — add items
@@ -835,7 +838,7 @@ export default function CreateBill() {
 
             {showTotals && (
               <div className="px-3 pb-3 pt-1 text-[11px] space-y-1">
-                <div className="grid grid-cols-[1fr_70px_70px] gap-2 mb-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_70px_70px] gap-2 mb-2">
                   <input
                     className="border rounded-lg px-2 py-1 w-full text-[11px]"
                     placeholder="Coupon code"
@@ -864,7 +867,7 @@ export default function CreateBill() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 mb-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-1">
                   <select
                     className="border rounded-lg px-2 py-1 w-full text-[11px]"
                     value={discountType}
@@ -925,7 +928,7 @@ export default function CreateBill() {
             )}
 
             {splitEnabled && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {paymentModes.map(m => (
                   <div key={m}>
                     <label className="text-[10px] text-gray-600">{m.toUpperCase()}</label>
@@ -950,7 +953,7 @@ export default function CreateBill() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
             <button
               onClick={() => saveInvoice(false)}
               className="bg-blue-600 text-white py-1.5 rounded-lg shadow text-[11px]"
