@@ -81,9 +81,10 @@ export default function Home() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedCategoryBranchId, setSelectedCategoryBranchId] = useState(
-    branchId ?? null
+    isAdmin ? null : branchId ?? null
   );
   const [selectedCategoryBranchName, setSelectedCategoryBranchName] = useState(() => {
+    if (isAdmin) return "All Branches";
     if (session?.branch_name) return session.branch_name;
     if (branchId != null) return `Branch ${branchId}`;
     return "All Branches";
@@ -211,6 +212,12 @@ export default function Home() {
     },
     [branchSales, loadCategorySales]
   );
+
+  const handleAllBranchesClick = useCallback(() => {
+    setSelectedCategoryBranchId(null);
+    setSelectedCategoryBranchName("All Branches");
+    loadCategorySales(null);
+  }, [loadCategorySales]);
 
   useEffect(() => {
     loadStats();
@@ -483,42 +490,6 @@ export default function Home() {
         {/* SIDEBAR DASHBOARD */}
         <aside className="lg:col-span-1 space-y-6">
 
-          {/* Today Summary */}
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Today Summary
-              </h3>
-              <button
-                onClick={() => {
-                  loadStats();
-                  if (!hasValidCustomRange) return;
-                  loadCategorySales(selectedCategoryBranchId);
-                  loadBranchSales();
-                }}
-                className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Refresh
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="bg-indigo-600 text-white rounded-xl p-4">
-                <div className="text-xs opacity-80">Sales</div>
-                <div className="text-lg font-bold">
-                  Rs. {Number(stats?.today_sales || 0).toFixed(2)}
-                </div>
-              </div>
-
-              <div className="bg-emerald-600 text-white rounded-xl p-4">
-                <div className="text-xs opacity-80">Bills</div>
-                <div className="text-lg font-bold">
-                  {Number(stats?.today_bills || 0)}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Sales Filter */}
           <div className="bg-white rounded-2xl shadow-sm border p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -563,6 +534,153 @@ export default function Home() {
               </p>
             )}
           </div>
+
+          {/* Today Summary */}
+          <div className="bg-white rounded-2xl shadow-sm border p-5">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Today Summary
+              </h3>
+              <button
+                onClick={() => {
+                  loadStats();
+                  if (!hasValidCustomRange) return;
+                  loadCategorySales(selectedCategoryBranchId);
+                  loadBranchSales();
+                }}
+                className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-emerald-600 text-white rounded-xl p-4">
+                <div className="text-xs opacity-80">Total Bills</div>
+                <div className="text-lg font-bold">
+                  {Number(stats?.today_bills || 0)}
+                </div>
+              </div>
+
+              <div className="bg-indigo-600 text-white rounded-xl p-4">
+                <div className="text-xs opacity-80">Total Amount</div>
+                <div className="text-lg font-bold">
+                  Rs. {Number(stats?.today_sales || 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Branch Sales */}
+          {isAdmin && (
+            <div className="bg-white rounded-2xl shadow-sm border p-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-700">
+                  Branch Sales
+                </h3>
+                <button
+                  onClick={handleAllBranchesClick}
+                  className={`px-2 py-1 text-[11px] rounded border transition ${
+                    selectedCategoryBranchId == null
+                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  All Branches
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Category filter: {selectedCategoryBranchName}
+              </p>
+
+              {branchSales.length === 0 ? (
+                <p className="text-xs text-gray-500">
+                  No branch sales for selected range.
+                </p>
+              ) : (
+                <>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={branchSales}
+                          dataKey="total_sales"
+                          nameKey="branch_name"
+                          innerRadius={40}
+                          outerRadius={80}
+                        >
+                          {branchSales.map((row, i) => (
+                            <Cell
+                              key={i}
+                              fill={COLORS[i % COLORS.length]}
+                              style={{ cursor: "pointer" }}
+                              onClick={() => handleBranchSalesClick(row, i)}
+                              stroke={
+                                String(row?.branch_id ?? "") ===
+                                String(selectedCategoryBranchId ?? "")
+                                  ? "#111827"
+                                  : "#ffffff"
+                              }
+                              strokeWidth={
+                                String(row?.branch_id ?? "") ===
+                                String(selectedCategoryBranchId ?? "")
+                                  ? 2
+                                  : 1
+                              }
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v) => `Rs. ${v}`} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-3 border-t pt-2">
+                    <div className="text-xs font-semibold text-gray-600 mb-2">
+                      Branch Names
+                    </div>
+                    <div className="max-h-32 overflow-auto space-y-1">
+                      {branchSales.map((row, i) => {
+                        const isSelected =
+                          String(row?.branch_id ?? "") ===
+                          String(selectedCategoryBranchId ?? "");
+
+                        return (
+                          <button
+                            key={`branch-name-${row?.branch_id ?? i}`}
+                            onClick={() => handleBranchSalesClick(row, i)}
+                            className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full flex-none"
+                                style={{
+                                  backgroundColor: COLORS[i % COLORS.length],
+                                }}
+                              />
+                              <span className="truncate">
+                                {row?.branch_name ||
+                                  (row?.branch_id != null
+                                    ? `Branch ${row.branch_id}`
+                                    : "-")}
+                              </span>
+                            </span>
+                            <span className="font-medium flex-none">
+                              Rs. {Number(row?.total_sales || 0).toFixed(2)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Category Sales */}
           <div className="bg-white rounded-2xl shadow-sm border p-5">
@@ -609,6 +727,52 @@ export default function Home() {
                   <Tooltip formatter={(v) => `Rs. ${v}`} />
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+
+            <div className="mt-3 border-t pt-2">
+              <div className="text-xs font-semibold text-gray-600 mb-2">
+                Category Names
+              </div>
+              {categorySales.length === 0 ? (
+                <p className="text-xs text-gray-500">
+                  No category sales for selected range.
+                </p>
+              ) : (
+                <div className="max-h-32 overflow-auto space-y-1">
+                  {categorySales.map((row, i) => {
+                    const isSelected =
+                      String(row?.category_id ?? "") ===
+                      String(selectedCategory?.category_id ?? "");
+
+                    return (
+                      <button
+                        key={`cat-name-${row?.category_id ?? i}`}
+                        onClick={() => handleCategorySalesClick(row, i)}
+                        className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
+                          isSelected
+                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-none"
+                            style={{
+                              backgroundColor: COLORS[i % COLORS.length],
+                            }}
+                          />
+                          <span className="truncate">
+                            {row?.category_name || "-"}
+                          </span>
+                        </span>
+                        <span className="font-medium flex-none">
+                          Rs. {Number(row?.total_sales || 0).toFixed(2)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {selectedCategory && (
@@ -673,51 +837,6 @@ export default function Home() {
               </div>
             )}
           </div>
-
-          {/* Branch Sales */}
-          {isAdmin && branchSales.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">
-                Branch Sales
-              </h3>
-
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={branchSales}
-                      dataKey="total_sales"
-                      nameKey="branch_name"
-                      innerRadius={40}
-                      outerRadius={80}
-                    >
-                      {branchSales.map((row, i) => (
-                        <Cell
-                          key={i}
-                          fill={COLORS[i % COLORS.length]}
-                          style={{ cursor: "pointer" }}
-                          onClick={() => handleBranchSalesClick(row, i)}
-                          stroke={
-                            String(row?.branch_id ?? "") ===
-                            String(selectedCategoryBranchId ?? "")
-                              ? "#111827"
-                              : "#ffffff"
-                          }
-                          strokeWidth={
-                            String(row?.branch_id ?? "") ===
-                            String(selectedCategoryBranchId ?? "")
-                              ? 2
-                              : 1
-                          }
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => `Rs. ${v}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
 
           {/* Quick Expense */}
           {canExpenseWrite && (
