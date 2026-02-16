@@ -77,6 +77,9 @@ export default function Home() {
   const [stats, setStats] = useState(null);
   const [categorySales, setCategorySales] = useState([]);
   const [branchSales, setBranchSales] = useState([]);
+  const [reportMode, setReportMode] = useState("today");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [selectedCategoryBranchId, setSelectedCategoryBranchId] = useState(
     branchId ?? null
   );
@@ -85,6 +88,9 @@ export default function Home() {
     if (branchId != null) return `Branch ${branchId}`;
     return "All Branches";
   });
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryItemDetails, setCategoryItemDetails] = useState([]);
+  const [categoryItemsLoading, setCategoryItemsLoading] = useState(false);
 
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
@@ -93,6 +99,19 @@ export default function Home() {
     payment_mode: "cash",
     note: "",
   });
+
+  const hasValidCustomRange =
+    reportMode !== "custom" || Boolean(fromDate && toDate);
+
+  const selectedCategoryItemsSold = useMemo(() => {
+    if (!selectedCategory) return 0;
+    const totalFromCategory = Number(selectedCategory?.total_items || 0);
+    if (totalFromCategory > 0) return totalFromCategory;
+    return categoryItemDetails.reduce(
+      (sum, row) => sum + Number(row?.total_qty || 0),
+      0
+    );
+  }, [selectedCategory, categoryItemDetails]);
 
   /* ------------------ LOAD SHOP ------------------ */
   useEffect(() => {
@@ -136,22 +155,36 @@ export default function Home() {
     }
   }, []);
 
-  const loadCategorySales = useCallback(async (targetBranchId = branchId) => {
+  const loadCategorySales = useCallback(async (targetBranchId = selectedCategoryBranchId) => {
+    if (!hasValidCustomRange) return;
     try {
       const res = await api.get("/reports/category-sales", {
-        params: { mode: "today", branch_id: targetBranchId ?? undefined },
+        params: {
+          mode: reportMode,
+          from_date: reportMode === "custom" ? fromDate || undefined : undefined,
+          to_date: reportMode === "custom" ? toDate || undefined : undefined,
+          branch_id: targetBranchId ?? undefined,
+        },
       });
       setCategorySales(res?.data || []);
+      setSelectedCategory(null);
+      setCategoryItemDetails([]);
     } catch {
       setCategorySales([]);
+      setSelectedCategory(null);
+      setCategoryItemDetails([]);
     }
-  }, [branchId]);
+  }, [selectedCategoryBranchId, hasValidCustomRange, reportMode, fromDate, toDate]);
 
   const loadBranchSales = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !hasValidCustomRange) return;
     try {
       const res = await api.get("/reports/branch-sales", {
-        params: { mode: "today" },
+        params: {
+          mode: reportMode,
+          from_date: reportMode === "custom" ? fromDate || undefined : undefined,
+          to_date: reportMode === "custom" ? toDate || undefined : undefined,
+        },
       });
       const rows = (res?.data || []).slice().sort(
         (a, b) => Number(b?.total_sales || 0) - Number(a?.total_sales || 0)
@@ -160,7 +193,7 @@ export default function Home() {
     } catch {
       setBranchSales([]);
     }
-  }, [isAdmin]);
+  }, [isAdmin, hasValidCustomRange, reportMode, fromDate, toDate]);
 
   const handleBranchSalesClick = useCallback(
     (entry, index) => {
@@ -181,9 +214,63 @@ export default function Home() {
 
   useEffect(() => {
     loadStats();
-    loadCategorySales();
+  }, [loadStats]);
+
+  const handleCategorySalesClick = useCallback(
+    async (entry, index) => {
+      if (!hasValidCustomRange) {
+        showToast("Select both From and To date for custom range", "error");
+        return;
+      }
+
+      const fromIndex =
+        Number.isInteger(index) && index >= 0 ? categorySales[index] : null;
+      const payload = fromIndex || entry?.payload || entry;
+      const categoryId = payload?.category_id;
+      if (categoryId == null) return;
+
+      setSelectedCategory(payload);
+      setCategoryItemDetails([]);
+      setCategoryItemsLoading(true);
+
+      try {
+        const res = await api.get("/reports/category-item-details", {
+          params: {
+            category_id: categoryId,
+            branch_id: selectedCategoryBranchId ?? undefined,
+            mode: reportMode,
+            from_date: reportMode === "custom" ? fromDate || undefined : undefined,
+            to_date: reportMode === "custom" ? toDate || undefined : undefined,
+          },
+        });
+        setCategoryItemDetails(res?.data || []);
+      } catch {
+        setCategoryItemDetails([]);
+      } finally {
+        setCategoryItemsLoading(false);
+      }
+    },
+    [
+      hasValidCustomRange,
+      categorySales,
+      selectedCategoryBranchId,
+      reportMode,
+      fromDate,
+      toDate,
+      showToast,
+    ]
+  );
+
+  useEffect(() => {
+    if (!hasValidCustomRange) return;
+    loadCategorySales(selectedCategoryBranchId);
     loadBranchSales();
-  }, [loadStats, loadCategorySales, loadBranchSales]);
+  }, [
+    hasValidCustomRange,
+    selectedCategoryBranchId,
+    loadCategorySales,
+    loadBranchSales,
+  ]);
 
   /* ------------------ MENU BUILD ------------------ */
   const showTableBilling = shopType === "hotel";
@@ -405,6 +492,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   loadStats();
+                  if (!hasValidCustomRange) return;
                   loadCategorySales(selectedCategoryBranchId);
                   loadBranchSales();
                 }}
@@ -431,6 +519,51 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Sales Filter */}
+          <div className="bg-white rounded-2xl shadow-sm border p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              Sales Filter
+            </h3>
+
+            <div className="flex flex-wrap gap-2">
+              {["today", "month", "custom"].map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setReportMode(mode)}
+                  className={`px-3 py-1 text-xs rounded-lg border transition ${
+                    reportMode === mode
+                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {mode.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {reportMode === "custom" && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            )}
+            {!hasValidCustomRange && (
+              <p className="mt-2 text-[11px] text-amber-700">
+                Select both From and To dates for custom range.
+              </p>
+            )}
+          </div>
+
           {/* Category Sales */}
           <div className="bg-white rounded-2xl shadow-sm border p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">
@@ -452,14 +585,93 @@ export default function Home() {
                     innerRadius={40}
                     outerRadius={80}
                   >
-                    {categorySales.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    {categorySales.map((row, i) => (
+                      <Cell
+                        key={i}
+                        fill={COLORS[i % COLORS.length]}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => handleCategorySalesClick(row, i)}
+                        stroke={
+                          String(row?.category_id ?? "") ===
+                          String(selectedCategory?.category_id ?? "")
+                            ? "#111827"
+                            : "#ffffff"
+                        }
+                        strokeWidth={
+                          String(row?.category_id ?? "") ===
+                          String(selectedCategory?.category_id ?? "")
+                            ? 2
+                            : 1
+                        }
+                      />
                     ))}
                   </Pie>
                   <Tooltip formatter={(v) => `Rs. ${v}`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
+
+            {selectedCategory && (
+              <div className="mt-4 rounded-xl border bg-gray-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-gray-500">
+                      Selected Category
+                    </div>
+                    <div className="text-sm font-semibold text-gray-800">
+                      {selectedCategory.category_name}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Sales: Rs.{" "}
+                      {Number(selectedCategory?.total_sales || 0).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Total Items Sold: {selectedCategoryItemsSold}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setCategoryItemDetails([]);
+                    }}
+                    className="text-[11px] text-red-600 hover:text-red-700"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="mt-3 border-t pt-2">
+                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                    Item-wise Quantity
+                  </div>
+
+                  {categoryItemsLoading ? (
+                    <p className="text-xs text-gray-500">Loading...</p>
+                  ) : categoryItemDetails.length === 0 ? (
+                    <p className="text-xs text-gray-500">
+                      No item sales found for this category.
+                    </p>
+                  ) : (
+                    <div className="max-h-36 overflow-auto divide-y">
+                      {categoryItemDetails.map((item, idx) => (
+                        <div
+                          key={`${item?.item_name || "item"}-${idx}`}
+                          className="py-1.5 flex justify-between text-xs"
+                        >
+                          <span className="truncate pr-2">
+                            {item?.item_name || "-"}
+                          </span>
+                          <span className="font-semibold">
+                            {Number(item?.total_qty || 0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Branch Sales */}
@@ -478,7 +690,6 @@ export default function Home() {
                       nameKey="branch_name"
                       innerRadius={40}
                       outerRadius={80}
-                      onClick={handleBranchSalesClick}
                     >
                       {branchSales.map((row, i) => (
                         <Cell
