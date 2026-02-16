@@ -101,14 +101,28 @@ export default function About() {
     }
 
     try {
+      const canUseDownloadAttr = (() => {
+        try {
+          const resolved = new URL(androidApkUrl, window.location.href);
+          return resolved.origin === window.location.origin;
+        } catch {
+          return false;
+        }
+      })();
+
       const a = document.createElement("a");
       a.href = androidApkUrl;
-      a.target = "_blank";
       a.rel = "noopener noreferrer";
+      if (canUseDownloadAttr) {
+        a.download = "haappii-billing.apk";
+      } else {
+        a.target = "_blank";
+      }
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setInstallOpen(true);
+      if (isAndroid) setInstallOpen(true);
+      else showToast("Download started. Copy the APK to an Android phone to install.", "success");
     } catch {
       showToast("Unable to start download", "error");
     }
