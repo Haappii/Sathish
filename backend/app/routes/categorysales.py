@@ -8,6 +8,7 @@ from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.items import Item
 from app.models.category import Category
+from app.models.shop_details import ShopDetails
 from app.utils.auth_user import get_current_user
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -16,17 +17,28 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 # =========================================================
 # DATE RANGE HELPER
 # =========================================================
-def date_range(mode: str, from_date: str | None, to_date: str | None):
-    today = datetime.today()
+def get_business_datetime(db: Session, shop_id: int) -> datetime:
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    biz_date = shop.app_date if shop and shop.app_date else datetime.utcnow().date()
+    return datetime.combine(biz_date, datetime.min.time())
+
+
+def date_range(
+    mode: str,
+    from_date: str | None,
+    to_date: str | None,
+    base_dt: datetime,
+):
+    today = base_dt
 
     if mode == "today":
         start = today.replace(hour=0, minute=0, second=0, microsecond=0)
-        end   = today.replace(hour=23, minute=59, second=59)
+        end   = today.replace(hour=23, minute=59, second=59, microsecond=999999)
         return start, end
 
     if mode == "month":
         start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end   = today
+        end   = today.replace(hour=23, minute=59, second=59, microsecond=999999)
         return start, end
 
     if mode == "custom":
@@ -53,7 +65,8 @@ def category_sales(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    start, end = date_range(mode, from_date, to_date)
+    base_dt = get_business_datetime(db, user.shop_id)
+    start, end = date_range(mode, from_date, to_date, base_dt)
 
     q = (
         db.query(
@@ -104,7 +117,8 @@ def category_item_details(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    start, end = date_range(mode, from_date, to_date)
+    base_dt = get_business_datetime(db, user.shop_id)
+    start, end = date_range(mode, from_date, to_date, base_dt)
 
     q = (
         db.query(

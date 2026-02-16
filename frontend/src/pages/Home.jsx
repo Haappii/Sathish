@@ -163,8 +163,10 @@ export default function Home() {
   }, [isAdmin]);
 
   const handleBranchSalesClick = useCallback(
-    (entry) => {
-      const payload = entry?.payload || entry;
+    (entry, index) => {
+      const fromIndex =
+        Number.isInteger(index) && index >= 0 ? branchSales[index] : null;
+      const payload = fromIndex || entry?.payload || entry;
       const nextBranchId = payload?.branch_id;
       if (nextBranchId == null) return;
 
@@ -174,7 +176,7 @@ export default function Home() {
       );
       loadCategorySales(nextBranchId);
     },
-    [loadCategorySales]
+    [branchSales, loadCategorySales]
   );
 
   useEffect(() => {
@@ -482,6 +484,8 @@ export default function Home() {
                         <Cell
                           key={i}
                           fill={COLORS[i % COLORS.length]}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => handleBranchSalesClick(row, i)}
                           stroke={
                             String(row?.branch_id ?? "") ===
                             String(selectedCategoryBranchId ?? "")
