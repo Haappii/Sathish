@@ -490,6 +490,42 @@ export default function Home() {
         {/* SIDEBAR DASHBOARD */}
         <aside className="lg:col-span-1 space-y-6">
 
+          {/* Today Summary */}
+          <div className="bg-white rounded-2xl shadow-sm border p-5">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Today Summary
+              </h3>
+              <button
+                onClick={() => {
+                  loadStats();
+                  if (!hasValidCustomRange) return;
+                  loadCategorySales(selectedCategoryBranchId);
+                  loadBranchSales();
+                }}
+                className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-emerald-600 text-white rounded-xl p-4">
+                <div className="text-xs opacity-80">Total Bills</div>
+                <div className="text-lg font-bold">
+                  {Number(stats?.today_bills || 0)}
+                </div>
+              </div>
+
+              <div className="bg-indigo-600 text-white rounded-xl p-4">
+                <div className="text-xs opacity-80">Total Amount</div>
+                <div className="text-lg font-bold">
+                  Rs. {Number(stats?.today_sales || 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Sales Filter */}
           <div className="bg-white rounded-2xl shadow-sm border p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -533,42 +569,6 @@ export default function Home() {
                 Select both From and To dates for custom range.
               </p>
             )}
-          </div>
-
-          {/* Today Summary */}
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Today Summary
-              </h3>
-              <button
-                onClick={() => {
-                  loadStats();
-                  if (!hasValidCustomRange) return;
-                  loadCategorySales(selectedCategoryBranchId);
-                  loadBranchSales();
-                }}
-                className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Refresh
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="bg-emerald-600 text-white rounded-xl p-4">
-                <div className="text-xs opacity-80">Total Bills</div>
-                <div className="text-lg font-bold">
-                  {Number(stats?.today_bills || 0)}
-                </div>
-              </div>
-
-              <div className="bg-indigo-600 text-white rounded-xl p-4">
-                <div className="text-xs opacity-80">Total Amount</div>
-                <div className="text-lg font-bold">
-                  Rs. {Number(stats?.today_sales || 0).toFixed(2)}
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Branch Sales */}
@@ -818,19 +818,43 @@ export default function Home() {
                     </p>
                   ) : (
                     <div className="max-h-36 overflow-auto divide-y">
-                      {categoryItemDetails.map((item, idx) => (
-                        <div
-                          key={`${item?.item_name || "item"}-${idx}`}
-                          className="py-1.5 flex justify-between text-xs"
-                        >
-                          <span className="truncate pr-2">
-                            {item?.item_name || "-"}
-                          </span>
-                          <span className="font-semibold">
-                            {Number(item?.total_qty || 0)}
-                          </span>
-                        </div>
-                      ))}
+                      {categoryItemDetails.map((item, idx) => {
+                        const rawAmount =
+                          item?.total_sales ??
+                          item?.total_amount ??
+                          item?.total_amt ??
+                          item?.amount ??
+                          item?.total_price ??
+                          item?.total_value ??
+                          null;
+
+                        const amountNumber =
+                          rawAmount == null || rawAmount === ""
+                            ? null
+                            : Number(rawAmount);
+
+                        return (
+                          <div
+                            key={`${item?.item_name || "item"}-${idx}`}
+                            className="py-1.5 flex items-start justify-between gap-2 text-xs"
+                          >
+                            <span className="truncate pr-2">
+                              {item?.item_name || "-"}
+                            </span>
+
+                            <span className="flex flex-col items-end flex-none leading-tight">
+                              <span className="font-semibold">
+                                {Number(item?.total_qty || 0)}
+                              </span>
+                              <span className="text-[11px] text-gray-600">
+                                {amountNumber == null || Number.isNaN(amountNumber)
+                                  ? "Rs. -"
+                                  : `Rs. ${amountNumber.toFixed(2)}`}
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
