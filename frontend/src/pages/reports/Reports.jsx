@@ -17,24 +17,104 @@ import { isHotelShop } from "../../utils/shopType";
    REPORT DEFINITIONS
    ===================================================== */
 const REPORTS = [
-  { key: "sales/summary", label: "Sales Summary" },
-  { key: "gst/summary", label: "GST Summary" },
-  { key: "sales/invoice-details", label: "Invoice Detail Report" },
-  { key: "sales/customer-invoices", label: "Customer Invoice Details" },
-  { key: "sales/items", label: "Item-wise Sales" },
-  { key: "sales/category", label: "Category-wise Sales" },
-  { key: "profit", label: "Profit Report" },
-  { key: "expenses", label: "Expense Report" },
-  { key: "suppliers", label: "Supplier Report" },
-  { key: "po-aging", label: "PO Aging" },
-  { key: "payables-summary", label: "Payables Summary" },
-  { key: "sales/user", label: "User-wise Sales" },
-  { key: "audit/logs", label: "Audit Logs" },
-  { key: "table/usage", label: "Table Usage" },
-  { key: "inventory/current", label: "Current Stock" },
-  { key: "inventory/movement", label: "Stock Movement" },
-  { key: "inventory/date-wise", label: "Stock Date-wise" },
-  { key: "audit/deleted-invoices", label: "Deleted Invoices" },
+  // Sales
+  { key: "sales/summary", label: "Sales Summary", group: "Sales" },
+  { key: "gst/summary", label: "GST Summary", group: "Sales" },
+  { key: "sales/invoice-details", label: "Invoice Detail Report", group: "Sales" },
+  { key: "sales/customer-invoices", label: "Customer Invoice Details", group: "Sales" },
+  { key: "sales/items", label: "Item-wise Sales", group: "Sales" },
+  { key: "sales/category", label: "Category-wise Sales", group: "Sales" },
+  { key: "sales/user", label: "User-wise Sales", group: "Sales" },
+
+  // Profit & Expenses
+  { key: "profit", label: "Profit Report", group: "Profit" },
+  { key: "expenses", label: "Expense Report", group: "Profit" },
+
+  // Purchases & Suppliers
+  { key: "suppliers", label: "Supplier Report", group: "Purchases" },
+  { key: "po-aging", label: "PO Aging", group: "Purchases" },
+  { key: "payables-summary", label: "Payables Summary", group: "Purchases" },
+  { key: "supplier-ledger/entries", label: "Supplier Ledger (Entries)", group: "Purchases" },
+  { key: "supplier-ledger/balances", label: "Supplier Ledger (Balances)", group: "Purchases", requiresDateRange: false },
+
+  // Receivables
+  { key: "dues/open", label: "Dues Outstanding", group: "Receivables", requiresDateRange: false },
+  { key: "dues/payments", label: "Collections / Payments", group: "Receivables" },
+
+  // Returns
+  { key: "returns/register", label: "Sales Returns (Register)", group: "Returns" },
+  { key: "returns/items", label: "Sales Returns (Item-wise)", group: "Returns" },
+
+  // Inventory
+  { key: "inventory/current", label: "Current Stock", group: "Inventory", requiresDateRange: false },
+  { key: "inventory/movement", label: "Stock Movement", group: "Inventory" },
+  { key: "inventory/date-wise", label: "Stock Date-wise", group: "Inventory" },
+  { key: "inventory/expiry-lots", label: "Expiry Lots", group: "Inventory" },
+
+  // Stock Transfers
+  { key: "stock-transfers/register", label: "Stock Transfers (Register)", group: "Stock Transfers" },
+  { key: "stock-transfers/items", label: "Stock Transfers (Item-wise)", group: "Stock Transfers" },
+
+  // Cash Drawer
+  { key: "cash-drawer/shifts", label: "Cash Shifts", group: "Cash Drawer" },
+  { key: "cash-drawer/movements", label: "Cash Movements", group: "Cash Drawer" },
+
+  // Stock Audit
+  { key: "stock-audit/audits", label: "Stock Audits", group: "Stock Audit" },
+  { key: "stock-audit/variances", label: "Stock Audit Variances", group: "Stock Audit" },
+
+  // Online Orders
+  { key: "online-orders/list", label: "Online Orders (Register)", group: "Online Orders" },
+  { key: "online-orders/summary", label: "Online Orders (Summary)", group: "Online Orders" },
+
+  // Loyalty & Coupons
+  { key: "loyalty/transactions", label: "Loyalty Transactions", group: "Loyalty" },
+  { key: "loyalty/balances", label: "Loyalty Balances", group: "Loyalty", requiresDateRange: false },
+  { key: "coupons/redemptions", label: "Coupon Redemptions", group: "Coupons" },
+  { key: "coupons/summary", label: "Coupons Summary", group: "Coupons" },
+
+  // Audit & Table
+  { key: "audit/logs", label: "Audit Logs", group: "Audit" },
+  { key: "audit/deleted-invoices", label: "Deleted Invoices", group: "Audit" },
+  { key: "table/usage", label: "Table Usage", group: "Table" },
+];
+
+const NO_USER_FILTER_KEYS = new Set([
+  "profit",
+  "expenses",
+  "suppliers",
+  "po-aging",
+  "payables-summary",
+  "gst/summary",
+  "sales/customer-invoices",
+  "inventory/current",
+  "inventory/movement",
+  "inventory/date-wise",
+  "inventory/expiry-lots",
+  "audit/deleted-invoices",
+  "stock-audit/variances",
+  "online-orders/list",
+  "online-orders/summary",
+  "coupons/summary",
+  "loyalty/balances",
+  "supplier-ledger/balances",
+]);
+
+const REPORT_GROUP_ORDER = [
+  "Sales",
+  "Profit",
+  "Receivables",
+  "Returns",
+  "Inventory",
+  "Purchases",
+  "Stock Transfers",
+  "Cash Drawer",
+  "Stock Audit",
+  "Online Orders",
+  "Loyalty",
+  "Coupons",
+  "Audit",
+  "Table",
 ];
 
 export default function Reports() {
@@ -46,6 +126,7 @@ export default function Reports() {
 
   const session = getSession() || {};
   const sessionBranchId = session.branch_id || "";
+  const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
   const [activeReport, setActiveReport] = useState(null);
 
@@ -98,15 +179,26 @@ export default function Reports() {
     r => hotelShop || r.key !== "table/usage"
   );
 
-  const NO_USER_FILTER_KEYS = new Set([
-    "profit",
-    "expenses",
-    "suppliers",
-    "po-aging",
-    "payables-summary",
-    "gst/summary",
-    "sales/customer-invoices",
-  ]);
+  const requiresDateRange = activeReport?.requiresDateRange !== false;
+
+  const reportGroups = (() => {
+    const grouped = reportOptions.reduce((acc, r) => {
+      const g = r.group || "Other";
+      (acc[g] ||= []).push(r);
+      return acc;
+    }, {});
+
+    const ordered = REPORT_GROUP_ORDER
+      .filter(g => Array.isArray(grouped[g]) && grouped[g].length)
+      .map(g => ({ group: g, reports: grouped[g] }));
+
+    const extras = Object.keys(grouped)
+      .filter(g => !REPORT_GROUP_ORDER.includes(g))
+      .sort()
+      .map(g => ({ group: g, reports: grouped[g] }));
+
+    return [...ordered, ...extras];
+  })();
 
   const buildExportName = () => {
     const now = new Date();
@@ -114,6 +206,18 @@ export default function Reports() {
     const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     const label = (activeReport?.label || "Report").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_");
     return `${label}_${stamp}`;
+  };
+
+  const formatRangeLabel = (forceAsOf = false) => {
+    if (!forceAsOf && fromDate && toDate) {
+      const a = fromDate.split("-").reverse().join("/");
+      const b = toDate.split("-").reverse().join("/");
+      return `${a} to ${b}`;
+    }
+    const now = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    const d = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+    return `As of ${d}`;
   };
 
   /* =====================================================
@@ -231,6 +335,25 @@ export default function Reports() {
     }
   };
 
+  const ensureHeaderBranchLoaded = async () => {
+    if (branchId) {
+      const inList = branches.find(b => String(b.branch_id) === String(branchId));
+      if (inList) return inList;
+      try {
+        const r = await api.get(`/branch/${branchId}`);
+        return r.data || null;
+      } catch {
+        return null;
+      }
+    }
+
+    if (isAdmin) {
+      return {};
+    }
+
+    return ensureBranchLoaded();
+  };
+
   /* =====================================================
      PDF HEADER (FONT FIX APPLIED)
      ===================================================== */
@@ -256,7 +379,7 @@ export default function Reports() {
     y += 8;
     doc.setFontSize(8); // ✅ 50% smaller report title
     doc.text(
-      `${activeReport.label} - ${fromDate.split("-").reverse().join("/")} to ${toDate.split("-").reverse().join("/")}`,
+      `${activeReport.label} - ${formatRangeLabel(!requiresDateRange)}`,
       centerX,
       y,
       { align: "center" }
@@ -269,7 +392,7 @@ export default function Reports() {
      LOAD REPORT
      ===================================================== */
   const loadReport = async () => {
-    if (!fromDate || !toDate) {
+    if (requiresDateRange && (!fromDate || !toDate)) {
       showToast("Select From & To dates", "warning");
       return;
     }
@@ -280,7 +403,11 @@ export default function Reports() {
 
     try {
       setLoading(true);
-      const params = { from_date: fromDate, to_date: toDate };
+      const params = {};
+      if (requiresDateRange && fromDate && toDate) {
+        params.from_date = fromDate;
+        params.to_date = toDate;
+      }
       if (!NO_USER_FILTER_KEYS.has(activeReport?.key) && userId)
         params.user_id = userId;
       if (branchId) params.branch_id = branchId;
@@ -336,7 +463,7 @@ export default function Reports() {
      ===================================================== */
   const exportPDF = async () => {
     if (!data.length) return;
-    const headerBranch = await ensureBranchLoaded();
+    const headerBranch = await ensureHeaderBranchLoaded();
 
     const blobToDataUrl = (blob) =>
       new Promise((resolve, reject) => {
@@ -426,7 +553,7 @@ export default function Reports() {
   const exportExcel = async () => {
     if (!data.length) return;
 
-    const headerBranch = await ensureBranchLoaded();
+    const headerBranch = await ensureHeaderBranchLoaded();
     const ws = XLSX.utils.json_to_sheet([]);
     const header = buildHeaderLines(headerBranch);
     const isInvoiceDetail =
@@ -494,12 +621,24 @@ export default function Reports() {
     return (
       <div className="p-6 bg-slate-100 min-h-screen">
         <h2 className="text-xl font-semibold mb-4">Reports</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {reportOptions.map(r => (
-            <button key={r.key} onClick={() => setActiveReport(r)}
-              className="bg-white border rounded-xl p-4 hover:bg-slate-50">
-              {r.label}
-            </button>
+        <div className="space-y-6">
+          {reportGroups.map(g => (
+            <div key={g.group}>
+              <div className="text-xs font-semibold tracking-wide text-slate-600 uppercase mb-2">
+                {g.group}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {g.reports.map(r => (
+                  <button
+                    key={r.key}
+                    onClick={() => setActiveReport(r)}
+                    className="bg-white border rounded-xl p-4 hover:bg-slate-50"
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -519,85 +658,93 @@ export default function Reports() {
       </div>
 
       <div className="bg-white rounded-xl p-4 flex flex-wrap gap-4 items-center">
-        <div className="relative">
-          <FaCalendarAlt
-            className="absolute left-2 top-2.5 text-slate-500 cursor-pointer"
-            onClick={() => setShowFromPicker(v => !v)}
-          />
-          <input
-            value={fromInput}
-            placeholder="From (DD/MM/YYYY)"
-            onChange={e => {
-              const v = formatInputDate(e.target.value);
-              setFromInput(v);
-              setFromDate(toApiDate(v));
-            }}
-            onFocus={() => setShowFromPicker(true)}
-            onBlur={() => {
-              if (isFullDate(fromInput)) setShowFromPicker(false);
-            }}
-            className="border rounded pl-8 pr-3 py-2 w-40"
-          />
-          {showFromPicker && (
-            <div className="absolute left-0 top-full mt-2 z-20 bg-white border rounded-lg shadow-lg p-2">
-              <input
-                ref={fromPickerRef}
-                type="date"
-                value={fromDate || ""}
-                onChange={e => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  const [yyyy, mm, dd] = v.split("-");
-                  const display = `${dd}/${mm}/${yyyy}`;
-                  setFromInput(display);
-                  setFromDate(v);
-                  setShowFromPicker(false);
-                }}
-                className="border rounded px-2 py-1 bg-white"
+        {requiresDateRange ? (
+          <>
+            <div className="relative">
+              <FaCalendarAlt
+                className="absolute left-2 top-2.5 text-slate-500 cursor-pointer"
+                onClick={() => setShowFromPicker(v => !v)}
               />
+              <input
+                value={fromInput}
+                placeholder="From (DD/MM/YYYY)"
+                onChange={e => {
+                  const v = formatInputDate(e.target.value);
+                  setFromInput(v);
+                  setFromDate(toApiDate(v));
+                }}
+                onFocus={() => setShowFromPicker(true)}
+                onBlur={() => {
+                  if (isFullDate(fromInput)) setShowFromPicker(false);
+                }}
+                className="border rounded pl-8 pr-3 py-2 w-40"
+              />
+              {showFromPicker && (
+                <div className="absolute left-0 top-full mt-2 z-20 bg-white border rounded-lg shadow-lg p-2">
+                  <input
+                    ref={fromPickerRef}
+                    type="date"
+                    value={fromDate || ""}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      const [yyyy, mm, dd] = v.split("-");
+                      const display = `${dd}/${mm}/${yyyy}`;
+                      setFromInput(display);
+                      setFromDate(v);
+                      setShowFromPicker(false);
+                    }}
+                    className="border rounded px-2 py-1 bg-white"
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="relative">
-          <FaCalendarAlt
-            className="absolute left-2 top-2.5 text-slate-500 cursor-pointer"
-            onClick={() => setShowToPicker(v => !v)}
-          />
-          <input
-            value={toInput}
-            placeholder="To (DD/MM/YYYY)"
-            onChange={e => {
-              const v = formatInputDate(e.target.value);
-              setToInput(v);
-              setToDate(toApiDate(v));
-            }}
-            onFocus={() => setShowToPicker(true)}
-            onBlur={() => {
-              if (isFullDate(toInput)) setShowToPicker(false);
-            }}
-            className="border rounded pl-8 pr-3 py-2 w-40"
-          />
-          {showToPicker && (
-            <div className="absolute left-0 top-full mt-2 z-20 bg-white border rounded-lg shadow-lg p-2">
-              <input
-                ref={toPickerRef}
-                type="date"
-                value={toDate || ""}
-                onChange={e => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  const [yyyy, mm, dd] = v.split("-");
-                  const display = `${dd}/${mm}/${yyyy}`;
-                  setToInput(display);
-                  setToDate(v);
-                  setShowToPicker(false);
-                }}
-                className="border rounded px-2 py-1 bg-white"
+            <div className="relative">
+              <FaCalendarAlt
+                className="absolute left-2 top-2.5 text-slate-500 cursor-pointer"
+                onClick={() => setShowToPicker(v => !v)}
               />
+              <input
+                value={toInput}
+                placeholder="To (DD/MM/YYYY)"
+                onChange={e => {
+                  const v = formatInputDate(e.target.value);
+                  setToInput(v);
+                  setToDate(toApiDate(v));
+                }}
+                onFocus={() => setShowToPicker(true)}
+                onBlur={() => {
+                  if (isFullDate(toInput)) setShowToPicker(false);
+                }}
+                className="border rounded pl-8 pr-3 py-2 w-40"
+              />
+              {showToPicker && (
+                <div className="absolute left-0 top-full mt-2 z-20 bg-white border rounded-lg shadow-lg p-2">
+                  <input
+                    ref={toPickerRef}
+                    type="date"
+                    value={toDate || ""}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      const [yyyy, mm, dd] = v.split("-");
+                      const display = `${dd}/${mm}/${yyyy}`;
+                      setToInput(display);
+                      setToDate(v);
+                      setShowToPicker(false);
+                    }}
+                    className="border rounded px-2 py-1 bg-white"
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="text-sm text-slate-600">
+            {formatRangeLabel(true)}
+          </div>
+        )}
 
         {!NO_USER_FILTER_KEYS.has(activeReport?.key) && (
           <select value={userId} onChange={e => setUserId(e.target.value)} className="border rounded px-3 py-2">
