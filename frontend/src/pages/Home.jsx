@@ -77,6 +77,14 @@ export default function Home() {
   const [stats, setStats] = useState(null);
   const [categorySales, setCategorySales] = useState([]);
   const [branchSales, setBranchSales] = useState([]);
+  const [selectedCategoryBranchId, setSelectedCategoryBranchId] = useState(
+    branchId ?? null
+  );
+  const [selectedCategoryBranchName, setSelectedCategoryBranchName] = useState(() => {
+    if (session?.branch_name) return session.branch_name;
+    if (branchId != null) return `Branch ${branchId}`;
+    return "All Branches";
+  });
 
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
@@ -128,10 +136,10 @@ export default function Home() {
     }
   }, []);
 
-  const loadCategorySales = useCallback(async () => {
+  const loadCategorySales = useCallback(async (targetBranchId = branchId) => {
     try {
       const res = await api.get("/reports/category-sales", {
-        params: { mode: "today", branch_id: branchId ?? undefined },
+        params: { mode: "today", branch_id: targetBranchId ?? undefined },
       });
       setCategorySales(res?.data || []);
     } catch {
@@ -153,6 +161,21 @@ export default function Home() {
       setBranchSales([]);
     }
   }, [isAdmin]);
+
+  const handleBranchSalesClick = useCallback(
+    (entry) => {
+      const payload = entry?.payload || entry;
+      const nextBranchId = payload?.branch_id;
+      if (nextBranchId == null) return;
+
+      setSelectedCategoryBranchId(nextBranchId);
+      setSelectedCategoryBranchName(
+        payload?.branch_name || `Branch ${nextBranchId}`
+      );
+      loadCategorySales(nextBranchId);
+    },
+    [loadCategorySales]
+  );
 
   useEffect(() => {
     loadStats();
@@ -380,7 +403,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   loadStats();
-                  loadCategorySales();
+                  loadCategorySales(selectedCategoryBranchId);
                   loadBranchSales();
                 }}
                 className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
@@ -411,6 +434,11 @@ export default function Home() {
             <h3 className="text-sm font-semibold text-gray-700 mb-4">
               Category Sales
             </h3>
+            {isAdmin && (
+              <p className="text-xs text-gray-500 -mt-2 mb-3">
+                Filtered by: {selectedCategoryBranchName}
+              </p>
+            )}
 
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -448,9 +476,25 @@ export default function Home() {
                       nameKey="branch_name"
                       innerRadius={40}
                       outerRadius={80}
+                      onClick={handleBranchSalesClick}
                     >
-                      {branchSales.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      {branchSales.map((row, i) => (
+                        <Cell
+                          key={i}
+                          fill={COLORS[i % COLORS.length]}
+                          stroke={
+                            String(row?.branch_id ?? "") ===
+                            String(selectedCategoryBranchId ?? "")
+                              ? "#111827"
+                              : "#ffffff"
+                          }
+                          strokeWidth={
+                            String(row?.branch_id ?? "") ===
+                            String(selectedCategoryBranchId ?? "")
+                              ? 2
+                              : 1
+                          }
+                        />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v) => `Rs. ${v}`} />
