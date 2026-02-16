@@ -43,6 +43,7 @@ export default function About() {
   const { showToast } = useToast();
   const [demoOpen, setDemoOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
 
   const [demoForm, setDemoForm] = useState({
     name: "",
@@ -84,6 +85,32 @@ export default function About() {
       );
     } finally {
       setSending(false);
+    }
+  };
+
+  const androidApkUrl =
+    import.meta.env.VITE_ANDROID_APK_URL || "/downloads/haappii-billing.apk";
+  const iosAppUrl = import.meta.env.VITE_IOS_APP_URL || "";
+  const isAndroid =
+    typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+  const startAndroidDownload = () => {
+    if (!androidApkUrl) {
+      showToast("Android app download is not configured", "error");
+      return;
+    }
+
+    try {
+      const a = document.createElement("a");
+      a.href = androidApkUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setInstallOpen(true);
+    } catch {
+      showToast("Unable to start download", "error");
     }
   };
 
@@ -153,6 +180,44 @@ export default function About() {
           display: flex;
           gap: 14px;
           flex-wrap: wrap;
+        }
+
+        /* ---------- APP DOWNLOAD ---------- */
+        .app-card {
+          margin-top: 26px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.14);
+          border-radius: 20px;
+          padding: 18px;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+          box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+        }
+
+        .app-title {
+          font-family: Fraunces, serif;
+          font-size: 20px;
+          margin: 0;
+        }
+
+        .app-sub {
+          color: #9aa4c7;
+          font-size: 14px;
+          line-height: 1.6;
+          margin: 0;
+        }
+
+        .app-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 6px;
+        }
+
+        .hint {
+          font-size: 12px;
+          color: rgba(248,250,252,0.72);
         }
 
         .btn {
@@ -295,6 +360,14 @@ export default function About() {
           margin-top: 16px;
         }
 
+        .steps {
+          margin-top: 10px;
+          padding-left: 18px;
+          color: rgba(248,250,252,0.85);
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
         @media (max-width: 900px) {
           .hero { grid-template-columns: 1fr; }
           .hero-copy, .hero-card { grid-column: span 12; }
@@ -328,11 +401,59 @@ export default function About() {
             <Link to="/setup/onboard">
               <button className="btn btn-outline">Application Setup</button>
             </Link>
+            <button
+              className="btn btn-outline"
+              onClick={() =>
+                document
+                  .getElementById("mobile-app")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            >
+              Download Mobile App
+            </button>
           </div>
         </div>
 
         <div className="hero-card">
           <img src={login} alt="Haappii Billing Login" />
+        </div>
+      </section>
+
+      {/* ---------- MOBILE APP ---------- */}
+      <section className="section" id="mobile-app">
+        <h2 className="section-title">Get the Mobile App</h2>
+        <p className="section-sub">
+          Download and install the Haappii Billing mobile application for faster billing and on-the-go access.
+        </p>
+
+        <div className="app-card">
+          <h3 className="app-title">Mobile App Download</h3>
+          <p className="app-sub">
+            {isAndroid
+              ? "You are on Android. Tap Download, then follow the install steps."
+              : "Use Android APK download, or install via iOS link if provided."}
+          </p>
+
+          <div className="app-actions">
+            <button className="btn btn-primary" onClick={startAndroidDownload}>
+              Download Android (APK)
+            </button>
+            {iosAppUrl ? (
+              <a
+                className="btn btn-outline"
+                href={iosAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                iOS App Link
+              </a>
+            ) : null}
+          </div>
+
+          <div className="hint">
+            Admin note: set <b>VITE_ANDROID_APK_URL</b> (and optional{" "}
+            <b>VITE_IOS_APP_URL</b>) for correct download links.
+          </div>
         </div>
       </section>
 
@@ -392,6 +513,42 @@ export default function About() {
               </button>
               <button className="btn btn-primary" onClick={submitDemo}>
                 {sending ? "Sending…" : "Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- INSTALL HELP ---------- */}
+      {installOpen && (
+        <div className="modal-backdrop" onClick={() => setInstallOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>Install on Android</h3>
+            <p className="hero-sub" style={{ marginTop: 8 }}>
+              Browsers can download the APK, but Android will ask you to confirm
+              installation.
+            </p>
+            <ol className="steps">
+              <li>
+                After download, open the downloaded APK from your notifications
+                / Downloads.
+              </li>
+              <li>
+                If prompted, allow “Install unknown apps” for your browser /
+                file manager.
+              </li>
+              <li>Tap Install, then Open.</li>
+            </ol>
+
+            <div className="modal-actions">
+              <button
+                className="btn btn-outline"
+                onClick={() => setInstallOpen(false)}
+              >
+                Close
+              </button>
+              <button className="btn btn-primary" onClick={startAndroidDownload}>
+                Download Again
               </button>
             </div>
           </div>
