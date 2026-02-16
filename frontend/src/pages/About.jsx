@@ -94,26 +94,53 @@ export default function About() {
   const isAndroid =
     typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
-  const startAndroidDownload = () => {
+  const startAndroidDownload = async () => {
     if (!androidApkUrl) {
       showToast("Android app download is not configured", "error");
       return;
     }
 
     try {
-      const canUseDownloadAttr = (() => {
+      const resolvedUrl = (() => {
         try {
-          const resolved = new URL(androidApkUrl, window.location.href);
-          return resolved.origin === window.location.origin;
+          return new URL(androidApkUrl, window.location.href);
         } catch {
-          return false;
+          return null;
         }
       })();
 
+      if (!resolvedUrl) {
+        showToast("Invalid APK download URL", "error");
+        return;
+      }
+
+      const isSameOrigin = resolvedUrl.origin === window.location.origin;
+
+      if (isSameOrigin) {
+        try {
+          const head = await fetch(resolvedUrl.href, { method: "HEAD" });
+          const contentType = (head.headers.get("content-type") || "").toLowerCase();
+
+          if (!head.ok || contentType.includes("text/html")) {
+            showToast(
+              "APK file is not available on the server. Please upload the APK and try again.",
+              "error"
+            );
+            return;
+          }
+        } catch {
+          showToast(
+            "Unable to verify APK on server. Please try again after uploading the APK.",
+            "error"
+          );
+          return;
+        }
+      }
+
       const a = document.createElement("a");
-      a.href = androidApkUrl;
+      a.href = resolvedUrl.href;
       a.rel = "noopener noreferrer";
-      if (canUseDownloadAttr) {
+      if (isSameOrigin) {
         a.download = "haappii-billing.apk";
       } else {
         a.target = "_blank";
