@@ -37,7 +37,7 @@ const MENU_GROUPS = [
   { key: "employees", title: "Employees", paths: ["/employees", "/employees/attendance"] },
   { key: "returns", title: "Returns", paths: ["/returns"] },
   { key: "expenses", title: "Expenses", paths: ["/expenses"] },
-  { key: "inventory", title: "Inventory", paths: ["/inventory", "/reorder-alerts", "/stock-transfers", "/item-lots", "/stock-audit"] },
+  { key: "inventory", title: "Inventory", paths: ["/inventory", "/reorder-alerts", "/stock-transfers", "/item-lots", "/labels", "/stock-audit"] },
   { key: "suppliers", title: "Purchase & Suppliers", paths: ["/supplier-ledger"] },
   { key: "cash_drawer", title: "Cash Drawer / Shift", paths: ["/cash-drawer"] },
   { key: "loyalty", title: "Loyalty & Coupons", paths: ["/loyalty", "/gift-cards", "/coupons"] },

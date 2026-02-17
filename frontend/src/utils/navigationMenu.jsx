@@ -181,6 +181,13 @@ const MENU_CATALOG = [
     perm: { module: "item_lots", action: "read" },
   },
   {
+    key: "labels",
+    name: "Labels / Barcode",
+    path: "/labels",
+    icon: <FaBarcode />,
+    perm: { module: "items", action: "read" },
+  },
+  {
     key: "transfers",
     name: "Transfers",
     path: "/stock-transfers",
@@ -359,6 +366,7 @@ export const buildRoleMenu = ({
       { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
       { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
       { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
+      { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       {
@@ -403,6 +411,7 @@ export const buildRoleMenu = ({
       { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
       { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
       { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
+      { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },

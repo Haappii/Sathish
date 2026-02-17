@@ -19,6 +19,7 @@
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
+    "jsbarcode": "^3.11.6",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "react": "^19.2.3",
