@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import authAxios from "../../api/authAxios";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast";
 import { getSession } from "../../utils/auth";
 import defaultLogo from "../../assets/logo.png";
 import { getShopLogoUrl } from "../../utils/shopLogo";
+import BackButton from "../../components/BackButton";
 
 export default function ShopDetails() {
-
-  const navigate = useNavigate();
   const { showToast } = useToast();
   const session = getSession();
 
@@ -180,9 +178,7 @@ export default function ShopDetails() {
     <div className="space-y-4">
 
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate("/home", { replace: true })} className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]">
-          &larr; Back
-        </button>
+        <BackButton />
 
         <h2 className="text-2xl font-bold">
           Shop Management

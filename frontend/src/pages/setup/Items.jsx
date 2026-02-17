@@ -1,12 +1,11 @@
 // src/pages/setup/Items.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { API_BASE } from "../../config/api";
+import BackButton from "../../components/BackButton";
 
 export default function Items() {
-  const navigate = useNavigate();
   const { showToast } = useToast();
 
   const [items, setItems] = useState([]);
@@ -241,12 +240,7 @@ export default function Items() {
 
       {/* Back + Add Item (same pattern as billing page) */}
       <div className="px-4 pt-2 pb-1 flex items-center justify-between">
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-        >
-          &larr; Back
-        </button>
+        <BackButton />
 
         <button
           type="button"

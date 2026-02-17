@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import authAxios from "../../api/authAxios";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast";
+import BackButton from "../../components/BackButton";
 
 export default function Users() {
-
-  const navigate = useNavigate();
   const { showToast } = useToast();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -119,12 +117,7 @@ export default function Users() {
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-        >
-          &larr; Back
-        </button>
+        <BackButton />
 
         <h2 className="text-lg font-bold text-emerald-700">
           User Management

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import authAxios from "../api/authAxios";
 import { getSession } from "../utils/auth";
+import BackButton from "../components/BackButton";
 import {
   LineChart,
   Line,
@@ -140,8 +141,11 @@ export default function Trends() {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen space-y-4">
-        <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Trends</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BackButton />
+          <h2 className="text-xl font-semibold">Trends</h2>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => exportPDF(metricMeta?.label)}

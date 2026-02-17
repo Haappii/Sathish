@@ -4,6 +4,7 @@ import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { modulesToPermMap } from "../utils/navigationMenu";
+import BackButton from "../components/BackButton";
 
 export default function Analytics() {
   const { showToast } = useToast();
@@ -119,7 +120,10 @@ export default function Analytics() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-semibold text-gray-700">Analytics</h2>
+        <div className="flex items-center gap-2">
+          <BackButton />
+          <h2 className="text-lg font-semibold text-gray-700">Analytics</h2>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <input

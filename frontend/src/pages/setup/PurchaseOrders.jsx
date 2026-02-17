@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { getSession } from "../../utils/auth";
 import * as XLSX from "xlsx";
 import { API_BASE } from "../../config/api";
+import BackButton from "../../components/BackButton";
 
 export default function PurchaseOrders() {
-  const navigate = useNavigate();
   const { showToast } = useToast();
   const session = getSession();
   const isAdmin = (session?.role || "").toLowerCase() === "admin";
@@ -315,13 +314,10 @@ export default function PurchaseOrders() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-        >
-          &larr; Back
-        </button>
-        <h2 className="text-lg font-bold text-slate-800">Purchase Orders</h2>
+        <div className="flex items-center gap-2">
+          <BackButton />
+          <h2 className="text-lg font-bold text-slate-800">Purchase Orders</h2>
+        </div>
       </div>
 
       {isAdmin && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
+import BackButton from "../components/BackButton";
 
 /* ---------------- ASSETS ---------------- */
 import adminMenu from "../assets/marketing/admin menu.png";
@@ -419,6 +420,10 @@ export default function About() {
           .modal-grid textarea { grid-column: span 1; }
         }
       `}</style>
+
+      <div className="max-w-[1200px] mx-auto px-6 pt-4">
+        <BackButton className="btn btn-outline" />
+      </div>
 
       {/* ---------- HERO ---------- */}
       <section className="hero">

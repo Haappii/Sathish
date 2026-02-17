@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
+import BackButton from "../../components/BackButton";
 import { isHotelShop } from "../../utils/shopType";
 import {
   FaPlus,
@@ -94,12 +95,7 @@ export default function Branches() {
 
       {/* HEADER */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-        >
-          &larr; Back
-        </button>
+        <BackButton />
 
         <h2 className="text-2xl font-extrabold" style={{ color: BLUE }}>
           Branch Management

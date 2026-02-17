@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import BackButton from "../components/BackButton";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const firstDay = (isoDate) => {
@@ -150,12 +151,7 @@ export default function EmployeeAttendance() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate("/home", { replace: true })}
-            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-          >
-            &larr; Back
-          </button>
+          <BackButton />
           <h2 className="text-lg font-bold text-slate-800">Employee Attendance</h2>
         </div>
         <div className="flex gap-2">

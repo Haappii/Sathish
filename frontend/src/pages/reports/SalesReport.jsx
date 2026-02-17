@@ -4,6 +4,7 @@ import { getSession } from "../../utils/auth";
 import ReportTable from "./ReportTable";
 import ReportFilters from "./ReportFilters";
 import { useToast } from "../../components/Toast";
+import BackButton from "../../components/BackButton";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -287,13 +288,16 @@ export default function SalesReport() {
 
         {/* HEADER */}
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-800">
-              Sales Report
-            </h2>
-            <p className="text-sm text-slate-500">
-              Invoice-wise item sales report
-            </p>
+          <div className="flex items-start gap-3">
+            <BackButton className="px-3 py-2 border rounded-lg text-[12px] hover:bg-gray-50" />
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-800">
+                Sales Report
+              </h2>
+              <p className="text-sm text-slate-500">
+                Invoice-wise item sales report
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-2">

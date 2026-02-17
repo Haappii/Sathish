@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import authAxios from "../api/authAxios";
+import BackButton from "../components/BackButton";
 
 export default function EditBill() {
   const { invoiceNumber } = useParams();
@@ -18,7 +19,7 @@ export default function EditBill() {
   useEffect(() => {
     if (!invoiceNumber) {
       console.error("invoiceNumber missing");
-      navigate("/sales-history");
+      navigate("/sales/history");
       return;
     }
 
@@ -43,7 +44,7 @@ export default function EditBill() {
         }
 
         alert("Invoice not found");
-        navigate("/sales-history");
+        navigate("/sales/history");
       } finally {
         setLoading(false);
       }
@@ -119,7 +120,7 @@ export default function EditBill() {
       });
 
       alert("Invoice updated successfully");
-      navigate("/sales-history");
+      navigate("/sales/history");
     } catch (err) {
       console.error(err);
       alert(err?.response?.data?.detail || "Update failed");
@@ -144,7 +145,7 @@ export default function EditBill() {
       });
 
       alert("Invoice deleted");
-      navigate("/sales-history");
+      navigate("/sales/history");
     } catch (err) {
       console.error(err);
       alert("Delete failed");
@@ -161,6 +162,9 @@ export default function EditBill() {
 
   return (
     <div className="page">
+      <div className="flex items-center gap-2 mb-2">
+        <BackButton />
+      </div>
       <h2>Edit Invoice – {invoice.invoice_number}</h2>
 
       <table className="table">

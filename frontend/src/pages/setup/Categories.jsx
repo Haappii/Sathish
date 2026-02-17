@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import authAxios from "../../api/authAxios";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast";
+import BackButton from "../../components/BackButton";
 
 export default function Categories() {
-
-  const navigate = useNavigate();
   const { showToast } = useToast();
 
   const [categories, setCategories] = useState([]);
@@ -99,12 +97,7 @@ export default function Categories() {
 
       {/* HEADER */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-        >
-          &larr; Back
-        </button>
+        <BackButton />
 
         <h2 className="text-lg font-bold text-gray-800">
           Category Management
