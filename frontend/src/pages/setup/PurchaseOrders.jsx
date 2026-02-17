@@ -12,6 +12,15 @@ export default function PurchaseOrders() {
   const isAdmin = (session?.role || "").toLowerCase() === "admin";
   const apiOrigin = String(API_BASE || "").replace(/\/api\/?$/, "");
 
+  const parseSerialNumbers = (text) => {
+    const raw = String(text || "");
+    if (!raw.trim()) return [];
+    return raw
+      .split(/[\n,]+/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
+
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState(session?.branch_id || "");
 
@@ -147,7 +156,10 @@ export default function PurchaseOrders() {
       item_id: i.item_id,
       item_name: i.item_name,
       remaining: i.qty_ordered - i.qty_received,
-      qty_received: 0
+      qty_received: 0,
+      batch_no: "",
+      expiry_date: "",
+      serial_numbers_text: "",
     }));
     setReceiveRows(rows);
     setReceiveOpen(true);
@@ -274,13 +286,32 @@ export default function PurchaseOrders() {
 
   const submitReceive = async () => {
     if (!activePo) return;
+    for (const r of receiveRows) {
+      const qty = Number(r.qty_received || 0);
+      if (qty <= 0) continue;
+      const serials = parseSerialNumbers(r.serial_numbers_text);
+      if (serials.length > 0 && serials.length !== qty) {
+        showToast(
+          `Serial numbers count (${serials.length}) must match received qty (${qty}) for ${r.item_name}`,
+          "error"
+        );
+        return;
+      }
+    }
+
     const payload = {
       items: receiveRows
         .filter(r => Number(r.qty_received) > 0)
-        .map(r => ({
-          item_id: r.item_id,
-          qty_received: Number(r.qty_received)
-        }))
+        .map(r => {
+          const serials = parseSerialNumbers(r.serial_numbers_text);
+          return {
+            item_id: r.item_id,
+            qty_received: Number(r.qty_received),
+            batch_no: (r.batch_no || "").trim() || undefined,
+            expiry_date: r.expiry_date || undefined,
+            serial_numbers: serials.length ? serials : undefined,
+          };
+        })
     };
     if (payload.items.length === 0) return showToast("Enter qty to receive", "error");
 
@@ -491,27 +522,84 @@ export default function PurchaseOrders() {
 
       {receiveOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-lg">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-3xl">
             <div className="flex justify-between mb-3">
               <h3 className="text-sm font-semibold">Receive Items</h3>
               <button onClick={() => setReceiveOpen(false)}>x</button>
             </div>
             <div className="space-y-2 text-[12px]">
               {receiveRows.map((r, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_80px_80px] gap-2 items-center">
-                  <div>{r.item_name}</div>
-                  <div className="text-slate-500">Bal: {r.remaining}</div>
-                  <input
-                    type="number"
-                    min="0"
-                    className="border rounded px-2 py-1"
-                    value={r.qty_received}
-                    onChange={e => {
-                      const clone = [...receiveRows];
-                      clone[idx] = { ...clone[idx], qty_received: e.target.value };
-                      setReceiveRows(clone);
-                    }}
-                  />
+                <div key={idx} className="border rounded-xl p-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px_120px] gap-2 items-center">
+                    <div className="font-semibold">{r.item_name}</div>
+                    <div className="text-slate-500 text-[11px]">Bal: {r.remaining}</div>
+                    <input
+                      type="number"
+                      min="0"
+                      className="border rounded px-2 py-1"
+                      value={r.qty_received}
+                      onChange={(e) => {
+                        const clone = [...receiveRows];
+                        clone[idx] = { ...clone[idx], qty_received: e.target.value };
+                        setReceiveRows(clone);
+                      }}
+                    />
+                  </div>
+
+                  {Number(r.qty_received || 0) > 0 && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-600">Batch No (optional)</label>
+                        <input
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="Batch no"
+                          value={r.batch_no || ""}
+                          onChange={(e) => {
+                            const clone = [...receiveRows];
+                            clone[idx] = { ...clone[idx], batch_no: e.target.value };
+                            setReceiveRows(clone);
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-600">Expiry Date (optional)</label>
+                        <input
+                          type="date"
+                          className="w-full border rounded px-2 py-1"
+                          value={r.expiry_date || ""}
+                          onChange={(e) => {
+                            const clone = [...receiveRows];
+                            clone[idx] = { ...clone[idx], expiry_date: e.target.value };
+                            setReceiveRows(clone);
+                          }}
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] text-slate-600">
+                          Serial Numbers (optional, one per line / comma)
+                        </label>
+                        <textarea
+                          rows={2}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="SN001\nSN002"
+                          value={r.serial_numbers_text || ""}
+                          onChange={(e) => {
+                            const clone = [...receiveRows];
+                            clone[idx] = { ...clone[idx], serial_numbers_text: e.target.value };
+                            setReceiveRows(clone);
+                          }}
+                        />
+                        {Boolean((r.serial_numbers_text || "").trim()) && (
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            Entered {parseSerialNumbers(r.serial_numbers_text).length} / Qty{" "}
+                            {Number(r.qty_received || 0)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
