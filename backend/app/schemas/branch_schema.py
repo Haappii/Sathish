@@ -12,6 +12,11 @@ class BranchBase(BaseModel):
     type: Optional[str] = "Branch"
     status: Optional[str] = "ACTIVE"
 
+    # Optional: default discount settings (stored in system_parameters)
+    discount_enabled: Optional[bool] = False
+    discount_type: Optional[str] = "flat"  # flat | percent
+    discount_value: Optional[float] = 0
+
 class BranchCreate(BranchBase):
     pass
 

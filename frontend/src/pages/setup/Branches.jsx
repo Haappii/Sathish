@@ -29,7 +29,10 @@ export default function Branches() {
     state: "",
     country: "",
     pincode: "",
-    type: "Branch"
+    type: "Branch",
+    discount_enabled: false,
+    discount_type: "flat",
+    discount_value: 0
   };
 
   const [form, setForm] = useState(emptyForm);
@@ -57,6 +60,19 @@ export default function Branches() {
       return;
     }
 
+    if (form.discount_enabled) {
+      const t = String(form.discount_type || "flat").toLowerCase();
+      const v = Number(form.discount_value || 0);
+      if (!v || v < 0) {
+        showToast("Enter valid discount value", "error");
+        return;
+      }
+      if (t === "percent" && v > 100) {
+        showToast("Percent discount cannot exceed 100", "error");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       if (editingId) {
@@ -78,7 +94,13 @@ export default function Branches() {
 
   const editBranch = b => {
     setEditingId(b.branch_id);
-    setForm({ ...b });
+    setForm({
+      ...emptyForm,
+      ...b,
+      discount_enabled: Boolean(b?.discount_enabled),
+      discount_type: (b?.discount_type || "flat").toLowerCase(),
+      discount_value: Number(b?.discount_value || 0),
+    });
   };
 
   const toggleStatus = async (id, status) => {
@@ -133,6 +155,47 @@ export default function Branches() {
               value={form.country}
               onChange={e => setForm({ ...form, country: e.target.value })}
             />
+          </div>
+
+          <div className="mt-4 rounded-xl border bg-slate-50 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-slate-800">Default Discount</div>
+              <label className="flex items-center gap-2 text-[12px]">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.discount_enabled)}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      discount_enabled: e.target.checked,
+                      discount_type: form.discount_type || "flat",
+                      discount_value: form.discount_value ?? 0,
+                    })
+                  }
+                />
+                Enable
+              </label>
+            </div>
+
+            {form.discount_enabled && (
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  className="border rounded-lg px-3 py-2"
+                  value={String(form.discount_type || "flat").toLowerCase()}
+                  onChange={(e) => setForm({ ...form, discount_type: e.target.value })}
+                >
+                  <option value="flat">Flat</option>
+                  <option value="percent">Percent %</option>
+                </select>
+                <input
+                  type="number"
+                  className="border rounded-lg px-3 py-2"
+                  placeholder="Value"
+                  value={form.discount_value}
+                  onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                />
+              </div>
+            )}
           </div>
 
           <button

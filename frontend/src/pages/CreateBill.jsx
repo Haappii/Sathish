@@ -49,6 +49,7 @@ export default function CreateBill() {
 
   const [discountType, setDiscountType] = useState("flat");
   const [discount, setDiscount] = useState(0);
+  const [defaultDiscountApplied, setDefaultDiscountApplied] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState("");
@@ -85,7 +86,17 @@ export default function CreateBill() {
       if (branch_id) {
         try {
           const br = await authAxios.get(`/branch/${branch_id}`);
-          setBranch(br.data || {});
+          const b = br.data || {};
+          setBranch(b);
+          if (!defaultDiscountApplied && b?.discount_enabled) {
+            const t = String(b.discount_type || "flat").toLowerCase();
+            const v = Number(b.discount_value || 0);
+            if (v > 0) {
+              setDiscountType(t === "percent" ? "percent" : "flat");
+              setDiscount(v);
+            }
+            setDefaultDiscountApplied(true);
+          }
         } catch {}
       }
 
@@ -137,6 +148,7 @@ export default function CreateBill() {
   };
 
   useEffect(() => {
+    setDefaultDiscountApplied(false);
     loadData();
   }, [branch_id]);
 
@@ -505,6 +517,7 @@ export default function CreateBill() {
       setPaymentMode("cash");
       setSplitEnabled(false);
       setSplit({ cash: "", card: "", upi: "" });
+      setDefaultDiscountApplied(false);
       await loadData();
     } catch (err) {
       const isNetworkError = !err?.response || !navigator.onLine;
@@ -572,6 +585,7 @@ export default function CreateBill() {
       setPaymentMode("cash");
       setSplitEnabled(false);
       setSplit({ cash: "", card: "", upi: "" });
+      setDefaultDiscountApplied(false);
       await loadData();
     } catch (err) {
       const msg = err?.response?.data?.detail || "Draft save failed";

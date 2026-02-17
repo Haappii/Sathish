@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 from app.models.branch import Branch
 from app.schemas.branch_schema import BranchCreate, BranchUpdate
 
+_DISCOUNT_FIELDS = {"discount_enabled", "discount_type", "discount_value"}
+
 
 def get_all_branches(db: Session, shop_id: int):
     return (
@@ -30,7 +32,7 @@ def get_branch(db: Session, shop_id: int, branch_id: int):
 
 def create_branch(db: Session, data: BranchCreate, user_id: int, shop_id: int):
     branch = Branch(
-        **data.dict(),
+        **data.dict(exclude=_DISCOUNT_FIELDS),
         shop_id=shop_id,
         created_by=user_id
     )
@@ -46,7 +48,10 @@ def update_branch(db: Session, shop_id: int, branch_id: int, data: BranchUpdate)
         return None
 
     for k, v in data.dict(exclude_unset=True).items():
-        setattr(branch, k, v)
+        if k in _DISCOUNT_FIELDS:
+            continue
+        if hasattr(branch, k):
+            setattr(branch, k, v)
 
     db.commit()
     db.refresh(branch)

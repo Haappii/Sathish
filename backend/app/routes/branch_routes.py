@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.db import SessionLocal
 from app.models.branch import Branch
+from app.models.system_parameters import SystemParameter
 from app.schemas.branch_schema import BranchCreate, BranchUpdate, BranchOut
 from app.services.branch_service import (
     get_all_branches,
@@ -18,6 +20,104 @@ from app.services.audit_service import log_action
 router = APIRouter(prefix="/branch", tags=["Branch"])
 
 
+def _discount_param_keys(branch_id: int) -> dict[str, str]:
+    return {
+        "enabled": f"branch:{branch_id}:default_discount_enabled",
+        "type": f"branch:{branch_id}:default_discount_type",
+        "value": f"branch:{branch_id}:default_discount_value",
+    }
+
+
+def _normalize_discount_type(raw: str | None) -> str:
+    t = str(raw or "").strip().lower()
+    if t in {"percent", "percentage", "%", "pct"}:
+        return "percent"
+    return "flat"
+
+
+def _read_branch_discount_from_params(pmap: dict[str, str], branch_id: int) -> dict:
+    keys = _discount_param_keys(branch_id)
+    enabled = str(pmap.get(keys["enabled"], "NO") or "NO").strip().upper() == "YES"
+    dtype = _normalize_discount_type(pmap.get(keys["type"], "flat"))
+    try:
+        dval = float(pmap.get(keys["value"], "0") or 0)
+    except Exception:
+        dval = 0.0
+    if dval < 0:
+        dval = 0.0
+    return {
+        "discount_enabled": bool(enabled),
+        "discount_type": dtype,
+        "discount_value": float(dval),
+    }
+
+
+def _upsert_param(db: Session, *, shop_id: int, key: str, value: str):
+    row = (
+        db.query(SystemParameter)
+        .filter(SystemParameter.shop_id == shop_id, SystemParameter.param_key == key)
+        .first()
+    )
+    if not row:
+        row = SystemParameter(shop_id=shop_id, param_key=key, param_value=value)
+    else:
+        row.param_value = value
+    db.add(row)
+
+
+def _save_branch_discount(db: Session, *, shop_id: int, branch_id: int, payload: BranchCreate | BranchUpdate):
+    # Persist only when any of these fields are explicitly present in the payload.
+    has_any = any(
+        getattr(payload, k, None) is not None for k in ("discount_enabled", "discount_type", "discount_value")
+    )
+    if not has_any:
+        return
+
+    enabled = bool(getattr(payload, "discount_enabled", False))
+    dtype = _normalize_discount_type(getattr(payload, "discount_type", "flat"))
+    try:
+        dval = float(getattr(payload, "discount_value", 0) or 0)
+    except Exception:
+        dval = 0.0
+    if dval < 0:
+        dval = 0.0
+
+    keys = _discount_param_keys(branch_id)
+    _upsert_param(db, shop_id=shop_id, key=keys["enabled"], value=("YES" if enabled else "NO"))
+    _upsert_param(db, shop_id=shop_id, key=keys["type"], value=dtype.upper())
+    _upsert_param(db, shop_id=shop_id, key=keys["value"], value=str(dval))
+    db.commit()
+
+
+def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> dict[str, str]:
+    if not branch_ids:
+        return {}
+
+    # Fetch only relevant discount keys for the given branches.
+    ors = []
+    for bid in branch_ids:
+        keys = _discount_param_keys(bid)
+        ors.extend([
+            SystemParameter.param_key == keys["enabled"],
+            SystemParameter.param_key == keys["type"],
+            SystemParameter.param_key == keys["value"],
+        ])
+
+    rows = (
+        db.query(SystemParameter.param_key, SystemParameter.param_value)
+        .filter(SystemParameter.shop_id == shop_id)
+        .filter(or_(*ors))
+        .all()
+    )
+    return {str(k): (str(v) if v is not None else "") for k, v in rows}
+
+
+def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
+    out = BranchOut.from_orm(branch).dict()
+    out.update(_read_branch_discount_from_params(pmap, int(branch.branch_id)))
+    return out
+
+
 def get_db():
     db: Session = SessionLocal()
     try:
@@ -31,7 +131,9 @@ def get_db():
 # =========================================================
 @router.get("/list", response_model=list[BranchOut], dependencies=[Depends(AdminOnly)])
 def list_branches(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return get_all_branches(db, user.shop_id)
+    branches = get_all_branches(db, user.shop_id)
+    pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
+    return [_branch_out_with_discount(b, pmap) for b in branches]
 
 
 # =========================================================
@@ -39,7 +141,9 @@ def list_branches(db: Session = Depends(get_db), user=Depends(get_current_user))
 # =========================================================
 @router.get("/active", response_model=list[BranchOut])
 def active_branches(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return get_active_branches(db, user.shop_id)
+    branches = get_active_branches(db, user.shop_id)
+    pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
+    return [_branch_out_with_discount(b, pmap) for b in branches]
 
 
 # =========================================================
@@ -57,7 +161,8 @@ def get_branch(branch_id: int, db: Session = Depends(get_db), user=Depends(get_c
     if not branch:
         raise HTTPException(404, "Branch not found")
 
-    return branch
+    pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(branch.branch_id)])
+    return _branch_out_with_discount(branch, pmap)
 
 
 # =========================================================
@@ -70,6 +175,7 @@ def create(
     user = Depends(get_current_user)
 ):
     branch = create_branch(db, data, user.user_id, user.shop_id)
+    _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
         db,
@@ -85,7 +191,8 @@ def create(
         user_id=user.user_id,
     )
 
-    return branch
+    pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(branch.branch_id)])
+    return _branch_out_with_discount(branch, pmap)
 
 
 # =========================================================
@@ -114,6 +221,8 @@ def update(branch_id: int, data: BranchUpdate,
     if not branch:
         raise HTTPException(404, "Branch not found")
 
+    _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+
     log_action(
         db,
         shop_id=user.shop_id,
@@ -129,7 +238,8 @@ def update(branch_id: int, data: BranchUpdate,
         user_id=user.user_id,
     )
 
-    return branch
+    pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(branch.branch_id)])
+    return _branch_out_with_discount(branch, pmap)
 
 
 # =========================================================
