@@ -341,6 +341,8 @@ def create_return(
         created_by=user.user_id,
     )
 
+    return_number = _new_return_number()
+
     wallet_txn = None
     if refund_mode == "STORE_CREDIT":
         if is_placeholder_mobile(invoice.mobile):
@@ -356,7 +358,7 @@ def create_return(
             customer=cust,
             amount=refund_amount,
             ref_type="RETURN",
-            ref_no=None,
+            ref_no=return_number,
             note="Sales return store credit",
             created_by=user.user_id,
         )
@@ -364,7 +366,7 @@ def create_return(
     row = SalesReturn(
         shop_id=user.shop_id,
         branch_id=int(invoice.branch_id or user.branch_id),
-        return_number=_new_return_number(),
+        return_number=return_number,
         invoice_id=invoice.invoice_id,
         invoice_number=invoice.invoice_number,
         customer_id=(customer.customer_id if customer else None),
