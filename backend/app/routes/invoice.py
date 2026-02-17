@@ -23,7 +23,8 @@ from app.services.invoice_service import generate_invoice_number
 from app.services.invoice_archive_service import archive_invoice
 from app.services.inventory_service import (
     is_inventory_enabled,
-    adjust_stock
+    adjust_stock,
+    get_stock,
 )
 from app.services.gst_service import calculate_gst
 from app.services.day_close_service import is_branch_day_closed
@@ -32,6 +33,7 @@ from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
 from app.utils.permissions import require_permission
 from app.services.gift_card_service import get_card_by_code, redeem_card, as_money, is_expired
+from app.services.item_lot_service import consume_lots_fifo
 from app.services.wallet_service import (
     is_placeholder_mobile,
     get_customer_by_mobile,
@@ -220,8 +222,33 @@ def create_invoice(
         ).all()
     }
 
+    inv_enabled = is_inventory_enabled(db, user.shop_id)
+    if inv_enabled:
+        for it in payload.items:
+            available = get_stock(db, user.shop_id, it.item_id, branch_id)
+            if available < int(it.quantity or 0):
+                raise HTTPException(400, f"Insufficient stock for item {it.item_id} (available {available})")
+
     for it in payload.items:
         item = item_map.get(it.item_id)
+        buy_price = (item.buy_price if item else 0)
+
+        if inv_enabled:
+            try:
+                buy_price = float(
+                    consume_lots_fifo(
+                        db,
+                        shop_id=user.shop_id,
+                        branch_id=branch_id,
+                        item_id=int(it.item_id),
+                        quantity=int(it.quantity or 0),
+                        fallback_unit_cost=(item.buy_price if item else 0),
+                        source_ref=invoice.invoice_number,
+                    )
+                )
+            except Exception:
+                # don't block sales if lot consumption fails
+                buy_price = (item.buy_price if item else 0)
 
         db.add(InvoiceDetail(
             invoice_id=invoice.invoice_id,
@@ -230,16 +257,18 @@ def create_invoice(
             branch_id=branch_id,
             quantity=it.quantity,
             amount=it.amount,
-            buy_price=(item.buy_price if item else 0),
+            buy_price=buy_price,
             mrp_price=(item.mrp_price if item else 0)
         ))
 
-        if is_inventory_enabled(db, user.shop_id):
-            adjust_stock(
+        if inv_enabled:
+            ok = adjust_stock(
                 db, user.shop_id, it.item_id, branch_id,
                 it.quantity, "REMOVE",
                 ref_no=invoice.invoice_number
             )
+            if ok is False:
+                raise HTTPException(400, f"Insufficient stock for item {it.item_id}")
     if payload.payment_mode is not None:
         invoice.payment_mode = payload.payment_mode
     if payload.payment_split is not None:

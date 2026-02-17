@@ -20,6 +20,7 @@ from app.services.audit_service import log_action
 from app.services.credit_service import as_decimal, normalize_mobile, upsert_customer
 from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import is_inventory_enabled, adjust_stock, get_stock
+from app.services.item_lot_service import add_lot, remove_return_lots
 from app.services.wallet_service import (
     is_placeholder_mobile,
     get_customer_by_mobile,
@@ -236,11 +237,14 @@ def create_return(
         raise HTTPException(400, "Invoice has no items")
 
     sold_map: dict[int, dict[str, Decimal]] = {}
+    cost_map: dict[int, Decimal] = {}
     for d in details:
         item_id = int(d.item_id)
         sold_map.setdefault(item_id, {"qty": Decimal("0"), "amount": Decimal("0")})
         sold_map[item_id]["qty"] += Decimal(int(d.quantity or 0))
         sold_map[item_id]["amount"] += as_decimal(d.amount)
+        if item_id not in cost_map:
+            cost_map[item_id] = as_decimal(getattr(d, "buy_price", 0))
 
     invoice_subtotal = sum(v["amount"] for v in sold_map.values())
     if invoice_subtotal <= 0:
@@ -430,6 +434,21 @@ def create_return(
                 "ADD",
                 ref_no=row.return_number,
             )
+            # Create a return lot so lot-based COGS stays consistent (best effort).
+            try:
+                add_lot(
+                    db,
+                    shop_id=user.shop_id,
+                    branch_id=row.branch_id,
+                    item_id=int(item.item_id),
+                    quantity=int(item.quantity or 0),
+                    unit_cost=cost_map.get(int(item.item_id), Decimal("0.00")),
+                    source_type="RETURN",
+                    source_ref=row.return_number,
+                    created_by=user.user_id,
+                )
+            except Exception:
+                pass
 
     log_action(
         db,
@@ -525,6 +544,17 @@ def cancel_return(
                 "REMOVE",
                 ref_no=f"CAN-{row.return_number}",
             )
+            try:
+                remove_return_lots(
+                    db,
+                    shop_id=user.shop_id,
+                    branch_id=row.branch_id,
+                    item_id=int(it.item_id),
+                    quantity=int(it.quantity),
+                    return_number=row.return_number,
+                )
+            except ValueError as e:
+                raise HTTPException(400, str(e))
 
     row.status = "CANCELLED"
     db.commit()

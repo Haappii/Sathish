@@ -263,7 +263,7 @@ def receive_po(
         adjust_stock(db, user.shop_id, item.item_id, po.branch_id, qty_in, "ADD", ref_no=po.po_number)
         any_received = True
 
-        # Optional: lot / batch / expiry / serial capture
+        # Lot / batch / expiry / serial capture (auto-fill Item Lots on every receive)
         batch_no = (req.batch_no or "").strip() or None
         exp_date = None
         if req.expiry_date:
@@ -272,23 +272,8 @@ def receive_po(
             except ValueError:
                 raise HTTPException(400, "Invalid expiry_date format YYYY-MM-DD")
         serials = req.serial_numbers or None
-        if batch_no or exp_date or serials:
-            if serials and len(serials) == qty_in:
-                for sn in serials:
-                    db.add(ItemLot(
-                        shop_id=user.shop_id,
-                        branch_id=po.branch_id,
-                        item_id=item.item_id,
-                        source_type="PO",
-                        source_ref=po.po_number,
-                        batch_no=batch_no,
-                        expiry_date=exp_date,
-                        serial_no=str(sn).strip() or None,
-                        quantity=1,
-                        unit_cost=unit_cost,
-                        created_by=user.user_id,
-                    ))
-            else:
+        if serials and len(serials) == qty_in:
+            for sn in serials:
                 db.add(ItemLot(
                     shop_id=user.shop_id,
                     branch_id=po.branch_id,
@@ -297,11 +282,25 @@ def receive_po(
                     source_ref=po.po_number,
                     batch_no=batch_no,
                     expiry_date=exp_date,
-                    serial_no=None,
-                    quantity=qty_in,
+                    serial_no=str(sn).strip() or None,
+                    quantity=1,
                     unit_cost=unit_cost,
                     created_by=user.user_id,
                 ))
+        else:
+            db.add(ItemLot(
+                shop_id=user.shop_id,
+                branch_id=po.branch_id,
+                item_id=item.item_id,
+                source_type="PO",
+                source_ref=po.po_number,
+                batch_no=batch_no,
+                expiry_date=exp_date,
+                serial_no=None,
+                quantity=qty_in,
+                unit_cost=unit_cost,
+                created_by=user.user_id,
+            ))
 
     # update status
     all_received = all(i.qty_received >= i.qty_ordered for i in po.items)
