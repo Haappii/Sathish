@@ -17,6 +17,7 @@ from app.services.gift_card_service import (
     get_card_by_code,
     redeem_card,
 )
+from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/gift-cards", tags=["Gift Cards"])
@@ -100,6 +101,22 @@ def create_gift_card(
     ))
     db.commit()
     db.refresh(card)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="GiftCards",
+        action="CREATE",
+        record_id=card.code,
+        new={
+            "gift_card_id": card.gift_card_id,
+            "code": card.code,
+            "amount": float(amt),
+            "expires_on": card.expires_on.strftime("%Y-%m-%d") if card.expires_on else None,
+            "mobile": card.mobile,
+        },
+        user_id=user.user_id,
+    )
     return _to_out(card)
 
 
@@ -153,4 +170,21 @@ def redeem_gift_card(
     )
     db.commit()
     db.refresh(card)
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="GiftCards",
+        action="REDEEM",
+        record_id=card.code,
+        new={
+            "gift_card_id": card.gift_card_id,
+            "code": card.code,
+            "amount": float(as_money(payload.amount)),
+            "ref_type": payload.ref_type,
+            "ref_no": payload.ref_no,
+            "balance_after": float(as_money(card.balance_amount)),
+        },
+        user_id=user.user_id,
+    )
     return _to_out(card)
