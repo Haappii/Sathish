@@ -21,6 +21,12 @@ const writeOffline = (rows) => {
   localStorage.setItem(OFFLINE_KEY, JSON.stringify(rows || []));
 };
 
+const updateRow = (rows, id, patch) => {
+  const next = rows.map((r) => (r.id === id ? { ...r, ...patch } : r));
+  writeOffline(next);
+  return next;
+};
+
 export default function OfflineSync() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -66,13 +72,24 @@ export default function OfflineSync() {
   const syncOne = async (row) => {
     if (!canWrite) return showToast("Not allowed", "error");
     try {
+      const nowIso = new Date().toISOString();
+      setRows((prev) => updateRow(prev, row.id, { lastAttemptAt: nowIso }));
       const res = await authAxios.post("/invoice/", row.payload);
       const invNo = res?.data?.invoice_number;
       removeRow(row.id);
       showToast(invNo ? `Synced: ${invNo}` : "Synced", "success");
+      return { ok: true, invoice_number: invNo || null };
     } catch (e) {
-      showToast(e?.response?.data?.detail || "Sync failed", "error");
-      throw e;
+      const msg = e?.response?.data?.detail || "Sync failed";
+      setRows((prev) =>
+        updateRow(prev, row.id, {
+          attempts: Number(row.attempts || 0) + 1,
+          lastAttemptAt: new Date().toISOString(),
+          lastError: msg,
+        })
+      );
+      showToast(msg, "error");
+      return { ok: false, error: msg };
     }
   };
 
@@ -81,9 +98,20 @@ export default function OfflineSync() {
     if (!canWrite) return showToast("Not allowed", "error");
     setSyncing(true);
     try {
-      for (const r of [...rows]) {
+      let okCount = 0;
+      let failCount = 0;
+      // use snapshot to avoid skipping due to removeRow mutation
+      // eslint-disable-next-line no-restricted-syntax
+      for (const r of [...readOffline()]) {
         // eslint-disable-next-line no-await-in-loop
-        await syncOne(r);
+        const out = await syncOne(r);
+        if (out?.ok) okCount += 1;
+        else failCount += 1;
+      }
+      if (failCount > 0) {
+        showToast(`Sync done: ${okCount} success, ${failCount} failed`, "warning");
+      } else if (okCount > 0) {
+        showToast(`Sync done: ${okCount} success`, "success");
       }
     } finally {
       setSyncing(false);
@@ -167,6 +195,8 @@ export default function OfflineSync() {
                 <th className="p-2">Mobile</th>
                 <th className="p-2 text-right">Items</th>
                 <th className="p-2 text-right">Payable</th>
+                <th className="p-2 text-right">Attempts</th>
+                <th className="p-2">Last Error</th>
                 <th className="p-2">Action</th>
               </tr>
             </thead>
@@ -182,6 +212,8 @@ export default function OfflineSync() {
                   <td className="p-2 text-right font-bold">
                     {Number(r?.payload?.total_amount || 0).toFixed(2)}
                   </td>
+                  <td className="p-2 text-right">{Number(r?.attempts || 0)}</td>
+                  <td className="p-2 text-rose-700">{r?.lastError || ""}</td>
                   <td className="p-2 flex items-center gap-2">
                     <button
                       onClick={() => syncOne(r)}

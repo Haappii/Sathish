@@ -14,7 +14,14 @@ const pushOfflineBill = (payload) => {
     const existing = JSON.parse(localStorage.getItem(OFFLINE_BILLS_KEY) || "[]");
     const rows = Array.isArray(existing) ? existing : [];
     const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    rows.unshift({ id, createdAt: new Date().toISOString(), payload });
+    rows.unshift({
+      id,
+      createdAt: new Date().toISOString(),
+      payload,
+      attempts: 0,
+      lastAttemptAt: null,
+      lastError: null,
+    });
     localStorage.setItem(OFFLINE_BILLS_KEY, JSON.stringify(rows));
   } catch {
     // ignore
