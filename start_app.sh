@@ -53,25 +53,40 @@ source venv/bin/activate
 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > "${BACKEND_LOG}" 2>&1 &
 echo $! > "${BACKEND_PID_FILE}"
 
-echo "Building + starting frontend preview (5173)..."
+FRONTEND_MODE="${FRONTEND_MODE:-preview}" # preview (recommended) | dev
+
+echo "Building + starting frontend (${FRONTEND_MODE}) on (5173)..."
 cd "${BASE_DIR}/frontend"
 : > "${FRONTEND_LOG}"
 
 echo "  - Node: $(node -v 2>/dev/null || echo 'NOT FOUND')"
 echo "  - NPM : $(npm -v 2>/dev/null || echo 'NOT FOUND')"
 
-if [[ -f "package-lock.json" ]]; then
-  echo "  - npm ci (this can take 1–5 minutes on small EC2)..."
-  npm ci >> "${FRONTEND_LOG}" 2>&1
+if [[ ! -d "node_modules" ]]; then
+  if [[ -f "package-lock.json" ]]; then
+    echo "  - npm ci (first run can take 1–5 minutes on small EC2)..."
+    npm ci >> "${FRONTEND_LOG}" 2>&1
+  else
+    echo "  - npm install (first run can take 1–5 minutes on small EC2)..."
+    npm install >> "${FRONTEND_LOG}" 2>&1
+  fi
 else
-  echo "  - npm install (this can take 1–5 minutes on small EC2)..."
-  npm install >> "${FRONTEND_LOG}" 2>&1
+  echo "  - node_modules exists (skipping install)"
 fi
 
-echo "  - npm run build..."
-npm run build >> "${FRONTEND_LOG}" 2>&1
-echo "  - npm run preview (bind 0.0.0.0:5173)..."
-nohup npm run preview >> "${FRONTEND_LOG}" 2>&1 &
+if [[ "${FRONTEND_MODE}" == "preview" ]]; then
+  if [[ ! -d "dist" ]]; then
+    echo "  - dist/ missing; running npm run build..."
+    npm run build >> "${FRONTEND_LOG}" 2>&1
+  else
+    echo "  - dist/ exists (skipping build)"
+  fi
+  echo "  - npm run preview (bind 0.0.0.0:5173)..."
+  nohup npm run preview >> "${FRONTEND_LOG}" 2>&1 &
+else
+  echo "  - npm run dev (bind 0.0.0.0:5173)..."
+  nohup npm run dev >> "${FRONTEND_LOG}" 2>&1 &
+fi
 echo $! > "${FRONTEND_PID_FILE}"
 
 echo "Verifying ports..."
