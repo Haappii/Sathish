@@ -31,6 +31,7 @@ from app.services.audit_service import log_action
 from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
 from app.utils.permissions import require_permission
+from app.services.gift_card_service import get_card_by_code, redeem_card, as_money, is_expired
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -56,6 +57,34 @@ def get_business_datetime(db: Session, shop_id: int) -> datetime:
     return datetime.combine(business_date, datetime.now().time())
 
 
+def _extract_gift_card_payment(payload: InvoiceCreate) -> tuple[str | None, float]:
+    mode = (payload.payment_mode or "").strip().lower()
+    split = payload.payment_split or {}
+
+    code = split.get("gift_card_code") or split.get("giftcard_code") or split.get("gift_code")
+    amount = (
+        split.get("gift_card_amount")
+        if split.get("gift_card_amount") is not None
+        else split.get("giftcard_amount")
+        if split.get("giftcard_amount") is not None
+        else split.get("gift_card")
+        if split.get("gift_card") is not None
+        else split.get("giftcard")
+        if split.get("giftcard") is not None
+        else 0
+    )
+    try:
+        amt = as_money(amount)
+    except Exception:
+        amt = 0.0
+
+    # Only honor gift card fields when payment_mode is gift_card or split
+    if mode not in {"gift_card", "split"}:
+        return None, 0.0
+
+    return (str(code or "").strip().upper().replace(" ", "") or None), float(amt)
+
+
 # =====================================================
 # CREATE INVOICE
 # =====================================================
@@ -71,6 +100,45 @@ def create_invoice(
     if is_branch_day_closed(db, user.shop_id, branch_id, business_dt):
         raise HTTPException(403, "Day closed for this branch")
 
+    if not payload.items:
+        raise HTTPException(400, "No items")
+
+    # Pre-calc totals early to validate gift card usage before creating rows.
+    subtotal = Decimal("0.00")
+    for it in payload.items:
+        subtotal += Decimal(it.amount)
+
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    tax, total = calculate_gst(subtotal, shop)
+    payable = total - Decimal(str(payload.discounted_amt or 0))
+    if payable < 0:
+        payable = Decimal("0.00")
+
+    gift_code, gift_amt = _extract_gift_card_payment(payload)
+    pay_mode = (payload.payment_mode or "cash").strip().lower()
+
+    if pay_mode == "gift_card" and gift_amt <= 0:
+        raise HTTPException(400, "Gift card amount required")
+    if gift_amt > 0 and not gift_code:
+        raise HTTPException(400, "Gift card code required")
+
+    if pay_mode == "gift_card" and Decimal(str(gift_amt)) != payable:
+        raise HTTPException(400, "Gift card amount must equal payable total")
+    if gift_amt > 0 and Decimal(str(gift_amt)) > payable:
+        raise HTTPException(400, "Gift card amount cannot exceed payable total")
+
+    gift_card_row = None
+    if gift_amt > 0:
+        gift_card_row = get_card_by_code(db, shop_id=user.shop_id, code=gift_code)
+        if not gift_card_row:
+            raise HTTPException(404, "Gift card not found")
+        if str(gift_card_row.status or "").upper() != "ACTIVE":
+            raise HTTPException(400, f"Gift card is not active ({gift_card_row.status})")
+        if is_expired(gift_card_row.expires_on):
+            raise HTTPException(400, "Gift card expired")
+        if as_money(gift_card_row.balance_amount) < as_money(gift_amt):
+            raise HTTPException(400, "Insufficient gift card balance")
+
     invoice = Invoice(
         invoice_number=generate_invoice_number(db),
         shop_id=user.shop_id,
@@ -84,11 +152,13 @@ def create_invoice(
         payment_split=payload.payment_split
     )
 
+    invoice.tax_amt = tax
+    invoice.total_amount = total
+    invoice.discounted_amt = payload.discounted_amt
+
     db.add(invoice)
     db.commit()
     db.refresh(invoice)
-
-    subtotal = Decimal("0.00")
 
     item_ids = [it.item_id for it in payload.items]
     item_map = {
@@ -100,7 +170,6 @@ def create_invoice(
     }
 
     for it in payload.items:
-        subtotal += Decimal(it.amount)
         item = item_map.get(it.item_id)
 
         db.add(InvoiceDetail(
@@ -120,19 +189,24 @@ def create_invoice(
                 it.quantity, "REMOVE",
                 ref_no=invoice.invoice_number
             )
-
-    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
-    tax, total = calculate_gst(subtotal, shop)
-
-    invoice.tax_amt = tax
-    invoice.total_amount = total
-    invoice.discounted_amt = payload.discounted_amt
     if payload.payment_mode is not None:
         invoice.payment_mode = payload.payment_mode
     if payload.payment_split is not None:
         invoice.payment_split = payload.payment_split
 
     db.commit()
+
+    if gift_amt > 0 and gift_card_row is not None:
+        redeem_card(
+            db,
+            shop_id=user.shop_id,
+            code=gift_code,
+            amount=gift_amt,
+            ref_type="INVOICE",
+            ref_no=invoice.invoice_number,
+            user_id=user.user_id,
+        )
+        db.commit()
 
     log_action(
         db,

@@ -50,6 +50,8 @@ import app.models.invoice_discount
 import app.models.item_lot
 import app.models.online_order
 import app.models.employee
+import app.models.gift_card
+import app.models.gift_card_txn
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -220,6 +222,7 @@ from app.routes import day_close
 from app.routes import expenses
 from app.routes import suppliers
 from app.routes import purchase_orders
+from app.routes import gift_cards
 
 # ---------- REPORT ROUTES ----------
 from app.routes import categorysales
@@ -276,6 +279,7 @@ app.include_router(day_close.router,     prefix="/api")
 app.include_router(expenses.router,      prefix="/api")
 app.include_router(suppliers.router,     prefix="/api")
 app.include_router(purchase_orders.router, prefix="/api")
+app.include_router(gift_cards.router, prefix="/api")
 
 # ---------- REPORTS ----------
 app.include_router(categorysales.router,         prefix="/api")

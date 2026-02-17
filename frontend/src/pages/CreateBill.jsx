@@ -57,14 +57,28 @@ export default function CreateBill() {
   const [priceLevel, setPriceLevel] = useState("BASE");
   const [priceLevels, setPriceLevels] = useState(["BASE"]);
   const [priceMap, setPriceMap] = useState({});
-  const paymentModes = ["cash", "card", "upi", "credit"];
+  const paymentModes = ["cash", "card", "upi", "credit", "gift_card"];
+  const splitModes = ["cash", "card", "upi", "gift_card"];
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({
     cash: "",
     card: "",
-    upi: ""
+    upi: "",
+    gift_card: "",
   });
+  const [giftCardCode, setGiftCardCode] = useState("");
+
+  const paymentModeLabel = m => {
+    const map = {
+      cash: "CASH",
+      card: "CARD",
+      upi: "UPI",
+      credit: "CREDIT",
+      gift_card: "GIFT CARD",
+    };
+    return map[m] || String(m || "").toUpperCase();
+  };
 
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstPercent, setGstPercent] = useState(0);
@@ -347,7 +361,7 @@ export default function CreateBill() {
 
   const payable = grossTotal - discountValue;
 
-  const splitTotal = ["cash", "card", "upi"]
+  const splitTotal = splitModes
     .map(k => Number(split[k] || 0))
     .reduce((a, b) => a + b, 0);
 
@@ -383,13 +397,28 @@ export default function CreateBill() {
     }
     if (splitEnabled) {
       const parts = [
-        `Cash ${Number(split.cash || 0).toFixed(2)}`,
-        `Card ${Number(split.card || 0).toFixed(2)}`,
-        `UPI ${Number(split.upi || 0).toFixed(2)}`
-      ].join(", ");
-      t += `Payment : Split (${parts})\n`;
+        ["Cash", split.cash],
+        ["Card", split.card],
+        ["UPI", split.upi],
+        ["GiftCard", split.gift_card],
+      ]
+        .map(([label, value]) => [label, Number(value || 0)])
+        .filter(([, value]) => value > 0)
+        .map(([label, value]) => `${label} ${value.toFixed(2)}`);
+
+      const codeTxt =
+        Number(split.gift_card || 0) > 0 && String(giftCardCode || "").trim()
+          ? `, Code ${String(giftCardCode || "").trim().toUpperCase()}`
+          : "";
+
+      t += `Payment : Split (${parts.join(", ") || "0.00"})${codeTxt}\n`;
     } else {
-      t += `Payment : ${String(paymentMode || "cash").toUpperCase()}\n`;
+      const pm = String(paymentMode || "cash");
+      const codeTxt =
+        pm === "gift_card" && String(giftCardCode || "").trim()
+          ? ` (${String(giftCardCode || "").trim().toUpperCase()})`
+          : "";
+      t += `Payment : ${paymentModeLabel(pm)}${codeTxt}\n`;
     }
     t += line + "\n";
     t += "Item".padEnd(22) + "Qty".padStart(4) + "Rate".padStart(10) + "Total".padStart(12) + "\n";
@@ -474,6 +503,12 @@ export default function CreateBill() {
     if (splitEnabled && Math.abs(splitTotal - payable) > 0.01) {
       return showToast("Split amounts must equal payable total", "error");
     }
+    if (!splitEnabled && paymentMode === "gift_card" && !String(giftCardCode || "").trim()) {
+      return showToast("Enter gift card code", "error");
+    }
+    if (splitEnabled && Number(split.gift_card || 0) > 0 && !String(giftCardCode || "").trim()) {
+      return showToast("Enter gift card code for gift card split", "error");
+    }
 
     const payload = {
       customer_name: customer.name,
@@ -487,9 +522,16 @@ export default function CreateBill() {
         ? {
             cash: Number(split.cash || 0),
             card: Number(split.card || 0),
-            upi: Number(split.upi || 0)
+            upi: Number(split.upi || 0),
+            gift_card_amount: Number(split.gift_card || 0),
+            gift_card_code: String(giftCardCode || "").trim() || null,
           }
-        : null,
+        : paymentMode === "gift_card"
+          ? {
+              gift_card_amount: Number(payable || 0),
+              gift_card_code: String(giftCardCode || "").trim() || null,
+            }
+          : null,
       items: cart.map(x => ({
         item_id: x.item_id,
         quantity: x.qty,
@@ -516,7 +558,8 @@ export default function CreateBill() {
       setCouponMsg("");
       setPaymentMode("cash");
       setSplitEnabled(false);
-      setSplit({ cash: "", card: "", upi: "" });
+      setSplit({ cash: "", card: "", upi: "", gift_card: "" });
+      setGiftCardCode("");
       setDefaultDiscountApplied(false);
       await loadData();
     } catch (err) {
@@ -533,7 +576,8 @@ export default function CreateBill() {
         setCouponMsg("");
         setPaymentMode("cash");
         setSplitEnabled(false);
-        setSplit({ cash: "", card: "", upi: "" });
+        setSplit({ cash: "", card: "", upi: "", gift_card: "" });
+        setGiftCardCode("");
         return;
       }
 
@@ -550,6 +594,12 @@ export default function CreateBill() {
     if (splitEnabled && Math.abs(splitTotal - payable) > 0.01) {
       return showToast("Split amounts must equal payable total", "error");
     }
+    if (!splitEnabled && paymentMode === "gift_card" && !String(giftCardCode || "").trim()) {
+      return showToast("Enter gift card code", "error");
+    }
+    if (splitEnabled && Number(split.gift_card || 0) > 0 && !String(giftCardCode || "").trim()) {
+      return showToast("Enter gift card code for gift card split", "error");
+    }
 
     const payload = {
       customer_name: customer.name,
@@ -561,9 +611,16 @@ export default function CreateBill() {
         ? {
             cash: Number(split.cash || 0),
             card: Number(split.card || 0),
-            upi: Number(split.upi || 0)
+            upi: Number(split.upi || 0),
+            gift_card_amount: Number(split.gift_card || 0),
+            gift_card_code: String(giftCardCode || "").trim() || null,
           }
-        : null,
+        : paymentMode === "gift_card"
+          ? {
+              gift_card_amount: Number(payable || 0),
+              gift_card_code: String(giftCardCode || "").trim() || null,
+            }
+          : null,
       items: cart.map(x => ({
         item_id: x.item_id,
         quantity: x.qty,
@@ -584,7 +641,8 @@ export default function CreateBill() {
       setCouponMsg("");
       setPaymentMode("cash");
       setSplitEnabled(false);
-      setSplit({ cash: "", card: "", upi: "" });
+      setSplit({ cash: "", card: "", upi: "", gift_card: "" });
+      setGiftCardCode("");
       setDefaultDiscountApplied(false);
       await loadData();
     } catch (err) {
@@ -935,17 +993,30 @@ export default function CreateBill() {
                       checked={paymentMode === m}
                       onChange={() => setPaymentMode(m)}
                     />
-                    <span>{m.toUpperCase()}</span>
+                    <span>{paymentModeLabel(m)}</span>
                   </label>
                 ))}
               </div>
             )}
 
+            {((!splitEnabled && paymentMode === "gift_card") ||
+              (splitEnabled && Number(split.gift_card || 0) > 0)) && (
+              <div>
+                <label className="text-[10px] text-gray-600">Gift Card Code</label>
+                <input
+                  className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                  placeholder="GC-XXXXXX"
+                  value={giftCardCode}
+                  onChange={e => setGiftCardCode(e.target.value)}
+                />
+              </div>
+            )}
+
             {splitEnabled && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {paymentModes.map(m => (
+                {splitModes.map(m => (
                   <div key={m}>
-                    <label className="text-[10px] text-gray-600">{m.toUpperCase()}</label>
+                    <label className="text-[10px] text-gray-600">{paymentModeLabel(m)}</label>
                     <input
                       type="number"
                       className="border rounded-lg px-2 py-1 w-full text-[11px]"

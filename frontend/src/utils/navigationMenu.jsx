@@ -139,6 +139,13 @@ const MENU_CATALOG = [
     perm: { module: "loyalty", action: "read" },
   },
   {
+    key: "gift_cards",
+    name: "Gift Cards",
+    path: "/gift-cards",
+    icon: <FaGift />,
+    perm: { module: "gift_cards", action: "read" },
+  },
+  {
     key: "coupons",
     name: "Coupons",
     path: "/coupons",
@@ -301,6 +308,7 @@ export const buildRoleMenu = ({
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
+      { name: "Gift Cards", path: "/gift-cards", icon: <FaGift /> },
     ];
   } else if (roleLower === "waiter") {
     menuItems = [
@@ -345,6 +353,7 @@ export const buildRoleMenu = ({
       { name: "Employees", path: "/employees", icon: <FaUsers /> },
       { name: "Employee Attendance", path: "/employees/attendance", icon: <FaClipboardCheck /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
+      { name: "Gift Cards", path: "/gift-cards", icon: <FaGift /> },
       { name: "Coupons", path: "/coupons", icon: <FaTags /> },
       { name: "Pricing", path: "/pricing", icon: <FaRupeeSign /> },
       { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
@@ -388,6 +397,7 @@ export const buildRoleMenu = ({
       { name: "Employees", path: "/employees", icon: <FaUsers /> },
       { name: "Employee Attendance", path: "/employees/attendance", icon: <FaClipboardCheck /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
+      { name: "Gift Cards", path: "/gift-cards", icon: <FaGift /> },
       { name: "Coupons", path: "/coupons", icon: <FaTags /> },
       { name: "Pricing", path: "/pricing", icon: <FaRupeeSign /> },
       { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },

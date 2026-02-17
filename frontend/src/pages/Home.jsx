@@ -40,7 +40,7 @@ const MENU_GROUPS = [
   { key: "inventory", title: "Inventory", paths: ["/inventory", "/reorder-alerts", "/stock-transfers", "/item-lots", "/stock-audit"] },
   { key: "suppliers", title: "Purchase & Suppliers", paths: ["/supplier-ledger"] },
   { key: "cash_drawer", title: "Cash Drawer / Shift", paths: ["/cash-drawer"] },
-  { key: "loyalty", title: "Loyalty & Coupons", paths: ["/loyalty", "/coupons"] },
+  { key: "loyalty", title: "Loyalty & Coupons", paths: ["/loyalty", "/gift-cards", "/coupons"] },
   { key: "pricing", title: "Pricing", paths: ["/pricing"] },
   { key: "analytics", title: "Analytics & Trends", paths: ["/analytics", "/trends"] },
   { key: "reports", title: "Reports", paths: ["/reports"] },

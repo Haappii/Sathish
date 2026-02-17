@@ -24,6 +24,7 @@ import SupportTickets from "./pages/SupportTickets";
 import Alerts from "./pages/Alerts";
 import CashDrawer from "./pages/CashDrawer";
 import Loyalty from "./pages/Loyalty";
+import GiftCards from "./pages/GiftCards";
 import Coupons from "./pages/Coupons";
 import Pricing from "./pages/Pricing";
 import SupplierLedger from "./pages/SupplierLedger";
@@ -100,6 +101,7 @@ export default function App() {
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/cash-drawer" element={<CashDrawer />} />
             <Route path="/loyalty" element={<Loyalty />} />
+            <Route path="/gift-cards" element={<GiftCards />} />
             <Route path="/coupons" element={<Coupons />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/supplier-ledger" element={<SupplierLedger />} />
