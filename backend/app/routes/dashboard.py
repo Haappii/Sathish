@@ -326,7 +326,7 @@ def get_trend_metric(
             (r.k.date() if hasattr(r.k, "date") else r.k): r
             for r in rows
         }
-    elif metric in ["profit"]:
+    elif metric in ["profit", "gross_profit"]:
         from sqlalchemy import and_, case
         from app.models.branch_expense import BranchExpense
         from app.models.sales_return import SalesReturn, SalesReturnItem
@@ -503,8 +503,9 @@ def get_trend_metric(
             discount = inv_discount_ex_tax - ret_discount_ex_tax
             cogs_net = inv_cogs_amt - ret_cogs_amt
 
-            profit = (sales - discount) - cogs_net - expense
-            data_map[k] = {"k": k, "v": profit}
+            gross_profit = (sales - discount) - cogs_net
+            net_profit = gross_profit - expense
+            data_map[k] = {"k": k, "v": gross_profit if metric == "gross_profit" else net_profit}
     else:
         data_map = {}
 

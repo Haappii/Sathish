@@ -165,7 +165,9 @@ def calc_period_financials(
     discount_ex_tax = invoice_discount_ex_tax - ret_discount_ex_tax
 
     cogs_net = invoice_cogs - ret_cogs
-    profit = (sales - discount_ex_tax) - cogs_net - expense
+    gross_profit = (sales - discount_ex_tax) - cogs_net
+    net_profit = gross_profit - expense
+    profit = net_profit
 
     return {
         "invoice_sales_ex_tax": invoice_sales_ex_tax,
@@ -185,6 +187,8 @@ def calc_period_financials(
         "discount_ex_tax": discount_ex_tax,
         "expense": expense,
         "cogs_net": cogs_net,
+        "gross_profit": gross_profit,
+        "net_profit": net_profit,
         "profit": profit,
     }
 

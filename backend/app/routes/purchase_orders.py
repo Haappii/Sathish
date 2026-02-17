@@ -13,6 +13,8 @@ from app.models.item_lot import ItemLot
 from app.models.purchase_order_attachment import PurchaseOrderAttachment
 from app.models.supplier_ledger import SupplierLedgerEntry
 from app.models.shop_details import ShopDetails
+from app.models.stock import Inventory
+from app.models.system_parameters import SystemParameter
 from app.schemas.purchase_order import (
     PurchaseOrderCreate,
     PurchaseOrderResponse,
@@ -23,6 +25,7 @@ from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import adjust_stock
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+from sqlalchemy import func
 
 router = APIRouter(prefix="/purchase-orders", tags=["Purchase Orders"])
 UPLOAD_ROOT = Path("uploads")
@@ -201,6 +204,17 @@ def receive_po(
 
     receive_map = {x.item_id: x for x in payload.items}
     any_received = False
+    cost_method_row = (
+        db.query(SystemParameter)
+        .filter(
+            SystemParameter.shop_id == user.shop_id,
+            SystemParameter.param_key == "inventory_cost_method",
+        )
+        .first()
+    )
+    cost_method = str(getattr(cost_method_row, "param_value", "") or "LAST").strip().upper()
+    if cost_method not in {"LAST", "WAVG"}:
+        cost_method = "LAST"
 
     for item in po.items:
         req = receive_map.get(item.item_id)
@@ -209,6 +223,39 @@ def receive_po(
         qty_in = int(req.qty_received or 0)
         if qty_in <= 0:
             continue
+
+        unit_cost = float(item.unit_cost or 0)
+        # Update item buy price from received cost (affects future COGS on invoices)
+        try:
+            master_item = (
+                db.query(Item)
+                .filter(Item.shop_id == user.shop_id, Item.item_id == item.item_id)
+                .first()
+            )
+            if master_item and unit_cost >= 0:
+                if cost_method == "LAST":
+                    master_item.buy_price = unit_cost
+                else:
+                    old_qty = float(
+                        (
+                            db.query(func.coalesce(func.sum(Inventory.quantity), 0))
+                            .filter(
+                                Inventory.shop_id == user.shop_id,
+                                Inventory.item_id == item.item_id,
+                            )
+                            .scalar()
+                        )
+                        or 0
+                    )
+                    old_qty = max(0.0, old_qty)
+                    old_cost = float(master_item.buy_price or 0)
+                    new_qty = old_qty + float(qty_in)
+                    if new_qty > 0:
+                        master_item.buy_price = (old_qty * old_cost + float(qty_in) * unit_cost) / new_qty
+        except Exception:
+            # Don't block receiving stock if cost update fails
+            pass
+
         remaining = item.qty_ordered - item.qty_received
         if qty_in > remaining:
             raise HTTPException(400, f"Qty exceeds remaining for {item.item_name}")
@@ -238,7 +285,7 @@ def receive_po(
                         expiry_date=exp_date,
                         serial_no=str(sn).strip() or None,
                         quantity=1,
-                        unit_cost=float(item.unit_cost or 0),
+                        unit_cost=unit_cost,
                         created_by=user.user_id,
                     ))
             else:
@@ -252,7 +299,7 @@ def receive_po(
                     expiry_date=exp_date,
                     serial_no=None,
                     quantity=qty_in,
-                    unit_cost=float(item.unit_cost or 0),
+                    unit_cost=unit_cost,
                     created_by=user.user_id,
                 ))
 

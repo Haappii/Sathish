@@ -170,7 +170,11 @@ export default function Analytics() {
           <div className="text-xl font-bold text-gray-800">{fmt(fin.sales_ex_tax)}</div>
         </div>
         <div className="border rounded bg-white p-3">
-          <div className="text-xs text-gray-500">Profit</div>
+          <div className="text-xs text-gray-500">Gross Profit</div>
+          <div className="text-xl font-bold text-gray-800">{fmt(fin.gross_profit)}</div>
+        </div>
+        <div className="border rounded bg-white p-3">
+          <div className="text-xs text-gray-500">Net Profit</div>
           <div className="text-xl font-bold text-gray-800">{fmt(fin.profit)}</div>
         </div>
         <div className="border rounded bg-white p-3">

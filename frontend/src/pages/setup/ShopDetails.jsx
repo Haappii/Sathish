@@ -38,6 +38,7 @@ export default function ShopDetails() {
     gst_mode: "inclusive",
 
     inventory_enabled: false,
+    inventory_cost_method: "LAST",
     swiggy_partner_id: "",
     zomato_partner_id: "",
     swiggy_enabled: false,
@@ -378,6 +379,21 @@ export default function ShopDetails() {
               <option value="NO">Disabled</option>
               <option value="YES">Enabled</option>
             </select>
+          </Field>
+
+          <Field label="Inventory Cost Method">
+            <select
+              disabled={!isSuperAdmin}
+              className={input}
+              value={String(form.inventory_cost_method || "LAST").toUpperCase()}
+              onChange={e => setField("inventory_cost_method", e.target.value)}
+            >
+              <option value="LAST">Last Purchase Cost</option>
+              <option value="WAVG">Weighted Average Cost</option>
+            </select>
+            <div className="text-[11px] text-gray-500 mt-1">
+              Used to update item buy price on PO receive (affects future profit).
+            </div>
           </Field>
 
           <Field label="Swiggy Partner ID">

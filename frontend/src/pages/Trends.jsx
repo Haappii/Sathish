@@ -20,6 +20,7 @@ import { saveAs } from "file-saver";
 const METRICS = [
   { key: "sales", label: "Sales Amount", type: "currency" },
   { key: "bills", label: "Bills Count", type: "number" },
+  { key: "gross_profit", label: "Gross Profit", type: "currency" },
   { key: "profit", label: "Profit", type: "currency" },
   { key: "gst", label: "GST Collected", type: "currency" },
   { key: "discount", label: "Discount Given", type: "currency" },

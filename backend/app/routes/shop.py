@@ -33,6 +33,7 @@ TEXT_PARAM_KEYS = {
     "zomato_status_sync_token",
     "swiggy_status_sync_secret",
     "zomato_status_sync_secret",
+    "inventory_cost_method",
 }
 SHOP_PARAM_KEYS = BOOL_PARAM_KEYS | INT_PARAM_KEYS | TEXT_PARAM_KEYS
 
@@ -105,6 +106,7 @@ def get_shop_details(
         "zomato_status_sync_token": pmap.get("zomato_status_sync_token") or None,
         "swiggy_status_sync_secret": pmap.get("swiggy_status_sync_secret") or None,
         "zomato_status_sync_secret": pmap.get("zomato_status_sync_secret") or None,
+        "inventory_cost_method": (pmap.get("inventory_cost_method") or "LAST").strip().upper(),
     }
 
 

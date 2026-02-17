@@ -46,6 +46,7 @@ class ShopDetailsBase(BaseModel):
     zomato_status_sync_token: Optional[str] = None
     swiggy_status_sync_secret: Optional[str] = None
     zomato_status_sync_secret: Optional[str] = None
+    inventory_cost_method: Optional[str] = None
 
 
 class ShopDetailsResponse(ShopDetailsBase):
