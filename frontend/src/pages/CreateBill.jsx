@@ -91,7 +91,7 @@ export default function CreateBill() {
   const navigate = useNavigate();
 
   /* ---------------- LOAD DATA ---------------- */
-  const loadData = async () => {
+  const loadData = async ({ forceDefaultDiscount = false } = {}) => {
     try {
       const shopRes = await authAxios.get("/shop/details");
       const s = shopRes.data || {};
@@ -102,7 +102,7 @@ export default function CreateBill() {
           const br = await authAxios.get(`/branch/${branch_id}`);
           const b = br.data || {};
           setBranch(b);
-          if (!defaultDiscountApplied && b?.discount_enabled) {
+          if ((forceDefaultDiscount || !defaultDiscountApplied) && b?.discount_enabled) {
             const t = String(b.discount_type || "flat").toLowerCase();
             const v = Number(b.discount_value || 0);
             if (v > 0) {
@@ -163,7 +163,7 @@ export default function CreateBill() {
 
   useEffect(() => {
     setDefaultDiscountApplied(false);
-    loadData();
+    loadData({ forceDefaultDiscount: true });
   }, [branch_id]);
 
   /* ---------------- CUSTOMER AUTO-FILL ---------------- */
@@ -561,7 +561,7 @@ export default function CreateBill() {
       setSplit({ cash: "", card: "", upi: "", gift_card: "" });
       setGiftCardCode("");
       setDefaultDiscountApplied(false);
-      await loadData();
+      await loadData({ forceDefaultDiscount: true });
     } catch (err) {
       const isNetworkError = !err?.response || !navigator.onLine;
       if (isNetworkError) {
@@ -644,7 +644,7 @@ export default function CreateBill() {
       setSplit({ cash: "", card: "", upi: "", gift_card: "" });
       setGiftCardCode("");
       setDefaultDiscountApplied(false);
-      await loadData();
+      await loadData({ forceDefaultDiscount: true });
     } catch (err) {
       const msg = err?.response?.data?.detail || "Draft save failed";
       showToast(msg, "error");
