@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db import engine, Base, SessionLocal
 import os
@@ -302,11 +303,39 @@ app.include_router(qr_orders_router, prefix="/api")
 
 
 # ======================================================
-# ROOT
+# FRONTEND (serve built React app from backend)
 # ======================================================
+FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
+FRONTEND_INDEX = FRONTEND_DIST_DIR / "index.html"
+
+
+def _frontend_ready() -> bool:
+    return FRONTEND_INDEX.exists()
+
+
+@app.get("/api/health")
+def api_health():
+    return {"status": "ok"}
+
+
 @app.get("/")
-def root():
-    return {
-        "status": "ok",
-        "message": "Billing API is running"
-    }
+def frontend_root():
+    if _frontend_ready():
+        return FileResponse(str(FRONTEND_INDEX))
+    return {"status": "ok", "message": "Billing API is running (frontend not built)"}
+
+
+@app.get("/{full_path:path}")
+def frontend_spa(full_path: str):
+    if not _frontend_ready():
+        raise HTTPException(404, "Frontend not built")
+
+    p = (full_path or "").lstrip("/")
+    if p.startswith("api/"):
+        raise HTTPException(404, "Not found")
+
+    candidate = (FRONTEND_DIST_DIR / p) if p else FRONTEND_INDEX
+    if p and candidate.exists() and candidate.is_file():
+        return FileResponse(str(candidate))
+
+    return FileResponse(str(FRONTEND_INDEX))
