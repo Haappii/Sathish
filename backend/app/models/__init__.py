@@ -13,6 +13,8 @@ from .customer import Customer
 from .invoice_due import InvoiceDue
 from .invoice_payment import InvoicePayment
 from .sales_return import SalesReturn, SalesReturnItem
+from .sales_return_meta import SalesReturnMeta, SalesReturnItemMeta
+from .customer_wallet_txn import CustomerWalletTxn
 from .stock_transfer import StockTransfer, StockTransferItem
 from .invoice_draft import InvoiceDraft, InvoiceDraftItem
 from .online_order import OnlineOrder, OnlineOrderItem, OnlineOrderEvent

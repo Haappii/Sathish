@@ -36,6 +36,7 @@ import app.models.customer
 import app.models.invoice_due
 import app.models.invoice_payment
 import app.models.sales_return
+import app.models.sales_return_meta
 import app.models.stock_transfer
 import app.models.invoice_draft
 import app.models.role_permission
@@ -50,6 +51,7 @@ import app.models.invoice_discount
 import app.models.item_lot
 import app.models.online_order
 import app.models.employee
+import app.models.customer_wallet_txn
 import app.models.gift_card
 import app.models.gift_card_txn
 

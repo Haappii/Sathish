@@ -32,6 +32,13 @@ from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
 from app.utils.permissions import require_permission
 from app.services.gift_card_service import get_card_by_code, redeem_card, as_money, is_expired
+from app.services.wallet_service import (
+    is_placeholder_mobile,
+    get_customer_by_mobile,
+    debit_wallet,
+    get_wallet_balance,
+    as_money as wallet_money,
+)
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -85,6 +92,29 @@ def _extract_gift_card_payment(payload: InvoiceCreate) -> tuple[str | None, floa
     return (str(code or "").strip().upper().replace(" ", "") or None), float(amt)
 
 
+def _extract_wallet_payment(payload: InvoiceCreate) -> tuple[str | None, float]:
+    mode = (payload.payment_mode or "").strip().lower()
+    split = payload.payment_split or {}
+
+    mobile = split.get("wallet_mobile") or split.get("walletMobile") or payload.mobile
+    amount = (
+        split.get("wallet_amount")
+        if split.get("wallet_amount") is not None
+        else split.get("wallet")
+        if split.get("wallet") is not None
+        else 0
+    )
+    try:
+        amt = wallet_money(amount)
+    except Exception:
+        amt = 0.0
+
+    if mode not in {"wallet", "split"}:
+        return None, 0.0
+
+    return (str(mobile or "").strip() or None), float(amt)
+
+
 # =====================================================
 # CREATE INVOICE
 # =====================================================
@@ -115,6 +145,7 @@ def create_invoice(
         payable = Decimal("0.00")
 
     gift_code, gift_amt = _extract_gift_card_payment(payload)
+    wallet_mobile, wallet_amt = _extract_wallet_payment(payload)
     pay_mode = (payload.payment_mode or "cash").strip().lower()
 
     if pay_mode == "gift_card" and gift_amt <= 0:
@@ -127,6 +158,15 @@ def create_invoice(
     if gift_amt > 0 and Decimal(str(gift_amt)) > payable:
         raise HTTPException(400, "Gift card amount cannot exceed payable total")
 
+    if pay_mode == "wallet" and wallet_amt <= 0:
+        raise HTTPException(400, "Wallet amount required")
+    if wallet_amt > 0 and not wallet_mobile:
+        raise HTTPException(400, "Wallet mobile required")
+    if pay_mode == "wallet" and Decimal(str(wallet_amt)) != payable:
+        raise HTTPException(400, "Wallet amount must equal payable total")
+    if wallet_amt > 0 and Decimal(str(wallet_amt)) > payable:
+        raise HTTPException(400, "Wallet amount cannot exceed payable total")
+
     gift_card_row = None
     if gift_amt > 0:
         gift_card_row = get_card_by_code(db, shop_id=user.shop_id, code=gift_code)
@@ -138,6 +178,17 @@ def create_invoice(
             raise HTTPException(400, "Gift card expired")
         if as_money(gift_card_row.balance_amount) < as_money(gift_amt):
             raise HTTPException(400, "Insufficient gift card balance")
+
+    wallet_customer = None
+    if wallet_amt > 0:
+        if is_placeholder_mobile(wallet_mobile):
+            raise HTTPException(400, "Valid customer mobile required for wallet payment")
+        wallet_customer = get_customer_by_mobile(db, shop_id=user.shop_id, mobile=wallet_mobile)
+        if not wallet_customer:
+            raise HTTPException(400, "Customer not found for wallet payment")
+        bal = get_wallet_balance(db, shop_id=user.shop_id, customer_id=wallet_customer.customer_id)
+        if wallet_money(bal) < wallet_money(wallet_amt):
+            raise HTTPException(400, "Insufficient wallet balance")
 
     invoice = Invoice(
         invoice_number=generate_invoice_number(db),
@@ -207,6 +258,23 @@ def create_invoice(
             user_id=user.user_id,
         )
         db.commit()
+
+    if wallet_amt > 0 and wallet_customer is not None:
+        try:
+            debit_wallet(
+                db,
+                shop_id=user.shop_id,
+                customer=wallet_customer,
+                amount=wallet_amt,
+                ref_type="INVOICE",
+                ref_no=invoice.invoice_number,
+                note="Wallet payment",
+                created_by=user.user_id,
+            )
+            db.commit()
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(400, str(e))
 
     log_action(
         db,

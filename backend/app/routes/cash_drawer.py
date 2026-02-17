@@ -13,6 +13,7 @@ from app.models.cash_drawer import CashShift, CashMovement
 from app.models.invoice import Invoice
 from app.models.invoice_payment import InvoicePayment
 from app.models.sales_return import SalesReturn
+from app.models.sales_return_meta import SalesReturnMeta
 from app.models.shop_details import ShopDetails
 from app.schemas.cash_drawer import (
     CashShiftOpen,
@@ -157,16 +158,23 @@ def _compute_expected_cash(
         )
     )
 
-    # Cash refunds (assumed) from returns
+    # Cash refunds from returns (store credit / wallet should not reduce cash)
     cash_refunds = float(
         (
             db.query(func.coalesce(func.sum(SalesReturn.refund_amount), 0))
+            .outerjoin(
+                SalesReturnMeta,
+                (SalesReturnMeta.shop_id == SalesReturn.shop_id)
+                & (SalesReturnMeta.return_id == SalesReturn.return_id),
+            )
             .filter(
                 SalesReturn.shop_id == shop_id,
                 SalesReturn.branch_id == branch_id,
                 SalesReturn.status != "CANCELLED",
                 SalesReturn.created_on >= opened_at,
                 SalesReturn.created_on <= end,
+                # Backward compatible: if meta missing, assume cash (legacy behavior)
+                or_(SalesReturnMeta.id.is_(None), SalesReturnMeta.refund_mode == "CASH"),
             )
             .scalar()
             or 0
