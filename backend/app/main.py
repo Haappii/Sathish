@@ -57,6 +57,7 @@ import app.models.gift_card_txn
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
+import app.models.table_qr
 
 
 from app.models.users import User
@@ -235,6 +236,9 @@ from app.routes.branch_sales import router as branch_sales_router
 # ⭐ TABLE BILLING ROUTER
 from app.routes.table_billing import router as table_billing_router
 from app.routes.table_management import router as table_management_router
+from app.routes.table_qr import router as table_qr_router
+from app.routes.public_qr import router as public_qr_router
+from app.routes.qr_orders import router as qr_orders_router
 
 
 # ======================================================
@@ -292,6 +296,9 @@ app.include_router(branch_sales_router,           prefix="/api")
 # ⭐ TABLE BILLING ----------
 app.include_router(table_billing_router, prefix="/api")
 app.include_router(table_management_router, prefix="/api")
+app.include_router(table_qr_router, prefix="/api")
+app.include_router(public_qr_router, prefix="/api")
+app.include_router(qr_orders_router, prefix="/api")
 
 
 # ======================================================
