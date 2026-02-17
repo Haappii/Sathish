@@ -2,6 +2,12 @@ import axios from "axios";
 
 const normalizeBaseUrl = (value) => String(value || "").replace(/\/+$/, "");
 
+const isLocalHost = () => {
+  if (typeof window === "undefined") return false;
+  const h = String(window.location?.hostname || "").toLowerCase();
+  return h === "localhost" || h === "127.0.0.1";
+};
+
 // Vite build-time env var (set this in Amplify/CI as well)
 // Example: VITE_API_BASE=https://api.example.com/api
 const envBase =
@@ -26,7 +32,15 @@ const fallbackBase = (() => {
   return `${proto}//${host}:8000/api`;
 })();
 
-export const API_BASE = normalizeBaseUrl(envBase || fallbackBase);
+// Local dev override:
+// When running the frontend on http://localhost:5173, it's very common to want
+// the backend on http://localhost:8000 even if the build env has a remote base.
+const envLocalBase = import.meta.env.VITE_API_BASE_LOCAL;
+const runtimeBase = isLocalHost()
+  ? (envLocalBase || fallbackBase)
+  : (envBase || fallbackBase);
+
+export const API_BASE = normalizeBaseUrl(runtimeBase);
 
 export const getApiBaseIssue = () => {
   if (typeof window === "undefined") return null;
