@@ -57,8 +57,8 @@ export default function CreateBill() {
   const [priceLevel, setPriceLevel] = useState("BASE");
   const [priceLevels, setPriceLevels] = useState(["BASE"]);
   const [priceMap, setPriceMap] = useState({});
-  const paymentModes = ["cash", "card", "upi", "credit", "gift_card"];
-  const splitModes = ["cash", "card", "upi", "gift_card"];
+  const paymentModes = ["cash", "card", "upi", "credit", "gift_card", "wallet"];
+  const splitModes = ["cash", "card", "upi", "gift_card", "wallet"];
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({
@@ -66,6 +66,7 @@ export default function CreateBill() {
     card: "",
     upi: "",
     gift_card: "",
+    wallet: "",
   });
   const [giftCardCode, setGiftCardCode] = useState("");
 
@@ -76,6 +77,7 @@ export default function CreateBill() {
       upi: "UPI",
       credit: "CREDIT",
       gift_card: "GIFT CARD",
+      wallet: "WALLET",
     };
     return map[m] || String(m || "").toUpperCase();
   };
@@ -401,6 +403,7 @@ export default function CreateBill() {
         ["Card", split.card],
         ["UPI", split.upi],
         ["GiftCard", split.gift_card],
+        ["Wallet", split.wallet],
       ]
         .map(([label, value]) => [label, Number(value || 0)])
         .filter(([, value]) => value > 0)
@@ -509,6 +512,12 @@ export default function CreateBill() {
     if (splitEnabled && Number(split.gift_card || 0) > 0 && !String(giftCardCode || "").trim()) {
       return showToast("Enter gift card code for gift card split", "error");
     }
+    if (!splitEnabled && paymentMode === "wallet" && /^9{9,}$/.test(String(customer.mobile || ""))) {
+      return showToast("Valid customer mobile required for wallet payment", "error");
+    }
+    if (splitEnabled && Number(split.wallet || 0) > 0 && /^9{9,}$/.test(String(customer.mobile || ""))) {
+      return showToast("Valid customer mobile required for wallet split", "error");
+    }
 
     const payload = {
       customer_name: customer.name,
@@ -525,13 +534,20 @@ export default function CreateBill() {
             upi: Number(split.upi || 0),
             gift_card_amount: Number(split.gift_card || 0),
             gift_card_code: String(giftCardCode || "").trim() || null,
+            wallet_amount: Number(split.wallet || 0),
+            wallet_mobile: String(customer.mobile || "").trim() || null,
           }
         : paymentMode === "gift_card"
           ? {
               gift_card_amount: Number(payable || 0),
               gift_card_code: String(giftCardCode || "").trim() || null,
             }
-          : null,
+          : paymentMode === "wallet"
+            ? {
+                wallet_amount: Number(payable || 0),
+                wallet_mobile: String(customer.mobile || "").trim() || null,
+              }
+            : null,
       items: cart.map(x => ({
         item_id: x.item_id,
         quantity: x.qty,
@@ -558,7 +574,7 @@ export default function CreateBill() {
       setCouponMsg("");
       setPaymentMode("cash");
       setSplitEnabled(false);
-      setSplit({ cash: "", card: "", upi: "", gift_card: "" });
+      setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
       setGiftCardCode("");
       setDefaultDiscountApplied(false);
       await loadData({ forceDefaultDiscount: true });
@@ -576,7 +592,7 @@ export default function CreateBill() {
         setCouponMsg("");
         setPaymentMode("cash");
         setSplitEnabled(false);
-        setSplit({ cash: "", card: "", upi: "", gift_card: "" });
+        setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
         setGiftCardCode("");
         return;
       }
@@ -600,6 +616,12 @@ export default function CreateBill() {
     if (splitEnabled && Number(split.gift_card || 0) > 0 && !String(giftCardCode || "").trim()) {
       return showToast("Enter gift card code for gift card split", "error");
     }
+    if (!splitEnabled && paymentMode === "wallet" && /^9{9,}$/.test(String(customer.mobile || ""))) {
+      return showToast("Valid customer mobile required for wallet payment", "error");
+    }
+    if (splitEnabled && Number(split.wallet || 0) > 0 && /^9{9,}$/.test(String(customer.mobile || ""))) {
+      return showToast("Valid customer mobile required for wallet split", "error");
+    }
 
     const payload = {
       customer_name: customer.name,
@@ -614,13 +636,20 @@ export default function CreateBill() {
             upi: Number(split.upi || 0),
             gift_card_amount: Number(split.gift_card || 0),
             gift_card_code: String(giftCardCode || "").trim() || null,
+            wallet_amount: Number(split.wallet || 0),
+            wallet_mobile: String(customer.mobile || "").trim() || null,
           }
         : paymentMode === "gift_card"
           ? {
               gift_card_amount: Number(payable || 0),
               gift_card_code: String(giftCardCode || "").trim() || null,
             }
-          : null,
+          : paymentMode === "wallet"
+            ? {
+                wallet_amount: Number(payable || 0),
+                wallet_mobile: String(customer.mobile || "").trim() || null,
+              }
+            : null,
       items: cart.map(x => ({
         item_id: x.item_id,
         quantity: x.qty,
@@ -641,7 +670,7 @@ export default function CreateBill() {
       setCouponMsg("");
       setPaymentMode("cash");
       setSplitEnabled(false);
-      setSplit({ cash: "", card: "", upi: "", gift_card: "" });
+      setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
       setGiftCardCode("");
       setDefaultDiscountApplied(false);
       await loadData({ forceDefaultDiscount: true });

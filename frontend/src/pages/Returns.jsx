@@ -12,8 +12,13 @@ export default function Returns() {
   const [invoice, setInvoice] = useState(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
 
+  const [returnType, setReturnType] = useState("REFUND");
+  const [refundMode, setRefundMode] = useState("CASH"); // CASH/CARD/UPI/STORE_CREDIT
+  const [reasonCode, setReasonCode] = useState("");
   const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
   const [qty, setQty] = useState({});
+  const [condition, setCondition] = useState({}); // item_id -> GOOD/DAMAGED
 
   const [lastReturn, setLastReturn] = useState(null);
 
@@ -25,6 +30,7 @@ export default function Returns() {
       const res = await authAxios.get(`/invoice/by-number/${invoiceNumber}`);
       setInvoice(res.data || null);
       setQty({});
+      setCondition({});
     } catch (err) {
       setInvoice(null);
       const msg = err?.response?.data?.detail || "Invoice not found";
@@ -39,21 +45,33 @@ export default function Returns() {
     const items = (invoice.items || [])
       .map(i => ({
         item_id: i.item_id,
-        quantity: Number(qty[i.item_id] || 0)
+        quantity: Number(qty[i.item_id] || 0),
+        condition: condition[i.item_id] || "GOOD",
+        restock: (condition[i.item_id] || "GOOD") !== "DAMAGED",
       }))
       .filter(x => x.quantity > 0);
 
     if (items.length === 0) return showToast("Enter return qty", "error");
 
+    if (refundMode === "STORE_CREDIT" && /^9{9,}$/.test(String(invoice.mobile || ""))) {
+      return showToast("Valid customer mobile required for store credit", "error");
+    }
+
     try {
       const res = await authAxios.post("/returns/", {
         invoice_number: invoice.invoice_number,
+        reason_code: reasonCode || null,
         reason: reason || null,
+        note: note || null,
+        return_type: returnType,
+        refund_mode: refundMode,
         items
       });
       setLastReturn(res.data);
       showToast("Return created", "success");
+      setReasonCode("");
       setReason("");
+      setNote("");
     } catch (err) {
       const msg =
         err?.response?.data?.detail ||
@@ -117,13 +135,65 @@ export default function Returns() {
       {invoice && (
         <div className="bg-white border rounded-lg p-3 space-y-2">
           <div className="flex gap-2 flex-wrap items-end">
+            <div className="min-w-[160px]">
+              <label className="text-[10px] text-gray-600">Return Type</label>
+              <select
+                className="w-full border rounded-lg px-2 py-1"
+                value={returnType}
+                onChange={e => setReturnType(e.target.value)}
+              >
+                <option value="REFUND">Refund</option>
+                <option value="EXCHANGE">Exchange</option>
+              </select>
+            </div>
+
+            <div className="min-w-[170px]">
+              <label className="text-[10px] text-gray-600">Refund Mode</label>
+              <select
+                className="w-full border rounded-lg px-2 py-1"
+                value={refundMode}
+                onChange={e => setRefundMode(e.target.value)}
+              >
+                <option value="CASH">Cash</option>
+                <option value="CARD">Card</option>
+                <option value="UPI">UPI</option>
+                <option value="STORE_CREDIT">Store Credit (Wallet)</option>
+              </select>
+            </div>
+
+            <div className="min-w-[200px]">
+              <label className="text-[10px] text-gray-600">Reason Code (optional)</label>
+              <select
+                className="w-full border rounded-lg px-2 py-1"
+                value={reasonCode}
+                onChange={e => setReasonCode(e.target.value)}
+              >
+                <option value="">Select</option>
+                <option value="DAMAGED">Damaged</option>
+                <option value="WRONG_ITEM">Wrong item</option>
+                <option value="EXPIRED">Expired</option>
+                <option value="CUSTOMER_CHANGED_MIND">Customer changed mind</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
             <div className="flex-1 min-w-[240px]">
               <label className="text-[10px] text-gray-600">Reason (optional)</label>
               <input
                 className="w-full border rounded-lg px-2 py-1"
                 value={reason}
                 onChange={e => setReason(e.target.value)}
-                placeholder="Damaged / Wrong item / Customer return..."
+                placeholder="Notes about return..."
+              />
+            </div>
+
+            <div className="flex-1 min-w-[240px]">
+              <label className="text-[10px] text-gray-600">Internal Note (optional)</label>
+              <input
+                className="w-full border rounded-lg px-2 py-1"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="For staff reference..."
               />
             </div>
             <button
@@ -141,6 +211,7 @@ export default function Returns() {
                   <th className="p-2">Item</th>
                   <th className="p-2 text-right">Sold Qty</th>
                   <th className="p-2 text-right">Amount</th>
+                  <th className="p-2">Condition</th>
                   <th className="p-2 text-right">Return Qty</th>
                 </tr>
               </thead>
@@ -150,6 +221,18 @@ export default function Returns() {
                     <td className="p-2">{i.item_name}</td>
                     <td className="p-2 text-right">{i.quantity}</td>
                     <td className="p-2 text-right">{Number(i.amount || 0).toFixed(2)}</td>
+                    <td className="p-2">
+                      <select
+                        className="border rounded-lg px-2 py-1"
+                        value={condition[i.item_id] || "GOOD"}
+                        onChange={e =>
+                          setCondition(prev => ({ ...prev, [i.item_id]: e.target.value }))
+                        }
+                      >
+                        <option value="GOOD">Good (add to stock)</option>
+                        <option value="DAMAGED">Damaged (do not add)</option>
+                      </select>
+                    </td>
                     <td className="p-2 text-right">
                       <input
                         type="number"
@@ -171,6 +254,9 @@ export default function Returns() {
           {lastReturn && (
             <div className="border rounded-lg p-3 bg-emerald-50 text-emerald-900">
               <div className="font-bold">Return Created: {lastReturn.return_number}</div>
+              {String(lastReturn.refund_mode || "").toUpperCase() === "STORE_CREDIT" && (
+                <div>Credited to customer wallet/store credit</div>
+              )}
               <div>Refund Amount: ₹ {Number(lastReturn.refund_amount || 0).toFixed(2)}</div>
             </div>
           )}
