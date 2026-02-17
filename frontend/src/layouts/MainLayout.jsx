@@ -17,6 +17,7 @@ import SupportChat from "../components/SupportChat";
 import { getShopLogoUrl } from "../utils/shopLogo";
 
 import { FaBars, FaExclamationTriangle, FaThumbtack } from "react-icons/fa";
+import { MdTableRestaurant } from "react-icons/md";
 import {
   buildRbacMenu,
   buildRoleMenu,
@@ -62,6 +63,8 @@ export default function MainLayout({ hideSidebar = false }) {
   const [lowStockItems, setLowStockItems] = useState([]);
   const lowStockBtnRef = useRef(null);
   const lowStockPopupRef = useRef(null);
+
+  const [qrPendingCount, setQrPendingCount] = useState(0);
 
   const branchId = session?.branch_id ?? null;
   const branchName = session?.branch_name ?? null;
@@ -250,6 +253,14 @@ export default function MainLayout({ hideSidebar = false }) {
   const isHeadOfficeClosed =
     Number(branchId) === 1 && String(session?.branch_close || "N").toUpperCase() === "Y";
 
+  const canQrOrders = useMemo(() => {
+    if (!showTableBilling) return false;
+    if (!permsEnabled || !permMap) {
+      return ["admin", "manager", "cashier", "waiter"].includes(roleLower);
+    }
+    return Boolean(permMap?.qr_orders?.can_read);
+  }, [showTableBilling, permsEnabled, permMap, roleLower]);
+
   const menuItems = useMemo(() => {
     const fallback = buildRoleMenu({
       roleLower,
@@ -266,6 +277,27 @@ export default function MainLayout({ hideSidebar = false }) {
     });
     return rbac && rbac.length ? rbac : fallback;
   }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
+
+  const loadQrPending = async () => {
+    if (!canQrOrders) {
+      setQrPendingCount(0);
+      return;
+    }
+    try {
+      const res = await api.get("/qr-orders/pending");
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setQrPendingCount(list.length);
+    } catch {
+      setQrPendingCount(0);
+    }
+  };
+
+  useEffect(() => {
+    loadQrPending();
+    if (!canQrOrders) return;
+    const t = setInterval(loadQrPending, 8000);
+    return () => clearInterval(t);
+  }, [canQrOrders, branchId]);
 
   useEffect(() => {
     if (!sidebarEnabled) {
@@ -508,6 +540,23 @@ export default function MainLayout({ hideSidebar = false }) {
                   </div>
                 )}
               </div>
+            )}
+
+            {canQrOrders && (
+              <button
+                type="button"
+                onClick={() => navigate("/qr-orders")}
+                className="relative border rounded px-2 py-1 text-xs sm:text-sm hover:bg-gray-50 flex items-center gap-2"
+                title="QR table orders"
+              >
+                <MdTableRestaurant className="text-slate-700" />
+                <span className="hidden sm:inline">QR Orders</span>
+                {qrPendingCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
+                    {qrPendingCount}
+                  </span>
+                )}
+              </button>
             )}
 
             <button

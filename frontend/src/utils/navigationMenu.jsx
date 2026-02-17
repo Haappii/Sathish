@@ -69,6 +69,14 @@ const MENU_CATALOG = [
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
+    key: "qr_orders",
+    name: "QR Orders",
+    path: "/qr-orders",
+    icon: <MdTableRestaurant />,
+    perm: { module: "qr_orders", action: "read" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
     key: "online_orders",
     name: "Online Orders",
     path: "/online-orders",
@@ -310,6 +318,11 @@ export const buildRoleMenu = ({
               path: "/table-billing",
               icon: <MdTableRestaurant />,
             },
+            {
+              name: "QR Orders",
+              path: "/qr-orders",
+              icon: <MdTableRestaurant />,
+            },
           ]
         : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
@@ -330,6 +343,11 @@ export const buildRoleMenu = ({
               path: "/table-billing",
               icon: <MdTableRestaurant />,
             },
+            {
+              name: "QR Orders",
+              path: "/qr-orders",
+              icon: <MdTableRestaurant />,
+            },
           ]
         : []),
     ];
@@ -346,6 +364,11 @@ export const buildRoleMenu = ({
             {
               name: "Table Billing",
               path: "/table-billing",
+              icon: <MdTableRestaurant />,
+            },
+            {
+              name: "QR Orders",
+              path: "/qr-orders",
               icon: <MdTableRestaurant />,
             },
           ]
@@ -391,6 +414,11 @@ export const buildRoleMenu = ({
             {
               name: "Table Billing",
               path: "/table-billing",
+              icon: <MdTableRestaurant />,
+            },
+            {
+              name: "QR Orders",
+              path: "/qr-orders",
               icon: <MdTableRestaurant />,
             },
           ]

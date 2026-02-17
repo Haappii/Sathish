@@ -39,6 +39,8 @@ import EmployeeAttendance from "./pages/EmployeeAttendance";
 
 import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
+import QrOrders from "./pages/QrOrders";
+import PublicQrMenu from "./pages/PublicQrMenu";
 
 import Setup from "./pages/Setup";
 import Categories from "./pages/setup/Categories";
@@ -74,6 +76,7 @@ export default function App() {
           <Route path="/" element={<Login />} />
           <Route path="/about" element={<About />} />
           <Route path="/setup/onboard" element={<SetupOnboard />} />
+          <Route path="/qr/:token" element={<PublicQrMenu />} />
 
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>
@@ -140,6 +143,7 @@ export default function App() {
 
             {/* TABLE BILLING */}
             <Route path="/table-billing" element={<TableGrid />} />
+            <Route path="/qr-orders" element={<QrOrders />} />
           </Route>
 
           {/* NO SIDEBAR LAYOUT */}
