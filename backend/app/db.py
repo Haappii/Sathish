@@ -38,7 +38,17 @@ sql_logger.setLevel(logging.INFO)
 sql_logger.addHandler(sql_handler)
 sql_logger.propagate = False
 
-engine = create_engine(DATABASE_URL, echo=False)
+connect_args = {}
+if str(DATABASE_URL or "").startswith("postgresql"):
+    # Fail fast when DB is down (prevents app "buffering" for long time on startup/requests)
+    connect_args = {"connect_timeout": 5}
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    connect_args=connect_args,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

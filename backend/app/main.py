@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db import engine, Base, SessionLocal
+import logging
 import os
 from pathlib import Path
 
@@ -67,18 +68,14 @@ from app.models.branch import Branch
 
 
 # ======================================================
-# CREATE DATABASE TABLES
-# ======================================================
-Base.metadata.create_all(bind=engine)
-
-
-# ======================================================
 # FASTAPI APP
 # ======================================================
 app = FastAPI(
     title="Shop Billing Application API",
     version="1.0.0"
 )
+
+logger = logging.getLogger("uvicorn.error")
 
 
 # ======================================================
@@ -181,7 +178,21 @@ def seed_defaults():
     db.close()
 
 
-seed_defaults()
+@app.on_event("startup")
+def _startup_db_init():
+    """
+    Initialize DB schema and seed defaults.
+    Keep startup resilient: if DB is down/misconfigured, don't hang the web server.
+    """
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        logger.exception("DB create_all failed: %s", e)
+
+    try:
+        seed_defaults()
+    except Exception as e:
+        logger.exception("DB seed_defaults failed: %s", e)
 
 
 # ======================================================
