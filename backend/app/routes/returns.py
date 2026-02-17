@@ -16,6 +16,7 @@ from app.models.sales_return_meta import SalesReturnMeta, SalesReturnItemMeta
 from app.models.shop_details import ShopDetails
 from app.models.customer import Customer
 from app.schemas.returns import SalesReturnCreate, SalesReturnOut
+from app.models.system_parameters import SystemParameter
 from app.services.audit_service import log_action
 from app.services.credit_service import as_decimal, normalize_mobile, upsert_customer
 from app.services.day_close_service import is_branch_day_closed
@@ -272,6 +273,18 @@ def create_return(
     return_type = _normalize_return_type(getattr(payload, "return_type", None))
     refund_mode = _normalize_refund_mode(getattr(payload, "refund_mode", None))
 
+    cost_method_row = (
+        db.query(SystemParameter)
+        .filter(
+            SystemParameter.shop_id == user.shop_id,
+            SystemParameter.param_key == "inventory_cost_method",
+        )
+        .first()
+    )
+    cost_method = str(getattr(cost_method_row, "param_value", "") or "LAST").strip().upper()
+    if cost_method not in {"LAST", "WAVG", "FIFO"}:
+        cost_method = "LAST"
+
     return_items: list[SalesReturnItem] = []
     return_item_meta: list[tuple[SalesReturnItem, SalesReturnItemMeta]] = []
     return_subtotal = Decimal("0")
@@ -434,21 +447,22 @@ def create_return(
                 "ADD",
                 ref_no=row.return_number,
             )
-            # Create a return lot so lot-based COGS stays consistent (best effort).
-            try:
-                add_lot(
-                    db,
-                    shop_id=user.shop_id,
-                    branch_id=row.branch_id,
-                    item_id=int(item.item_id),
-                    quantity=int(item.quantity or 0),
-                    unit_cost=cost_map.get(int(item.item_id), Decimal("0.00")),
-                    source_type="RETURN",
-                    source_ref=row.return_number,
-                    created_by=user.user_id,
-                )
-            except Exception:
-                pass
+            # Create return lots only when FIFO is enabled (best effort).
+            if cost_method == "FIFO":
+                try:
+                    add_lot(
+                        db,
+                        shop_id=user.shop_id,
+                        branch_id=row.branch_id,
+                        item_id=int(item.item_id),
+                        quantity=int(item.quantity or 0),
+                        unit_cost=cost_map.get(int(item.item_id), Decimal("0.00")),
+                        source_type="RETURN",
+                        source_ref=row.return_number,
+                        created_by=user.user_id,
+                    )
+                except Exception:
+                    pass
 
     log_action(
         db,
@@ -544,17 +558,18 @@ def cancel_return(
                 "REMOVE",
                 ref_no=f"CAN-{row.return_number}",
             )
-            try:
-                remove_return_lots(
-                    db,
-                    shop_id=user.shop_id,
-                    branch_id=row.branch_id,
-                    item_id=int(it.item_id),
-                    quantity=int(it.quantity),
-                    return_number=row.return_number,
-                )
-            except ValueError as e:
-                raise HTTPException(400, str(e))
+            if cost_method == "FIFO":
+                try:
+                    remove_return_lots(
+                        db,
+                        shop_id=user.shop_id,
+                        branch_id=row.branch_id,
+                        item_id=int(it.item_id),
+                        quantity=int(it.quantity),
+                        return_number=row.return_number,
+                    )
+                except ValueError as e:
+                    raise HTTPException(400, str(e))
 
     row.status = "CANCELLED"
     db.commit()

@@ -213,7 +213,7 @@ def receive_po(
         .first()
     )
     cost_method = str(getattr(cost_method_row, "param_value", "") or "LAST").strip().upper()
-    if cost_method not in {"LAST", "WAVG"}:
+    if cost_method not in {"LAST", "WAVG", "FIFO"}:
         cost_method = "LAST"
 
     for item in po.items:
@@ -233,7 +233,7 @@ def receive_po(
                 .first()
             )
             if master_item and unit_cost >= 0:
-                if cost_method == "LAST":
+                if cost_method in {"LAST", "FIFO"}:
                     master_item.buy_price = unit_cost
                 else:
                     old_qty = float(

@@ -34,6 +34,7 @@ from app.models.invoice_due import InvoiceDue
 from app.utils.permissions import require_permission
 from app.services.gift_card_service import get_card_by_code, redeem_card, as_money, is_expired
 from app.services.item_lot_service import consume_lots_fifo
+from app.models.system_parameters import SystemParameter
 from app.services.wallet_service import (
     is_placeholder_mobile,
     get_customer_by_mobile,
@@ -223,6 +224,18 @@ def create_invoice(
     }
 
     inv_enabled = is_inventory_enabled(db, user.shop_id)
+    cost_method_row = (
+        db.query(SystemParameter)
+        .filter(
+            SystemParameter.shop_id == user.shop_id,
+            SystemParameter.param_key == "inventory_cost_method",
+        )
+        .first()
+    )
+    cost_method = str(getattr(cost_method_row, "param_value", "") or "LAST").strip().upper()
+    if cost_method not in {"LAST", "WAVG", "FIFO"}:
+        cost_method = "LAST"
+
     if inv_enabled:
         for it in payload.items:
             available = get_stock(db, user.shop_id, it.item_id, branch_id)
@@ -233,7 +246,7 @@ def create_invoice(
         item = item_map.get(it.item_id)
         buy_price = (item.buy_price if item else 0)
 
-        if inv_enabled:
+        if inv_enabled and cost_method == "FIFO":
             try:
                 buy_price = float(
                     consume_lots_fifo(

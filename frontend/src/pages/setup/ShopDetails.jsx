@@ -382,19 +382,20 @@ export default function ShopDetails() {
           </Field>
 
           <Field label="Inventory Cost Method">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={String(form.inventory_cost_method || "LAST").toUpperCase()}
-              onChange={e => setField("inventory_cost_method", e.target.value)}
-            >
-              <option value="LAST">Last Purchase Cost</option>
-              <option value="WAVG">Weighted Average Cost</option>
-            </select>
-            <div className="text-[11px] text-gray-500 mt-1">
-              Used to update item buy price on PO receive (affects future profit).
-            </div>
-          </Field>
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={String(form.inventory_cost_method || "LAST").toUpperCase()}
+                onChange={e => setField("inventory_cost_method", e.target.value)}
+              >
+                <option value="LAST">Last Purchase Cost</option>
+                <option value="WAVG">Weighted Average Cost</option>
+                <option value="FIFO">FIFO (Item Lots)</option>
+              </select>
+              <div className="text-[11px] text-gray-500 mt-1">
+                LAST/WAVG update item buy price on PO receive. FIFO uses Item Lots for invoice COGS and profit.
+              </div>
+            </Field>
 
           <Field label="Swiggy Partner ID">
             <input
