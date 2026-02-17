@@ -1,6 +1,6 @@
 // src/layouts/MainLayout.jsx
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useNavigate, useLocation, NavLink } from "react-router-dom";
 import api from "../utils/apiClient";
 
@@ -16,7 +16,7 @@ import defaultLogo from "../assets/logo.png";
 import SupportChat from "../components/SupportChat";
 import { getShopLogoUrl } from "../utils/shopLogo";
 
-import { FaBars, FaThumbtack } from "react-icons/fa";
+import { FaBars, FaExclamationTriangle, FaThumbtack } from "react-icons/fa";
 import {
   buildRbacMenu,
   buildRoleMenu,
@@ -56,6 +56,12 @@ export default function MainLayout({ hideSidebar = false }) {
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [lowStockOpen, setLowStockOpen] = useState(false);
+  const [lowStockLoading, setLowStockLoading] = useState(false);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const lowStockBtnRef = useRef(null);
+  const lowStockPopupRef = useRef(null);
 
   const branchId = session?.branch_id ?? null;
   const branchName = session?.branch_name ?? null;
@@ -167,6 +173,50 @@ export default function MainLayout({ hideSidebar = false }) {
   useEffect(() => {
     loadBranchAddress();
   }, [branchId, branchName, branches, shop]);
+
+  const loadLowStock = async () => {
+    if (!shop?.inventory_enabled || !branchId) {
+      setLowStockItems([]);
+      return;
+    }
+
+    setLowStockLoading(true);
+    try {
+      const res = await api.get("/inventory/list", {
+        params: { branch_id: branchId },
+      });
+      const rows = Array.isArray(res?.data) ? res.data : [];
+      const lows = rows
+        .filter((r) => Number(r.quantity || 0) <= Number(r.min_stock || 0))
+        .sort((a, b) => Number(a.quantity || 0) - Number(b.quantity || 0));
+      setLowStockItems(lows);
+    } catch {
+      setLowStockItems([]);
+    } finally {
+      setLowStockLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadLowStock();
+  }, [shop?.inventory_enabled, branchId]);
+
+  useEffect(() => {
+    if (!lowStockOpen) return;
+
+    const onDocClick = (e) => {
+      const t = e.target;
+      const btn = lowStockBtnRef.current;
+      const pop = lowStockPopupRef.current;
+      if (btn && btn.contains(t)) return;
+      if (pop && pop.contains(t)) return;
+      setLowStockOpen(false);
+    };
+
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [lowStockOpen]);
 
   /* ================= SWITCH BRANCH ================= */
   const switchBranch = async id => {
@@ -373,6 +423,92 @@ export default function MainLayout({ hideSidebar = false }) {
             <span className="border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap">
               {appDateDisplay}
             </span>
+
+            {shop?.inventory_enabled && (
+              <div className="relative">
+                <button
+                  ref={lowStockBtnRef}
+                  type="button"
+                  onClick={async () => {
+                    const next = !lowStockOpen;
+                    setLowStockOpen(next);
+                    if (next) await loadLowStock();
+                  }}
+                  className="relative border rounded px-2 py-1 text-xs sm:text-sm hover:bg-gray-50 flex items-center gap-2"
+                  title="Low stock alerts"
+                >
+                  <FaExclamationTriangle className="text-amber-600" />
+                  <span className="hidden sm:inline">Low Stock</span>
+                  {lowStockItems.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
+                      {lowStockItems.length}
+                    </span>
+                  )}
+                </button>
+
+                {lowStockOpen && (
+                  <div
+                    ref={lowStockPopupRef}
+                    className="absolute right-0 mt-2 w-[320px] max-w-[calc(100vw-24px)] bg-white border rounded-xl shadow-lg z-50 overflow-hidden"
+                  >
+                    <div className="px-3 py-2 border-b flex items-center justify-between">
+                      <div className="text-[12px] font-semibold text-slate-800">
+                        Low Stock Items
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLowStockOpen(false)}
+                        className="text-[12px] text-slate-500 hover:text-slate-800"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="max-h-[280px] overflow-auto">
+                      {lowStockLoading ? (
+                        <div className="p-3 text-[12px] text-slate-500">Loading...</div>
+                      ) : lowStockItems.length === 0 ? (
+                        <div className="p-3 text-[12px] text-slate-500">No low stock items</div>
+                      ) : (
+                        <div className="divide-y">
+                          {lowStockItems.slice(0, 10).map((r) => (
+                            <div key={r.item_id} className="px-3 py-2 text-[12px]">
+                              <div className="font-semibold text-slate-800 truncate">
+                                {r.item_name}
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex justify-between">
+                                <span>Qty: {Number(r.quantity || 0)}</span>
+                                <span>Min: {Number(r.min_stock || 0)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-3 py-2 border-t flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLowStockOpen(false);
+                          navigate("/reorder-alerts");
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-[12px] hover:bg-gray-50"
+                      >
+                        Open Alerts
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => await loadLowStock()}
+                        className="px-3 py-1.5 rounded-lg border text-[12px] hover:bg-gray-50"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               onClick={() => {
