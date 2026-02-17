@@ -12,7 +12,19 @@ const envBase =
 // Fallback kept for local/legacy usage.
 // For production HTTPS (Amplify), set `VITE_API_BASE` to an HTTPS endpoint
 // like `https://api.example.com/api` (or `/api` only if you have a proxy).
-const fallbackBase = "http://13.60.186.234:8000/api";
+const fallbackBase = (() => {
+  if (typeof window === "undefined") return "http://localhost:8000/api";
+
+  // If frontend is served from the backend (same port), use same-origin /api.
+  if (String(window.location?.port || "") === "8000") {
+    return `${window.location.origin}/api`;
+  }
+
+  // Default local/dev: frontend on :5173, backend on :8000.
+  const proto = window.location?.protocol || "http:";
+  const host = window.location?.hostname || "localhost";
+  return `${proto}//${host}:8000/api`;
+})();
 
 export const API_BASE = normalizeBaseUrl(envBase || fallbackBase);
 
