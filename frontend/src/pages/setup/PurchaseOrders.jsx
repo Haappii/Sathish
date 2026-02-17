@@ -165,6 +165,11 @@ export default function PurchaseOrders() {
     setReceiveOpen(true);
   };
 
+  const supplierNameById = (id) => {
+    const s = suppliers.find(x => Number(x.supplier_id) === Number(id));
+    return s?.supplier_name || `Supplier #${id}`;
+  };
+
   const openPayment = po => {
     setActivePo(po);
     setPaymentForm({
@@ -490,7 +495,7 @@ export default function PurchaseOrders() {
                 </div>
               </div>
               <div className="text-[11px] text-slate-500">
-                Supplier ID: {p.supplier_id} - Payment: {p.payment_status}
+                Supplier: {supplierNameById(p.supplier_id)} - Payment: {p.payment_status} - Paid Rs. {Number(p.paid_amount || 0).toFixed(2)} - Due Rs. {Math.max(0, Number(p.total_amount || 0) - Number(p.paid_amount || 0)).toFixed(2)}
               </div>
               <div className="mt-2 flex gap-2">
                 {!isClosed && (
