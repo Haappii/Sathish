@@ -6,7 +6,7 @@ import api from "../utils/apiClient";
 
 import {
   getSession,
-  setSession,
+  setSession as persistSession,
   clearSession,
   isSessionExpired,
   refreshSessionActivity
@@ -32,7 +32,15 @@ export default function MainLayout({ hideSidebar = false }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const session = getSession() || {};
+  const [session, setSessionState] = useState(() => getSession() || {});
+
+  const setSessionAndRerender = (updater) => {
+    const current = getSession() || {};
+    const next = typeof updater === "function" ? updater(current) : updater;
+    persistSession(next);
+    setSessionState(next);
+    return next;
+  };
 
   /* ================= USER INFO ================= */
   const userName =
@@ -41,8 +49,11 @@ export default function MainLayout({ hideSidebar = false }) {
     session?.name ||
     "User";
 
-  const roleLower = (session?.role || "").toString().toLowerCase();
-  const isAdmin = roleLower === "admin";
+  const actualRoleLower = (session?.role || "").toString().toLowerCase();
+  const isActualAdmin = actualRoleLower === "admin";
+
+  const uiRoleOverrideLower = (session?.ui_role || "").toString().toLowerCase();
+  const effectiveRoleLower = uiRoleOverrideLower || actualRoleLower;
 
   /* ================= STATE ================= */
   const [shopName, setShopName] = useState("Haappii Billing");
@@ -118,11 +129,11 @@ export default function MainLayout({ hideSidebar = false }) {
 
   /* ================= BRANCH LIST (ADMIN) ================= */
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isActualAdmin) return;
     api.get("/branch/list")
       .then(res => setBranches(res.data || []))
       .catch(() => {});
-  }, [isAdmin]);
+  }, [isActualAdmin]);
 
   /* ================= BRANCH ADDRESS ================= */
   const loadBranchAddress = async () => {
@@ -228,17 +239,32 @@ export default function MainLayout({ hideSidebar = false }) {
     if (!b) return;
 
     setSwitching(true);
-    setSession({
-      ...session,
+    const prev = getSession() || {};
+    setSessionAndRerender((cur) => ({
+      ...cur,
       branch_id: b.branch_id,
-      branch_name: b.branch_name
-    });
+      branch_name: b.branch_name,
+    }));
 
     try {
       await api.post("/auth/set-branch", { branch_id: b.branch_id });
-    } catch {}
 
-    window.location.reload();
+      // Full refresh so every screen re-reads the new branch context.
+      window.location.replace("/home");
+      return;
+    } catch (e) {
+      console.error("Failed to switch branch", e);
+
+      // Revert local selection if backend rejects the switch.
+      setSessionAndRerender((cur) => ({
+        ...cur,
+        branch_id: prev?.branch_id ?? cur?.branch_id ?? null,
+        branch_name: prev?.branch_name ?? cur?.branch_name ?? null,
+      }));
+      alert("Failed to switch branch. Please try again.");
+    } finally {
+      setSwitching(false);
+    }
   };
 
   /* ================= SIDEBAR MENU ================= */
@@ -255,20 +281,20 @@ export default function MainLayout({ hideSidebar = false }) {
 
   const canQrOrders = useMemo(() => {
     if (!showTableBilling) return false;
-    if (!permsEnabled || !permMap) {
-      return ["admin", "manager", "cashier", "waiter"].includes(roleLower);
+    if (!permsEnabled || !permMap || uiRoleOverrideLower) {
+      return ["admin", "manager", "cashier", "waiter"].includes(effectiveRoleLower);
     }
     return Boolean(permMap?.qr_orders?.can_read);
-  }, [showTableBilling, permsEnabled, permMap, roleLower]);
+  }, [showTableBilling, permsEnabled, permMap, effectiveRoleLower, uiRoleOverrideLower]);
 
   const menuItems = useMemo(() => {
     const fallback = buildRoleMenu({
-      roleLower,
+      roleLower: effectiveRoleLower,
       showTableBilling,
       isHeadOfficeClosed,
     });
 
-    if (!permsEnabled || !permMap) return fallback;
+    if (!permsEnabled || !permMap || uiRoleOverrideLower) return fallback;
 
     const rbac = buildRbacMenu({
       permMap,
@@ -276,7 +302,7 @@ export default function MainLayout({ hideSidebar = false }) {
       isHeadOfficeClosed,
     });
     return rbac && rbac.length ? rbac : fallback;
-  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
+  }, [permsEnabled, permMap, effectiveRoleLower, showTableBilling, isHeadOfficeClosed, uiRoleOverrideLower]);
 
   const loadQrPending = async () => {
     if (!canQrOrders) {
@@ -433,16 +459,46 @@ export default function MainLayout({ hideSidebar = false }) {
           </div>
 
           <div className="w-full sm:w-auto flex items-center justify-end gap-2 sm:gap-4 flex-wrap">
-            <div className="text-right leading-tight min-w-[64px]">
-              <div className="text-xs sm:text-sm font-semibold text-gray-700">{userName}</div>
-              <div className="text-xs text-gray-500 capitalize">{roleLower}</div>
-            </div>
+              <div className="text-right leading-tight min-w-[64px]">
+                <div className="text-xs sm:text-sm font-semibold text-gray-700">{userName}</div>
+                <div className="text-xs text-gray-500 capitalize">
+                  {uiRoleOverrideLower ? (
+                    <>
+                      {actualRoleLower} â†’ {uiRoleOverrideLower}
+                    </>
+                  ) : (
+                    effectiveRoleLower
+                  )}
+                </div>
+              </div>
 
-            {isAdmin && branches.length > 0 && (
-              <select
-                value={Number(branchId) || ""}
-                onChange={e => switchBranch(Number(e.target.value))}
-                className="border rounded px-2 py-1 text-sm max-w-[150px]"
+              {isActualAdmin && (
+                <select
+                  value={uiRoleOverrideLower || actualRoleLower || ""}
+                  onChange={(e) => {
+                    const next = String(e.target.value || "").toLowerCase();
+                    setSessionAndRerender((cur) => {
+                      const updated = { ...cur };
+                      if (!next || next === actualRoleLower) delete updated.ui_role;
+                      else updated.ui_role = next;
+                      return updated;
+                    });
+                  }}
+                  className="border rounded px-2 py-1 text-sm max-w-[140px]"
+                  title="View menu as role (UI only)"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="cashier">Cashier</option>
+                  <option value="waiter">Waiter</option>
+                </select>
+              )}
+
+              {isActualAdmin && branches.length > 0 && (
+                <select
+                  value={Number(branchId) || ""}
+                  onChange={e => switchBranch(Number(e.target.value))}
+                  className="border rounded px-2 py-1 text-sm max-w-[150px]"
               >
                 {branches.map(b => (
                   <option key={b.branch_id} value={b.branch_id}>

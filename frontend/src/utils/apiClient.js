@@ -23,6 +23,7 @@ api.interceptors.request.use(
 
     const session = getSession();
     config.headers = config.headers || {};
+    config.params = config.params || {};
 
     // 🔑 SUPPORT BOTH session + localStorage token names
     const token =
@@ -43,6 +44,14 @@ api.interceptors.request.use(
     // Let backend decide auth validity
     if (session?.branch_id) {
       config.headers["x-branch-id"] = session.branch_id;
+    }
+
+    // Enforce branch scope: only allow the current (header-selected) branch.
+    if (
+      session?.branch_id &&
+      Object.prototype.hasOwnProperty.call(config.params, "branch_id")
+    ) {
+      config.params.branch_id = session.branch_id;
     }
 
     return config;

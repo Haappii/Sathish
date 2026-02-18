@@ -65,9 +65,11 @@ export default function Home() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const session = getSession() || {};
-  const roleLower = (session?.role || "").toString().toLowerCase();
+  const actualRoleLower = (session?.role || "").toString().toLowerCase();
+  const uiRoleOverrideLower = (session?.ui_role || "").toString().toLowerCase();
+  const effectiveRoleLower = uiRoleOverrideLower || actualRoleLower;
   const branchId = session?.branch_id ?? null;
-  const isAdmin = roleLower === "admin";
+  const isAdmin = effectiveRoleLower === "admin";
 
   const [shop, setShop] = useState(null);
   const [shopType, setShopType] = useState("");
@@ -287,12 +289,12 @@ export default function Home() {
 
   const menus = useMemo(() => {
     const fallback = buildRoleMenu({
-      roleLower,
+      roleLower: effectiveRoleLower,
       showTableBilling,
       isHeadOfficeClosed,
     });
 
-    if (!permsEnabled || !permMap) return fallback;
+    if (!permsEnabled || !permMap || uiRoleOverrideLower) return fallback;
 
     const rbac = buildRbacMenu({
       permMap,
@@ -301,7 +303,14 @@ export default function Home() {
     });
 
     return rbac?.length ? rbac : fallback;
-  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
+  }, [
+    permsEnabled,
+    permMap,
+    effectiveRoleLower,
+    showTableBilling,
+    isHeadOfficeClosed,
+    uiRoleOverrideLower,
+  ]);
 
   const menuCards = useMemo(
     () => menus.filter((m) => m?.path && m.path !== "/home"),
