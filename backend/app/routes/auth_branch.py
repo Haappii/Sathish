@@ -40,7 +40,7 @@ def set_branch(
     if resolved_branch_id is None:
         raise HTTPException(422, "branch_id is required")
 
-    branch = get_branch(db, resolved_branch_id)
+    branch = get_branch(db, user.shop_id, resolved_branch_id)
 
     if not branch or branch.status != "ACTIVE":
         raise HTTPException(400, "Invalid or inactive branch")
