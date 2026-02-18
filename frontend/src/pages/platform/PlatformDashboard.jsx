@@ -47,9 +47,6 @@ export default function PlatformDashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 10000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pendingReqs = useMemo(() => reqs.filter((r) => r.status === "PENDING"), [reqs]);
@@ -269,4 +266,3 @@ export default function PlatformDashboard() {
     </div>
   );
 }
-
