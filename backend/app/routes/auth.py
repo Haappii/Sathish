@@ -33,6 +33,10 @@ def login(request: dict, db: Session = Depends(get_db)):
         today = datetime.utcnow().date()
         if today > shop.expires_on:
             raise HTTPException(403, f"Shop access expired on {shop.expires_on}")
+    if getattr(shop, "paid_until", None):
+        today = datetime.utcnow().date()
+        if today > shop.paid_until:
+            raise HTTPException(403, f"Shop subscription expired on {shop.paid_until}")
 
     user = (
         db.query(User)

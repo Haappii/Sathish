@@ -5,22 +5,24 @@ import platformAxios from "../../api/platformAxios";
 import { clearPlatformToken, getPlatformToken } from "../../utils/platformAuth";
 import { useToast } from "../../components/Toast";
 
-const BLUE = "#0B3C8C";
+const PRIMARY = "#2563eb";
 
-const fmt = (v) => (v ? new Date(v).toLocaleString() : "-");
+const fmtDate = (v) => (v ? String(v) : "-");
+const fmtMoney = (v) => `₹ ${Number(v || 0).toFixed(2)}`;
 
 export default function PlatformDashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [tab, setTab] = useState("ONBOARD");
+  const [tab, setTab] = useState("OVERVIEW"); // OVERVIEW | SHOPS | ONBOARD | DEMO | SUPPORT
   const [loading, setLoading] = useState(true);
 
-  const [reqs, setReqs] = useState([]);
+  const [shops, setShops] = useState([]);
+  const [revenue, setRevenue] = useState({ days: 30, total: 0 });
+  const [onboardReqs, setOnboardReqs] = useState([]);
   const [tickets, setTickets] = useState([]);
 
-  const [busyReqId, setBusyReqId] = useState(null);
-  const [busyTicketId, setBusyTicketId] = useState(null);
+  const [busyId, setBusyId] = useState(null);
   const [acceptedInfo, setAcceptedInfo] = useState(null);
   const [demoDays, setDemoDays] = useState(7);
 
@@ -33,12 +35,16 @@ export default function PlatformDashboard() {
   const load = async () => {
     try {
       setLoading(true);
-      const [r1, r2] = await Promise.all([
+      const [shopRes, revenueRes, onboardRes, ticketRes] = await Promise.all([
+        platformAxios.get("/platform/shops"),
+        platformAxios.get("/platform/revenue", { params: { days: 30 } }),
         platformAxios.get("/platform/onboard/requests", { params: { limit: 200 } }),
         platformAxios.get("/platform/support/tickets", { params: { limit: 200 } }),
       ]);
-      setReqs(Array.isArray(r1.data) ? r1.data : []);
-      setTickets(Array.isArray(r2.data) ? r2.data : []);
+      setShops(Array.isArray(shopRes.data) ? shopRes.data : []);
+      setRevenue(revenueRes.data || { days: 30, total: 0 });
+      setOnboardReqs(Array.isArray(onboardRes.data) ? onboardRes.data : []);
+      setTickets(Array.isArray(ticketRes.data) ? ticketRes.data : []);
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to load platform data", "error");
     } finally {
@@ -48,21 +54,34 @@ export default function PlatformDashboard() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pendingReqs = useMemo(() => reqs.filter((r) => r.status === "PENDING"), [reqs]);
-  const openTickets = useMemo(() => tickets.filter((t) => t.status === "OPEN"), [tickets]);
+  const pendingOnboard = useMemo(
+    () => onboardReqs.filter((r) => String(r.status || "").toUpperCase() === "PENDING"),
+    [onboardReqs]
+  );
+
   const demoTickets = useMemo(
     () => tickets.filter((t) => String(t.ticket_type || "").toUpperCase() === "DEMO"),
-    [tickets]
-  );
-  const supportTickets = useMemo(
-    () => tickets.filter((t) => String(t.ticket_type || "").toUpperCase() !== "DEMO"),
     [tickets]
   );
   const openDemoTickets = useMemo(
     () => demoTickets.filter((t) => String(t.status || "").toUpperCase() === "OPEN"),
     [demoTickets]
+  );
+  const supportTickets = useMemo(
+    () => tickets.filter((t) => String(t.ticket_type || "").toUpperCase() !== "DEMO"),
+    [tickets]
+  );
+
+  const activeShops = useMemo(
+    () => shops.filter((s) => String(s.status || "").toUpperCase() === "ACTIVE").length,
+    [shops]
+  );
+  const expiredShops = useMemo(
+    () => shops.filter((s) => String(s.status || "").toUpperCase() === "EXPIRED").length,
+    [shops]
   );
 
   const logout = () => {
@@ -70,75 +89,61 @@ export default function PlatformDashboard() {
     navigate("/platform/login", { replace: true });
   };
 
-  const acceptReq = async (id) => {
-    if (busyReqId) return;
-    setBusyReqId(id);
+  const acceptOnboard = async (id) => {
+    if (busyId) return;
+    setBusyId(id);
     setAcceptedInfo(null);
     try {
       const res = await platformAxios.post(`/platform/onboard/requests/${id}/accept`);
       setAcceptedInfo(res.data || null);
-      showToast("Request accepted (shop created)", "success");
+      showToast(res?.data?.email_sent ? "Accepted (email sent)" : "Accepted (email not sent)", "success");
       await load();
     } catch (e) {
       showToast(e?.response?.data?.detail || "Accept failed", "error");
     } finally {
-      setBusyReqId(null);
+      setBusyId(null);
     }
   };
 
-  const rejectReq = async (id) => {
-    if (busyReqId) return;
-    if (!window.confirm("Reject this onboarding request?")) return;
-    setBusyReqId(id);
+  const rejectOnboard = async (id) => {
+    if (busyId) return;
+    const ok = window.confirm("Reject this onboarding request?");
+    if (!ok) return;
+    setBusyId(id);
     try {
       await platformAxios.post(`/platform/onboard/requests/${id}/reject`);
-      showToast("Request rejected", "success");
+      showToast("Rejected", "success");
       await load();
     } catch (e) {
       showToast(e?.response?.data?.detail || "Reject failed", "error");
     } finally {
-      setBusyReqId(null);
-    }
-  };
-
-  const setTicketStatus = async (id, next) => {
-    if (busyTicketId) return;
-    setBusyTicketId(id);
-    try {
-      await platformAxios.post(`/platform/support/tickets/${id}/status`, null, {
-        params: { new_status: next },
-      });
-      showToast("Ticket updated", "success");
-      await load();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Update failed", "error");
-    } finally {
-      setBusyTicketId(null);
+      setBusyId(null);
     }
   };
 
   const acceptDemo = async (ticketId) => {
-    if (busyTicketId) return;
-    setBusyTicketId(ticketId);
+    if (busyId) return;
+    setBusyId(ticketId);
     setAcceptedInfo(null);
     try {
       const res = await platformAxios.post(`/platform/demo/tickets/${ticketId}/accept`, null, {
         params: { days: demoDays },
       });
       setAcceptedInfo(res.data || null);
-      showToast("Demo accepted (shop created)", "success");
+      showToast(res?.data?.email_sent ? "Demo accepted (email sent)" : "Demo accepted (email not sent)", "success");
       await load();
     } catch (e) {
       showToast(e?.response?.data?.detail || "Accept demo failed", "error");
     } finally {
-      setBusyTicketId(null);
+      setBusyId(null);
     }
   };
 
   const rejectDemo = async (ticketId) => {
-    if (busyTicketId) return;
-    if (!window.confirm("Reject this demo request?")) return;
-    setBusyTicketId(ticketId);
+    if (busyId) return;
+    const ok = window.confirm("Reject this demo request?");
+    if (!ok) return;
+    setBusyId(ticketId);
     try {
       await platformAxios.post(`/platform/demo/tickets/${ticketId}/reject`);
       showToast("Demo rejected", "success");
@@ -146,192 +151,335 @@ export default function PlatformDashboard() {
     } catch (e) {
       showToast(e?.response?.data?.detail || "Reject demo failed", "error");
     } finally {
-      setBusyTicketId(null);
+      setBusyId(null);
+    }
+  };
+
+  const updateTicketStatus = async (ticketId, next) => {
+    if (busyId) return;
+    setBusyId(ticketId);
+    try {
+      await platformAxios.post(`/platform/support/tickets/${ticketId}/status`, null, {
+        params: { new_status: next },
+      });
+      showToast("Ticket updated", "success");
+      await load();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Update failed", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const extendPayment = async (shopId, days) => {
+    if (busyId) return;
+    setBusyId(shopId);
+    try {
+      await platformAxios.post(`/platform/shops/${shopId}/update-payment`, {
+        extend_days: Number(days || 30),
+      });
+      showToast("Renewal extended", "success");
+      await load();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Update payment failed", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const sendReminder = async (shopId) => {
+    if (busyId) return;
+    setBusyId(shopId);
+    try {
+      const res = await platformAxios.post(`/platform/shops/${shopId}/reminder`);
+      showToast(res?.data?.email_sent ? "Reminder email sent" : "Email not sent (SMTP not configured)", "success");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Reminder failed", "error");
+    } finally {
+      setBusyId(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-
-        {/* HEADER */}
-        <div className="bg-white rounded-3xl shadow-lg p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              Platform Control Center
-            </h1>
-            <p className="text-sm text-slate-500">
-              Manage onboarding, demo requests & support tickets
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <div className="max-w-7xl mx-auto p-6 sm:p-8 space-y-8">
+        <div className="flex justify-between items-center gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-wide truncate">Platform Admin Dashboard</h1>
+            <div className="text-xs text-slate-300 mt-1">
+              Pending onboard: <span className="font-semibold">{pendingOnboard.length}</span> • Open demos:{" "}
+              <span className="font-semibold">{openDemoTickets.length}</span>
+            </div>
           </div>
-
-          <div className="flex gap-3">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={load}
-              className="px-4 py-2 rounded-xl border text-sm hover:bg-slate-50 transition"
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition"
             >
               Refresh
             </button>
-
             <button
               onClick={logout}
-              className="px-4 py-2 rounded-xl text-white text-sm shadow-md hover:opacity-90 transition"
-              style={{ background: BLUE }}
+              className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 transition"
             >
               Logout
             </button>
           </div>
         </div>
 
-        {/* STATS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard title="Pending Onboard" value={pendingReqs.length} />
-          <StatCard title="Open Tickets" value={openTickets.length} />
-          <StatCard title="Demo Requests" value={openDemoTickets.length} />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <GlassCard title={`Revenue (last ${revenue?.days || 30} days)`} value={fmtMoney(revenue?.total || 0)} />
+          <GlassCard title="Total Shops" value={shops.length} />
+          <GlassCard title="Active Shops" value={activeShops} />
+          <GlassCard title="Expired Shops" value={expiredShops} />
         </div>
 
-        {/* TABS */}
-        <div className="bg-white p-2 rounded-2xl shadow flex gap-2 w-fit">
-          {[
-            { k: "ONBOARD", label: "Onboarding" },
-            { k: "DEMO", label: "Demo Requests" },
-            { k: "SUPPORT", label: "Support Tickets" },
-          ].map((x) => (
+        {acceptedInfo?.admin_password ? (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+            <div className="text-sm font-semibold text-emerald-200">Created Credentials (copy now)</div>
+            <div className="text-xs text-emerald-100 mt-1">
+              Shop ID: <span className="font-semibold">{acceptedInfo.shop_id}</span> • Username:{" "}
+              <span className="font-semibold">{acceptedInfo.admin_username}</span> • Password:{" "}
+              <span className="font-semibold">{acceptedInfo.admin_password}</span>
+              {acceptedInfo.expires_on ? (
+                <>
+                  {" "}
+                  • Expires on: <span className="font-semibold">{acceptedInfo.expires_on}</span>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-3">
+          {["OVERVIEW", "SHOPS", "ONBOARD", "DEMO", "SUPPORT"].map((t) => (
             <button
-              key={x.k}
-              onClick={() => setTab(x.k)}
-              className={`px-4 py-2 text-sm rounded-xl transition ${
-                tab === x.k
-                  ? "bg-blue-600 text-white shadow"
-                  : "hover:bg-slate-100 text-slate-600"
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-5 py-2 rounded-xl transition ${
+                tab === t ? "bg-blue-600 shadow-lg" : "bg-white/10 hover:bg-white/20"
               }`}
             >
-              {x.label}
+              {t}
             </button>
           ))}
         </div>
 
-        {/* CONTENT */}
         {loading ? (
-          <div className="text-center py-10 text-slate-500">Loading data...</div>
-        ) : (
-          <div className="space-y-4">
-            {/* ONBOARD */}
-            {tab === "ONBOARD" &&
-              pendingReqs.map((r) => (
-                <Card key={r.request_id}>
-                  <div className="flex justify-between flex-wrap gap-4">
-                    <div>
-                      <h3 className="font-semibold text-slate-800">
-                        #{r.request_id} — {r.shop_name}
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Branch: {r.branch_name}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-1">
-                        {r.requester_name} • {r.requester_phone}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Requested: {fmt(r.created_at)}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
+          <div className="text-center py-16 text-slate-300">Loading data...</div>
+        ) : tab === "SHOPS" ? (
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-slate-300 border-b border-white/10">
+                  <th className="py-3 text-left">Shop</th>
+                  <th>Status</th>
+                  <th>Plan</th>
+                  <th>Last Payment</th>
+                  <th>Next Renewal</th>
+                  <th>Sales Revenue</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shops.map((s) => (
+                  <tr
+                    key={s.shop_id}
+                    className="border-b border-white/5 hover:bg-white/5 transition"
+                  >
+                    <td className="py-3">
+                      <div className="font-semibold">{s.shop_name || `Shop #${s.shop_id}`}</div>
+                      <div className="text-xs text-slate-300">
+                        ID: {s.shop_id} {s.mailid ? `• ${s.mailid}` : ""} {s.mobile ? `• ${s.mobile}` : ""}
+                      </div>
+                      {s.is_demo ? (
+                        <div className="text-xs text-slate-300">
+                          Demo expiry: <span className="font-semibold">{fmtDate(s.expires_on)}</span>
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>
+                      <Status status={String(s.status || "").toUpperCase()} />
+                    </td>
+                    <td>{s.plan || "TRIAL"}</td>
+                    <td>{fmtDate(s.last_payment_on)}</td>
+                    <td>{fmtDate(s.next_renewal)}</td>
+                    <td>{fmtMoney(s.revenue || 0)}</td>
+                    <td className="space-x-2">
                       <button
-                        onClick={() => rejectReq(r.request_id)}
-                        className="px-3 py-2 text-xs rounded-lg border hover:bg-slate-100"
+                        onClick={() => extendPayment(s.shop_id, 30)}
+                        disabled={busyId === s.shop_id}
+                        className="px-3 py-1 bg-green-500 rounded-lg text-xs hover:bg-green-600 disabled:opacity-60"
+                      >
+                        Extend 30d
+                      </button>
+                      <button
+                        onClick={() => sendReminder(s.shop_id)}
+                        disabled={busyId === s.shop_id}
+                        className="px-3 py-1 bg-white/15 rounded-lg text-xs hover:bg-white/25 disabled:opacity-60"
+                      >
+                        Send Reminder
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {shops.length === 0 ? (
+                  <tr>
+                    <td className="py-6 text-slate-300" colSpan={7}>
+                      No shops found.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : tab === "ONBOARD" ? (
+          <div className="space-y-4">
+            {pendingOnboard.length === 0 ? (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-slate-300">
+                No pending onboarding requests.
+              </div>
+            ) : (
+              pendingOnboard.map((r) => (
+                <div key={r.request_id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">
+                        #{r.request_id} • {r.shop_name} • {r.branch_name}
+                      </div>
+                      <div className="text-xs text-slate-300 mt-1">
+                        {r.requester_name || "Requester"} {r.requester_email ? `• ${r.requester_email}` : ""}{" "}
+                        {r.requester_phone ? `• ${r.requester_phone}` : ""}
+                      </div>
+                      {r.message ? (
+                        <div className="text-xs text-slate-200 mt-2 whitespace-pre-wrap">{r.message}</div>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => rejectOnboard(r.request_id)}
+                        disabled={busyId === r.request_id}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition disabled:opacity-60"
                       >
                         Reject
                       </button>
-
                       <button
-                        onClick={() => acceptReq(r.request_id)}
-                        className="px-3 py-2 text-xs rounded-lg text-white shadow hover:opacity-90"
-                        style={{ background: BLUE }}
+                        onClick={() => acceptOnboard(r.request_id)}
+                        disabled={busyId === r.request_id}
+                        className="px-4 py-2 rounded-xl text-white transition disabled:opacity-60"
+                        style={{ background: PRIMARY }}
                       >
-                        Accept
+                        Accept + Create Shop
                       </button>
                     </div>
                   </div>
-                </Card>
-              ))}
-
-            {/* DEMO */}
-            {tab === "DEMO" &&
+                </div>
+              ))
+            )}
+          </div>
+        ) : tab === "DEMO" ? (
+          <div className="space-y-4">
+            {openDemoTickets.length === 0 ? (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-slate-300">
+                No open demo requests.
+              </div>
+            ) : (
               openDemoTickets.map((t) => (
-                <Card key={t.ticket_id}>
-                  <div className="flex justify-between flex-wrap gap-4">
-                    <div>
-                      <h3 className="font-semibold text-slate-800">
-                        #{t.ticket_id} — DEMO
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        {t.user_name} • {t.email}
-                      </p>
+                <div key={t.ticket_id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">
+                        #{t.ticket_id} • {t.user_name || "User"} {t.email ? `• ${t.email}` : ""}{" "}
+                        {t.phone ? `• ${t.phone}` : ""}
+                      </div>
+                      {t.business ? <div className="text-xs text-slate-300 mt-1">{t.business}</div> : null}
                     </div>
-
-                    <div className="flex gap-2 items-center">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <select
-                        className="border rounded-lg px-2 py-1 text-xs"
+                        className="rounded-lg px-2 py-2 text-xs bg-slate-900 border border-white/10"
                         value={demoDays}
                         onChange={(e) => setDemoDays(Number(e.target.value))}
                       >
-                        {[7, 14, 30].map((d) => (
+                        {[7, 14, 30, 60].map((d) => (
                           <option key={d} value={d}>
                             {d} days
                           </option>
                         ))}
                       </select>
-
                       <button
                         onClick={() => rejectDemo(t.ticket_id)}
-                        className="px-3 py-2 text-xs rounded-lg border"
+                        disabled={busyId === t.ticket_id}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition disabled:opacity-60"
                       >
                         Reject
                       </button>
-
                       <button
                         onClick={() => acceptDemo(t.ticket_id)}
-                        className="px-3 py-2 text-xs rounded-lg text-white"
-                        style={{ background: BLUE }}
+                        disabled={busyId === t.ticket_id}
+                        className="px-4 py-2 rounded-xl text-white transition disabled:opacity-60"
+                        style={{ background: PRIMARY }}
                       >
-                        Approve
+                        Accept + Create Demo
                       </button>
                     </div>
                   </div>
-                </Card>
-              ))}
-
-            {/* SUPPORT */}
-            {tab === "SUPPORT" &&
+                  {t.message ? (
+                    <div className="text-xs text-slate-200 whitespace-pre-wrap">{t.message}</div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        ) : tab === "SUPPORT" ? (
+          <div className="space-y-4">
+            {supportTickets.length === 0 ? (
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-slate-300">No support tickets.</div>
+            ) : (
               supportTickets.map((t) => (
-                <Card key={t.ticket_id}>
-                  <div className="flex justify-between flex-wrap gap-4">
-                    <div>
-                      <h3 className="font-semibold text-slate-800">
-                        #{t.ticket_id} — {t.ticket_type}
-                      </h3>
-                      <StatusBadge status={t.status} />
+                <div key={t.ticket_id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">
+                        #{t.ticket_id} • {t.ticket_type} • {t.status}
+                      </div>
+                      <div className="text-xs text-slate-300 mt-1">
+                        {t.user_name || "User"} {t.shop_name ? `• ${t.shop_name}` : ""}{" "}
+                        {t.branch_name ? `• ${t.branch_name}` : ""}
+                      </div>
                     </div>
-
-                    <select
-                      className="border rounded-lg px-2 py-1 text-xs"
-                      value={t.status}
-                      onChange={(e) =>
-                        setTicketStatus(t.ticket_id, e.target.value)
-                      }
-                    >
-                      {["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {t.attachment_path ? (
+                        <a
+                          className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-xs"
+                          href={`/api/platform/support/tickets/${t.ticket_id}/attachment`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Attachment
+                        </a>
+                      ) : null}
+                      <select
+                        className="rounded-lg px-2 py-2 text-xs bg-slate-900 border border-white/10"
+                        value={t.status}
+                        disabled={busyId === t.ticket_id}
+                        onChange={(e) => updateTicketStatus(t.ticket_id, e.target.value)}
+                      >
+                        {["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-
-                  <p className="text-xs text-slate-600 mt-2">{t.message}</p>
-                </Card>
-              ))}
+                  {t.message ? <div className="text-xs text-slate-200 whitespace-pre-wrap">{t.message}</div> : null}
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-10 text-center text-slate-300">
+            Overview: use tabs to manage shops, onboarding, demos and support.
           </div>
         )}
       </div>
@@ -339,40 +487,26 @@ export default function PlatformDashboard() {
   );
 }
 
-/* ---------- UI COMPONENTS ---------- */
-
-function Card({ children }) {
+function GlassCard({ title, value }) {
   return (
-    <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition">
-      {children}
+    <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl shadow-lg border border-white/10">
+      <div className="text-slate-300 text-sm">{title}</div>
+      <div className="text-2xl font-bold mt-2">{value}</div>
     </div>
   );
 }
 
-function StatCard({ title, value }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-md p-5">
-      <div className="text-sm text-slate-500">{title}</div>
-      <div className="text-2xl font-bold text-slate-800 mt-1">{value}</div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
+function Status({ status }) {
   const map = {
-    OPEN: "bg-yellow-100 text-yellow-700",
-    IN_PROGRESS: "bg-blue-100 text-blue-700",
-    RESOLVED: "bg-green-100 text-green-700",
-    CLOSED: "bg-gray-200 text-gray-700",
+    ACTIVE: "bg-green-500",
+    EXPIRED: "bg-red-500",
+    TRIAL: "bg-yellow-500",
   };
 
   return (
-    <span
-      className={`inline-block px-3 py-1 text-xs rounded-full mt-1 ${
-        map[status] || "bg-slate-100 text-slate-600"
-      }`}
-    >
-      {status}
+    <span className={`px-3 py-1 text-xs rounded-full ${map[status] || "bg-gray-500"}`}>
+      {status || "UNKNOWN"}
     </span>
   );
 }
+

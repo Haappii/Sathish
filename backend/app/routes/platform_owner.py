@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import Numeric, cast, func
 
 from app.db import get_db
 from app.models.branch import Branch
@@ -22,6 +23,7 @@ from app.models.roles import Role
 from app.models.shop_details import ShopDetails
 from app.models.support_ticket import SupportTicket
 from app.models.users import User
+from app.models.invoice import Invoice
 from app.utils.jwt_token import create_access_token
 from app.utils.passwords import encode_password, password_needs_upgrade, verify_password
 from app.utils.platform_owner_auth import PlatformOwnerOnly
@@ -379,6 +381,155 @@ def platform_list_tickets(
     if status:
         q = q.filter(SupportTicket.status == status.upper())
     return q.limit(min(max(int(limit), 1), 500)).all()
+
+
+@router.get("/revenue")
+def platform_revenue(
+    days: int = Query(30, ge=1, le=3650),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    since = datetime.utcnow() - timedelta(days=int(days))
+    amt = (
+        db.query(
+            func.coalesce(
+                func.sum(
+                    cast(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0), Numeric(12, 2))
+                ),
+                0,
+            )
+        )
+        .filter(Invoice.created_time >= since)
+        .scalar()
+        or 0
+    )
+    return {"days": int(days), "total": float(amt)}
+
+
+@router.get("/shops")
+def platform_list_shops(
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    # Revenue per shop (all-time)
+    rev_rows = (
+        db.query(
+            Invoice.shop_id.label("shop_id"),
+            func.coalesce(
+                func.sum(
+                    cast(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0), Numeric(12, 2))
+                ),
+                0,
+            ).label("revenue"),
+        )
+        .group_by(Invoice.shop_id)
+        .all()
+    )
+    rev_map = {int(r.shop_id): float(r.revenue or 0) for r in rev_rows if r and r.shop_id is not None}
+
+    today = datetime.utcnow().date()
+    shops = db.query(ShopDetails).order_by(ShopDetails.shop_id.desc()).all()
+    out = []
+    for s in shops:
+        expires = getattr(s, "expires_on", None)
+        paid_until = getattr(s, "paid_until", None)
+        status = "ACTIVE"
+        if expires and today > expires:
+            status = "EXPIRED"
+        elif paid_until and today > paid_until:
+            status = "EXPIRED"
+        elif getattr(s, "plan", None) == "TRIAL":
+            status = "TRIAL"
+
+        out.append(
+            {
+                "shop_id": s.shop_id,
+                "shop_name": s.shop_name,
+                "mailid": getattr(s, "mailid", None),
+                "mobile": getattr(s, "mobile", None),
+                "is_demo": bool(getattr(s, "is_demo", False)),
+                "expires_on": str(expires) if expires else None,
+                "plan": getattr(s, "plan", None) or "TRIAL",
+                "last_payment_on": str(getattr(s, "last_payment_on", None)) if getattr(s, "last_payment_on", None) else None,
+                "next_renewal": str(paid_until) if paid_until else None,
+                "total_paid": float(getattr(s, "total_paid", 0) or 0),
+                "status": status,
+                "revenue": float(rev_map.get(int(s.shop_id), 0)),
+            }
+        )
+    return out
+
+
+class ShopPaymentUpdateIn(BaseModel):
+    plan: str | None = None
+    extend_days: int | None = Field(default=None, ge=1, le=3650)
+    paid_until: str | None = None  # YYYY-MM-DD
+    amount: float | None = Field(default=None, ge=0)
+
+
+@router.post("/shops/{shop_id}/update-payment")
+def update_shop_payment(
+    shop_id: int,
+    payload: ShopPaymentUpdateIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    s = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not s:
+        raise HTTPException(404, "Shop not found")
+
+    if payload.plan:
+        s.plan = (payload.plan or "").strip().upper()[:30] or s.plan
+
+    today = datetime.utcnow().date()
+    if payload.paid_until:
+        try:
+            y, m, d = [int(x) for x in str(payload.paid_until).split("-")]
+            s.paid_until = date(y, m, d)
+        except Exception:
+            raise HTTPException(400, "paid_until must be YYYY-MM-DD")
+    elif payload.extend_days:
+        base = s.paid_until if getattr(s, "paid_until", None) and s.paid_until > today else today
+        s.paid_until = base + timedelta(days=int(payload.extend_days))
+
+    if payload.amount is not None:
+        s.total_paid = float(getattr(s, "total_paid", 0) or 0) + float(payload.amount or 0)
+        s.last_payment_on = today
+
+    db.commit()
+    db.refresh(s)
+    return {"success": True}
+
+
+@router.post("/shops/{shop_id}/reminder")
+def send_shop_reminder(
+    shop_id: int,
+    kind: str = Query("PAYMENT_DUE"),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    s = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not s:
+        raise HTTPException(404, "Shop not found")
+
+    to_email = (getattr(s, "mailid", None) or "").strip()
+    paid_until = getattr(s, "paid_until", None)
+    subject = "Payment reminder"
+    content = (
+        "Reminder from the platform.\n\n"
+        f"Shop: {getattr(s, 'shop_name', '')}\n"
+        f"Shop ID: {s.shop_id}\n"
+        f"Plan: {getattr(s, 'plan', 'TRIAL')}\n"
+        + (f"Paid until: {paid_until}\n" if paid_until else "")
+        + "\nPlease renew your subscription to avoid access interruption.\n"
+    )
+    email_sent = False
+    try:
+        email_sent = _send_credentials_email(to_email=to_email, subject=subject, content=content)
+    except Exception:
+        email_sent = False
+
+    return {"success": True, "email_sent": bool(email_sent)}
 
 
 @router.post("/support/tickets/{ticket_id}/status")

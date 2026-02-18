@@ -215,7 +215,11 @@ def _auto_migrate_demo_expiry() -> None:
                     """
                     ALTER TABLE IF EXISTS shop_details
                       ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE,
-                      ADD COLUMN IF NOT EXISTS expires_on DATE;
+                      ADD COLUMN IF NOT EXISTS expires_on DATE,
+                      ADD COLUMN IF NOT EXISTS plan VARCHAR(30) DEFAULT 'TRIAL',
+                      ADD COLUMN IF NOT EXISTS paid_until DATE,
+                      ADD COLUMN IF NOT EXISTS last_payment_on DATE,
+                      ADD COLUMN IF NOT EXISTS total_paid NUMERIC(12,2) DEFAULT 0;
                     """
                 )
             )

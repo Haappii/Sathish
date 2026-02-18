@@ -34,3 +34,9 @@ class ShopDetails(Base):
     # Demo / expiry (optional)
     is_demo = Column(Boolean, default=False)
     expires_on = Column(Date, nullable=True)
+
+    # Subscription / payment (optional)
+    plan = Column(String(30), default="TRIAL")
+    paid_until = Column(Date, nullable=True)
+    last_payment_on = Column(Date, nullable=True)
+    total_paid = Column(Numeric(12, 2), default=0)
