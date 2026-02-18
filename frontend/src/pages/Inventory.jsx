@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { isHotelShop } from "../utils/shopType";
 
 import { IoTimeOutline, IoClose } from "react-icons/io5";
 
@@ -12,6 +13,9 @@ export default function Inventory() {
   const { showToast } = useToast();
   const session = getSession() || {};
   const branch_id = session?.branch_id ?? null;
+
+  const [shop, setShop] = useState({});
+  const [isHotel, setIsHotel] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [inventoryEnabled, setInventoryEnabled] = useState(false);
@@ -36,14 +40,25 @@ export default function Inventory() {
   /* ---------- LOAD ---------- */
   const loadData = async () => {
     try {
-      const [resItems, resCats, param] = await Promise.all([
+      const [shopRes, resItems, resCats, param] = await Promise.all([
+        authAxios.get("/shop/details"),
         authAxios.get("/items/"),
         authAxios.get("/category/"),
         authAxios.get("/parameters/inventory")
       ]);
 
-      setItems(resItems.data || []);
-      setCategories(resCats.data || []);
+      const shopData = shopRes.data || {};
+      const hotel = isHotelShop(shopData);
+      setShop(shopData);
+      setIsHotel(hotel);
+
+      const allItems = resItems.data || [];
+      const invItems = hotel ? allItems.filter((it) => !!it?.is_raw_material) : allItems;
+      const catIds = new Set(invItems.map((it) => String(it?.category_id ?? "")));
+      const invCats = (resCats.data || []).filter((c) => catIds.has(String(c?.category_id ?? "")));
+
+      setItems(invItems);
+      setCategories(invCats);
       setInventoryEnabled(param?.data?.value === "YES");
 
       if (param?.data?.value === "YES" && branch_id) {
@@ -120,7 +135,7 @@ export default function Inventory() {
         </button>
 
         <h1 className="font-semibold text-gray-800">
-          Inventory
+          {isHotel ? "Raw Materials" : "Inventory"}
         </h1>
       </div>
 

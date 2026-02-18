@@ -22,7 +22,8 @@ export default function Items() {
     buy_price: "",
     mrp_price: "",
     min_stock: "",
-    item_status: true
+    item_status: true,
+    is_raw_material: false,
   });
 
   const [editingId, setEditingId] = useState(null);
@@ -94,7 +95,8 @@ export default function Items() {
       buy_price: "",
       mrp_price: "",
       min_stock: "",
-      item_status: true
+      item_status: true,
+      is_raw_material: false,
     });
     setEditingId(null);
     setEditingItem(null);
@@ -120,7 +122,8 @@ export default function Items() {
       buy_price: Number(form.buy_price) || 0,
       mrp_price: Number(form.mrp_price) || 0,
       min_stock: Number(form.min_stock) || 0,
-      item_status: !!form.item_status
+      item_status: !!form.item_status,
+      is_raw_material: !!form.is_raw_material,
     };
 
     const uploadImage = async itemId => {
@@ -188,7 +191,8 @@ export default function Items() {
       buy_price: item.buy_price ?? 0,
       mrp_price: item.mrp_price ?? 0,
       min_stock: item.min_stock ?? 0,
-      item_status: !!item.item_status
+      item_status: !!item.item_status,
+      is_raw_material: !!item.is_raw_material,
     });
     setImageFile(null);
   };
@@ -364,13 +368,26 @@ export default function Items() {
                         )}
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-[13px] whitespace-normal break-words leading-snug">
-                          {item.item_name}
+                       <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="font-semibold text-[13px] whitespace-normal break-words leading-snug min-w-0">
+                            {item.item_name}
+                          </div>
+                          {item.is_raw_material ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-800 flex-shrink-0">
+                              RAW
+                            </span>
+                          ) : null}
                         </div>
-                        <div className="text-[12px] mt-1 font-medium">
-                          RS.{Number(item.price || 0).toFixed(0)}
-                        </div>
+                        {!item.is_raw_material ? (
+                          <div className="text-[12px] mt-1 font-medium">
+                            RS.{Number(item.price || 0).toFixed(0)}
+                          </div>
+                        ) : (
+                          <div className="text-[12px] mt-1 font-medium text-amber-800">
+                            Raw Material
+                          </div>
+                        )}
                         <div className="text-[11px] text-gray-500 mt-1 whitespace-normal break-words">
                           {activeCategoryId === "all" && catName ? `${catName} | ` : ""}
                           Buy RS.{Number(item.buy_price || 0).toFixed(0)} | MRP RS.{Number(item.mrp_price || 0).toFixed(0)} | Min {Number(item.min_stock || 0)}
@@ -454,6 +471,7 @@ export default function Items() {
                   className="border rounded-lg px-2 py-1 w-full text-[11px]"
                   value={form.price}
                   onChange={e => setForm({ ...form, price: e.target.value })}
+                  disabled={form.is_raw_material}
                 />
               </div>
 
@@ -474,6 +492,7 @@ export default function Items() {
                   className="border rounded-lg px-2 py-1 w-full text-[11px]"
                   value={form.mrp_price}
                   onChange={e => setForm({ ...form, mrp_price: e.target.value })}
+                  disabled={form.is_raw_material}
                 />
               </div>
 
@@ -530,6 +549,15 @@ export default function Items() {
                 onChange={e => setForm({ ...form, item_status: e.target.checked })}
               />
               Active
+            </label>
+
+            <label className="flex items-center gap-2 text-[11px] mb-2">
+              <input
+                type="checkbox"
+                checked={form.is_raw_material}
+                onChange={e => setForm({ ...form, is_raw_material: e.target.checked })}
+              />
+              Raw Material (shows in Inventory, hidden from Billing)
             </label>
           </div>
 

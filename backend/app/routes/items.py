@@ -102,6 +102,7 @@ def create_item(
         buy_price=request_data.buy_price or 0,
         mrp_price=request_data.mrp_price or 0,
         min_stock=request_data.min_stock,
+        is_raw_material=bool(getattr(request_data, "is_raw_material", False)),
         created_by=None
     )
 
@@ -134,6 +135,7 @@ def create_item(
             "buy_price": item.buy_price,
             "mrp_price": item.mrp_price,
             "min_stock": item.min_stock,
+            "is_raw_material": getattr(item, "is_raw_material", False),
         },
         user_id=user.user_id,
     )
@@ -164,6 +166,7 @@ def update_item(
         "buy_price": item.buy_price,
         "mrp_price": item.mrp_price,
         "min_stock": item.min_stock,
+        "is_raw_material": getattr(item, "is_raw_material", False),
     }
 
     if request_data.item_name is not None:
@@ -184,6 +187,9 @@ def update_item(
 
     if request_data.min_stock is not None:
         item.min_stock = request_data.min_stock   # 👈 now updates here
+
+    if getattr(request_data, "is_raw_material", None) is not None:
+        item.is_raw_material = bool(request_data.is_raw_material)
 
     db.commit()
     db.refresh(item)
@@ -221,6 +227,7 @@ def update_item(
             "buy_price": item.buy_price,
             "mrp_price": item.mrp_price,
             "min_stock": item.min_stock,
+            "is_raw_material": getattr(item, "is_raw_material", False),
         },
         user_id=user.user_id,
     )

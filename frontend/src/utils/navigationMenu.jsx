@@ -294,7 +294,16 @@ export const buildRbacMenu = ({
     items = items.filter((x) => HEAD_OFFICE_CLOSED_KEYS.has(x.key));
   }
 
-  return items.filter((x) => canAccess(permMap, x.perm));
+  const filtered = items.filter((x) => canAccess(permMap, x.perm));
+
+  if (!showTableBilling) return filtered;
+
+  // Hotel: inventory means raw materials stock.
+  return filtered.map((x) => {
+    if (x.key === "inventory") return { ...x, name: "Raw Materials" };
+    if (x.key === "reorder_alerts") return { ...x, name: "Raw Material Alerts" };
+    return x;
+  });
 };
 
 export const buildRoleMenu = ({
@@ -303,6 +312,8 @@ export const buildRoleMenu = ({
   isHeadOfficeClosed,
 }) => {
   let menuItems = [];
+  const inventoryName = showTableBilling ? "Raw Materials" : "Inventory";
+  const reorderAlertsName = showTableBilling ? "Raw Material Alerts" : "Reorder Alerts";
 
   if (roleLower === "cashier") {
     menuItems = [
@@ -397,8 +408,8 @@ export const buildRoleMenu = ({
         path: "/deleted-invoices",
         icon: <FaFileInvoice />,
       },
-      { name: "Inventory", path: "/inventory", icon: <FaBoxes /> },
-      { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
+      { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
+      { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
     ];
   } else if (roleLower === "admin") {
@@ -441,7 +452,7 @@ export const buildRoleMenu = ({
       { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
       { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
-      { name: "Reorder Alerts", path: "/reorder-alerts", icon: <FaBell /> },
+      { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       {
@@ -449,6 +460,7 @@ export const buildRoleMenu = ({
         path: "/deleted-invoices",
         icon: <FaFileInvoice />,
       },
+      { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
       { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> },
     ];

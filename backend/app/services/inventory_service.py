@@ -119,8 +119,8 @@ def update_min_stock(db: Session, shop_id: int, item_id: int, branch_id: int, mi
 # =========================================================
 # LIST STOCK FOR ONE BRANCH (JOIN WITH ITEM NAME)
 # =========================================================
-def get_branch_stock_rows(db: Session, shop_id: int, branch_id: int):
-    return (
+def get_branch_stock_rows(db: Session, shop_id: int, branch_id: int, raw_only: bool = False):
+    q = (
         db.query(
             Inventory.item_id,
             Item.item_name,
@@ -131,3 +131,8 @@ def get_branch_stock_rows(db: Session, shop_id: int, branch_id: int):
         .filter(Inventory.shop_id == shop_id, Inventory.branch_id == branch_id)
         .order_by(desc(Inventory.quantity))
     )
+
+    if raw_only:
+        q = q.filter(Item.is_raw_material == True)
+
+    return q

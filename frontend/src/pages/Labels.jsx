@@ -71,7 +71,8 @@ export default function Labels() {
     setLoading(true);
     try {
       const res = await api.get("/items/");
-      setItems(Array.isArray(res?.data) ? res.data : []);
+      const rows = Array.isArray(res?.data) ? res.data : [];
+      setItems(rows.filter((it) => !it?.is_raw_material));
     } catch {
       setItems([]);
       showToast("Failed to load items", "error");
@@ -387,4 +388,3 @@ export default function Labels() {
     </div>
   );
 }
-

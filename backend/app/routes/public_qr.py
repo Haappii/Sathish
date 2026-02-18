@@ -188,7 +188,11 @@ def public_qr_bootstrap(
     )
     items = (
         db.query(Item)
-        .filter(Item.shop_id == tok.shop_id, Item.item_status == True)
+        .filter(
+            Item.shop_id == tok.shop_id,
+            Item.item_status == True,
+            Item.is_raw_material == False,
+        )
         .order_by(Item.item_name)
         .all()
     )
@@ -266,7 +270,11 @@ def public_qr_bootstrap_with_mobile(
     )
     items = (
         db.query(Item)
-        .filter(Item.shop_id == tok.shop_id, Item.item_status == True)
+        .filter(
+            Item.shop_id == tok.shop_id,
+            Item.item_status == True,
+            Item.is_raw_material == False,
+        )
         .order_by(Item.item_name)
         .all()
     )
@@ -388,7 +396,12 @@ def public_qr_create_order(
     item_ids = list({int(x.item_id) for x in req_items})
     db_items = (
         db.query(Item)
-        .filter(Item.shop_id == tok.shop_id, Item.item_id.in_(item_ids), Item.item_status == True)
+        .filter(
+            Item.shop_id == tok.shop_id,
+            Item.item_id.in_(item_ids),
+            Item.item_status == True,
+            Item.is_raw_material == False,
+        )
         .all()
     )
     item_map = {i.item_id: i for i in db_items}

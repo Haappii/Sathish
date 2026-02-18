@@ -9,6 +9,7 @@ class ItemBase(BaseModel):
     buy_price: Optional[float] = 0
     mrp_price: Optional[float] = 0
     item_status: Optional[bool] = True
+    is_raw_material: Optional[bool] = False
     min_stock: Optional[int] = 0   # 👈 now belongs to Item
 
 
@@ -20,6 +21,7 @@ class ItemCreate(ItemBase):
     mrp_price: float = 0
     item_status: bool = True
     min_stock: int = 0
+    is_raw_material: bool = False
 
 
 class ItemUpdate(ItemBase):
@@ -35,6 +37,7 @@ class ItemResponse(BaseModel):
     mrp_price: float
     image_filename: Optional[str] = None
     min_stock: int
+    is_raw_material: bool = False
     item_status: bool
 
     class Config:

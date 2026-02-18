@@ -47,7 +47,7 @@ export default function ItemLots() {
   const loadItems = async () => {
     try {
       const res = await authAxios.get("/items/");
-      setItems(res.data || []);
+      setItems((res.data || []).filter((it) => !it?.is_raw_material));
     } catch {
       setItems([]);
     }

@@ -36,7 +36,7 @@ export default function Pricing() {
   const loadItems = async () => {
     try {
       const res = await authAxios.get("/items/");
-      setItems(res.data || []);
+      setItems((res.data || []).filter((it) => !it?.is_raw_material));
     } catch {
       setItems([]);
       showToast("Failed to load items", "error");

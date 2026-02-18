@@ -19,6 +19,7 @@ class Item(Base):
     image_filename = Column(String(255), nullable=True)
 
     min_stock = Column(Integer, nullable=False, default=0)   # 👈 Moved here
+    is_raw_material = Column(Boolean, nullable=False, default=False)
 
     item_status = Column(Boolean, default=True)
     created_on = Column(TIMESTAMP(timezone=True), server_default=func.now())

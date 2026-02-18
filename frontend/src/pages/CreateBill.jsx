@@ -132,7 +132,7 @@ export default function CreateBill() {
       setCategories(cats.data || []);
 
       const items = await authAxios.get("/items/");
-      setItemsData(items.data || []);
+      setItemsData((items.data || []).filter((it) => !it?.is_raw_material));
 
       // Pricing / price levels (optional, RBAC-controlled)
       try {

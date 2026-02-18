@@ -66,7 +66,7 @@ export default function TableOrder() {
       api.get("/items/"),
     ]);
     setCategories(c.data || []);
-    setItems(i.data || []);
+    setItems((i.data || []).filter((it) => !it?.is_raw_material));
     setShop(shopData || {});
     const session = getSession() || {};
     if (session.branch_id) {
