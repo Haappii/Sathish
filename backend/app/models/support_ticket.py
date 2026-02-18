@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Date, func
 
 from app.db import Base
 
@@ -25,3 +25,11 @@ class SupportTicket(Base):
 
     status = Column(String(30), nullable=False, default="OPEN")
     created_on = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    # Provisioning info (used when platform owner accepts DEMO requests)
+    provisioned_shop_id = Column(Integer, nullable=True)
+    provisioned_branch_id = Column(Integer, nullable=True)
+    provisioned_admin_user_id = Column(Integer, nullable=True)
+    provisioned_expires_on = Column(Date, nullable=True)
+    decided_by = Column(String(120), nullable=True)
+    decided_at = Column(TIMESTAMP(timezone=True), nullable=True)

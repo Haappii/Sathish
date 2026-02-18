@@ -22,6 +22,7 @@ export default function PlatformDashboard() {
   const [busyReqId, setBusyReqId] = useState(null);
   const [busyTicketId, setBusyTicketId] = useState(null);
   const [acceptedInfo, setAcceptedInfo] = useState(null);
+  const [demoDays, setDemoDays] = useState(7);
 
   const token = getPlatformToken();
 
@@ -105,6 +106,40 @@ export default function PlatformDashboard() {
     }
   };
 
+  const acceptDemo = async (ticketId) => {
+    if (busyTicketId) return;
+    setBusyTicketId(ticketId);
+    setAcceptedInfo(null);
+    try {
+      const res = await platformAxios.post(`/platform/demo/tickets/${ticketId}/accept`, null, {
+        params: { days: demoDays },
+      });
+      setAcceptedInfo(res.data || null);
+      showToast("Demo accepted (shop created)", "success");
+      await load();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Accept demo failed", "error");
+    } finally {
+      setBusyTicketId(null);
+    }
+  };
+
+  const rejectDemo = async (ticketId) => {
+    if (busyTicketId) return;
+    const ok = window.confirm("Reject this demo request?");
+    if (!ok) return;
+    setBusyTicketId(ticketId);
+    try {
+      await platformAxios.post(`/platform/demo/tickets/${ticketId}/reject`);
+      showToast("Demo rejected", "success");
+      await load();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Reject demo failed", "error");
+    } finally {
+      setBusyTicketId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
@@ -160,6 +195,12 @@ export default function PlatformDashboard() {
               Shop ID: <span className="font-semibold">{acceptedInfo.shop_id}</span> • Admin:{" "}
               <span className="font-semibold">{acceptedInfo.admin_username}</span> • Password:{" "}
               <span className="font-semibold">{acceptedInfo.admin_password}</span>
+              {acceptedInfo.expires_on ? (
+                <>
+                  {" "}
+                  • Expires on: <span className="font-semibold">{acceptedInfo.expires_on}</span>
+                </>
+              ) : null}
             </div>
           </div>
         )}
@@ -232,6 +273,39 @@ export default function PlatformDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {String(t.ticket_type || "").toUpperCase() === "DEMO" && String(t.status || "").toUpperCase() === "OPEN" ? (
+                        <>
+                          <select
+                            className="border rounded-lg px-2 py-2 text-[12px]"
+                            value={demoDays}
+                            onChange={(e) => setDemoDays(Number(e.target.value))}
+                            title="Demo expiry days"
+                          >
+                            {[7, 14, 30, 60].map((d) => (
+                              <option key={d} value={d}>
+                                {d} days
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => rejectDemo(t.ticket_id)}
+                            disabled={busyTicketId === t.ticket_id}
+                            className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => acceptDemo(t.ticket_id)}
+                            disabled={busyTicketId === t.ticket_id}
+                            className="px-3 py-2 rounded-lg text-white text-[12px] disabled:opacity-60"
+                            style={{ background: BLUE }}
+                          >
+                            Accept Demo
+                          </button>
+                        </>
+                      ) : null}
                       {t.attachment_path ? (
                         <a
                           className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50"

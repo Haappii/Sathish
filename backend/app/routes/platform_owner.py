@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime
+from datetime import date, datetime
 from mimetypes import guess_type
 from pathlib import Path
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -340,6 +341,122 @@ def platform_update_ticket_status(
     db.commit()
     db.refresh(row)
     return {"success": True, "ticket_id": row.ticket_id, "status": row.status}
+
+
+def _demo_expiry(days: int) -> date:
+    d = int(days)
+    if d < 1 or d > 365:
+        raise HTTPException(400, "Expiry days must be between 1 and 365")
+    return (datetime.utcnow().date() + timedelta(days=d))
+
+
+@router.post("/demo/tickets/{ticket_id}/accept")
+def accept_demo_ticket(
+    ticket_id: int,
+    days: int = Query(7, ge=1, le=365),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    t = db.query(SupportTicket).filter(SupportTicket.ticket_id == ticket_id).first()
+    if not t:
+        raise HTTPException(404, "Ticket not found")
+    if str(t.ticket_type or "").upper() != "DEMO":
+        raise HTTPException(400, "Not a demo ticket")
+    if str(t.status or "").upper() != "OPEN":
+        raise HTTPException(400, f"Ticket already {t.status}")
+
+    expires_on = _demo_expiry(days)
+
+    # Use business / name as shop name fallback.
+    shop_name = (t.business or "").strip() or (t.user_name or "").strip() or f"Demo Shop {ticket_id}"
+    admin_username = "admin"
+    admin_password = _generate_password()
+
+    admin_role = _ensure_admin_role(db)
+
+    try:
+        shop = ShopDetails(
+            shop_name=shop_name,
+            owner_name=t.user_name,
+            mobile=getattr(t, "phone", None) or None,
+            mailid=getattr(t, "email", None) or None,
+            billing_type="store",
+            gst_enabled=False,
+            gst_percent=0,
+            gst_mode="inclusive",
+            is_demo=True,
+            expires_on=expires_on,
+        )
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
+        branch = Branch(
+            shop_id=shop.shop_id,
+            branch_name="Head Office",
+            type="Head Office",
+            status="ACTIVE",
+            branch_close="N",
+        )
+        db.add(branch)
+        db.commit()
+        db.refresh(branch)
+
+        user = User(
+            shop_id=shop.shop_id,
+            user_name=admin_username,
+            password=encode_password(admin_password),
+            name="Demo Admin",
+            role=admin_role.role_id,
+            status=True,
+            branch_id=branch.branch_id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        t.status = "RESOLVED"
+        t.provisioned_shop_id = shop.shop_id
+        t.provisioned_branch_id = branch.branch_id
+        t.provisioned_admin_user_id = user.user_id
+        t.provisioned_expires_on = expires_on
+        t.decided_by = str(owner.get("platform_username") or "")
+        t.decided_at = datetime.utcnow()
+        db.commit()
+
+        return {
+            "success": True,
+            "ticket_id": t.ticket_id,
+            "shop_id": shop.shop_id,
+            "branch_id": branch.branch_id,
+            "admin_username": admin_username,
+            "admin_password": admin_password,
+            "expires_on": str(expires_on),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Failed to provision demo: {str(e)}")
+
+
+@router.post("/demo/tickets/{ticket_id}/reject")
+def reject_demo_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    t = db.query(SupportTicket).filter(SupportTicket.ticket_id == ticket_id).first()
+    if not t:
+        raise HTTPException(404, "Ticket not found")
+    if str(t.ticket_type or "").upper() != "DEMO":
+        raise HTTPException(400, "Not a demo ticket")
+    if str(t.status or "").upper() != "OPEN":
+        raise HTTPException(400, f"Ticket already {t.status}")
+
+    t.status = "CLOSED"
+    t.decided_by = str(owner.get("platform_username") or "")
+    t.decided_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "ticket_id": t.ticket_id, "status": t.status}
 
 
 @router.get("/support/tickets/{ticket_id}/attachment")

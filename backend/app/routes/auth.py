@@ -1,5 +1,7 @@
 # PATH: app/routes/auth.py
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -27,6 +29,10 @@ def login(request: dict, db: Session = Depends(get_db)):
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
     if not shop:
         raise HTTPException(400, "Invalid Shop ID")
+    if getattr(shop, "expires_on", None):
+        today = datetime.utcnow().date()
+        if today > shop.expires_on:
+            raise HTTPException(403, f"Shop access expired on {shop.expires_on}")
 
     user = (
         db.query(User)
