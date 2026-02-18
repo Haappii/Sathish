@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.db import engine, Base, SessionLocal
 import logging
 import os
@@ -198,6 +199,44 @@ def seed_platform_owner_defaults():
         db.close()
 
 
+def _auto_migrate_demo_expiry() -> None:
+    """
+    Lightweight, safe schema patch for the demo/expiry feature.
+
+    This avoids manual SQL runs on environments that don't use Alembic.
+    Only runs on Postgres and uses IF NOT EXISTS to stay idempotent.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS shop_details
+                      ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE,
+                      ADD COLUMN IF NOT EXISTS expires_on DATE;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS support_tickets
+                      ADD COLUMN IF NOT EXISTS provisioned_shop_id INTEGER,
+                      ADD COLUMN IF NOT EXISTS provisioned_branch_id INTEGER,
+                      ADD COLUMN IF NOT EXISTS provisioned_admin_user_id INTEGER,
+                      ADD COLUMN IF NOT EXISTS provisioned_expires_on DATE,
+                      ADD COLUMN IF NOT EXISTS decided_by VARCHAR(120),
+                      ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ;
+                    """
+                )
+            )
+    except Exception as e:
+        # Don't take down the API due to a migration/DDL issue.
+        logger.exception("Auto-migration (demo expiry) failed: %s", e)
+
+
 @app.on_event("startup")
 def _startup_db_init():
     """
@@ -208,6 +247,8 @@ def _startup_db_init():
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         logger.exception("DB create_all failed: %s", e)
+
+    _auto_migrate_demo_expiry()
 
     try:
         seed_defaults()
