@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 
-const steps = [
-  "Shop Details",
-  "Branch Details",
-  "User Details",
-  "Verification"
-];
+const steps = ["Business", "Branch", "Contact"];
 
 export default function SetupOnboard() {
   const navigate = useNavigate();
@@ -31,10 +27,11 @@ export default function SetupOnboard() {
     branch_state: "",
     branch_pincode: "",
 
-    admin_name: "",
-    admin_username: "",
-    admin_password: "",
-    verification_code: ""
+    requester_name: "",
+    requester_email: "",
+    requester_phone: "",
+    business: "",
+    message: "",
   });
 
   const [logoFile, setLogoFile] = useState(null);
@@ -45,14 +42,12 @@ export default function SetupOnboard() {
       setLogoPreviewUrl("");
       return;
     }
-
     const url = URL.createObjectURL(logoFile);
     setLogoPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [logoFile]);
 
-  const update = (k, v) =>
-    setForm(prev => ({ ...prev, [k]: v }));
+  const update = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
 
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0] || null;
@@ -77,24 +72,19 @@ export default function SetupOnboard() {
   };
 
   const validateStep = () => {
-    if (step === 0 && !form.shop_name.trim())
-      return "Shop name required";
-    if (step === 1 && !form.branch_name.trim())
-      return "Branch name required";
-    if (step === 2 && (!form.admin_username || !form.admin_password))
-      return "Admin credentials required";
-    if (step === 3 && !form.verification_code)
-      return "Verification code required";
+    if (step === 0 && !form.shop_name.trim()) return "Shop name required";
+    if (step === 1 && !form.branch_name.trim()) return "Branch name required";
+    if (step === 2 && !String(form.requester_email || "").includes("@")) return "Valid email required";
     return null;
   };
 
   const next = () => {
     const err = validateStep();
     if (err) return showToast(err, "error");
-    setStep(s => Math.min(s + 1, steps.length - 1));
+    setStep((s) => Math.min(s + 1, steps.length - 1));
   };
 
-  const back = () => setStep(s => Math.max(s - 1, 0));
+  const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const submit = async () => {
     const err = validateStep();
@@ -103,18 +93,25 @@ export default function SetupOnboard() {
     try {
       setLoading(true);
 
+      // Keep multipart so we can add logo later (even if backend currently reads JSON).
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => {
-        fd.append(k, v ?? "");
-      });
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v ?? ""));
       if (logoFile) fd.append("logo", logoFile);
 
-      const res = await api.post("/setup/onboard", fd);
+      // Backend currently accepts JSON for platform onboarding requests.
+      // If logo is needed, we can extend backend later; for now send JSON.
+      const res = await api.post("/platform/onboard/requests", {
+        ...form,
+        shop_name: form.shop_name,
+        branch_name: form.branch_name,
+        billing_type: "store",
+      });
+
       setResult(res.data);
-      showToast("Setup completed", "success");
-      setTimeout(() => navigate("/"), 1200);
+      showToast("Request sent. We will contact you soon.", "success");
+      setTimeout(() => navigate("/"), 1500);
     } catch (e) {
-      showToast(e?.response?.data?.detail || "Setup failed", "error");
+      showToast(e?.response?.data?.detail || "Request failed", "error");
     } finally {
       setLoading(false);
     }
@@ -188,92 +185,93 @@ export default function SetupOnboard() {
         }
 
         .step.active .step-circle {
-          background: linear-gradient(135deg, #5b7cff, #00e5c0);
-          color: #051018;
+          background: rgba(0,229,192,0.15);
+          border-color: rgba(0,229,192,0.5);
+          color: #a7f3d0;
         }
 
         .step-line {
           flex: 1;
           height: 2px;
-          background: rgba(255,255,255,0.2);
-          margin: 0 14px;
+          background: rgba(255,255,255,0.12);
+          margin: 0 12px;
         }
 
-        .section-title {
-          font-size: 20px;
-          font-weight: 600;
-          margin-bottom: 16px;
+        .step.active .step-line {
+          background: rgba(0,229,192,0.45);
         }
 
         .grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 16px;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
         }
 
-        input {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.18);
+        input, textarea {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.15);
+          color: #f8fafc;
+          padding: 12px 12px;
           border-radius: 14px;
-          padding: 12px 14px;
-          color: #fff;
+          outline: none;
           font-size: 14px;
         }
 
-        input::placeholder {
-          color: #9aa4c7;
-        }
+        textarea { grid-column: 1 / -1; min-height: 110px; resize: vertical; }
+
+        input::placeholder, textarea::placeholder { color: rgba(248,250,252,0.55); }
+
+        .section-title { margin: 10px 0 14px; font-weight: 600; color: #e5e7eb; }
 
         .info {
-          margin-top: 12px;
-          padding: 14px;
-          border-radius: 14px;
-          background: rgba(91,124,255,0.12);
-          color: #c7d2ff;
+          margin-top: 14px;
+          padding: 12px 14px;
+          border-radius: 16px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.12);
+          color: #cbd5e1;
           font-size: 13px;
         }
 
         .footer {
           display: flex;
           justify-content: space-between;
-          margin-top: 36px;
+          gap: 12px;
+          margin-top: 22px;
         }
 
         .btn {
-          padding: 12px 22px;
-          border-radius: 14px;
+          border-radius: 16px;
+          padding: 12px 16px;
           font-weight: 600;
+          border: 1px solid rgba(255,255,255,0.15);
+          background: rgba(255,255,255,0.06);
+          color: #f8fafc;
           cursor: pointer;
-          border: none;
-        }
-
-        .btn-outline {
-          background: transparent;
-          border: 1px solid rgba(255,255,255,0.25);
-          color: #fff;
         }
 
         .btn-primary {
-          background: linear-gradient(135deg, #5b7cff, #7aa2ff);
-          color: #fff;
+          background: rgba(91,124,255,0.25);
+          border-color: rgba(91,124,255,0.45);
         }
 
         .btn-success {
-          background: linear-gradient(135deg, #00e5c0, #5bffdc);
-          color: #051018;
+          background: rgba(0,229,192,0.18);
+          border-color: rgba(0,229,192,0.45);
         }
 
-        .btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        @media (max-width: 720px) {
+          .grid { grid-template-columns: 1fr; }
+          .card { padding: 22px; }
         }
       `}</style>
 
       <div className="card">
-        <h1 className="title">Application Setup</h1>
-        <p className="subtitle">One-time onboarding • Takes less than 2 minutes</p>
+        <h1 className="title">Request Onboarding</h1>
+        <p className="subtitle">No verification code. Submit request and we will activate your shop.</p>
 
-        {/* STEPPER */}
         <div className="stepper">
           {steps.map((_, i) => (
             <div className={`step ${step >= i ? "active" : ""}`} key={i}>
@@ -283,24 +281,20 @@ export default function SetupOnboard() {
           ))}
         </div>
 
-        {/* RESULT */}
-        {result && (
-          <div className="info">
-            ✅ Setup completed successfully. Redirecting to login…
-          </div>
-        )}
+        {result?.request_id ? (
+          <div className="info">Request created: #{result.request_id}. Redirecting to login…</div>
+        ) : null}
 
-        {/* STEPS */}
         {step === 0 && (
           <>
-            <div className="section-title">Shop Details</div>
+            <div className="section-title">Business</div>
             <div className="grid">
-              <input placeholder="Shop Name *" value={form.shop_name} onChange={e => update("shop_name", e.target.value)} />
-              <input placeholder="Owner Name" value={form.owner_name} onChange={e => update("owner_name", e.target.value)} />
-              <input placeholder="Mobile" value={form.mobile} onChange={e => update("mobile", e.target.value)} />
-              <input placeholder="Email" value={form.mailid} onChange={e => update("mailid", e.target.value)} />
-              <input placeholder="City" value={form.city} onChange={e => update("city", e.target.value)} />
-              <input placeholder="State" value={form.state} onChange={e => update("state", e.target.value)} />
+              <input placeholder="Shop Name *" value={form.shop_name} onChange={(e) => update("shop_name", e.target.value)} />
+              <input placeholder="Owner Name" value={form.owner_name} onChange={(e) => update("owner_name", e.target.value)} />
+              <input placeholder="Mobile" value={form.mobile} onChange={(e) => update("mobile", e.target.value)} />
+              <input placeholder="Email" value={form.mailid} onChange={(e) => update("mailid", e.target.value)} />
+              <input placeholder="City" value={form.city} onChange={(e) => update("city", e.target.value)} />
+              <input placeholder="State" value={form.state} onChange={(e) => update("state", e.target.value)} />
               <input type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} />
             </div>
 
@@ -315,15 +309,13 @@ export default function SetupOnboard() {
                       height: 56,
                       borderRadius: 14,
                       objectFit: "cover",
-                      background: "rgba(255,255,255,0.10)"
+                      background: "rgba(255,255,255,0.10)",
                     }}
                   />
-                  <div>
-                    Logo selected{logoFile?.name ? `: ${logoFile.name}` : ""}
-                  </div>
+                  <div>Logo selected{logoFile?.name ? `: ${logoFile.name}` : ""}</div>
                 </div>
               ) : (
-                <span>Optional: Upload a shop logo (PNG/JPG/JPEG)</span>
+                <span>Optional: Upload a logo (PNG/JPG/JPEG)</span>
               )}
             </div>
           </>
@@ -331,42 +323,34 @@ export default function SetupOnboard() {
 
         {step === 1 && (
           <>
-            <div className="section-title">Branch Details</div>
+            <div className="section-title">Branch</div>
             <div className="grid">
-              <input placeholder="Branch Name *" value={form.branch_name} onChange={e => update("branch_name", e.target.value)} />
-              <input placeholder="City" value={form.branch_city} onChange={e => update("branch_city", e.target.value)} />
-              <input placeholder="State" value={form.branch_state} onChange={e => update("branch_state", e.target.value)} />
-              <input placeholder="Pincode" value={form.branch_pincode} onChange={e => update("branch_pincode", e.target.value)} />
+              <input placeholder="Branch Name *" value={form.branch_name} onChange={(e) => update("branch_name", e.target.value)} />
+              <input placeholder="City" value={form.branch_city} onChange={(e) => update("branch_city", e.target.value)} />
+              <input placeholder="State" value={form.branch_state} onChange={(e) => update("branch_state", e.target.value)} />
+              <input placeholder="Pincode" value={form.branch_pincode} onChange={(e) => update("branch_pincode", e.target.value)} />
             </div>
           </>
         )}
 
         {step === 2 && (
           <>
-            <div className="section-title">Admin User</div>
+            <div className="section-title">Contact</div>
             <div className="grid">
-              <input placeholder="Admin Name" value={form.admin_name} onChange={e => update("admin_name", e.target.value)} />
-              <input placeholder="Username *" value={form.admin_username} onChange={e => update("admin_username", e.target.value)} />
-              <input type="password" placeholder="Password *" value={form.admin_password} onChange={e => update("admin_password", e.target.value)} />
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            <div className="section-title">Verification</div>
-            <div className="grid">
-              <input placeholder="Verification Code *" value={form.verification_code} onChange={e => update("verification_code", e.target.value)} />
+              <input placeholder="Your Name" value={form.requester_name} onChange={(e) => update("requester_name", e.target.value)} />
+              <input placeholder="Your Email *" value={form.requester_email} onChange={(e) => update("requester_email", e.target.value)} />
+              <input placeholder="Your Phone" value={form.requester_phone} onChange={(e) => update("requester_phone", e.target.value)} />
+              <input placeholder="Business Type" value={form.business} onChange={(e) => update("business", e.target.value)} />
+              <textarea placeholder="Message (optional)" value={form.message} onChange={(e) => update("message", e.target.value)} />
             </div>
             <div className="info">
-              Enter the verification code provided by the administrator.
+              After approval, you will receive Shop ID and admin credentials from the platform owner.
             </div>
           </>
         )}
 
-        {/* FOOTER */}
         <div className="footer">
-          <button className="btn btn-outline" onClick={back} disabled={step === 0}>
+          <button className="btn" onClick={back} disabled={step === 0}>
             Back
           </button>
 
@@ -376,7 +360,7 @@ export default function SetupOnboard() {
             </button>
           ) : (
             <button className="btn btn-success" onClick={submit} disabled={loading}>
-              {loading ? "Creating…" : "Complete Setup"}
+              {loading ? "Sending..." : "Send Request"}
             </button>
           )}
         </div>
@@ -384,3 +368,4 @@ export default function SetupOnboard() {
     </div>
   );
 }
+

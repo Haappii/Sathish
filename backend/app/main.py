@@ -60,6 +60,7 @@ import app.models.gift_card_txn
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
 import app.models.table_qr
+import app.models.platform_onboard_request
 
 
 from app.models.users import User
@@ -238,6 +239,7 @@ from app.routes import expenses
 from app.routes import suppliers
 from app.routes import purchase_orders
 from app.routes import gift_cards
+from app.routes import platform_owner
 
 # ---------- REPORT ROUTES ----------
 from app.routes import categorysales
@@ -298,6 +300,7 @@ app.include_router(expenses.router,      prefix="/api")
 app.include_router(suppliers.router,     prefix="/api")
 app.include_router(purchase_orders.router, prefix="/api")
 app.include_router(gift_cards.router, prefix="/api")
+app.include_router(platform_owner.router, prefix="/api")
 
 # ---------- REPORTS ----------
 app.include_router(categorysales.router,         prefix="/api")

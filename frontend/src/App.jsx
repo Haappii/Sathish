@@ -55,6 +55,9 @@ import Permissions from "./pages/setup/Permissions";
 import SetupOnboard from "./pages/SetupOnboard";
 import About from "./pages/About";
 
+import PlatformLogin from "./pages/platform/PlatformLogin";
+import PlatformDashboard from "./pages/platform/PlatformDashboard";
+
 import Reports from "./pages/reports/Reports";
 
 import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
@@ -76,6 +79,8 @@ export default function App() {
           <Route path="/" element={<Login />} />
           <Route path="/about" element={<About />} />
           <Route path="/setup/onboard" element={<SetupOnboard />} />
+          <Route path="/platform/login" element={<PlatformLogin />} />
+          <Route path="/platform/dashboard" element={<PlatformDashboard />} />
           <Route path="/qr/:token" element={<PublicQrMenu />} />
 
           {/* MAIN LAYOUT */}
