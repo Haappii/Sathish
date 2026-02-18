@@ -13,7 +13,7 @@ export default function PlatformDashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [tab, setTab] = useState("ONBOARD"); // ONBOARD | DEMO | SUPPORT
+  const [tab, setTab] = useState("ONBOARD");
   const [loading, setLoading] = useState(true);
 
   const [reqs, setReqs] = useState([]);
@@ -88,8 +88,7 @@ export default function PlatformDashboard() {
 
   const rejectReq = async (id) => {
     if (busyReqId) return;
-    const ok = window.confirm("Reject this onboarding request?");
-    if (!ok) return;
+    if (!window.confirm("Reject this onboarding request?")) return;
     setBusyReqId(id);
     try {
       await platformAxios.post(`/platform/onboard/requests/${id}/reject`);
@@ -138,8 +137,7 @@ export default function PlatformDashboard() {
 
   const rejectDemo = async (ticketId) => {
     if (busyTicketId) return;
-    const ok = window.confirm("Reject this demo request?");
-    if (!ok) return;
+    if (!window.confirm("Reject this demo request?")) return;
     setBusyTicketId(ticketId);
     try {
       await platformAxios.post(`/platform/demo/tickets/${ticketId}/reject`);
@@ -153,28 +151,31 @@ export default function PlatformDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
-        <div className="bg-white border rounded-2xl shadow p-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-lg font-extrabold text-slate-900">Platform Dashboard</div>
-            <div className="text-[12px] text-slate-500">
-              Pending onboard: <span className="font-semibold">{pendingReqs.length}</span> • Open tickets:{" "}
-              <span className="font-semibold">{openTickets.length}</span>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+
+        {/* HEADER */}
+        <div className="bg-white rounded-3xl shadow-lg p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              Platform Control Center
+            </h1>
+            <p className="text-sm text-slate-500">
+              Manage onboarding, demo requests & support tickets
+            </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+
+          <div className="flex gap-3">
             <button
-              type="button"
               onClick={load}
-              className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50"
+              className="px-4 py-2 rounded-xl border text-sm hover:bg-slate-50 transition"
             >
               Refresh
             </button>
+
             <button
-              type="button"
               onClick={logout}
-              className="px-3 py-2 rounded-lg text-white text-[12px]"
+              className="px-4 py-2 rounded-xl text-white text-sm shadow-md hover:opacity-90 transition"
               style={{ background: BLUE }}
             >
               Logout
@@ -182,7 +183,15 @@ export default function PlatformDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* STATS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard title="Pending Onboard" value={pendingReqs.length} />
+          <StatCard title="Open Tickets" value={openTickets.length} />
+          <StatCard title="Demo Requests" value={openDemoTickets.length} />
+        </div>
+
+        {/* TABS */}
+        <div className="bg-white p-2 rounded-2xl shadow flex gap-2 w-fit">
           {[
             { k: "ONBOARD", label: "Onboarding" },
             { k: "DEMO", label: "Demo Requests" },
@@ -190,10 +199,11 @@ export default function PlatformDashboard() {
           ].map((x) => (
             <button
               key={x.k}
-              type="button"
               onClick={() => setTab(x.k)}
-              className={`px-3 py-2 rounded-lg border text-[12px] ${
-                tab === x.k ? "bg-white shadow" : "bg-slate-50 hover:bg-white"
+              className={`px-4 py-2 text-sm rounded-xl transition ${
+                tab === x.k
+                  ? "bg-blue-600 text-white shadow"
+                  : "hover:bg-slate-100 text-slate-600"
               }`}
             >
               {x.label}
@@ -201,178 +211,168 @@ export default function PlatformDashboard() {
           ))}
         </div>
 
-        {acceptedInfo?.admin_password && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-            <div className="text-sm font-semibold text-emerald-800">Created Credentials (copy now)</div>
-            <div className="text-[12px] text-emerald-800 mt-1">
-              Shop ID: <span className="font-semibold">{acceptedInfo.shop_id}</span> • Admin:{" "}
-              <span className="font-semibold">{acceptedInfo.admin_username}</span> • Password:{" "}
-              <span className="font-semibold">{acceptedInfo.admin_password}</span>
-              {acceptedInfo.expires_on ? (
-                <>
-                  {" "}
-                  • Expires on: <span className="font-semibold">{acceptedInfo.expires_on}</span>
-                </>
-              ) : null}
-            </div>
-          </div>
-        )}
-
+        {/* CONTENT */}
         {loading ? (
-          <div className="text-sm text-slate-500">Loading...</div>
-        ) : tab === "ONBOARD" ? (
-          <div className="space-y-3">
-            {pendingReqs.length === 0 ? (
-              <div className="bg-white border rounded-2xl shadow p-4 text-sm text-slate-600">
-                No pending onboarding requests.
-              </div>
-            ) : (
+          <div className="text-center py-10 text-slate-500">Loading data...</div>
+        ) : (
+          <div className="space-y-4">
+            {/* ONBOARD */}
+            {tab === "ONBOARD" &&
               pendingReqs.map((r) => (
-                <div key={r.request_id} className="bg-white border rounded-2xl shadow p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900 truncate">
-                        #{r.request_id} • {r.shop_name}
-                      </div>
-                      <div className="text-[12px] text-slate-500">
-                        Branch: {r.branch_name} • Requested: {fmt(r.created_at)}
-                      </div>
-                      <div className="text-[12px] text-slate-600 mt-1">
-                        {r.requester_name || "Requester"} {r.requester_phone ? `• ${r.requester_phone}` : ""}{" "}
-                        {r.requester_email ? `• ${r.requester_email}` : ""}
-                      </div>
-                      {r.message ? (
-                        <div className="text-[12px] text-slate-700 mt-2 whitespace-pre-wrap">{r.message}</div>
-                      ) : null}
+                <Card key={r.request_id}>
+                  <div className="flex justify-between flex-wrap gap-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-800">
+                        #{r.request_id} — {r.shop_name}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Branch: {r.branch_name}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {r.requester_name} • {r.requester_phone}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Requested: {fmt(r.created_at)}
+                      </p>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+
+                    <div className="flex gap-2">
                       <button
-                        type="button"
                         onClick={() => rejectReq(r.request_id)}
-                        disabled={busyReqId === r.request_id}
-                        className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50 disabled:opacity-60"
+                        className="px-3 py-2 text-xs rounded-lg border hover:bg-slate-100"
                       >
                         Reject
                       </button>
+
                       <button
-                        type="button"
                         onClick={() => acceptReq(r.request_id)}
-                        disabled={busyReqId === r.request_id}
-                        className="px-3 py-2 rounded-lg text-white text-[12px] disabled:opacity-60"
+                        className="px-3 py-2 text-xs rounded-lg text-white shadow hover:opacity-90"
                         style={{ background: BLUE }}
                       >
-                        Accept + Create Shop
+                        Accept
                       </button>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : tab === "DEMO" ? (
-          <div className="space-y-3">
-            {openDemoTickets.length === 0 ? (
-              <div className="bg-white border rounded-2xl shadow p-4 text-sm text-slate-600">
-                No open demo requests.
-              </div>
-            ) : (
+                </Card>
+              ))}
+
+            {/* DEMO */}
+            {tab === "DEMO" &&
               openDemoTickets.map((t) => (
-                <div key={t.ticket_id} className="bg-white border rounded-2xl shadow p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900 truncate">
-                        #{t.ticket_id} • DEMO • {t.status}
-                      </div>
-                      <div className="text-[12px] text-slate-500">
-                        {t.user_name || "User"} {t.email ? `• ${t.email}` : ""} {t.phone ? `• ${t.phone}` : ""}
-                      </div>
-                      {t.business ? <div className="text-[12px] text-slate-600 mt-1">{t.business}</div> : null}
+                <Card key={t.ticket_id}>
+                  <div className="flex justify-between flex-wrap gap-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-800">
+                        #{t.ticket_id} — DEMO
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {t.user_name} • {t.email}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+
+                    <div className="flex gap-2 items-center">
                       <select
-                        className="border rounded-lg px-2 py-2 text-[12px]"
+                        className="border rounded-lg px-2 py-1 text-xs"
                         value={demoDays}
                         onChange={(e) => setDemoDays(Number(e.target.value))}
-                        title="Demo expiry days"
                       >
-                        {[7, 14, 30, 60].map((d) => (
+                        {[7, 14, 30].map((d) => (
                           <option key={d} value={d}>
                             {d} days
                           </option>
                         ))}
                       </select>
+
                       <button
-                        type="button"
                         onClick={() => rejectDemo(t.ticket_id)}
-                        disabled={busyTicketId === t.ticket_id}
-                        className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50 disabled:opacity-60"
+                        className="px-3 py-2 text-xs rounded-lg border"
                       >
                         Reject
                       </button>
+
                       <button
-                        type="button"
                         onClick={() => acceptDemo(t.ticket_id)}
-                        disabled={busyTicketId === t.ticket_id}
-                        className="px-3 py-2 rounded-lg text-white text-[12px] disabled:opacity-60"
+                        className="px-3 py-2 text-xs rounded-lg text-white"
                         style={{ background: BLUE }}
                       >
-                        Accept + Create Demo
+                        Approve
                       </button>
                     </div>
                   </div>
-                  <div className="text-[12px] text-slate-700 whitespace-pre-wrap">{t.message}</div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {supportTickets.length === 0 ? (
-              <div className="bg-white border rounded-2xl shadow p-4 text-sm text-slate-600">No tickets.</div>
-            ) : (
+                </Card>
+              ))}
+
+            {/* SUPPORT */}
+            {tab === "SUPPORT" &&
               supportTickets.map((t) => (
-                <div key={t.ticket_id} className="bg-white border rounded-2xl shadow p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900 truncate">
-                        #{t.ticket_id} • {t.ticket_type} • {t.status}
-                      </div>
-                      <div className="text-[12px] text-slate-500">
-                        {t.user_name || "User"} {t.email ? `• ${t.email}` : ""} {t.phone ? `• ${t.phone}` : ""}
-                      </div>
+                <Card key={t.ticket_id}>
+                  <div className="flex justify-between flex-wrap gap-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-800">
+                        #{t.ticket_id} — {t.ticket_type}
+                      </h3>
+                      <StatusBadge status={t.status} />
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {t.attachment_path ? (
-                        <a
-                          className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50"
-                          href={`/api/platform/support/tickets/${t.ticket_id}/attachment`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Attachment
-                        </a>
-                      ) : null}
-                      <select
-                        className="border rounded-lg px-2 py-2 text-[12px]"
-                        value={t.status}
-                        disabled={busyTicketId === t.ticket_id}
-                        onChange={(e) => setTicketStatus(t.ticket_id, e.target.value)}
-                      >
-                        {["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+
+                    <select
+                      className="border rounded-lg px-2 py-1 text-xs"
+                      value={t.status}
+                      onChange={(e) =>
+                        setTicketStatus(t.ticket_id, e.target.value)
+                      }
+                    >
+                      {["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="text-[12px] text-slate-700 whitespace-pre-wrap">{t.message}</div>
-                </div>
-              ))
-            )}
+
+                  <p className="text-xs text-slate-600 mt-2">{t.message}</p>
+                </Card>
+              ))}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/* ---------- UI COMPONENTS ---------- */
+
+function Card({ children }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition">
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ title, value }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-md p-5">
+      <div className="text-sm text-slate-500">{title}</div>
+      <div className="text-2xl font-bold text-slate-800 mt-1">{value}</div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    OPEN: "bg-yellow-100 text-yellow-700",
+    IN_PROGRESS: "bg-blue-100 text-blue-700",
+    RESOLVED: "bg-green-100 text-green-700",
+    CLOSED: "bg-gray-200 text-gray-700",
+  };
+
+  return (
+    <span
+      className={`inline-block px-3 py-1 text-xs rounded-full mt-1 ${
+        map[status] || "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {status}
+    </span>
   );
 }
