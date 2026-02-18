@@ -145,8 +145,8 @@ export default function Home() {
     if (permsEnabled && permMap) {
       return canAccess(permMap, { module: "expenses", action: "write" });
     }
-    return roleLower === "admin" || roleLower === "manager";
-  }, [permsEnabled, permMap, roleLower]);
+    return effectiveRoleLower === "admin" || effectiveRoleLower === "manager";
+  }, [permsEnabled, permMap, effectiveRoleLower]);
 
   /* ------------------ LOAD DASHBOARD DATA ------------------ */
   const loadStats = useCallback(async () => {
