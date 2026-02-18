@@ -17,6 +17,10 @@ class BranchBase(BaseModel):
     discount_type: Optional[str] = "flat"  # flat | percent
     discount_value: Optional[float] = 0
 
+    # Optional: print settings (stored in system_parameters)
+    kot_required: Optional[bool] = True
+    receipt_required: Optional[bool] = True
+
 class BranchCreate(BranchBase):
     pass
 

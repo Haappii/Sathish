@@ -28,6 +28,13 @@ def _discount_param_keys(branch_id: int) -> dict[str, str]:
     }
 
 
+def _print_param_keys(branch_id: int) -> dict[str, str]:
+    return {
+        "kot_required": f"branch:{branch_id}:kot_required",
+        "receipt_required": f"branch:{branch_id}:receipt_required",
+    }
+
+
 def _normalize_discount_type(raw: str | None) -> str:
     t = str(raw or "").strip().lower()
     if t in {"percent", "percentage", "%", "pct"}:
@@ -49,6 +56,18 @@ def _read_branch_discount_from_params(pmap: dict[str, str], branch_id: int) -> d
         "discount_enabled": bool(enabled),
         "discount_type": dtype,
         "discount_value": float(dval),
+    }
+
+
+def _read_branch_print_from_params(pmap: dict[str, str], branch_id: int) -> dict:
+    keys = _print_param_keys(branch_id)
+
+    # Default YES when missing.
+    kot = str(pmap.get(keys["kot_required"], "YES") or "YES").strip().upper() == "YES"
+    receipt = str(pmap.get(keys["receipt_required"], "YES") or "YES").strip().upper() == "YES"
+    return {
+        "kot_required": bool(kot),
+        "receipt_required": bool(receipt),
     }
 
 
@@ -89,6 +108,20 @@ def _save_branch_discount(db: Session, *, shop_id: int, branch_id: int, payload:
     db.commit()
 
 
+def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, payload: BranchCreate | BranchUpdate):
+    has_any = any(getattr(payload, k, None) is not None for k in ("kot_required", "receipt_required"))
+    if not has_any:
+        return
+
+    kot_required = bool(getattr(payload, "kot_required", True))
+    receipt_required = bool(getattr(payload, "receipt_required", True))
+
+    keys = _print_param_keys(branch_id)
+    _upsert_param(db, shop_id=shop_id, key=keys["kot_required"], value=("YES" if kot_required else "NO"))
+    _upsert_param(db, shop_id=shop_id, key=keys["receipt_required"], value=("YES" if receipt_required else "NO"))
+    db.commit()
+
+
 def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> dict[str, str]:
     if not branch_ids:
         return {}
@@ -101,6 +134,11 @@ def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> 
             SystemParameter.param_key == keys["enabled"],
             SystemParameter.param_key == keys["type"],
             SystemParameter.param_key == keys["value"],
+        ])
+        pkeys = _print_param_keys(bid)
+        ors.extend([
+            SystemParameter.param_key == pkeys["kot_required"],
+            SystemParameter.param_key == pkeys["receipt_required"],
         ])
 
     rows = (
@@ -115,6 +153,7 @@ def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> 
 def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
     out = BranchOut.from_orm(branch).dict()
     out.update(_read_branch_discount_from_params(pmap, int(branch.branch_id)))
+    out.update(_read_branch_print_from_params(pmap, int(branch.branch_id)))
     return out
 
 
@@ -176,6 +215,7 @@ def create(
 ):
     branch = create_branch(db, data, user.user_id, user.shop_id)
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
         db,
@@ -222,6 +262,7 @@ def update(branch_id: int, data: BranchUpdate,
         raise HTTPException(404, "Branch not found")
 
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
         db,

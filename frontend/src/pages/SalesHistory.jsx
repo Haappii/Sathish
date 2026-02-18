@@ -341,6 +341,10 @@ export default function SalesHistory() {
   };
 
   const printInvoice = () => {
+    if (branch?.receipt_required === false) {
+      showToast("Receipt printing disabled for this branch", "warning");
+      return;
+    }
     if (!printTextRef.current) return;
     printTextRef.current.textContent = generateBillText();
     setTimeout(() => window.print(), 300);

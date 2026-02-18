@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
+import { getSession } from "../utils/auth";
 
 const BLUE = "#0B3C8C";
 
@@ -13,6 +14,7 @@ export default function QrOrders() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [busyId, setBusyId] = useState(null);
+  const [printCfg, setPrintCfg] = useState({ kot_required: true, receipt_required: true });
 
   const load = async () => {
     try {
@@ -27,6 +29,20 @@ export default function QrOrders() {
     let mounted = true;
     (async () => {
       setLoading(true);
+      try {
+        const s = getSession() || {};
+        if (s?.branch_id) {
+          const br = await api.get(`/branch/${s.branch_id}`);
+          if (mounted) {
+            setPrintCfg({
+              kot_required: Boolean(br?.data?.kot_required ?? true),
+              receipt_required: Boolean(br?.data?.receipt_required ?? true),
+            });
+          }
+        }
+      } catch {
+        // ignore; keep defaults
+      }
       await load();
       if (mounted) setLoading(false);
     })();
@@ -100,11 +116,15 @@ export default function QrOrders() {
     try {
       const res = await api.post(`/qr-orders/${id}/accept`);
       const data = res.data || {};
-      printKOT({
-        tableName: data.table_name,
-        items: data.items || [],
-      });
-      showToast("Order accepted and KOT printed", "success");
+      if (printCfg.kot_required) {
+        printKOT({
+          tableName: data.table_name,
+          items: data.items || [],
+        });
+        showToast("Order accepted and KOT printed", "success");
+      } else {
+        showToast("Order accepted", "success");
+      }
       await load();
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to accept order", "error");
@@ -226,7 +246,7 @@ export default function QrOrders() {
                           className="px-3 py-2 rounded-lg text-white text-[12px] disabled:opacity-60"
                           style={{ background: BLUE }}
                         >
-                          Accept + Print KOT
+                          {printCfg.kot_required ? "Accept + Print KOT" : "Accept"}
                         </button>
                       </div>
                     </div>
@@ -240,4 +260,3 @@ export default function QrOrders() {
     </div>
   );
 }
-

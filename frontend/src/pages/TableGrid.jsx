@@ -325,12 +325,15 @@ export default function TableGrid() {
         const invoice = invRes.data || {};
         const items = invoice.items || [];
 
-        if (printTextRef.current) {
+        const receiptRequired = branchData?.receipt_required !== false;
+
+        if (receiptRequired && printTextRef.current) {
           printTextRef.current.textContent = generateBillText(invoice, shopRes.data || {}, branchData, items);
           setTimeout(() => window.print(), 300);
+          showToast("Order completed and invoice printed", "success");
+        } else {
+          showToast("Order completed", "success");
         }
-
-        showToast("Order completed and invoice printed", "success");
       } else {
         showToast("Order completed", "success");
       }

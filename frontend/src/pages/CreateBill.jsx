@@ -565,11 +565,15 @@ export default function CreateBill() {
     try {
       const res = await authAxios.post(`/invoice/`, payload);
 
-      printKOT();
+      if (branch?.kot_required !== false) {
+        printKOT();
+      }
 
-      if (print && printTextRef.current) {
+      if (print && branch?.receipt_required !== false && printTextRef.current) {
         printTextRef.current.textContent = generateBillText(res.data.invoice_number);
         setTimeout(() => window.print(), 600);
+      } else if (print && branch?.receipt_required === false) {
+        showToast("Receipt printing disabled for this branch", "warning");
       }
 
       showToast("Bill saved", "success");

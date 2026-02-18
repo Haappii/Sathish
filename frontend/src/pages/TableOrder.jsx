@@ -353,7 +353,8 @@ export default function TableOrder() {
 
   const confirmOrderAndPrintKOT = async () => {
     try {
-      const confirmPrint = window.confirm("Confirm order and print KOT?");
+      const kotRequired = branch?.kot_required !== false;
+      const confirmPrint = window.confirm(kotRequired ? "Confirm order and print KOT?" : "Confirm order?");
       if (!confirmPrint) return;
       const res = await api.get(`/table-billing/order/by-table/${tableId}`);
       const latestItems = Array.isArray(res.data?.items) ? res.data.items : [];
@@ -362,8 +363,12 @@ export default function TableOrder() {
         showToast("Add items before confirming order", "warning");
         return;
       }
-      printKOT(latestItems);
-      showToast("Order confirmed and KOT printed", "success");
+      if (kotRequired) {
+        printKOT(latestItems);
+        showToast("Order confirmed and KOT printed", "success");
+      } else {
+        showToast("Order confirmed", "success");
+      }
     } catch (err) {
       showToast(errorDetail(err, "Failed to confirm order"), "error");
     }
@@ -426,10 +431,13 @@ export default function TableOrder() {
         }
       );
 
-      if (print) {
+      const receiptRequired = branch?.receipt_required !== false;
+      if (print && receiptRequired) {
         // AUTO PRINT AFTER COMPLETION
         await printInvoice(res.data.invoice_number);
         showToast("Order completed and invoice printed", "success");
+      } else if (print && !receiptRequired) {
+        showToast("Order completed", "success");
       } else {
         showToast("Order completed", "success");
       }
@@ -820,7 +828,7 @@ export default function TableOrder() {
               disabled={!orderItems.length || completing}
               className="bg-amber-500 text-white py-1.5 rounded-lg shadow text-[11px] disabled:opacity-60"
             >
-              Confirm KOT
+              {branch?.kot_required !== false ? "Confirm KOT" : "Confirm Order"}
             </button>
             <button
               onClick={() => completeOrder(false)}
@@ -830,11 +838,11 @@ export default function TableOrder() {
               {completing ? "Processing..." : "Complete"}
             </button>
             <button
-              onClick={() => completeOrder(true)}
+              onClick={() => completeOrder(branch?.receipt_required !== false)}
               disabled={!orderItems.length || completing}
               className="bg-emerald-600 text-white py-1.5 rounded-lg shadow text-[11px] disabled:opacity-60"
             >
-              {completing ? "Processing..." : "Complete & Print"}
+              {completing ? "Processing..." : (branch?.receipt_required !== false ? "Complete & Print" : "Complete")}
             </button>
           </div>
 

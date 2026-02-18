@@ -32,7 +32,9 @@ export default function Branches() {
     type: "Branch",
     discount_enabled: false,
     discount_type: "flat",
-    discount_value: 0
+    discount_value: 0,
+    kot_required: true,
+    receipt_required: true,
   };
 
   const [form, setForm] = useState(emptyForm);
@@ -196,6 +198,29 @@ export default function Branches() {
                 />
               </div>
             )}
+          </div>
+
+          <div className="mt-4 rounded-xl border bg-slate-50 p-3 space-y-2">
+            <div className="text-sm font-semibold text-slate-800">Printing</div>
+            <label className="flex items-center justify-between text-[12px]">
+              <span className="text-slate-700">KOT required</span>
+              <input
+                type="checkbox"
+                checked={Boolean(form.kot_required)}
+                onChange={(e) => setForm({ ...form, kot_required: e.target.checked })}
+              />
+            </label>
+            <label className="flex items-center justify-between text-[12px]">
+              <span className="text-slate-700">Receipt required</span>
+              <input
+                type="checkbox"
+                checked={Boolean(form.receipt_required)}
+                onChange={(e) => setForm({ ...form, receipt_required: e.target.checked })}
+              />
+            </label>
+            <div className="text-[12px] text-slate-500">
+              If disabled, the app will skip printing KOT / receipts for this branch.
+            </div>
           </div>
 
           <button
