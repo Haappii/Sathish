@@ -13,7 +13,7 @@ export default function PlatformDashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [tab, setTab] = useState("ONBOARD"); // ONBOARD | SUPPORT
+  const [tab, setTab] = useState("ONBOARD"); // ONBOARD | DEMO | SUPPORT
   const [loading, setLoading] = useState(true);
 
   const [reqs, setReqs] = useState([]);
@@ -52,6 +52,18 @@ export default function PlatformDashboard() {
 
   const pendingReqs = useMemo(() => reqs.filter((r) => r.status === "PENDING"), [reqs]);
   const openTickets = useMemo(() => tickets.filter((t) => t.status === "OPEN"), [tickets]);
+  const demoTickets = useMemo(
+    () => tickets.filter((t) => String(t.ticket_type || "").toUpperCase() === "DEMO"),
+    [tickets]
+  );
+  const supportTickets = useMemo(
+    () => tickets.filter((t) => String(t.ticket_type || "").toUpperCase() !== "DEMO"),
+    [tickets]
+  );
+  const openDemoTickets = useMemo(
+    () => demoTickets.filter((t) => String(t.status || "").toUpperCase() === "OPEN"),
+    [demoTickets]
+  );
 
   const logout = () => {
     clearPlatformToken();
@@ -173,6 +185,7 @@ export default function PlatformDashboard() {
         <div className="flex items-center gap-2">
           {[
             { k: "ONBOARD", label: "Onboarding" },
+            { k: "DEMO", label: "Demo Requests" },
             { k: "SUPPORT", label: "Support Tickets" },
           ].map((x) => (
             <button
@@ -256,12 +269,68 @@ export default function PlatformDashboard() {
               ))
             )}
           </div>
+        ) : tab === "DEMO" ? (
+          <div className="space-y-3">
+            {openDemoTickets.length === 0 ? (
+              <div className="bg-white border rounded-2xl shadow p-4 text-sm text-slate-600">
+                No open demo requests.
+              </div>
+            ) : (
+              openDemoTickets.map((t) => (
+                <div key={t.ticket_id} className="bg-white border rounded-2xl shadow p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 truncate">
+                        #{t.ticket_id} • DEMO • {t.status}
+                      </div>
+                      <div className="text-[12px] text-slate-500">
+                        {t.user_name || "User"} {t.email ? `• ${t.email}` : ""} {t.phone ? `• ${t.phone}` : ""}
+                      </div>
+                      {t.business ? <div className="text-[12px] text-slate-600 mt-1">{t.business}</div> : null}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        className="border rounded-lg px-2 py-2 text-[12px]"
+                        value={demoDays}
+                        onChange={(e) => setDemoDays(Number(e.target.value))}
+                        title="Demo expiry days"
+                      >
+                        {[7, 14, 30, 60].map((d) => (
+                          <option key={d} value={d}>
+                            {d} days
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => rejectDemo(t.ticket_id)}
+                        disabled={busyTicketId === t.ticket_id}
+                        className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => acceptDemo(t.ticket_id)}
+                        disabled={busyTicketId === t.ticket_id}
+                        className="px-3 py-2 rounded-lg text-white text-[12px] disabled:opacity-60"
+                        style={{ background: BLUE }}
+                      >
+                        Accept + Create Demo
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-[12px] text-slate-700 whitespace-pre-wrap">{t.message}</div>
+                </div>
+              ))
+            )}
+          </div>
         ) : (
           <div className="space-y-3">
-            {tickets.length === 0 ? (
+            {supportTickets.length === 0 ? (
               <div className="bg-white border rounded-2xl shadow p-4 text-sm text-slate-600">No tickets.</div>
             ) : (
-              tickets.map((t) => (
+              supportTickets.map((t) => (
                 <div key={t.ticket_id} className="bg-white border rounded-2xl shadow p-4 space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -273,39 +342,6 @@ export default function PlatformDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {String(t.ticket_type || "").toUpperCase() === "DEMO" && String(t.status || "").toUpperCase() === "OPEN" ? (
-                        <>
-                          <select
-                            className="border rounded-lg px-2 py-2 text-[12px]"
-                            value={demoDays}
-                            onChange={(e) => setDemoDays(Number(e.target.value))}
-                            title="Demo expiry days"
-                          >
-                            {[7, 14, 30, 60].map((d) => (
-                              <option key={d} value={d}>
-                                {d} days
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => rejectDemo(t.ticket_id)}
-                            disabled={busyTicketId === t.ticket_id}
-                            className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50 disabled:opacity-60"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => acceptDemo(t.ticket_id)}
-                            disabled={busyTicketId === t.ticket_id}
-                            className="px-3 py-2 rounded-lg text-white text-[12px] disabled:opacity-60"
-                            style={{ background: BLUE }}
-                          >
-                            Accept Demo
-                          </button>
-                        </>
-                      ) : null}
                       {t.attachment_path ? (
                         <a
                           className="px-3 py-2 rounded-lg border text-[12px] hover:bg-slate-50"

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import secrets
 from datetime import date, datetime
+from email.message import EmailMessage
 from mimetypes import guess_type
 from pathlib import Path
 from datetime import timedelta
+import os
+import smtplib
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -28,6 +31,17 @@ router = APIRouter(prefix="/platform", tags=["Platform Owner"])
 
 SUPPORT_UPLOADS_DIR = Path("uploads") / "support"
 SUPPORT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+SUPPORT_EMAIL_ENABLED = (os.getenv("SUPPORT_EMAIL_ENABLED") or "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "y",
+}
+SENDER_EMAIL = (os.getenv("SUPPORT_SENDER_EMAIL") or "").strip()
+SENDER_PASSWORD = (os.getenv("SUPPORT_SENDER_PASSWORD") or "").strip()
+SMTP_HOST = (os.getenv("SUPPORT_SMTP_HOST") or "smtp.gmail.com").strip()
+SMTP_PORT = int((os.getenv("SUPPORT_SMTP_PORT") or "465").strip())
 
 
 class PlatformLoginIn(BaseModel):
@@ -77,6 +91,29 @@ def platform_login(payload: PlatformLoginIn, db: Session = Depends(get_db)):
         }
     )
     return {"access_token": token, "token_type": "bearer"}
+
+
+def _can_send_mail() -> bool:
+    return bool(SUPPORT_EMAIL_ENABLED and SENDER_EMAIL and SENDER_PASSWORD and SMTP_HOST and SMTP_PORT)
+
+
+def _send_credentials_email(*, to_email: str, subject: str, content: str) -> bool:
+    if not _can_send_mail():
+        return False
+    to_addr = (to_email or "").strip()
+    if not to_addr or "@" not in to_addr:
+        return False
+
+    email = EmailMessage()
+    email["Subject"] = subject
+    email["From"] = SENDER_EMAIL
+    email["To"] = to_addr
+    email.set_content(content)
+
+    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as smtp:
+        smtp.login(SENDER_EMAIL, SENDER_PASSWORD)
+        smtp.send_message(email)
+    return True
 
 
 class OnboardRequestIn(BaseModel):
@@ -271,6 +308,23 @@ def accept_onboard_request(
         db.commit()
         db.refresh(row)
 
+        email_sent = False
+        try:
+            email_sent = _send_credentials_email(
+                to_email=(row.requester_email or ""),
+                subject="Your shop has been activated",
+                content=(
+                    "Your request is approved.\n\n"
+                    f"Shop ID: {shop.shop_id}\n"
+                    f"Username: {admin_username}\n"
+                    f"Password: {admin_password}\n\n"
+                    "Login URL: / (open the app and login)\n"
+                ),
+            )
+        except Exception:
+            # Don't fail provisioning due to email issues.
+            email_sent = False
+
         return {
             "success": True,
             "request_id": row.request_id,
@@ -279,6 +333,7 @@ def accept_onboard_request(
             "branch_id": branch.branch_id,
             "admin_username": admin_username,
             "admin_password": admin_password,
+            "email_sent": email_sent,
         }
     except HTTPException:
         db.rollback()
@@ -424,6 +479,23 @@ def accept_demo_ticket(
         t.decided_at = datetime.utcnow()
         db.commit()
 
+        email_sent = False
+        try:
+            email_sent = _send_credentials_email(
+                to_email=(getattr(t, "email", None) or ""),
+                subject="Your demo is activated",
+                content=(
+                    "Your demo request is approved.\n\n"
+                    f"Shop ID: {shop.shop_id}\n"
+                    f"Username: {admin_username}\n"
+                    f"Password: {admin_password}\n"
+                    f"Expires on: {expires_on}\n\n"
+                    "Login URL: / (open the app and login)\n"
+                ),
+            )
+        except Exception:
+            email_sent = False
+
         return {
             "success": True,
             "ticket_id": t.ticket_id,
@@ -432,6 +504,7 @@ def accept_demo_ticket(
             "admin_username": admin_username,
             "admin_password": admin_password,
             "expires_on": str(expires_on),
+            "email_sent": email_sent,
         }
     except Exception as e:
         db.rollback()
