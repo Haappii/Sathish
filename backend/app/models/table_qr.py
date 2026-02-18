@@ -30,6 +30,31 @@ class TableQrToken(Base):
     orders = relationship("QrOrder", back_populates="qr_token")
 
 
+class TableQrSession(Base):
+    """
+    Active QR "table session" used to lock a table to the first customer's mobile
+    while the table is OCCUPIED. The session ends when the table is freed.
+    """
+
+    __tablename__ = "table_qr_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False, index=True)
+    branch_id = Column(Integer, nullable=False, index=True)
+    table_id = Column(Integer, ForeignKey("tables_master.table_id"), nullable=False, index=True)
+    qr_token_id = Column(Integer, ForeignKey("table_qr_tokens.id"), nullable=True, index=True)
+
+    customer_name = Column(String(120), nullable=True)
+    mobile = Column(String(20), nullable=False, index=True)
+    email = Column(String(120), nullable=True)
+
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    ended_at = Column(DateTime, nullable=True, index=True)
+
+    table = relationship("TableMaster")
+    qr_token = relationship("TableQrToken")
+
+
 class QrOrder(Base):
     __tablename__ = "qr_orders"
 
@@ -73,4 +98,3 @@ class QrOrderItem(Base):
 
     qr_order = relationship("QrOrder", back_populates="items")
     item = relationship("Item")
-

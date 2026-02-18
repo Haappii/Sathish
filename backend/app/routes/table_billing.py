@@ -15,6 +15,7 @@ from app.models.items import Item
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.shop_details import ShopDetails
+from app.models.table_qr import TableQrSession
 from app.services.gst_service import calculate_gst
 
 from app.services.inventory_service import adjust_stock, is_inventory_enabled
@@ -25,6 +26,21 @@ router = APIRouter(
     prefix="/table-billing",
     tags=["Table Billing"]
 )
+
+def _end_active_qr_session(*, db: Session, shop_id: int, table_id: int) -> None:
+    s = (
+        db.query(TableQrSession)
+        .filter(
+            TableQrSession.shop_id == shop_id,
+            TableQrSession.table_id == table_id,
+            TableQrSession.ended_at.is_(None),
+        )
+        .order_by(TableQrSession.started_at.desc())
+        .first()
+    )
+    if not s:
+        return
+    s.ended_at = datetime.utcnow()
 
 def get_business_datetime(db: Session, shop_id: int) -> datetime:
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
@@ -362,6 +378,7 @@ def checkout_order(
     order.closed_at = datetime.now()
     order.table.status = "FREE"
     order.table.table_start_time = None
+    _end_active_qr_session(db=db, shop_id=int(user.shop_id), table_id=int(order.table_id))
 
     db.commit()
 
@@ -402,6 +419,7 @@ def cancel_order(
     order.closed_at = datetime.now()
     order.table.status = "FREE"
     order.table.table_start_time = None
+    _end_active_qr_session(db=db, shop_id=int(user.shop_id), table_id=int(order.table_id))
 
     db.commit()
 

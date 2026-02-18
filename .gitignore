@@ -22,6 +22,8 @@ frontend/src/assets/logo/*
 # Mobile app
 mobile-app/node_modules/
 mobile-app/.expo/
+mobile-app/.idea/
+mobile-app/android/
 mobile-app/dist/
 mobile-app/web-build/
 

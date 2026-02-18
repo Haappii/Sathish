@@ -15,6 +15,8 @@ export default function PublicQrMenu() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [locked, setLocked] = useState(false);
+  const [requiresMobile, setRequiresMobile] = useState(false);
 
   const [shop, setShop] = useState({});
   const [branch, setBranch] = useState({});
@@ -43,6 +45,8 @@ export default function PublicQrMenu() {
       try {
         const res = await publicApi.get(`/public/qr/${token}/bootstrap`);
         if (!mounted) return;
+        setLocked(Boolean(res.data?.locked));
+        setRequiresMobile(Boolean(res.data?.requires_mobile));
         setShop(res.data?.shop || {});
         setBranch(res.data?.branch || {});
         setTable(res.data?.table || {});
@@ -123,10 +127,35 @@ export default function PublicQrMenu() {
       showToast("Enter a valid email (or leave blank)", "error");
       return;
     }
-    // Best-effort: flip table status to RUNNING in cashier UI once details are entered.
-    publicApi.post(`/public/qr/${token}/start`).catch(() => {});
-    setCustomer({ customer_name: name, mobile, email });
-    setStep("MENU");
+
+    (async () => {
+      try {
+        // Enforce "occupied table mobile lock" and flip table status to OCCUPIED.
+        await publicApi.post(`/public/qr/${token}/start`, {
+          customer_name: name,
+          mobile,
+          email: email || null,
+        });
+
+        // If the initial bootstrap hid the menu due to lock, fetch it after verifying mobile.
+        if (locked || requiresMobile || !items.length) {
+          const res = await publicApi.post(`/public/qr/${token}/bootstrap`, { mobile });
+          setLocked(Boolean(res.data?.locked));
+          setRequiresMobile(Boolean(res.data?.requires_mobile));
+          setShop(res.data?.shop || {});
+          setBranch(res.data?.branch || {});
+          setTable(res.data?.table || {});
+          setCategories(res.data?.categories || []);
+          setItems(res.data?.items || []);
+        }
+
+        setCustomer({ customer_name: name, mobile, email });
+        setStep("MENU");
+      } catch (e) {
+        const msg = e?.response?.data?.detail || "Unable to open table";
+        showToast(msg, "error");
+      }
+    })();
   };
 
   const submitOrder = async () => {
@@ -195,6 +224,11 @@ export default function PublicQrMenu() {
         {step === "INFO" && (
           <div className="bg-white border rounded-2xl shadow p-4 max-w-xl">
             <div className="text-sm font-semibold text-slate-800">Customer details</div>
+            {locked && requiresMobile ? (
+              <div className="mt-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Table is already occupied. Enter the same mobile number used earlier to continue.
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
               <div className="sm:col-span-1">
                 <label className="text-xs text-slate-500">Name *</label>
