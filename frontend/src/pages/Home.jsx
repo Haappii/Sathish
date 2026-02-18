@@ -65,11 +65,9 @@ export default function Home() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const session = getSession() || {};
-  const actualRoleLower = (session?.role || "").toString().toLowerCase();
-  const uiRoleOverrideLower = (session?.ui_role || "").toString().toLowerCase();
-  const effectiveRoleLower = uiRoleOverrideLower || actualRoleLower;
+  const roleLower = (session?.role || "").toString().toLowerCase();
   const branchId = session?.branch_id ?? null;
-  const isAdmin = effectiveRoleLower === "admin";
+  const isAdmin = roleLower === "admin";
 
   const [shop, setShop] = useState(null);
   const [shopType, setShopType] = useState("");
@@ -145,8 +143,8 @@ export default function Home() {
     if (permsEnabled && permMap) {
       return canAccess(permMap, { module: "expenses", action: "write" });
     }
-    return effectiveRoleLower === "admin" || effectiveRoleLower === "manager";
-  }, [permsEnabled, permMap, effectiveRoleLower]);
+    return roleLower === "admin" || roleLower === "manager";
+  }, [permsEnabled, permMap, roleLower]);
 
   /* ------------------ LOAD DASHBOARD DATA ------------------ */
   const loadStats = useCallback(async () => {
@@ -289,12 +287,12 @@ export default function Home() {
 
   const menus = useMemo(() => {
     const fallback = buildRoleMenu({
-      roleLower: effectiveRoleLower,
+      roleLower,
       showTableBilling,
       isHeadOfficeClosed,
     });
 
-    if (!permsEnabled || !permMap || uiRoleOverrideLower) return fallback;
+    if (!permsEnabled || !permMap) return fallback;
 
     const rbac = buildRbacMenu({
       permMap,
@@ -306,10 +304,9 @@ export default function Home() {
   }, [
     permsEnabled,
     permMap,
-    effectiveRoleLower,
+    roleLower,
     showTableBilling,
     isHeadOfficeClosed,
-    uiRoleOverrideLower,
   ]);
 
   const menuCards = useMemo(

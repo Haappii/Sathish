@@ -49,11 +49,8 @@ export default function MainLayout({ hideSidebar = false }) {
     session?.name ||
     "User";
 
-  const actualRoleLower = (session?.role || "").toString().toLowerCase();
-  const isActualAdmin = actualRoleLower === "admin";
-
-  const uiRoleOverrideLower = (session?.ui_role || "").toString().toLowerCase();
-  const effectiveRoleLower = uiRoleOverrideLower || actualRoleLower;
+  const roleLower = (session?.role || "").toString().toLowerCase();
+  const isActualAdmin = roleLower === "admin";
 
   /* ================= STATE ================= */
   const [shopName, setShopName] = useState("Haappii Billing");
@@ -281,20 +278,20 @@ export default function MainLayout({ hideSidebar = false }) {
 
   const canQrOrders = useMemo(() => {
     if (!showTableBilling) return false;
-    if (!permsEnabled || !permMap || uiRoleOverrideLower) {
-      return ["admin", "manager", "cashier", "waiter"].includes(effectiveRoleLower);
+    if (!permsEnabled || !permMap) {
+      return ["admin", "manager", "cashier", "waiter"].includes(roleLower);
     }
     return Boolean(permMap?.qr_orders?.can_read);
-  }, [showTableBilling, permsEnabled, permMap, effectiveRoleLower, uiRoleOverrideLower]);
+  }, [showTableBilling, permsEnabled, permMap, roleLower]);
 
   const menuItems = useMemo(() => {
     const fallback = buildRoleMenu({
-      roleLower: effectiveRoleLower,
+      roleLower,
       showTableBilling,
       isHeadOfficeClosed,
     });
 
-    if (!permsEnabled || !permMap || uiRoleOverrideLower) return fallback;
+    if (!permsEnabled || !permMap) return fallback;
 
     const rbac = buildRbacMenu({
       permMap,
@@ -302,7 +299,7 @@ export default function MainLayout({ hideSidebar = false }) {
       isHeadOfficeClosed,
     });
     return rbac && rbac.length ? rbac : fallback;
-  }, [permsEnabled, permMap, effectiveRoleLower, showTableBilling, isHeadOfficeClosed, uiRoleOverrideLower]);
+  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
 
   const loadQrPending = async () => {
     if (!canQrOrders) {
@@ -461,38 +458,8 @@ export default function MainLayout({ hideSidebar = false }) {
           <div className="w-full sm:w-auto flex items-center justify-end gap-2 sm:gap-4 flex-wrap">
               <div className="text-right leading-tight min-w-[64px]">
                 <div className="text-xs sm:text-sm font-semibold text-gray-700">{userName}</div>
-                <div className="text-xs text-gray-500 capitalize">
-                  {uiRoleOverrideLower ? (
-                    <>
-                      {actualRoleLower} â†’ {uiRoleOverrideLower}
-                    </>
-                  ) : (
-                    effectiveRoleLower
-                  )}
-                </div>
+                <div className="text-xs text-gray-500 capitalize">{roleLower}</div>
               </div>
-
-              {isActualAdmin && (
-                <select
-                  value={uiRoleOverrideLower || actualRoleLower || ""}
-                  onChange={(e) => {
-                    const next = String(e.target.value || "").toLowerCase();
-                    setSessionAndRerender((cur) => {
-                      const updated = { ...cur };
-                      if (!next || next === actualRoleLower) delete updated.ui_role;
-                      else updated.ui_role = next;
-                      return updated;
-                    });
-                  }}
-                  className="border rounded px-2 py-1 text-sm max-w-[140px]"
-                  title="View menu as role (UI only)"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="cashier">Cashier</option>
-                  <option value="waiter">Waiter</option>
-                </select>
-              )}
 
               {isActualAdmin && branches.length > 0 && (
                 <select
