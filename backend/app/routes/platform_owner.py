@@ -13,13 +13,14 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.branch import Branch
 from app.models.platform_onboard_request import PlatformOnboardRequest
+from app.models.platform_user import PlatformUser
 from app.models.roles import Role
 from app.models.shop_details import ShopDetails
 from app.models.support_ticket import SupportTicket
 from app.models.users import User
 from app.utils.jwt_token import create_access_token
-from app.utils.passwords import encode_password
-from app.utils.platform_owner_auth import PlatformOwnerOnly, validate_platform_owner_credentials
+from app.utils.passwords import encode_password, password_needs_upgrade, verify_password
+from app.utils.platform_owner_auth import PlatformOwnerOnly
 
 
 router = APIRouter(prefix="/platform", tags=["Platform Owner"])
@@ -34,12 +35,44 @@ class PlatformLoginIn(BaseModel):
 
 
 @router.post("/auth/login")
-def platform_login(payload: PlatformLoginIn):
-    validate_platform_owner_credentials(username=payload.username, password=payload.password)
+def platform_login(payload: PlatformLoginIn, db: Session = Depends(get_db)):
+    username = (payload.username or "").strip()
+    password = payload.password or ""
+    if not username or not password:
+        raise HTTPException(400, "Username and password required")
+
+    # Seed the initial platform owner user on first run.
+    any_user = db.query(PlatformUser.platform_user_id).first()
+    if any_user is None:
+        db.add(
+            PlatformUser(
+                username="Admin",
+                password=encode_password("admin123"),
+                status=True,
+            )
+        )
+        db.commit()
+
+    user = (
+        db.query(PlatformUser)
+        .filter(PlatformUser.username == username, PlatformUser.status == True)
+        .first()
+    )
+    if not user:
+        raise HTTPException(403, "Invalid username or password")
+
+    if not verify_password(password, user.password):
+        raise HTTPException(403, "Invalid username or password")
+
+    if password_needs_upgrade(user.password):
+        user.password = encode_password(password)
+        db.commit()
+
     token = create_access_token(
         {
             "platform_owner": True,
-            "platform_username": payload.username,
+            "platform_username": user.username,
+            "platform_user_id": user.platform_user_id,
         }
     )
     return {"access_token": token, "token_type": "bearer"}
@@ -335,4 +368,3 @@ def platform_download_ticket_attachment(
         filename=(row.attachment_filename or resolved.name),
         media_type=(mime_type or "application/octet-stream"),
     )
-

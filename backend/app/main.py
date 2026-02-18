@@ -61,11 +61,13 @@ import app.models.gift_card_txn
 import app.models.table_billing
 import app.models.table_qr
 import app.models.platform_onboard_request
+import app.models.platform_user
 
 
 from app.models.users import User
 from app.models.roles import Role
 from app.models.branch import Branch
+from app.models.platform_user import PlatformUser
 
 
 # ======================================================
@@ -179,6 +181,23 @@ def seed_defaults():
     db.close()
 
 
+def seed_platform_owner_defaults():
+    db: Session = SessionLocal()
+    try:
+        exists = db.query(PlatformUser.platform_user_id).first()
+        if exists is None:
+            db.add(
+                PlatformUser(
+                    username="Admin",
+                    password=encode_password("admin123"),
+                    status=True,
+                )
+            )
+            db.commit()
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def _startup_db_init():
     """
@@ -194,6 +213,11 @@ def _startup_db_init():
         seed_defaults()
     except Exception as e:
         logger.exception("DB seed_defaults failed: %s", e)
+
+    try:
+        seed_platform_owner_defaults()
+    except Exception as e:
+        logger.exception("DB seed_platform_owner_defaults failed: %s", e)
 
 
 # ======================================================
