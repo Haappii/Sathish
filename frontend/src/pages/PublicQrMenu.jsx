@@ -188,9 +188,6 @@ export default function PublicQrMenu() {
               {table?.table_name ? `Table ${table.table_name}` : "Table Order"}
             </div>
           </div>
-          <div className="text-[12px] text-slate-600">
-            No login required. Please enter your details to order.
-          </div>
         </div>
 
         {step === "INFO" && (
@@ -391,4 +388,3 @@ export default function PublicQrMenu() {
     </div>
   );
 }
-

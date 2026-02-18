@@ -8,7 +8,8 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;           /* Prevent page-level scroll */
+    overflow-x: hidden;          /* Avoid sideways scroll from off-canvas elements */
+    overflow-y: auto;            /* Allow page scroll */
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 
