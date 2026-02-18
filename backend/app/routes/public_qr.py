@@ -32,6 +32,20 @@ class PublicQrOrderIn(BaseModel):
     items: list[PublicQrOrderItemIn] = Field(min_length=1)
 
 
+def _mark_table_running(*, db: Session, table: TableMaster) -> None:
+    """
+    Flip the table to RUNNING (OCCUPIED) as soon as the public flow starts,
+    instead of waiting for cashier acceptance.
+    """
+    if not table:
+        return
+    if table.status != "OCCUPIED":
+        table.status = "OCCUPIED"
+    if not getattr(table, "table_start_time", None):
+        table.table_start_time = datetime.utcnow()
+    db.commit()
+
+
 @router.get("/{token}/bootstrap")
 def public_qr_bootstrap(
     token: str,
@@ -101,6 +115,37 @@ def public_qr_bootstrap(
     }
 
 
+@router.post("/{token}/start")
+def public_qr_start(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Called after the customer enters details (before ordering),
+    to move the table from IDLE->RUNNING in the cashier UI.
+    """
+    tok = (
+        db.query(TableQrToken)
+        .filter(TableQrToken.token == token, TableQrToken.active == True)
+        .first()
+    )
+    if not tok:
+        raise HTTPException(404, "Invalid QR token")
+
+    ensure_hotel_billing_type(db, int(tok.shop_id))
+
+    table = (
+        db.query(TableMaster)
+        .filter(TableMaster.table_id == tok.table_id, TableMaster.shop_id == tok.shop_id)
+        .first()
+    )
+    if not table:
+        raise HTTPException(404, "Invalid QR token")
+
+    _mark_table_running(db=db, table=table)
+    return {"success": True, "table_id": table.table_id, "status": table.status}
+
+
 @router.post("/{token}/order")
 def public_qr_create_order(
     token: str,
@@ -120,6 +165,9 @@ def public_qr_create_order(
     table = db.query(TableMaster).filter(TableMaster.table_id == tok.table_id, TableMaster.shop_id == tok.shop_id).first()
     if not table:
         raise HTTPException(404, "Invalid QR token")
+
+    # Ensure table shows as RUNNING once an order is placed (even if /start wasn't called).
+    _mark_table_running(db=db, table=table)
 
     req_items = payload.items or []
     item_ids = list({int(x.item_id) for x in req_items})
@@ -166,4 +214,3 @@ def public_qr_create_order(
         "qr_order_id": order.qr_order_id,
         "status": order.status,
     }
-

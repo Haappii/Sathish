@@ -123,6 +123,8 @@ export default function PublicQrMenu() {
       showToast("Enter a valid email (or leave blank)", "error");
       return;
     }
+    // Best-effort: flip table status to RUNNING in cashier UI once details are entered.
+    publicApi.post(`/public/qr/${token}/start`).catch(() => {});
     setCustomer({ customer_name: name, mobile, email });
     setStep("MENU");
   };

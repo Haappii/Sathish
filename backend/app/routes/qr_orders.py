@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -22,6 +23,32 @@ class QrOrderAcceptOutItem(BaseModel):
     item_id: int
     item_name: str | None = None
     quantity: int
+
+
+def _role_lower(user) -> str:
+    return str(getattr(user, "role_name", "") or "").strip().lower()
+
+
+def _resolve_branch_id(*, user, request: Request) -> int | None:
+    """
+    Admin can switch branch in UI; frontend sends `x-branch-id`.
+    Non-admin is locked to their own branch_id.
+    """
+    role = _role_lower(user)
+    if role != "admin":
+        try:
+            return int(getattr(user, "branch_id", None))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Branch required")
+
+    header = request.headers.get("x-branch-id")
+    if header in (None, ""):
+        # For admin, allow listing across branches if not provided.
+        return None
+    try:
+        return int(header)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Invalid branch id")
 
 
 def _get_or_create_open_table_order(
@@ -73,21 +100,25 @@ def _get_or_create_open_table_order(
 
 @router.get("/pending")
 def list_pending_qr_orders(
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_permission("qr_orders", "read")),
 ):
     ensure_hotel_billing_type(db, int(user.shop_id))
+
+    branch_id = _resolve_branch_id(user=user, request=request)
 
     q = (
         db.query(QrOrder)
         .options(joinedload(QrOrder.items))
         .filter(
             QrOrder.shop_id == user.shop_id,
-            QrOrder.branch_id == user.branch_id,
             QrOrder.status == "PENDING",
         )
         .order_by(QrOrder.created_at.desc())
     )
+    if branch_id is not None:
+        q = q.filter(QrOrder.branch_id == branch_id)
     rows = q.all()
 
     table_ids = list({r.table_id for r in rows})
@@ -129,6 +160,7 @@ def list_pending_qr_orders(
 @router.post("/{qr_order_id}/accept")
 def accept_qr_order(
     qr_order_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_permission("qr_orders", "write")),
 ):
@@ -139,20 +171,21 @@ def accept_qr_order(
         .options(joinedload(QrOrder.items))
         .filter(
             QrOrder.shop_id == user.shop_id,
-            QrOrder.branch_id == user.branch_id,
             QrOrder.qr_order_id == qr_order_id,
         )
         .first()
     )
     if not qr:
         raise HTTPException(404, "QR order not found")
+    if _role_lower(user) != "admin" and int(qr.branch_id) != int(getattr(user, "branch_id", 0) or 0):
+        raise HTTPException(403, "Not allowed")
     if qr.status != "PENDING":
         raise HTTPException(400, f"QR order already {qr.status}")
 
     order = _get_or_create_open_table_order(
         db=db,
         shop_id=int(user.shop_id),
-        branch_id=int(user.branch_id),
+        branch_id=int(qr.branch_id),
         table_id=int(qr.table_id),
         opened_by=int(getattr(user, "user_id", None) or 0) or None,
     )
@@ -208,7 +241,7 @@ def accept_qr_order(
         db.query(TableMaster)
         .filter(
             TableMaster.shop_id == user.shop_id,
-            TableMaster.branch_id == user.branch_id,
+            TableMaster.branch_id == int(qr.branch_id),
             TableMaster.table_id == qr.table_id,
         )
         .first()
@@ -230,6 +263,7 @@ def accept_qr_order(
 @router.post("/{qr_order_id}/reject")
 def reject_qr_order(
     qr_order_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_permission("qr_orders", "write")),
 ):
@@ -239,13 +273,14 @@ def reject_qr_order(
         db.query(QrOrder)
         .filter(
             QrOrder.shop_id == user.shop_id,
-            QrOrder.branch_id == user.branch_id,
             QrOrder.qr_order_id == qr_order_id,
         )
         .first()
     )
     if not qr:
         raise HTTPException(404, "QR order not found")
+    if _role_lower(user) != "admin" and int(qr.branch_id) != int(getattr(user, "branch_id", 0) or 0):
+        raise HTTPException(403, "Not allowed")
     if qr.status != "PENDING":
         raise HTTPException(400, f"QR order already {qr.status}")
 
@@ -254,4 +289,3 @@ def reject_qr_order(
     qr.accepted_by = int(getattr(user, "user_id", None) or 0) or None
     db.commit()
     return {"success": True}
-
