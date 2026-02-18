@@ -48,92 +48,6 @@ def _business_date(db: Session, shop_id: int) -> date:
     return datetime.utcnow().date()
 
 
-@router.post("/bootstrap")
-def bootstrap_from_purchase_orders(
-    branch_id: int | None = Query(None),
-    db: Session = Depends(get_db),
-    user=Depends(require_permission("supplier_ledger", "write")),
-):
-    bid = resolve_branch(branch_id, user)
-
-    pos = (
-        db.query(PurchaseOrder)
-        .filter(PurchaseOrder.shop_id == user.shop_id)
-        .filter(PurchaseOrder.branch_id == bid)
-        .all()
-    )
-
-    created_po = 0
-    created_pay = 0
-
-    for po in pos:
-        # PO debit
-        has_po = (
-            db.query(SupplierLedgerEntry.entry_id)
-            .filter(
-                SupplierLedgerEntry.shop_id == user.shop_id,
-                SupplierLedgerEntry.branch_id == po.branch_id,
-                SupplierLedgerEntry.po_id == po.po_id,
-                SupplierLedgerEntry.entry_type == "PO",
-            )
-            .first()
-            is not None
-        )
-        if not has_po:
-            db.add(
-                SupplierLedgerEntry(
-                    shop_id=user.shop_id,
-                    branch_id=po.branch_id,
-                    supplier_id=po.supplier_id,
-                    entry_type="PO",
-                    reference_no=po.po_number,
-                    po_id=po.po_id,
-                    debit=float(po.total_amount or 0),
-                    credit=0,
-                    notes="Bootstrapped from purchase order",
-                    entry_time=po.created_at,
-                    created_by=user.user_id,
-                )
-            )
-            created_po += 1
-
-        # payment credit (difference)
-        paid = float(po.paid_amount or 0)
-        if paid > 0:
-            credited = float(
-                (
-                    db.query(func.coalesce(func.sum(SupplierLedgerEntry.credit), 0))
-                    .filter(
-                        SupplierLedgerEntry.shop_id == user.shop_id,
-                        SupplierLedgerEntry.po_id == po.po_id,
-                        SupplierLedgerEntry.entry_type == "PAYMENT",
-                    )
-                    .scalar()
-                    or 0
-                )
-            )
-            diff = paid - credited
-            if diff > 0.01:
-                db.add(
-                    SupplierLedgerEntry(
-                        shop_id=user.shop_id,
-                        branch_id=po.branch_id,
-                        supplier_id=po.supplier_id,
-                        entry_type="PAYMENT",
-                        reference_no=f"{po.po_number}-PAY",
-                        po_id=po.po_id,
-                        debit=0,
-                        credit=float(diff),
-                        notes="Bootstrapped from paid_amount",
-                        created_by=user.user_id,
-                    )
-                )
-                created_pay += 1
-
-    db.commit()
-    return {"created_po_entries": created_po, "created_payment_entries": created_pay}
-
-
 @router.get("/aging", response_model=list[SupplierAgingRow])
 def aging_dashboard(
     branch_id: int | None = Query(None),
@@ -405,4 +319,3 @@ def record_payment(
     )
 
     return entry
-

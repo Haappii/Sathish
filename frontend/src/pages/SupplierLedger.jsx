@@ -127,22 +127,6 @@ export default function SupplierLedger() {
     [suppliers, selectedSupplierId]
   );
 
-  const bootstrap = async () => {
-    if (!canWrite) return showToast("Not allowed", "error");
-    try {
-      const res = await authAxios.post("/supplier-ledger/bootstrap", null, {
-        params: { branch_id: isAdmin ? branchId : undefined },
-      });
-      showToast(
-        `Bootstrapped: PO ${res?.data?.created_po_entries || 0}, Pay ${res?.data?.created_payment_entries || 0}`,
-        "success"
-      );
-      loadSupplierDetails(selectedSupplierId);
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Bootstrap failed", "error");
-    }
-  };
-
   const recordPayment = async () => {
     if (!canWrite) return showToast("Not allowed", "error");
     if (!selectedSupplierId) return showToast("Select supplier", "error");
@@ -216,17 +200,8 @@ export default function SupplierLedger() {
               <option key={b.branch_id} value={b.branch_id}>
                 {b.branch_name}
               </option>
-            ))}
+              ))}
           </select>
-
-          <button
-            onClick={bootstrap}
-            disabled={!canWrite}
-            className="ml-auto px-3 py-1.5 rounded-lg border bg-white text-[12px] disabled:opacity-60"
-            title="Create missing ledger entries for existing purchase orders"
-          >
-            Bootstrap
-          </button>
         </div>
       )}
 
