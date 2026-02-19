@@ -271,10 +271,6 @@ def _startup_db_init():
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
-        from app.scripts.reset_and_seed_on_startup import reset_and_seed
-
-        reset_and_seed()
-
         seed_defaults()
     except Exception as e:
         logger.exception("DB seed_defaults failed: %s", e)
