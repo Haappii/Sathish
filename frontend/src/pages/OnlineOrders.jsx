@@ -36,7 +36,8 @@ const fmtDateTime = (v) => {
 };
 
 const randomOrderId = (provider) => {
-  const ts = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
+  // Avoid Tailwind class extraction false-positive on bracket character-class regex.
+  const ts = new Date().toISOString().replace(/-|:|T|Z|\./g, "").slice(0, 14);
   return `${provider}-${ts}-${Math.floor(Math.random() * 900 + 100)}`;
 };
 

@@ -332,6 +332,7 @@ def _employee_wage_summary(
     }
 
 
+@router.get("", response_model=list[EmployeeResponse])
 @router.get("/", response_model=list[EmployeeResponse])
 def list_employees(
     branch_id: int | None = Query(None),
@@ -346,6 +347,7 @@ def list_employees(
     return query.order_by(Employee.employee_name.asc()).all()
 
 
+@router.post("", response_model=EmployeeResponse)
 @router.post("/", response_model=EmployeeResponse)
 def create_employee(
     payload: EmployeeCreate,
