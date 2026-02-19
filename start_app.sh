@@ -55,4 +55,4 @@ trap 'kill ${BACKEND_PID} 2>/dev/null || true' EXIT
 cd "${ROOT_DIR}/frontend"
 
 # npm run dev (bind all interfaces)
-npm run dev -- --host "${FRONTEND_HOST}" --port "${FRONTEND_PORT}"
+npm run dev -- --strictPort --host "${FRONTEND_HOST}" --port "${FRONTEND_PORT}"
