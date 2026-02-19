@@ -20,6 +20,19 @@ DESKTOP_FRONTEND_PORT="${DESKTOP_FRONTEND_PORT:-5180}"
 PUBLIC_HOST="${PUBLIC_HOST:-localhost}"
 export APP_URL="${APP_URL:-http://${PUBLIC_HOST}:${DESKTOP_FRONTEND_PORT}}"
 
+# About page download links (Vite dev env vars; also useful for preview builds).
+# These default to the backend static `/downloads/*` endpoint.
+DOWNLOADS_BASE_URL="${DOWNLOADS_BASE_URL:-http://${PUBLIC_HOST}:${BACKEND_PORT}/downloads}"
+export VITE_WINDOWS_APP_URL="${VITE_WINDOWS_APP_URL:-${DOWNLOADS_BASE_URL}/poss-desktop-setup.exe}"
+export VITE_ANDROID_APK_URL="${VITE_ANDROID_APK_URL:-${DOWNLOADS_BASE_URL}/haappii-billing.apk}"
+
+# Helpful startup info
+echo "API:        http://${PUBLIC_HOST}:${BACKEND_PORT}/api"
+echo "Web UI:     http://${PUBLIC_HOST}:${FRONTEND_PORT}"
+echo "Desktop UI: http://${PUBLIC_HOST}:${DESKTOP_FRONTEND_PORT} (same UI; desktop wrapper points here)"
+echo "Downloads:  ${DOWNLOADS_BASE_URL}"
+echo "Windows EXE expected at: ${ROOT_DIR}/downloads/poss-desktop-setup.exe"
+
 # --- Backend ---
 cd "${ROOT_DIR}/backend"
 
