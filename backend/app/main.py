@@ -142,14 +142,32 @@ def seed_defaults():
     roles = ensure_core_roles(db)
     admin_role = roles.get("admin")
 
+    # ---- DEFAULT SHOP ----
+    from app.models.shop_details import ShopDetails
+
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == 1).first()
+    if not shop:
+        shop = ShopDetails(
+            shop_id=1,
+            shop_name="Default Shop",
+            billing_type="store",
+            gst_enabled=False,
+            gst_mode="inclusive",
+        )
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
     # ---- HEAD OFFICE BRANCH ----
     ho_branch = db.query(Branch).filter(
-        Branch.branch_id == 1
+        Branch.branch_id == 1,
+        Branch.shop_id == 1,
     ).first()
 
     if not ho_branch:
         ho_branch = Branch(
             branch_id=1,
+            shop_id=1,
             branch_name="Head Office",
             type="Head Office",
             status="ACTIVE"
@@ -159,11 +177,13 @@ def seed_defaults():
 
     # ---- ADMIN USER ----
     admin = db.query(User).filter(
-        User.user_name == "admin"
+        User.user_name == "admin",
+        User.shop_id == 1,
     ).first()
 
     if not admin:
         admin = User(
+            shop_id=1,
             user_name="admin",
             password=encode_password("admin123"),     # project convention
             name="System Admin",
@@ -250,6 +270,11 @@ def _startup_db_init():
     _auto_migrate_demo_expiry()
 
     try:
+        # Optional dev helper: wipe DB + seed sample data on restart.
+        from app.scripts.reset_and_seed_on_startup import reset_and_seed
+
+        reset_and_seed()
+
         seed_defaults()
     except Exception as e:
         logger.exception("DB seed_defaults failed: %s", e)
