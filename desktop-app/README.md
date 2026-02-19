@@ -16,7 +16,7 @@ It does **not** bundle the Python backend. It simply opens the configured web UR
 
 - `cd desktop-app`
 - `npm install`
-- `set APP_URL=https://your-web-app-domain` (or use PowerShell `$env:APP_URL="..."`)
+- (Optional) set runtime URL for local testing: `set APP_URL=https://your-web-app-domain` (or use PowerShell `$env:APP_URL="..."`)
 - `npm run dist:win`
 
 The installer will be created under `desktop-app/dist/`.
@@ -28,3 +28,14 @@ Copy the generated `*.exe` to `<repo_root>/downloads/poss-desktop-setup.exe` on 
 The installer registers the `poss://` protocol.
 
 From the About page, clicking "Open Desktop App" will attempt to open `poss://open?path=/home`.
+
+## Configure server URL (installed desktop app)
+
+If the installed desktop app opens a blank page, it usually means it is trying to load `http://localhost:8000` (default).
+
+Run it once with the server URL; it will be saved to `%APPDATA%` user config for future launches:
+
+- `POSS.exe --url=http://YOUR_SERVER_IP:5180`
+
+Example:
+- `POSS.exe --url=http://13.60.186.234:5180`
