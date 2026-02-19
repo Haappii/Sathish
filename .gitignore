@@ -19,6 +19,10 @@ frontend/venv/
 frontend/src/assets/logo/*
 !frontend/src/assets/logo/.gitkeep
 
+# Desktop app (Electron)
+desktop-app/node_modules/
+desktop-app/dist/
+
 # Mobile app
 mobile-app/node_modules/
 mobile-app/.expo/
