@@ -133,6 +133,19 @@ def save_shop_details(
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first() or ShopDetails(shop_id=user.shop_id)
 
     prev_shop_name = shop.shop_name
+    prev_billing_type = (getattr(shop, "billing_type", None) or "").strip().lower()
+
+    # Business type (billing_type) is immutable after it is first set.
+    # Allow setting it only when it's empty/null in DB.
+    if "billing_type" in shop_payload:
+        incoming = (shop_payload.get("billing_type") or "").strip().lower()
+        if incoming == "":
+            shop_payload.pop("billing_type", None)
+        elif prev_billing_type and incoming != prev_billing_type:
+            raise HTTPException(400, "Business type cannot be changed after creation")
+        elif prev_billing_type and incoming == prev_billing_type:
+            # Ignore no-op updates (frontend should not send billing_type on edit).
+            shop_payload.pop("billing_type", None)
 
     for k, v in shop_payload.items():
         setattr(shop, k, v)

@@ -194,7 +194,7 @@ def create_invoice(
             raise HTTPException(400, "Insufficient wallet balance")
 
     invoice = Invoice(
-        invoice_number=generate_invoice_number(db),
+        invoice_number=generate_invoice_number(db, shop_id=user.shop_id, branch_id=branch_id),
         shop_id=user.shop_id,
         branch_id=branch_id,
         created_user=user.user_id,

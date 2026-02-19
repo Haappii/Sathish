@@ -138,7 +138,11 @@ export default function ShopDetails() {
     };
 
     try {
-      await authAxios.post("/shop/", form, {
+      const payload = { ...form };
+      // Business type is immutable after creation; never send on edit.
+      delete payload.billing_type;
+
+      await authAxios.post("/shop/", payload, {
         headers: { "x-user-role": userRole }
       });
 
@@ -250,24 +254,10 @@ export default function ShopDetails() {
 
           {/* Business Type */}
           <Field label="Business Type">
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  checked={form.billing_type === "store"}
-                  onChange={() => setField("billing_type", "store")}
-                />
-                Store / Retail
-              </label>
-
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  checked={form.billing_type === "hotel"}
-                  onChange={() => setField("billing_type", "hotel")}
-                />
-                Hotel / Restaurant
-              </label>
+            <div className="text-sm text-gray-700">
+              {String(form.billing_type || "").toLowerCase() === "hotel"
+                ? "Hotel / Restaurant"
+                : "Store / Retail"}
             </div>
           </Field>
 

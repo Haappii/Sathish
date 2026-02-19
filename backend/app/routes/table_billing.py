@@ -19,6 +19,7 @@ from app.models.table_qr import TableQrSession
 from app.services.gst_service import calculate_gst
 
 from app.services.inventory_service import adjust_stock, is_inventory_enabled
+from app.services.invoice_service import generate_invoice_number
 from app.services.day_close_service import is_branch_day_closed
 from app.utils.shop_type import ensure_hotel_billing_type
 
@@ -58,27 +59,6 @@ class CheckoutRequest(BaseModel):
     payment_mode: Optional[str] = "cash"
     payment_split: Optional[dict] = None
     service_charge: Optional[float] = 0
-
-
-# ======================================================
-# INVOICE NUMBER GENERATOR
-# ======================================================
-def generate_invoice_number(db: Session, shop_id: int, branch_id: int) -> str:
-    last_invoice = (
-        db.query(Invoice)
-        .filter(Invoice.shop_id == shop_id, Invoice.branch_id == branch_id)
-        .order_by(Invoice.invoice_id.desc())
-        .first()
-    )
-
-    next_no = 1
-    if last_invoice and last_invoice.invoice_number:
-        try:
-            next_no = int(last_invoice.invoice_number.split("-")[-1]) + 1
-        except Exception:
-            next_no = last_invoice.invoice_id + 1
-
-    return f"INV-{str(next_no).zfill(5)}"
 
 
 # ======================================================
@@ -323,7 +303,7 @@ def checkout_order(
 
     invoice = Invoice(
         shop_id=user.shop_id,
-        invoice_number=generate_invoice_number(db, user.shop_id, order.branch_id),
+        invoice_number=generate_invoice_number(db, shop_id=user.shop_id, branch_id=order.branch_id),
         branch_id=order.branch_id,
         created_user=user.user_id,
         created_time=business_dt,

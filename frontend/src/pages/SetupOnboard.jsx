@@ -21,6 +21,7 @@ export default function SetupOnboard() {
     mailid: "",
     city: "",
     state: "",
+    billing_type: "store",
 
     branch_name: "",
     branch_city: "",
@@ -73,6 +74,9 @@ export default function SetupOnboard() {
 
   const validateStep = () => {
     if (step === 0 && !form.shop_name.trim()) return "Shop name required";
+    if (step === 0 && !["store", "hotel"].includes(String(form.billing_type || "").toLowerCase())) {
+      return "Business type required";
+    }
     if (step === 1 && !form.branch_name.trim()) return "Branch name required";
     if (step === 2 && !String(form.requester_email || "").includes("@")) return "Valid email required";
     return null;
@@ -93,18 +97,13 @@ export default function SetupOnboard() {
     try {
       setLoading(true);
 
-      // Keep multipart so we can add logo later (even if backend currently reads JSON).
-      const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v ?? ""));
-      if (logoFile) fd.append("logo", logoFile);
-
       // Backend currently accepts JSON for platform onboarding requests.
       // If logo is needed, we can extend backend later; for now send JSON.
       const res = await api.post("/platform/onboard/requests", {
         ...form,
         shop_name: form.shop_name,
         branch_name: form.branch_name,
-        billing_type: "store",
+        billing_type: String(form.billing_type || "store").toLowerCase(),
       });
 
       setResult(res.data);
@@ -295,6 +294,10 @@ export default function SetupOnboard() {
               <input placeholder="Email" value={form.mailid} onChange={(e) => update("mailid", e.target.value)} />
               <input placeholder="City" value={form.city} onChange={(e) => update("city", e.target.value)} />
               <input placeholder="State" value={form.state} onChange={(e) => update("state", e.target.value)} />
+              <select value={form.billing_type} onChange={(e) => update("billing_type", e.target.value)}>
+                <option value="store">Store / Retail</option>
+                <option value="hotel">Hotel / Restaurant</option>
+              </select>
               <input type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} />
             </div>
 
@@ -368,4 +371,3 @@ export default function SetupOnboard() {
     </div>
   );
 }
-
