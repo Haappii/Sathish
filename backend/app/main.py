@@ -93,10 +93,23 @@ app.mount(
 )
 
 # ======================================================
+# STATIC FILES (DOWNLOADS)
+# Stored in: <project_root>/downloads/
+# Used by About page for APK/desktop installer downloads.
+# ======================================================
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DOWNLOADS_DIR = PROJECT_ROOT / "downloads"
+DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/downloads",
+    StaticFiles(directory=str(DOWNLOADS_DIR)),
+    name="downloads"
+)
+
+# ======================================================
 # STATIC FILES (ITEM IMAGES)
 # Stored in: frontend/src/assets/items/{item_id}.{ext}
 # ======================================================
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ITEM_IMAGES_DIR = PROJECT_ROOT / "frontend" / "src" / "assets" / "items"
 ITEM_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(

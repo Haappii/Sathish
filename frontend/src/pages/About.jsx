@@ -91,8 +91,12 @@ export default function About() {
   const androidApkUrl =
     import.meta.env.VITE_ANDROID_APK_URL || "/downloads/haappii-billing.apk";
   const iosAppUrl = import.meta.env.VITE_IOS_APP_URL || "";
+  const windowsAppUrl =
+    import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
   const isAndroid =
     typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+  const isWindows =
+    typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
 
   const startAndroidDownload = async () => {
     if (!androidApkUrl) {
@@ -152,6 +156,81 @@ export default function About() {
       else showToast("Download started. Copy the APK to an Android phone to install.", "success");
     } catch {
       showToast("Unable to start download", "error");
+    }
+  };
+
+  const startWindowsDownload = async () => {
+    if (!windowsAppUrl) {
+      showToast("Windows app download is not configured", "error");
+      return;
+    }
+
+    try {
+      const resolvedUrl = (() => {
+        try {
+          return new URL(windowsAppUrl, window.location.href);
+        } catch {
+          return null;
+        }
+      })();
+
+      if (!resolvedUrl) {
+        showToast("Invalid Windows app download URL", "error");
+        return;
+      }
+
+      const isSameOrigin = resolvedUrl.origin === window.location.origin;
+
+      if (isSameOrigin) {
+        try {
+          const head = await fetch(resolvedUrl.href, { method: "HEAD" });
+          const contentType = (head.headers.get("content-type") || "").toLowerCase();
+
+          if (!head.ok || contentType.includes("text/html")) {
+            showToast(
+              "Windows installer is not available on the server. Please upload the installer and try again.",
+              "error"
+            );
+            return;
+          }
+        } catch {
+          showToast(
+            "Unable to verify installer on server. Please try again after uploading the installer.",
+            "error"
+          );
+          return;
+        }
+      }
+
+      const a = document.createElement("a");
+      a.href = resolvedUrl.href;
+      a.rel = "noopener noreferrer";
+      if (isSameOrigin) {
+        a.download = "poss-desktop-setup.exe";
+      } else {
+        a.target = "_blank";
+      }
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      showToast("Download started. Run the installer to install the desktop app.", "success");
+    } catch {
+      showToast("Unable to start download", "error");
+    }
+  };
+
+  const openDesktopApp = () => {
+    try {
+      const path = "/home";
+      const deepLink = `poss://open?path=${encodeURIComponent(path)}`;
+      window.location.href = deepLink;
+      showToast(
+        "Trying to open the desktop app… If nothing happens, install it first.",
+        "info"
+      );
+    } catch {
+      showToast("Unable to open desktop app", "error");
     }
   };
 
@@ -494,6 +573,29 @@ export default function About() {
           <div className="hint">
             Admin note: set <b>VITE_ANDROID_APK_URL</b> (and optional{" "}
             <b>VITE_IOS_APP_URL</b>) for correct download links.
+          </div>
+        </div>
+
+        <div className="app-card" style={{ marginTop: 18 }}>
+          <h3 className="app-title">Desktop App (Windows)</h3>
+          <p className="app-sub">
+            {isWindows
+              ? "You are on Windows. Download and install the desktop app, then you can open it directly."
+              : "Download the Windows installer on a Windows PC to install the desktop app."}
+          </p>
+
+          <div className="app-actions">
+            <button className="btn btn-primary" onClick={startWindowsDownload}>
+              Download Windows (EXE)
+            </button>
+            <button className="btn btn-outline" onClick={openDesktopApp}>
+              Open Desktop App
+            </button>
+          </div>
+
+          <div className="hint">
+            Admin note: upload <b>poss-desktop-setup.exe</b> to <b>/downloads</b>{" "}
+            (or set <b>VITE_WINDOWS_APP_URL</b>).
           </div>
         </div>
       </section>

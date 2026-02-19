@@ -1,0 +1,45 @@
+{
+  "name": "poss-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "POSS Desktop wrapper for the Shop Billing web app",
+  "main": "main.js",
+  "scripts": {
+    "dev": "cross-env APP_URL=http://localhost:5173 electron .",
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis -p never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.haappii.poss",
+    "productName": "POSS",
+    "files": [
+      "main.js"
+    ],
+    "protocols": [
+      {
+        "name": "POSS Desktop",
+        "schemes": [
+          "poss"
+        ]
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}
+
