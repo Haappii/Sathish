@@ -9,6 +9,7 @@ import uuid
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.db import get_db
 from app.models.support_ticket import SupportTicket
@@ -89,6 +90,34 @@ def _send_mail(subject: str, content: str, file: UploadFile | None = None, file_
     with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as smtp:
         smtp.login(SENDER_EMAIL, SENDER_PASSWORD)
         smtp.send_message(email)
+
+
+def _role_lower(user) -> str:
+    return str(getattr(user, "role_name", "") or getattr(user, "role", "") or "").strip().lower()
+
+
+def _staff_guard(user=Depends(get_current_user)):
+    role = _role_lower(user)
+    if role not in {"admin", "manager"}:
+        raise HTTPException(403, "Access denied")
+    return user
+
+
+def _ensure_ticket_access(ticket: SupportTicket, *, user) -> None:
+    role = _role_lower(user)
+    if role == "admin":
+        return
+
+    # Manager: only SUPPORT tickets for their own branch_name.
+    if str(ticket.ticket_type or "").strip().upper() != "SUPPORT":
+        raise HTTPException(403, "Access denied")
+
+    user_branch = str(getattr(user, "branch_name", "") or "").strip()
+    if not user_branch:
+        raise HTTPException(403, "Branch required")
+
+    if (str(ticket.branch_name or "").strip().lower()) != user_branch.lower():
+        raise HTTPException(403, "Access denied")
 
 
 # ========================================================
@@ -228,9 +257,20 @@ def list_tickets(
     status: str | None = None,
     limit: int = 200,
     db: Session = Depends(get_db),
-    user=Depends(AdminOnly),
+    user=Depends(_staff_guard),
 ):
     q = db.query(SupportTicket).order_by(SupportTicket.ticket_id.desc())
+
+    role = _role_lower(user)
+    if role != "admin":
+        user_branch = str(getattr(user, "branch_name", "") or "").strip()
+        if not user_branch:
+            raise HTTPException(403, "Branch required")
+        q = q.filter(func.upper(SupportTicket.ticket_type) == "SUPPORT")
+        q = q.filter(func.lower(func.coalesce(SupportTicket.branch_name, "")) == user_branch.lower())
+        # Managers cannot query other ticket types.
+        ticket_type = "SUPPORT"
+
     if ticket_type:
         q = q.filter(SupportTicket.ticket_type == ticket_type.upper())
     if status:
@@ -243,11 +283,13 @@ def update_ticket_status(
     ticket_id: int,
     new_status: str,
     db: Session = Depends(get_db),
-    user=Depends(AdminOnly),
+    user=Depends(_staff_guard),
 ):
     row = db.query(SupportTicket).filter(SupportTicket.ticket_id == ticket_id).first()
     if not row:
         raise HTTPException(404, "Ticket not found")
+
+    _ensure_ticket_access(row, user=user)
 
     row.status = (new_status or "").strip().upper() or row.status
     db.commit()
@@ -259,11 +301,13 @@ def update_ticket_status(
 def download_ticket_attachment(
     ticket_id: int,
     db: Session = Depends(get_db),
-    user=Depends(AdminOnly),
+    user=Depends(_staff_guard),
 ):
     row = db.query(SupportTicket).filter(SupportTicket.ticket_id == ticket_id).first()
     if not row or not row.attachment_path:
         raise HTTPException(404, "Attachment not found")
+
+    _ensure_ticket_access(row, user=user)
 
     p = Path(row.attachment_path)
     try:

@@ -99,7 +99,7 @@ export default function OnlineOrders() {
   const loadBranches = async () => {
     if (!isAdmin) return;
     try {
-      const res = await api.get("/branch/list");
+      const res = await api.get("/branch/active");
       setBranches(res?.data || []);
     } catch {
       setBranches([]);

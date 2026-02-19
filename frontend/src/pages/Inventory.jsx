@@ -53,7 +53,9 @@ export default function Inventory() {
       setIsHotel(hotel);
 
       const allItems = resItems.data || [];
-      const invItems = hotel ? allItems.filter((it) => !!it?.is_raw_material) : allItems;
+      const invItems = hotel
+        ? allItems.filter((it) => !!it?.is_raw_material)
+        : allItems.filter((it) => !it?.is_raw_material);
       const catIds = new Set(invItems.map((it) => String(it?.category_id ?? "")));
       const invCats = (resCats.data || []).filter((c) => catIds.has(String(c?.category_id ?? "")));
 

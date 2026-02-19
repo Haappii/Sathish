@@ -9,6 +9,7 @@ from app.utils.auth_user import AdminOnly, get_current_user
 from app.utils.permissions import (
     PERMISSION_MODULES,
     DEFAULT_ROLE_PERMISSIONS,
+    MANAGER_DENY_MODULES,
     permissions_enabled,
 )
 
@@ -49,13 +50,22 @@ def get_my_permissions(
                 "can_write": bool(r.can_write),
             }
     else:
-        for m in PERMISSION_MODULES:
-            key = m["key"]
-            rules = DEFAULT_ROLE_PERMISSIONS.get(key, {})
-            by_module[key] = {
-                "can_read": role_lower in (rules.get("read") or set()),
-                "can_write": role_lower in (rules.get("write") or set()),
+        if role_lower == "manager":
+            by_module = {
+                m["key"]: {
+                    "can_read": m["key"] not in MANAGER_DENY_MODULES,
+                    "can_write": m["key"] not in MANAGER_DENY_MODULES,
+                }
+                for m in PERMISSION_MODULES
             }
+        else:
+            for m in PERMISSION_MODULES:
+                key = m["key"]
+                rules = DEFAULT_ROLE_PERMISSIONS.get(key, {})
+                by_module[key] = {
+                    "can_read": role_lower in (rules.get("read") or set()),
+                    "can_write": role_lower in (rules.get("write") or set()),
+                }
 
     modules = []
     for m in PERMISSION_MODULES:
@@ -184,8 +194,15 @@ def bootstrap_default_permissions(
         role_lower = str(role.role_name or "").strip().lower()
         for mod in modules:
             rules = DEFAULT_ROLE_PERMISSIONS.get(mod, {})
-            can_read = role_lower in (rules.get("read") or set()) or role_lower == "admin"
-            can_write = role_lower in (rules.get("write") or set()) or role_lower == "admin"
+            if role_lower == "admin":
+                can_read = True
+                can_write = True
+            elif role_lower == "manager":
+                can_read = mod not in MANAGER_DENY_MODULES
+                can_write = mod not in MANAGER_DENY_MODULES
+            else:
+                can_read = role_lower in (rules.get("read") or set())
+                can_write = role_lower in (rules.get("write") or set())
             db.add(RolePermission(
                 shop_id=user.shop_id,
                 role_id=int(role.role_id),

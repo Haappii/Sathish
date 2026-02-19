@@ -2,9 +2,13 @@ import React, { useEffect, useState } from "react";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import BackButton from "../../components/BackButton";
+import { getSession } from "../../utils/auth";
 
 export default function Users() {
   const { showToast } = useToast();
+  const session = getSession() || {};
+  const roleLower = (session?.role || "").toString().toLowerCase();
+  const isAdmin = roleLower === "admin";
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -26,12 +30,17 @@ export default function Users() {
   // ---------- LOAD ----------
   const loadData = async () => {
     try {
-      const u = await authAxios.get("/users/");
-      const r = await authAxios.get("/roles/");
-      const b = await authAxios.get("/branch/list");
+      const [u, r, b] = await Promise.all([
+        authAxios.get("/users/"),
+        authAxios.get("/roles/active"),
+        authAxios.get("/branch/scoped"),
+      ]);
 
       setUsers(u.data || []);
-      setRoles(r.data || []);
+
+      const roleRows = (r.data || []).filter((x) => Boolean(x?.status));
+      setRoles(isAdmin ? roleRows : roleRows.filter((x) => (x?.role_name || "").toLowerCase() !== "admin"));
+
       setBranches(b.data || []);
 
     } catch {
@@ -54,13 +63,14 @@ export default function Users() {
     if (!form.user_name) return showToast("Username required", "error");
 
     try {
+      const forcedBranchId = isAdmin ? form.branch_id : (session?.branch_id ?? form.branch_id);
       const payload = {
         user_name: form.user_name,
         password: form.password || undefined,
         name: form.name,
         role: Number(form.role) || null,
         status: form.status,
-        branch_id: Number(form.branch_id) || null
+        branch_id: Number(forcedBranchId) || null
       };
 
       if (form.user_id)
@@ -91,7 +101,7 @@ export default function Users() {
       password: "",
       name: u.name || "",
       role: u.role || "",
-      branch_id: u.branch_id || "",
+      branch_id: isAdmin ? (u.branch_id || "") : (session?.branch_id || u.branch_id || ""),
       status: u.status ?? true
     });
     setShowForm(true);
@@ -263,19 +273,24 @@ export default function Users() {
               ))}
             </select>
 
-
-            <select
-              className="w-full border rounded-lg px-2 py-1.5"
-              value={form.branch_id}
-              onChange={e => setForm({ ...form, branch_id: e.target.value })}
-            >
-              <option value="">Select Branch</option>
-              {branches.map(b => (
-                <option key={b.branch_id} value={b.branch_id}>
-                  {b.branch_name}
-                </option>
-              ))}
-            </select>
+            {isAdmin ? (
+              <select
+                className="w-full border rounded-lg px-2 py-1.5"
+                value={form.branch_id}
+                onChange={e => setForm({ ...form, branch_id: e.target.value })}
+              >
+                <option value="">Select Branch</option>
+                {branches.map(b => (
+                  <option key={b.branch_id} value={b.branch_id}>
+                    {b.branch_name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="w-full border rounded-lg px-2 py-2 text-[11px] text-gray-600 bg-gray-50">
+                Branch locked: {session?.branch_name || "Current branch"}
+              </div>
+            )}
 
 
             <div className="flex justify-end gap-2 pt-1">

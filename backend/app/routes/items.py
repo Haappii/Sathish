@@ -12,6 +12,7 @@ from app.schemas.items import ItemCreate, ItemUpdate, ItemResponse
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+from app.utils.shop_type import get_shop_billing_type
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -22,9 +23,21 @@ MAX_IMAGE_DIM = 512           # max width/height (px)
 JPEG_QUALITY = 82             # 1..95 (higher = larger file)
 
 
-def resolve_branch(request: Request):
-    header_branch = request.headers.get("x-branch-id")
-    return int(header_branch) if header_branch else 1
+def resolve_branch_for_user(*, user, request: Request) -> int:
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+
+    if role == "admin":
+        header_branch = request.headers.get("x-branch-id")
+        branch_raw = header_branch if header_branch not in (None, "") else getattr(user, "branch_id", None)
+        if branch_raw in (None, ""):
+            branch_raw = 1
+    else:
+        branch_raw = getattr(user, "branch_id", None)
+
+    try:
+        return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 def _resolve_image_ext(upload: UploadFile) -> str:
@@ -84,7 +97,27 @@ def create_item(
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
 ):
-    branch_id = resolve_branch(request)
+    branch_id = resolve_branch_for_user(user=user, request=request)
+
+    shop_type = get_shop_billing_type(db, int(user.shop_id))
+    is_raw = bool(getattr(request_data, "is_raw_material", False))
+
+    if shop_type == "hotel":
+        # Hotels: selling price is required only for sellable items.
+        if not is_raw and float(request_data.price or 0) <= 0:
+            raise HTTPException(400, "Selling price is required for items")
+        # Hotels: buy/MRP not needed.
+        request_data.buy_price = 0
+        request_data.mrp_price = 0
+    else:
+        # Shops: require buy + sell + MRP for sellable items.
+        if not is_raw:
+            if float(request_data.price or 0) <= 0:
+                raise HTTPException(400, "Selling price is required for items")
+            if float(request_data.buy_price or 0) <= 0:
+                raise HTTPException(400, "Buy price is required for items")
+            if float(request_data.mrp_price or 0) <= 0:
+                raise HTTPException(400, "MRP is required for items")
 
     category = db.query(Category).filter(
         Category.category_id == request_data.category_id,
@@ -152,11 +185,13 @@ def update_item(
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
 ):
-    branch_id = resolve_branch(request)
+    branch_id = resolve_branch_for_user(user=user, request=request)
 
     item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
+
+    shop_type = get_shop_billing_type(db, int(user.shop_id))
 
     old = {
         "item_name": item.item_name,
@@ -180,16 +215,36 @@ def update_item(
 
     if request_data.price is not None:
         item.price = request_data.price
-    if request_data.buy_price is not None:
-        item.buy_price = request_data.buy_price
-    if request_data.mrp_price is not None:
-        item.mrp_price = request_data.mrp_price
+
+    if shop_type == "hotel":
+        # Hotels: buy/MRP are not used.
+        item.buy_price = 0
+        item.mrp_price = 0
+    else:
+        if request_data.buy_price is not None:
+            item.buy_price = request_data.buy_price
+        if request_data.mrp_price is not None:
+            item.mrp_price = request_data.mrp_price
 
     if request_data.min_stock is not None:
         item.min_stock = request_data.min_stock   # 👈 now updates here
 
     if getattr(request_data, "is_raw_material", None) is not None:
         item.is_raw_material = bool(request_data.is_raw_material)
+
+    # Post-validate (after applying toggles).
+    is_raw = bool(getattr(item, "is_raw_material", False))
+    if shop_type == "hotel":
+        if not is_raw and float(getattr(item, "price", 0) or 0) <= 0:
+            raise HTTPException(400, "Selling price is required for items")
+    else:
+        if not is_raw:
+            if float(getattr(item, "price", 0) or 0) <= 0:
+                raise HTTPException(400, "Selling price is required for items")
+            if float(getattr(item, "buy_price", 0) or 0) <= 0:
+                raise HTTPException(400, "Buy price is required for items")
+            if float(getattr(item, "mrp_price", 0) or 0) <= 0:
+                raise HTTPException(400, "MRP is required for items")
 
     db.commit()
     db.refresh(item)

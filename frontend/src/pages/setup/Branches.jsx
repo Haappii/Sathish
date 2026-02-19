@@ -5,6 +5,7 @@ import api from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
 import BackButton from "../../components/BackButton";
 import { isHotelShop } from "../../utils/shopType";
+import { getSession } from "../../utils/auth";
 import {
   FaPlus,
   FaEdit,
@@ -16,6 +17,9 @@ const BLUE = "#0B3C8C";
 export default function Branches() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const session = getSession() || {};
+  const roleLower = (session?.role || "").toString().toLowerCase();
+  const isAdmin = roleLower === "admin";
 
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,8 +46,14 @@ export default function Branches() {
 
   /* ===== LOAD ===== */
   const loadBranches = async () => {
-    const res = await api.get("/branch/list");
-    setBranches(res.data || []);
+    const res = await api.get("/branch/scoped");
+    const rows = res.data || [];
+    setBranches(rows);
+
+    if (!isAdmin) {
+      const first = rows?.[0] || null;
+      if (first?.branch_id) editBranch(first);
+    }
   };
 
   useEffect(() => {
@@ -57,6 +67,10 @@ export default function Branches() {
 
   /* ===== SAVE ===== */
   const saveBranch = async () => {
+    if (!isAdmin && !editingId) {
+      showToast("Only Admin can create branches", "error");
+      return;
+    }
     if (!form.branch_name || !form.city || !form.country) {
       showToast("Branch Name, City & Country are required", "error");
       return;
@@ -106,6 +120,10 @@ export default function Branches() {
   };
 
   const toggleStatus = async (id, status) => {
+    if (!isAdmin) {
+      showToast("Only Admin can change branch status", "error");
+      return;
+    }
     try {
       await api.post(`/branch/${id}/status?status=${status}`);
       loadBranches();
@@ -232,6 +250,11 @@ export default function Branches() {
             {editingId ? <FaEdit /> : <FaPlus />}
             {editingId ? "Update" : "Create"}
           </button>
+          {!isAdmin && (
+            <div className="mt-2 text-[11px] text-gray-500">
+              Branch creation / status changes are Admin-only. Managers can edit only their own branch.
+            </div>
+          )}
         </div>
 
         {/* LIST */}
@@ -278,6 +301,7 @@ export default function Branches() {
                         )
                       }
                       className="px-3 py-1 border rounded-full"
+                      disabled={!isAdmin}
                     >
                       {b.status === "ACTIVE" ? "Disable" : "Enable"}
                     </button>

@@ -15,9 +15,14 @@ from app.services.branch_service import (
 )
 from app.utils.auth_user import get_current_user, AdminOnly
 from app.services.audit_service import log_action
+from app.utils.permissions import require_permission
 
 
 router = APIRouter(prefix="/branch", tags=["Branch"])
+
+
+def _role_lower(user) -> str:
+    return str(getattr(user, "role_name", "") or "").strip().lower()
 
 
 def _discount_param_keys(branch_id: int) -> dict[str, str]:
@@ -181,6 +186,13 @@ def list_branches(db: Session = Depends(get_db), user=Depends(get_current_user))
 @router.get("/active", response_model=list[BranchOut])
 def active_branches(db: Session = Depends(get_db), user=Depends(get_current_user)):
     branches = get_active_branches(db, user.shop_id)
+    if _role_lower(user) != "admin" and getattr(user, "branch_id", None):
+        try:
+            bid = int(getattr(user, "branch_id", None))
+        except (TypeError, ValueError):
+            bid = None
+        if bid is not None:
+            branches = [b for b in branches if int(b.branch_id) == bid]
     pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
     return [_branch_out_with_discount(b, pmap) for b in branches]
 
@@ -190,6 +202,13 @@ def active_branches(db: Session = Depends(get_db), user=Depends(get_current_user
 # =========================================================
 @router.get("/{branch_id}", response_model=BranchOut)
 def get_branch(branch_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if _role_lower(user) != "admin":
+        try:
+            user_bid = int(getattr(user, "branch_id", None))
+        except (TypeError, ValueError):
+            user_bid = None
+        if user_bid is not None and int(branch_id) != user_bid:
+            raise HTTPException(403, "Access denied for branch")
 
     branch = (
         db.query(Branch)
@@ -202,6 +221,35 @@ def get_branch(branch_id: int, db: Session = Depends(get_db), user=Depends(get_c
 
     pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(branch.branch_id)])
     return _branch_out_with_discount(branch, pmap)
+
+
+# =========================================================
+# 🔹 Scoped — Visible branches for current user
+# Admin    -> all branches (active + inactive)
+# Non-admin-> only their own branch (if set)
+# =========================================================
+@router.get("/scoped", response_model=list[BranchOut])
+def scoped_branches(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("setup", "read")),
+):
+    role = _role_lower(user)
+    if role == "admin":
+        branches = get_all_branches(db, user.shop_id)
+    else:
+        bid = getattr(user, "branch_id", None)
+        if not bid:
+            branches = get_active_branches(db, user.shop_id)
+        else:
+            b = (
+                db.query(Branch)
+                .filter(Branch.shop_id == user.shop_id, Branch.branch_id == int(bid))
+                .first()
+            )
+            branches = [b] if b else []
+
+    pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
+    return [_branch_out_with_discount(b, pmap) for b in branches]
 
 
 # =========================================================
@@ -238,10 +286,18 @@ def create(
 # =========================================================
 # 🔹 Update Branch (Admin Only)
 # =========================================================
-@router.put("/{branch_id}", response_model=BranchOut, dependencies=[Depends(AdminOnly)])
+@router.put("/{branch_id}", response_model=BranchOut)
 def update(branch_id: int, data: BranchUpdate,
            db: Session = Depends(get_db),
-           user=Depends(get_current_user)):
+           user=Depends(require_permission("setup", "write"))):
+
+    if _role_lower(user) != "admin":
+        try:
+            user_bid = int(getattr(user, "branch_id", None))
+        except (TypeError, ValueError):
+            user_bid = None
+        if user_bid is not None and int(branch_id) != user_bid:
+            raise HTTPException(403, "Only Admin can modify other branches")
 
     existing = (
         db.query(Branch)

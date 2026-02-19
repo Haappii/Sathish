@@ -15,6 +15,14 @@ export default function Permissions() {
   const session = getSession() || {};
   const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
+  if (!isAdmin) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-red-600">
+        You are not authorized to access this page
+      </div>
+    );
+  }
+
   const [modules, setModules] = useState([]);
   const [roles, setRoles] = useState([]);
   const [perms, setPerms] = useState([]);

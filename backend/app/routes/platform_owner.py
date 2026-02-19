@@ -211,14 +211,15 @@ def list_onboard_requests(
 
 
 def _ensure_admin_role(db: Session) -> Role:
-    admin_role = db.query(Role).filter(Role.role_name == "Admin").first()
-    if admin_role:
-        return admin_role
-    admin_role = Role(role_name="Admin", status=True)
-    db.add(admin_role)
-    db.commit()
-    db.refresh(admin_role)
-    return admin_role
+    from app.services.role_service import ensure_role
+
+    return ensure_role(db, role_name="Admin")
+
+
+def _ensure_manager_role(db: Session) -> Role:
+    from app.services.role_service import ensure_role
+
+    return ensure_role(db, role_name="Manager")
 
 
 def _generate_password() -> str:
@@ -240,6 +241,7 @@ def accept_onboard_request(
         raise HTTPException(400, f"Request already {row.status}")
 
     admin_role = _ensure_admin_role(db)
+    _ensure_manager_role(db)
     admin_username = (row.admin_username or "admin").strip()
     admin_password = _generate_password()
 
@@ -579,6 +581,7 @@ def accept_demo_ticket(
     admin_password = _generate_password()
 
     admin_role = _ensure_admin_role(db)
+    _ensure_manager_role(db)
 
     try:
         shop = ShopDetails(

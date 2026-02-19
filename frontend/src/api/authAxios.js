@@ -13,6 +13,9 @@ authAxios.interceptors.request.use(config => {
   const session = getSession();
   config.headers = config.headers || {};
   config.params = config.params || {};
+
+  const roleLower = (session?.role || "").toString().toLowerCase();
+  const isAdmin = roleLower === "admin";
   let token =
     localStorage.getItem("token") ||
     localStorage.getItem("access_token");   // 👈 fallback
@@ -27,12 +30,14 @@ authAxios.interceptors.request.use(config => {
     config.headers["x-branch-id"] = session.branch_id;
   }
 
-  // Enforce branch scope: only allow the current (header-selected) branch.
-  if (
-    session?.branch_id &&
-    Object.prototype.hasOwnProperty.call(config.params, "branch_id")
-  ) {
-    config.params.branch_id = session.branch_id;
+  // Enforce branch scope for non-admin users only.
+  if (!isAdmin) {
+    if (
+      session?.branch_id &&
+      Object.prototype.hasOwnProperty.call(config.params, "branch_id")
+    ) {
+      config.params.branch_id = session.branch_id;
+    }
   }
 
   return config;

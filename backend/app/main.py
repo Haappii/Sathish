@@ -136,16 +136,11 @@ app.add_middleware(
 def seed_defaults():
     db: Session = SessionLocal()
 
-    # ---- ADMIN ROLE ----
-    admin_role = db.query(Role).filter(
-        Role.role_name == "Admin"
-    ).first()
+    # ---- CORE ROLES ----
+    from app.services.role_service import ensure_core_roles
 
-    if not admin_role:
-        admin_role = Role(role_name="Admin")
-        db.add(admin_role)
-        db.commit()
-        db.refresh(admin_role)
+    roles = ensure_core_roles(db)
+    admin_role = roles.get("admin")
 
     # ---- HEAD OFFICE BRANCH ----
     ho_branch = db.query(Branch).filter(

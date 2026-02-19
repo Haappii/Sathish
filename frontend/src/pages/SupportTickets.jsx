@@ -14,6 +14,8 @@ export default function SupportTickets() {
 
   const roleLower = String(session?.role || session?.role_name || "").toLowerCase();
   const isAdmin = roleLower === "admin";
+  const isManager = roleLower === "manager";
+  const isStaff = isAdmin || isManager;
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
@@ -35,7 +37,8 @@ export default function SupportTickets() {
       const params = {
         limit: Number(limit || 200)
       };
-      if (ticketType) params.ticket_type = ticketType;
+      if (isManager) params.ticket_type = "SUPPORT";
+      else if (ticketType) params.ticket_type = ticketType;
       if (status) params.status = status;
 
       const res = await authAxios.get("/support/tickets", { params });
@@ -84,11 +87,12 @@ export default function SupportTickets() {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isStaff) return;
+    if (isManager) setTicketType("SUPPORT");
     load();
-  }, [isAdmin]);
+  }, [isStaff]);
 
-  if (!isAdmin) {
+  if (!isStaff) {
     return (
       <div className="mt-10 text-center text-sm font-medium text-red-600">
         You are not authorized to access this page
@@ -113,15 +117,21 @@ export default function SupportTickets() {
         <div className="flex flex-wrap gap-2 items-end">
           <div className="min-w-[160px]">
             <label className="text-[10px] text-gray-600">Type</label>
-            <select
-              className="w-full border rounded-lg px-2 py-1"
-              value={ticketType}
-              onChange={e => setTicketType(e.target.value)}
-            >
-              <option value="">All</option>
-              <option value="SUPPORT">SUPPORT</option>
-              <option value="DEMO">DEMO</option>
-            </select>
+            {isManager ? (
+              <div className="w-full border rounded-lg px-2 py-1 bg-gray-50 text-gray-700">
+                SUPPORT (Branch only)
+              </div>
+            ) : (
+              <select
+                className="w-full border rounded-lg px-2 py-1"
+                value={ticketType}
+                onChange={e => setTicketType(e.target.value)}
+              >
+                <option value="">All</option>
+                <option value="SUPPORT">SUPPORT</option>
+                <option value="DEMO">DEMO</option>
+              </select>
+            )}
           </div>
 
           <div className="min-w-[160px]">

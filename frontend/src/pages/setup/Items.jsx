@@ -4,12 +4,14 @@ import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { API_BASE } from "../../config/api";
 import BackButton from "../../components/BackButton";
+import { isHotelShop } from "../../utils/shopType";
 
 export default function Items() {
   const { showToast } = useToast();
 
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [hotelShop, setHotelShop] = useState(false);
 
   const [activeCategoryId, setActiveCategoryId] = useState("all");
   const [categorySearch, setCategorySearch] = useState("");
@@ -34,10 +36,12 @@ export default function Items() {
 
   const loadData = async () => {
     try {
-      const [i, c] = await Promise.all([
+      const [shopRes, i, c] = await Promise.all([
+        authAxios.get("/shop/details"),
         authAxios.get("/items/"),
         authAxios.get("/category/")
       ]);
+      setHotelShop(isHotelShop(shopRes?.data || {}));
       setItems(i.data || []);
       setCategories(c.data || []);
     } catch {
@@ -115,12 +119,20 @@ export default function Items() {
       return showToast("Enter item name and select a category", "error");
     }
 
+    if (!hotelShop && !form.is_raw_material) {
+      if (!Number(form.buy_price)) return showToast("Buy price is required", "error");
+      if (!Number(form.mrp_price)) return showToast("MRP is required", "error");
+    }
+    if (!form.is_raw_material && !Number(form.price)) {
+      return showToast("Selling price is required", "error");
+    }
+
     const payload = {
       item_name: form.item_name.toUpperCase(),
       category_id: Number(form.category_id),
       price: Number(form.price) || 0,
-      buy_price: Number(form.buy_price) || 0,
-      mrp_price: Number(form.mrp_price) || 0,
+      buy_price: hotelShop ? 0 : (Number(form.buy_price) || 0),
+      mrp_price: hotelShop ? 0 : (Number(form.mrp_price) || 0),
       min_stock: Number(form.min_stock) || 0,
       item_status: !!form.item_status,
       is_raw_material: !!form.is_raw_material,
@@ -390,7 +402,12 @@ export default function Items() {
                         )}
                         <div className="text-[11px] text-gray-500 mt-1 whitespace-normal break-words">
                           {activeCategoryId === "all" && catName ? `${catName} | ` : ""}
-                          Buy RS.{Number(item.buy_price || 0).toFixed(0)} | MRP RS.{Number(item.mrp_price || 0).toFixed(0)} | Min {Number(item.min_stock || 0)}
+                          {!hotelShop && (
+                            <>
+                              Buy RS.{Number(item.buy_price || 0).toFixed(0)} | MRP RS.{Number(item.mrp_price || 0).toFixed(0)} |{" "}
+                            </>
+                          )}
+                          Min {Number(item.min_stock || 0)}
                         </div>
                       </div>
                     </div>
@@ -475,26 +492,30 @@ export default function Items() {
                 />
               </div>
 
-              <div>
-                <label className="text-[9px] text-gray-600">Buy Price</label>
-                <input
-                  type="number"
-                  className="border rounded-lg px-2 py-1 w-full text-[11px]"
-                  value={form.buy_price}
-                  onChange={e => setForm({ ...form, buy_price: e.target.value })}
-                />
-              </div>
+              {!hotelShop && (
+                <>
+                  <div>
+                    <label className="text-[9px] text-gray-600">Buy Price</label>
+                    <input
+                      type="number"
+                      className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                      value={form.buy_price}
+                      onChange={e => setForm({ ...form, buy_price: e.target.value })}
+                    />
+                  </div>
 
-              <div>
-                <label className="text-[9px] text-gray-600">MRP Price</label>
-                <input
-                  type="number"
-                  className="border rounded-lg px-2 py-1 w-full text-[11px]"
-                  value={form.mrp_price}
-                  onChange={e => setForm({ ...form, mrp_price: e.target.value })}
-                  disabled={form.is_raw_material}
-                />
-              </div>
+                  <div>
+                    <label className="text-[9px] text-gray-600">MRP Price</label>
+                    <input
+                      type="number"
+                      className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                      value={form.mrp_price}
+                      onChange={e => setForm({ ...form, mrp_price: e.target.value })}
+                      disabled={form.is_raw_material}
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="text-[9px] text-gray-600">Min Stock</label>

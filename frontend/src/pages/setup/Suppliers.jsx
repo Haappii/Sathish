@@ -44,7 +44,7 @@ export default function Suppliers() {
   const loadBranches = async () => {
     if (!isAdmin) return;
     try {
-      const res = await authAxios.get("/branch/list");
+      const res = await authAxios.get("/branch/active");
       setBranches(res.data || []);
     } catch {}
   };

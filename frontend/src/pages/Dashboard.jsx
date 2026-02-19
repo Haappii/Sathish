@@ -116,7 +116,7 @@ export default function Dashboard() {
   };
 
   const loadBranches = async () => {
-    const r = await authAxios.get("/branch/list");
+    const r = await authAxios.get("/branch/active");
     setBranches(r.data || []);
   };
 

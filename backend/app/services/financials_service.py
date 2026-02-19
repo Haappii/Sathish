@@ -6,9 +6,11 @@ from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
 from app.models.branch_expense import BranchExpense
+from app.models.employee import EmployeeAttendance
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.sales_return import SalesReturn, SalesReturnItem
+from app.utils.shop_type import get_shop_billing_type
 
 
 def calc_period_financials(
@@ -19,6 +21,8 @@ def calc_period_financials(
     from_dt: date,
     to_dt: date,
 ) -> dict[str, float]:
+    shop_type = get_shop_billing_type(db, int(shop_id))
+
     inv_total_expr = func.coalesce(Invoice.total_amount, 0)
     inv_tax_expr = func.coalesce(Invoice.tax_amt, 0)
     inv_sales_ex_tax_expr = inv_total_expr - inv_tax_expr
@@ -159,13 +163,30 @@ def calc_period_financials(
         exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
     expense = float(exp_q.scalar() or 0)
 
+    # Employee wages treated as expense (earned on attendance date).
+    wage_q = db.query(func.coalesce(func.sum(EmployeeAttendance.wage_amount), 0)).filter(
+        EmployeeAttendance.shop_id == shop_id,
+        EmployeeAttendance.attendance_date.between(from_dt, to_dt),
+    )
+    if branch_id is not None:
+        wage_q = wage_q.filter(EmployeeAttendance.branch_id == branch_id)
+    wages_expense = float(wage_q.scalar() or 0)
+
+    expense = float(expense + wages_expense)
+
     sales = invoice_sales_ex_tax - ret_sales_ex_tax
     gst = invoice_gst - ret_tax
     discount = invoice_discount - ret_discount
     discount_ex_tax = invoice_discount_ex_tax - ret_discount_ex_tax
 
     cogs_net = invoice_cogs - ret_cogs
-    gross_profit = (sales - discount_ex_tax) - cogs_net
+    if shop_type == "hotel":
+        # Hotels: day-end profit is sales (ex GST, net of discounts/returns) - expenses.
+        cogs_net = 0.0
+        gross_profit = (sales - discount_ex_tax)
+    else:
+        # Shops: consider COGS for profit.
+        gross_profit = (sales - discount_ex_tax) - cogs_net
     net_profit = gross_profit - expense
     profit = net_profit
 
@@ -186,6 +207,7 @@ def calc_period_financials(
         "discount": discount,
         "discount_ex_tax": discount_ex_tax,
         "expense": expense,
+        "wages_expense": wages_expense,
         "cogs_net": cogs_net,
         "gross_profit": gross_profit,
         "net_profit": net_profit,

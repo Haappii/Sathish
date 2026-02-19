@@ -25,6 +25,9 @@ api.interceptors.request.use(
     config.headers = config.headers || {};
     config.params = config.params || {};
 
+    const roleLower = (session?.role || "").toString().toLowerCase();
+    const isAdmin = roleLower === "admin";
+
     // 🔑 SUPPORT BOTH session + localStorage token names
     const token =
       session?.access_token ||
@@ -46,12 +49,14 @@ api.interceptors.request.use(
       config.headers["x-branch-id"] = session.branch_id;
     }
 
-    // Enforce branch scope: only allow the current (header-selected) branch.
-    if (
-      session?.branch_id &&
-      Object.prototype.hasOwnProperty.call(config.params, "branch_id")
-    ) {
-      config.params.branch_id = session.branch_id;
+    // Enforce branch scope for non-admin users only.
+    if (!isAdmin) {
+      if (
+        session?.branch_id &&
+        Object.prototype.hasOwnProperty.call(config.params, "branch_id")
+      ) {
+        config.params.branch_id = session.branch_id;
+      }
     }
 
     return config;

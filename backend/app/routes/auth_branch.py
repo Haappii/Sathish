@@ -40,6 +40,16 @@ def set_branch(
     if resolved_branch_id is None:
         raise HTTPException(422, "branch_id is required")
 
+    role_lower = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role_lower != "admin":
+        # Non-admin users are locked to their assigned branch.
+        try:
+            user_branch_id = int(getattr(user, "branch_id", None))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Branch required")
+        if int(resolved_branch_id) != user_branch_id:
+            raise HTTPException(403, "Only Admin can switch branches")
+
     branch = get_branch(db, user.shop_id, resolved_branch_id)
 
     if not branch or branch.status != "ACTIVE":

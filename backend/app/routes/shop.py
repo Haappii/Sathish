@@ -117,6 +117,15 @@ def save_shop_details(
     x_user_role: str | None = Header(None),
     user=Depends(get_current_user)
 ):
+    # Ensure core roles exist for this installation (idempotent).
+    # This keeps role dropdowns consistent for newly provisioned shops.
+    try:
+        from app.services.role_service import ensure_core_roles
+
+        ensure_core_roles(db)
+    except Exception:
+        # Never block shop updates due to role seeding issues.
+        pass
 
     payload = data.dict(exclude_unset=True)
     shop_payload = {k: v for k, v in payload.items() if k not in SHOP_PARAM_KEYS}

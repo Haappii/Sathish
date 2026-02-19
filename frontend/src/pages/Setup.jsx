@@ -27,6 +27,8 @@ export default function Setup() {
   const navigate = useNavigate();
   const session = getSession();
   const [allowed, setAllowed] = useState(null);
+  const roleLower = (session?.role || "").toString().toLowerCase();
+  const isPrivileged = ["admin", "manager"].includes(roleLower);
   const isHeadOffice =
     (session?.branch_type || "").toLowerCase().includes("head") ||
     (session?.branch_name || "").toLowerCase().includes("head") ||
@@ -187,9 +189,14 @@ export default function Setup() {
     }
   ];
 
-  const visibleMenus = isHeadOffice
-    ? menus
-    : menus.filter(m => m.link === "/inventory" || m.link === "/day-close");
+  const filteredMenus = menus.filter((m) => {
+    if (m.link === "/setup/permissions" && roleLower !== "admin") return false;
+    return true;
+  });
+
+  const visibleMenus = isHeadOffice || isPrivileged
+    ? filteredMenus
+    : filteredMenus.filter(m => m.link === "/inventory" || m.link === "/day-close");
 
   return (
     <div className="space-y-4">

@@ -8,6 +8,7 @@ from app.models.role_permission import RolePermission
 from app.models.users import User
 from app.schemas.roles import RoleCreate, RoleUpdate, RoleResponse
 from app.utils.auth_user import AdminOnly
+from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/roles", tags=["Roles"])
 
@@ -24,6 +25,20 @@ def list_roles(
     user=Depends(AdminOnly),
 ):
     return db.query(Role).order_by(Role.status.desc(), Role.role_name).all()
+
+
+@router.get("/active", response_model=list[RoleResponse])
+def list_active_roles(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("users", "read")),
+):
+    # Managers need this list to create users; role CRUD remains admin-only.
+    return (
+        db.query(Role)
+        .filter(Role.status == True)  # noqa: E712
+        .order_by(Role.role_name)
+        .all()
+    )
 
 
 @router.post("/", response_model=RoleResponse)

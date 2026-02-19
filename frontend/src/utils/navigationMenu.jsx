@@ -411,6 +411,8 @@ export const buildRoleMenu = ({
       { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
       { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
+      { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },
+      { name: "Admin", path: "/setup", icon: <FaTools /> },
     ];
   } else if (roleLower === "admin") {
     menuItems = [

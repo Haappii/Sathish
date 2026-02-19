@@ -53,7 +53,13 @@ def list_stock(
     branch = resolve_branch(branch_id, user)
 
     is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
-    rows = get_branch_stock_rows(db, user.shop_id, branch, raw_only=is_hotel)
+    rows = get_branch_stock_rows(
+        db,
+        user.shop_id,
+        branch,
+        raw_only=is_hotel,
+        exclude_raw=not is_hotel,
+    )
 
     return [
         {
@@ -83,16 +89,17 @@ def add_stock(
     branch = resolve_branch(branch_id, user)
 
     is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
-    if is_hotel:
-        it = (
-            db.query(Item)
-            .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
-            .first()
-        )
-        if not it:
-            raise HTTPException(404, "Item not found")
-        if not bool(getattr(it, "is_raw_material", False)):
-            raise HTTPException(400, "Inventory is for raw materials only")
+    it = (
+        db.query(Item)
+        .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+        .first()
+    )
+    if not it:
+        raise HTTPException(404, "Item not found")
+    if is_hotel and not bool(getattr(it, "is_raw_material", False)):
+        raise HTTPException(400, "Inventory is for raw materials only")
+    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
+        raise HTTPException(400, "Inventory is for sellable items only")
 
     ensure_stock_row(db, user.shop_id, item_id, branch)
     adjust_stock(db, user.shop_id, item_id, branch, qty, "ADD")
@@ -127,16 +134,17 @@ def remove_stock(
     branch = resolve_branch(branch_id, user)
 
     is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
-    if is_hotel:
-        it = (
-            db.query(Item)
-            .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
-            .first()
-        )
-        if not it:
-            raise HTTPException(404, "Item not found")
-        if not bool(getattr(it, "is_raw_material", False)):
-            raise HTTPException(400, "Inventory is for raw materials only")
+    it = (
+        db.query(Item)
+        .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+        .first()
+    )
+    if not it:
+        raise HTTPException(404, "Item not found")
+    if is_hotel and not bool(getattr(it, "is_raw_material", False)):
+        raise HTTPException(400, "Inventory is for raw materials only")
+    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
+        raise HTTPException(400, "Inventory is for sellable items only")
 
     ensure_stock_row(db, user.shop_id, item_id, branch)
     ok = adjust_stock(db, user.shop_id, item_id, branch, qty, "REMOVE")
@@ -174,16 +182,17 @@ def set_min_stock(
     branch = resolve_branch(branch_id, user)
 
     is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
-    if is_hotel:
-        it = (
-            db.query(Item)
-            .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
-            .first()
-        )
-        if not it:
-            raise HTTPException(404, "Item not found")
-        if not bool(getattr(it, "is_raw_material", False)):
-            raise HTTPException(400, "Inventory is for raw materials only")
+    it = (
+        db.query(Item)
+        .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+        .first()
+    )
+    if not it:
+        raise HTTPException(404, "Item not found")
+    if is_hotel and not bool(getattr(it, "is_raw_material", False)):
+        raise HTTPException(400, "Inventory is for raw materials only")
+    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
+        raise HTTPException(400, "Inventory is for sellable items only")
 
     update_min_stock(db, user.shop_id, item_id, branch, min_stock)
 
@@ -216,16 +225,17 @@ def stock_history(
     branch = resolve_branch(branch_id, user)
     is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
 
-    if is_hotel:
-        it = (
-            db.query(Item)
-            .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
-            .first()
-        )
-        if not it:
-            raise HTTPException(404, "Item not found")
-        if not bool(getattr(it, "is_raw_material", False)):
-            return []
+    it = (
+        db.query(Item)
+        .filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+        .first()
+    )
+    if not it:
+        raise HTTPException(404, "Item not found")
+    if is_hotel and not bool(getattr(it, "is_raw_material", False)):
+        return []
+    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
+        return []
 
     rows = (
         db.query(StockLedger)
@@ -282,6 +292,8 @@ def reorder_alerts(
     )
     if is_hotel:
         q = q.filter(Item.is_raw_material == True)
+    else:
+        q = q.filter(Item.is_raw_material == False)
 
     rows = q.order_by((Inventory.min_stock - Inventory.quantity).desc()).all()
 

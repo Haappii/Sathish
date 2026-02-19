@@ -77,6 +77,8 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "support_tickets": {"read": {"admin"}, "write": {"admin"}},
 }
 
+MANAGER_DENY_MODULES: set[str] = {"roles"}
+
 
 def _role_lower(user) -> str:
     return str(getattr(user, "role_name", "") or "").strip().lower()
@@ -107,6 +109,8 @@ def _allowed_by_default(*, module: str, action: str, user) -> bool:
     if role == "admin":
         return True
     mod = (module or "").strip().lower()
+    if role == "manager":
+        return mod not in MANAGER_DENY_MODULES
     act = (action or "").strip().lower()
     rules = DEFAULT_ROLE_PERMISSIONS.get(mod)
     if not rules:

@@ -12,6 +12,14 @@ from app.utils.permissions import require_permission
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
+def _role_lower(user) -> str:
+    return str(getattr(user, "role_name", "") or "").strip().lower()
+
+
+def _is_admin(user) -> bool:
+    return _role_lower(user) == "admin"
+
+
 # ------------------------------------------------
 # LIST USERS (USED BY REPORTS PAGE)
 # ------------------------------------------------
@@ -20,12 +28,17 @@ def list_users(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "read")),
 ):
-    return (
+    q = (
         db.query(User)
-        .filter(User.status == True, User.shop_id == current_user.shop_id)           # ✅ correct column
+        .filter(User.status == True, User.shop_id == current_user.shop_id)  # noqa: E712
         .order_by(User.user_name)
-        .all()
     )
+
+    # Managers can only see users in their own branch.
+    if not _is_admin(current_user) and getattr(current_user, "branch_id", None):
+        q = q.filter(User.branch_id == int(current_user.branch_id))
+
+    return q.all()
 
 
 # ------------------------------------------------
@@ -37,6 +50,8 @@ def create_user(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "write")),
 ):
+    is_admin = _is_admin(current_user)
+
     role = (
         db.query(Role)
         .filter(Role.role_id == request.role, Role.status == True)  # noqa: E712
@@ -45,6 +60,10 @@ def create_user(
     if not role:
         raise HTTPException(400, "Invalid or inactive role")
 
+    role_lower = str(role.role_name or "").strip().lower()
+    if not is_admin and role_lower == "admin":
+        raise HTTPException(403, "Only Admin can assign Admin role")
+
     exists = db.query(User).filter(
         User.user_name == request.user_name,
         User.shop_id == current_user.shop_id
@@ -52,6 +71,11 @@ def create_user(
 
     if exists:
         raise HTTPException(400, "Username already exists")
+
+    branch_id = request.branch_id
+    if not is_admin:
+        # Force managers to create users only under their own branch.
+        branch_id = getattr(current_user, "branch_id", None)
 
     user = User(
         shop_id=current_user.shop_id,
@@ -62,7 +86,7 @@ def create_user(
         status=request.status,
         login_status=False,
         created_by=current_user.user_id,
-        branch_id=request.branch_id
+        branch_id=branch_id,
     )
 
     db.add(user)
@@ -98,6 +122,8 @@ def update_user(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "write")),
 ):
+    is_admin = _is_admin(current_user)
+
     user = db.query(User).filter(
         User.user_id == user_id,
         User.shop_id == current_user.shop_id
@@ -115,6 +141,15 @@ def update_user(
     }
 
     payload = request.dict(exclude_unset=True)
+
+    if not is_admin:
+        # Managers can only edit users in their own branch.
+        if getattr(current_user, "branch_id", None) and int(user.branch_id or 0) != int(current_user.branch_id):
+            raise HTTPException(403, "Access denied for user branch")
+
+        # Managers cannot move users across branches.
+        payload.pop("branch_id", None)
+
     if "role" in payload:
         role = (
             db.query(Role)
@@ -123,6 +158,8 @@ def update_user(
         )
         if not role:
             raise HTTPException(400, "Invalid or inactive role")
+        if not is_admin and str(role.role_name or "").strip().lower() == "admin":
+            raise HTTPException(403, "Only Admin can assign Admin role")
 
     for field, value in payload.items():
         if field == "password" and value:
@@ -162,6 +199,8 @@ def deactivate_user(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "write")),
 ):
+    is_admin = _is_admin(current_user)
+
     user = db.query(User).filter(
         User.user_id == user_id,
         User.shop_id == current_user.shop_id
@@ -169,6 +208,10 @@ def deactivate_user(
 
     if not user:
         raise HTTPException(404, "User not found")
+
+    if not is_admin and getattr(current_user, "branch_id", None):
+        if int(user.branch_id or 0) != int(current_user.branch_id):
+            raise HTTPException(403, "Access denied for user branch")
 
     if user.login_status:
         raise HTTPException(
