@@ -13,6 +13,7 @@ from sqlalchemy import func
 
 from app.db import get_db
 from app.models.support_ticket import SupportTicket
+from app.models.shop_details import ShopDetails
 from app.utils.auth_user import AdminOnly, get_current_user
 
 router = APIRouter(prefix="/support", tags=["Support Chat"])
@@ -123,6 +124,7 @@ def _ensure_ticket_access(ticket: SupportTicket, *, user) -> None:
 # ========================================================
 #  API - RECEIVE SUPPORT MESSAGE (PUBLIC)
 # ========================================================
+# Allow continuing an existing ticket by passing ticket_id.
 @router.post("/message")
 async def support_message(
     user_name: str = Form(...),
@@ -130,26 +132,64 @@ async def support_message(
     branch_name: str = Form(...),
     branch_contact: str = Form(...),
     message: str = Form(...),
+    ticket_id: int | None = Form(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     try:
         attachment_name, attachment_path, file_data = await _save_attachment(file)
 
-        ticket = SupportTicket(
-            ticket_type="SUPPORT",
-            user_name=user_name,
-            shop_name=shop_name,
-            branch_name=branch_name,
-            branch_contact=branch_contact,
-            message=message,
-            attachment_filename=attachment_name,
-            attachment_path=attachment_path,
-            status="OPEN",
-        )
-        db.add(ticket)
-        db.commit()
-        db.refresh(ticket)
+        ticket: SupportTicket | None = None
+
+        if ticket_id:
+            ticket = (
+                db.query(SupportTicket)
+                .filter(SupportTicket.ticket_id == int(ticket_id))
+                .first()
+            )
+            if not ticket:
+                raise HTTPException(404, "Ticket not found")
+
+            # Basic branch/shop guard to avoid cross-branch updates.
+            if (
+                ticket.shop_name
+                and shop_name
+                and ticket.shop_name.strip().lower() != shop_name.strip().lower()
+            ):
+                raise HTTPException(403, "Ticket belongs to a different shop")
+            if (
+                ticket.branch_name
+                and branch_name
+                and ticket.branch_name.strip().lower() != branch_name.strip().lower()
+            ):
+                raise HTTPException(403, "Ticket belongs to a different branch")
+
+            stamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            prev_msg = ticket.message or ""
+            ticket.message = f"{prev_msg}\n\n[{stamp}] {user_name}: {message}".strip()
+            if attachment_name:
+                ticket.attachment_filename = attachment_name
+                ticket.attachment_path = attachment_path
+            ticket.status = ticket.status or "OPEN"
+            db.add(ticket)
+            db.commit()
+            db.refresh(ticket)
+
+        else:
+            ticket = SupportTicket(
+                ticket_type="SUPPORT",
+                user_name=user_name,
+                shop_name=shop_name,
+                branch_name=branch_name,
+                branch_contact=branch_contact,
+                message=message,
+                attachment_filename=attachment_name,
+                attachment_path=attachment_path,
+                status="OPEN",
+            )
+            db.add(ticket)
+            db.commit()
+            db.refresh(ticket)
 
         content = f"""
 Support Ticket Details
@@ -167,13 +207,17 @@ Message:
 
         email_sent = False
         if _can_send_mail():
-            _send_mail(
-                subject=f"Support Request - {user_name} ({branch_name})",
-                content=content,
-                file=file,
-                file_data=file_data,
-            )
-            email_sent = True
+            try:
+                _send_mail(
+                    subject=f"Support Request - {user_name} ({branch_name})",
+                    content=content,
+                    file=file,
+                    file_data=file_data,
+                )
+                email_sent = True
+            except Exception:
+                # Keep ticket stored even if email fails.
+                email_sent = False
 
         return JSONResponse(
             {
@@ -230,11 +274,14 @@ Message:
 
         email_sent = False
         if _can_send_mail():
-            _send_mail(
-                subject=f"Demo Request - {name}",
-                content=content,
-            )
-            email_sent = True
+            try:
+                _send_mail(
+                    subject=f"Demo Request - {name}",
+                    content=content,
+                )
+                email_sent = True
+            except Exception:
+                email_sent = False
 
         return JSONResponse(
             {
@@ -325,3 +372,30 @@ def download_ticket_attachment(
         filename=(row.attachment_filename or resolved.name),
         media_type=(mime_type or "application/octet-stream"),
     )
+
+
+# ========================================================
+#  MY TICKETS (current user, any role)
+# ========================================================
+@router.get("/my")
+def my_tickets(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    shop = (
+        db.query(ShopDetails.shop_name)
+        .filter(ShopDetails.shop_id == user.shop_id)
+        .first()
+    )
+    shop_name = str(getattr(shop, "shop_name", "") or "").strip()
+    branch_name = str(getattr(user, "branch_name", "") or "").strip()
+
+    q = db.query(SupportTicket).order_by(SupportTicket.ticket_id.desc())
+    if shop_name:
+        q = q.filter(func.lower(func.coalesce(SupportTicket.shop_name, "")) == shop_name.lower())
+    if branch_name:
+        q = q.filter(func.lower(func.coalesce(SupportTicket.branch_name, "")) == branch_name.lower())
+
+    rows = q.limit(min(max(int(limit), 1), 200)).all()
+    return rows

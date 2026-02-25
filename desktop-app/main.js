@@ -1,6 +1,8 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const http = require("http");
+const https = require("https");
 
 const PROTOCOL = "poss";
 const CONFIG_FILE = "config.json";
@@ -53,7 +55,9 @@ function resolveAppUrl() {
   const cfg = readUserConfig();
   if (cfg && cfg.app_url) return String(cfg.app_url);
 
-  return "http://localhost:8000";
+  // Default to the Desktop UI port used by the repo's local runners.
+  // (The backend API is typically on :8000, while the UI is on :5173/:5180.)
+  return "http://localhost:5180";
 }
 
 function persistAppUrl(url) {
@@ -61,6 +65,112 @@ function persistAppUrl(url) {
   const cfg = readUserConfig() || {};
   if (String(cfg.app_url || "") === String(url)) return;
   writeUserConfig({ ...cfg, app_url: String(url) });
+}
+
+function getOfflineUiDir() {
+  // Packaged app: files end up under resources/offline-ui
+  const packaged = path.join(process.resourcesPath || "", "offline-ui");
+  if (packaged && fs.existsSync(packaged)) return packaged;
+
+  // Dev / repo path: desktop-app/offline-ui (synced from frontend/dist)
+  const local = path.join(__dirname, "offline-ui");
+  if (fs.existsSync(local)) return local;
+
+  // Fallback to repo frontend/dist for local dev runs
+  const repoDist = path.resolve(__dirname, "..", "frontend", "dist");
+  if (fs.existsSync(repoDist)) return repoDist;
+
+  return null;
+}
+
+const MIME_TYPES = {
+  ".html": "text/html",
+  ".js": "application/javascript",
+  ".mjs": "application/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".eot": "application/vnd.ms-fontobject",
+  ".map": "application/json",
+};
+
+function startOfflineServer(staticDir) {
+  return new Promise((resolve, reject) => {
+    const safeRoot = path.resolve(staticDir);
+
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url, "http://localhost");
+      const decodedPath = decodeURIComponent(url.pathname || "/");
+      const normalized = path.normalize(decodedPath).replace(/^(\.\.[/\\])+/, "");
+      let filePath = path.join(safeRoot, normalized);
+
+      if (!filePath.startsWith(safeRoot)) {
+        filePath = path.join(safeRoot, "index.html");
+      } else if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(filePath, "index.html");
+      } else if (!fs.existsSync(filePath)) {
+        filePath = path.join(safeRoot, "index.html");
+      }
+
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          res.writeHead(500, { "Content-Type": "text/plain" });
+          res.end("offline bundle read error");
+          return;
+        }
+        res.writeHead(200, { "Content-Type": contentType });
+        res.end(data);
+      });
+    });
+
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const port = server.address().port;
+      resolve({
+        server,
+        url: `http://127.0.0.1:${port}`,
+      });
+    });
+  });
+}
+
+function probeUrlReachable(targetUrl, timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(targetUrl);
+      const lib = u.protocol === "https:" ? https : http;
+      const req = lib.request(
+        {
+          method: "HEAD",
+          hostname: u.hostname,
+          port: u.port || (u.protocol === "https:" ? 443 : 80),
+          path: u.pathname || "/",
+          timeout: timeoutMs,
+        },
+        (res) => {
+          res.destroy();
+          resolve(true);
+        }
+      );
+      req.on("timeout", () => {
+        req.destroy();
+        resolve(false);
+      });
+      req.on("error", () => resolve(false));
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 function errorHtml({ baseUrl, code, description, validatedUrl }) {
@@ -112,7 +222,7 @@ function errorHtml({ baseUrl, code, description, validatedUrl }) {
 </html>`;
 }
 
-function createWindow(targetUrl) {
+function createWindow(targetUrl, offlineUrl) {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -120,12 +230,22 @@ function createWindow(targetUrl) {
     backgroundColor: "#050b1e",
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js")
     }
   });
 
+  let triedOffline = false;
+
   win.once("ready-to-show", () => win.show());
   win.webContents.on("did-fail-load", (_evt, code, description, validatedUrl) => {
+    if (!triedOffline && offlineUrl) {
+      triedOffline = true;
+      baseUrl = offlineUrl;
+      win.loadURL(offlineUrl);
+      return;
+    }
+
     const html = errorHtml({
       baseUrl: targetUrl,
       code,
@@ -138,8 +258,41 @@ function createWindow(targetUrl) {
   return win;
 }
 
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+ipcMain.handle("silent-print-text", async (_event, payload) => {
+  const { text = "", options = {} } = payload || {};
+  const fontSize = Number(options.fontSize || 12) || 12;
+
+  const printWin = new BrowserWindow({
+    show: false,
+    webPreferences: { offscreen: true },
+  });
+
+  const html = `<pre style="font-family: monospace; font-size: ${fontSize}px; margin:0;">${escapeHtml(
+    text
+  )}</pre>`;
+
+  await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+  return new Promise((resolve, reject) => {
+    printWin.webContents.print({ silent: true, printBackground: false }, (success, failureReason) => {
+      setTimeout(() => printWin.close(), 200);
+      if (success) resolve(true);
+      else reject(new Error(failureReason || "print failed"));
+    });
+  });
+});
+
 let mainWindow = null;
 let baseUrl = null;
+let offlineServer = null;
+let offlineUrl = null;
 
 function toAbsoluteUrl(openUrl) {
   const raw = String(openUrl || "");
@@ -173,9 +326,24 @@ if (!gotTheLock) {
   });
 }
 
-app.whenReady().then(() => {
-  baseUrl = resolveAppUrl();
-  persistAppUrl(baseUrl);
+app.whenReady().then(async () => {
+  const resolvedUrl = resolveAppUrl();
+  persistAppUrl(resolvedUrl);
+
+  // Start lightweight static server for the bundled offline UI (if present).
+  const offlineDir = getOfflineUiDir();
+  if (offlineDir) {
+    try {
+      offlineServer = await startOfflineServer(offlineDir);
+      offlineUrl = offlineServer.url;
+    } catch {
+      offlineServer = null;
+      offlineUrl = null;
+    }
+  }
+
+  const reachable = await probeUrlReachable(resolvedUrl);
+  baseUrl = reachable ? resolvedUrl : (offlineUrl || resolvedUrl);
 
   if (!app.isDefaultProtocolClient(PROTOCOL)) {
     try {
@@ -185,7 +353,7 @@ app.whenReady().then(() => {
     }
   }
 
-  mainWindow = createWindow(baseUrl);
+  mainWindow = createWindow(baseUrl, offlineUrl);
 });
 
 app.on("open-url", (event, url) => {
@@ -194,13 +362,28 @@ app.on("open-url", (event, url) => {
   if (target && mainWindow) mainWindow.loadURL(target);
 });
 
+const stopOfflineServer = () => {
+  if (offlineServer && offlineServer.server) {
+    try {
+      offlineServer.server.close();
+    } catch {
+      // ignore shutdown errors
+    }
+  }
+  offlineServer = null;
+  offlineUrl = null;
+};
+
 app.on("window-all-closed", () => {
+  stopOfflineServer();
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     baseUrl = baseUrl || resolveAppUrl();
-    mainWindow = createWindow(baseUrl);
+    mainWindow = createWindow(baseUrl, offlineUrl);
   }
 });
+
+app.on("will-quit", stopOfflineServer);

@@ -27,7 +27,6 @@ import Loyalty from "./pages/Loyalty";
 import GiftCards from "./pages/GiftCards";
 import Labels from "./pages/Labels";
 import Coupons from "./pages/Coupons";
-import Pricing from "./pages/Pricing";
 import SupplierLedger from "./pages/SupplierLedger";
 import StockAudit from "./pages/StockAudit";
 import ItemLots from "./pages/ItemLots";
@@ -113,7 +112,6 @@ export default function App() {
             <Route path="/gift-cards" element={<GiftCards />} />
             <Route path="/labels" element={<Labels />} />
             <Route path="/coupons" element={<Coupons />} />
-            <Route path="/pricing" element={<Pricing />} />
             <Route path="/supplier-ledger" element={<SupplierLedger />} />
             <Route path="/stock-audit" element={<StockAudit />} />
             <Route path="/item-lots" element={<ItemLots />} />

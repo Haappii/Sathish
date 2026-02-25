@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/apiClient";
+import { printDirectText } from "../utils/printDirect";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 
@@ -87,27 +88,11 @@ export default function QrOrders() {
     return t;
   };
 
-  const printKOT = ({ tableName, items }) => {
+  const printKOT = async ({ tableName, items }) => {
     const it = (Array.isArray(items) ? items : []).filter((x) => Number(x.quantity || 0) > 0);
     if (!it.length) return;
-    if (!kotPrintRef.current) return;
-    kotPrintRef.current.textContent = generateKOTText({ tableName, items: it });
-    const w = window.open("", "KOT_PRINT");
-    if (!w) {
-      showToast("Popup blocked. Allow popups to print KOT.", "warning");
-      return;
-    }
-    w.document.write(
-      "<pre style='font-family: monospace; font-size: 12px;'>" +
-        kotPrintRef.current.textContent +
-        "</pre>"
-    );
-    w.document.close();
-    w.focus();
-    setTimeout(() => {
-      w.print();
-      w.close();
-    }, 200);
+    const ok = await printDirectText(generateKOTText({ tableName, items: it }));
+    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   const accept = async (id) => {
@@ -117,7 +102,7 @@ export default function QrOrders() {
       const res = await api.post(`/qr-orders/${id}/accept`);
       const data = res.data || {};
       if (printCfg.kot_required) {
-        printKOT({
+        await printKOT({
           tableName: data.table_name,
           items: data.items || [],
         });

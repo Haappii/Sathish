@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // src/pages/setup/Items.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { API_BASE } from "../../config/api";
@@ -32,9 +33,8 @@ export default function Items() {
   const [editingItem, setEditingItem] = useState(null);
 
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [shopRes, i, c] = await Promise.all([
         authAxios.get("/shop/details"),
@@ -47,22 +47,21 @@ export default function Items() {
     } catch {
       showToast("Failed to load data", "error");
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
+
+  const imagePreviewUrl = useMemo(() => {
+    if (!imageFile) return "";
+    return URL.createObjectURL(imageFile);
+  }, [imageFile]);
 
   useEffect(() => {
-    if (!imageFile) {
-      setImagePreviewUrl("");
-      return;
-    }
-
-    const url = URL.createObjectURL(imageFile);
-    setImagePreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [imageFile]);
+    if (!imagePreviewUrl) return;
+    return () => URL.revokeObjectURL(imagePreviewUrl);
+  }, [imagePreviewUrl]);
 
   const filteredCategories = useMemo(() => {
     const q = categorySearch.trim().toLowerCase();
@@ -80,13 +79,6 @@ export default function Items() {
       return acc;
     }, {});
   }, [items]);
-
-  const activeCategory = useMemo(() => {
-    if (activeCategoryId === "all") return null;
-    return (
-      categories.find(c => String(c.category_id) === String(activeCategoryId)) || null
-    );
-  }, [activeCategoryId, categories]);
 
   const resetForm = ({ keepCategory = true } = {}) => {
     const nextCategoryId =
@@ -578,7 +570,7 @@ export default function Items() {
                 checked={form.is_raw_material}
                 onChange={e => setForm({ ...form, is_raw_material: e.target.checked })}
               />
-              Raw Material (shows in Inventory, hidden from Billing)
+              Raw Material
             </label>
           </div>
 

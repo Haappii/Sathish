@@ -8,6 +8,10 @@ import {
   isSessionExpired,
   refreshSessionActivity
 } from "../utils/auth";
+import {
+  rememberOfflineAuth,
+  tryOfflineAuth,
+} from "../utils/offlineAuth";
 
 export default function Login() {
 
@@ -32,6 +36,20 @@ export default function Login() {
     }
   }, []);
 
+  const attemptOfflineLogin = async () => {
+    const offlineSession = await tryOfflineAuth(form);
+    if (offlineSession) {
+      setSession({
+        ...offlineSession,
+        offline_login: true,
+      });
+      navigate("/home", { replace: true });
+      return true;
+    }
+    setError("Offline login not available for these credentials. Connect to the internet once and sign in.");
+    return false;
+  };
+
   const submit = async () => {
     if (!form.shop_id)
       return setError("Enter Shop ID");
@@ -40,6 +58,12 @@ export default function Login() {
 
     setError("");
     setLoading(true);
+
+    if (!navigator.onLine) {
+      await attemptOfflineLogin();
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await api.post("/auth/login", form);
@@ -51,7 +75,7 @@ export default function Login() {
         return;
       }
 
-      setSession({
+      const sessionPayload = {
         token: res.data.access_token,
         access_token: res.data.access_token,
         user_id: res.data.user_id,
@@ -63,7 +87,18 @@ export default function Login() {
         branch_name: res.data.branch_name,
         branch_close: res.data.branch_close,
         branch_type: res.data.branch_type
-      });
+      };
+
+      setSession(sessionPayload);
+
+      // Remember for offline login (best-effort).
+      rememberOfflineAuth({
+        shop_id: form.shop_id,
+        username: form.username,
+        password: form.password,
+        branch_id: sessionPayload.branch_id,
+        session: sessionPayload,
+      }).catch(() => {});
 
       navigate("/home", { replace: true });
 
@@ -71,6 +106,8 @@ export default function Login() {
       const msg = err?.response?.data?.detail || err?.message;
       if (msg) {
         setError(msg);
+      } else if (!navigator.onLine) {
+        await attemptOfflineLogin();
       } else {
         const networkHint =
           window?.location?.protocol === "https:" ? " (API must be HTTPS)" : "";

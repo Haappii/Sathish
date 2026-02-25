@@ -1,32 +1,19 @@
-import React, { useState, useEffect, useRef } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { printDirectText } from "../utils/printDirect";
+import {
+  cacheMasterData,
+  getCachedMasterData,
+} from "../utils/offlineCache";
+import { addOfflineBill } from "../utils/offlineBills";
 
 const DEFAULT_MOBILE = "9999999999";
-const OFFLINE_BILLS_KEY = "offline_bills_v1";
-
-const pushOfflineBill = (payload) => {
-  try {
-    const existing = JSON.parse(localStorage.getItem(OFFLINE_BILLS_KEY) || "[]");
-    const rows = Array.isArray(existing) ? existing : [];
-    const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    rows.unshift({
-      id,
-      createdAt: new Date().toISOString(),
-      payload,
-      attempts: 0,
-      lastAttemptAt: null,
-      lastError: null,
-    });
-    localStorage.setItem(OFFLINE_BILLS_KEY, JSON.stringify(rows));
-  } catch {
-    // ignore
-  }
-};
 
 export default function CreateBill() {
   const { showToast } = useToast();
@@ -56,10 +43,10 @@ export default function CreateBill() {
 
   const [discountType, setDiscountType] = useState("flat");
   const [discount, setDiscount] = useState(0);
-  const [defaultDiscountApplied, setDefaultDiscountApplied] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState("");
+  const defaultDiscountBranchRef = useRef(null);
 
   const [priceLevel, setPriceLevel] = useState("BASE");
   const [priceLevels, setPriceLevels] = useState(["BASE"]);
@@ -92,6 +79,7 @@ export default function CreateBill() {
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstPercent, setGstPercent] = useState(0);
   const [gstMode, setGstMode] = useState("inclusive");
+  const [offlineMode, setOfflineMode] = useState(!navigator.onLine);
 
   const [showTotals, setShowTotals] = useState(false);
 
@@ -100,39 +88,95 @@ export default function CreateBill() {
   const navigate = useNavigate();
 
   /* ---------------- LOAD DATA ---------------- */
-  const loadData = async ({ forceDefaultDiscount = false } = {}) => {
+  const applyCachedData = useCallback((cached, { forceDefaultDiscount = false } = {}) => {
+    if (!cached) return;
+
+    if (cached.shop) {
+      setShop(cached.shop);
+      setGstEnabled(cached.shop?.gst_enabled || false);
+      setGstPercent(Number(cached.shop?.gst_percent || 0));
+      setGstMode(String(cached.shop?.gst_mode || "inclusive").toLowerCase());
+      setInventoryEnabled(cached.shop?.inventory_enabled || false);
+    }
+
+    if (cached.branch) {
+      setBranch(cached.branch);
+      const discountAlreadyApplied =
+        defaultDiscountBranchRef.current === branch_id && !forceDefaultDiscount;
+
+      if (!discountAlreadyApplied && cached.branch?.discount_enabled) {
+        const t = String(cached.branch.discount_type || "flat").toLowerCase();
+        const v = Number(cached.branch.discount_value || 0);
+        if (v > 0) {
+          setDiscountType(t === "percent" ? "percent" : "flat");
+          setDiscount(v);
+        }
+        defaultDiscountBranchRef.current = branch_id;
+      }
+    }
+
+    if (cached.categories) setCategories(cached.categories);
+    if (cached.items) setItemsData(cached.items);
+    if (cached.priceLevels) setPriceLevels(cached.priceLevels);
+    if (cached.priceMap) setPriceMap(cached.priceMap);
+    if (cached.stock) setStockData(cached.stock);
+  }, [branch_id]);
+
+  const loadData = useCallback(async ({ forceDefaultDiscount = false } = {}) => {
+    const cached = getCachedMasterData(branch_id);
+
+    if (!navigator.onLine) {
+      applyCachedData(cached, { forceDefaultDiscount });
+      setOfflineMode(true);
+      showToast("Offline mode: using cached data", "warning");
+      return;
+    }
+
     try {
       const shopRes = await authAxios.get("/shop/details");
       const s = shopRes.data || {};
       setShop(s);
-
-      if (branch_id) {
-        try {
-          const br = await authAxios.get(`/branch/${branch_id}`);
-          const b = br.data || {};
-          setBranch(b);
-          if ((forceDefaultDiscount || !defaultDiscountApplied) && b?.discount_enabled) {
-            const t = String(b.discount_type || "flat").toLowerCase();
-            const v = Number(b.discount_value || 0);
-            if (v > 0) {
-              setDiscountType(t === "percent" ? "percent" : "flat");
-              setDiscount(v);
-            }
-            setDefaultDiscountApplied(true);
-          }
-        } catch {}
-      }
-
       setGstEnabled(s?.gst_enabled || false);
       setGstPercent(Number(s?.gst_percent || 0));
       setGstMode(String(s?.gst_mode || "inclusive").toLowerCase());
       setInventoryEnabled(s?.inventory_enabled || false);
+      cacheMasterData({ shop: s });
+
+      let branchData = null;
+      if (branch_id) {
+        try {
+          const br = await authAxios.get(`/branch/${branch_id}`);
+          branchData = br.data || {};
+          setBranch(branchData);
+          const discountAlreadyApplied =
+            defaultDiscountBranchRef.current === branch_id && !forceDefaultDiscount;
+
+          if (!discountAlreadyApplied && branchData?.discount_enabled) {
+            const t = String(branchData.discount_type || "flat").toLowerCase();
+            const v = Number(branchData.discount_value || 0);
+            if (v > 0) {
+              setDiscountType(t === "percent" ? "percent" : "flat");
+              setDiscount(v);
+            }
+            defaultDiscountBranchRef.current = branch_id;
+          }
+          cacheMasterData({ branch: branchData, branchId: branch_id });
+        } catch {
+          if (cached.branch) {
+            applyCachedData({ branch: cached.branch }, { forceDefaultDiscount });
+          }
+        }
+      }
 
       const cats = await authAxios.get("/category/");
-      setCategories(cats.data || []);
+      const catRows = cats.data || [];
+      setCategories(catRows);
+      cacheMasterData({ categories: catRows });
 
       const items = await authAxios.get("/items/");
-      setItemsData((items.data || []).filter((it) => !it?.is_raw_material));
+      const itemRows = (items.data || []).filter((it) => !it?.is_raw_material);
+      setItemsData(itemRows);
+      cacheMasterData({ items: itemRows });
 
       // Pricing / price levels (optional, RBAC-controlled)
       try {
@@ -143,8 +187,6 @@ export default function CreateBill() {
         const lvls = (lvlRes.data || [])
           .map(x => String(x?.level || "").trim().toUpperCase())
           .filter(Boolean);
-        setPriceLevels(["BASE", ...lvls]);
-
         const map = {};
         for (const r of allRes.data || []) {
           const id = String(r.item_id);
@@ -153,27 +195,63 @@ export default function CreateBill() {
           if (!map[id]) map[id] = {};
           map[id][lvl] = Number(r.price || 0);
         }
+        setPriceLevels(["BASE", ...lvls]);
         setPriceMap(map);
+        cacheMasterData({
+          priceLevels: ["BASE", ...lvls],
+          priceMap: map,
+        });
       } catch {
-        setPriceLevels(["BASE"]);
-        setPriceMap({});
+        if (cached.priceLevels?.length) setPriceLevels(cached.priceLevels);
+        if (cached.priceMap) setPriceMap(cached.priceMap);
       }
 
-      if (s?.inventory_enabled && branch_id) {
-        const stock = await authAxios.get("/inventory/list", {
-          params: { branch_id }
-        });
-        setStockData(stock.data || []);
+      if ((s?.inventory_enabled || cached?.shop?.inventory_enabled) && branch_id) {
+        try {
+          const stock = await authAxios.get("/inventory/list", {
+            params: { branch_id }
+          });
+          const stockRows = stock.data || [];
+          setStockData(stockRows);
+          cacheMasterData({ stock: stockRows, branchId: branch_id });
+        } catch {
+          if (cached.stock?.length) setStockData(cached.stock);
+        }
+      } else {
+        setStockData([]);
       }
+
+      setOfflineMode(false);
     } catch {
-      showToast("Failed to load data", "error");
+      if (cached.hasAny) {
+        applyCachedData(cached, { forceDefaultDiscount });
+        setOfflineMode(true);
+        showToast("Offline mode: using cached data", "warning");
+      } else {
+        showToast("Failed to load data", "error");
+      }
     }
-  };
+  }, [branch_id, applyCachedData, showToast]);
 
   useEffect(() => {
-    setDefaultDiscountApplied(false);
+    defaultDiscountBranchRef.current = null;
     loadData({ forceDefaultDiscount: true });
-  }, [branch_id]);
+  }, [branch_id, loadData]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setOfflineMode(false);
+      loadData({ forceDefaultDiscount: false });
+    };
+    const handleOffline = () => setOfflineMode(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [branch_id, loadData]);
 
   /* ---------------- CUSTOMER AUTO-FILL ---------------- */
   const fetchCustomerByMobile = async mobile => {
@@ -192,7 +270,9 @@ export default function CreateBill() {
         }));
         showToast("Customer loaded from previous bill", "success");
       }
-    } catch {}
+    } catch (err) {
+      console.error("Failed to fetch customer by mobile", err);
+    }
   };
 
   /* ---------------- MOBILE & NAME ---------------- */
@@ -488,21 +568,9 @@ export default function CreateBill() {
     return t;
   };
 
-  const printKOT = () => {
-    if (!kotPrintRef.current) return;
-    kotPrintRef.current.textContent = generateKOTText();
-    const w = window.open("", "KOT_PRINT");
-    if (!w) {
-      showToast("Popup blocked. Allow popups to print KOT.", "warning");
-      return;
-    }
-    w.document.write("<pre style='font-family: monospace; font-size: 12px;'>" + kotPrintRef.current.textContent + "</pre>");
-    w.document.close();
-    w.focus();
-    setTimeout(() => {
-      w.print();
-      w.close();
-    }, 200);
+  const printKOT = async () => {
+    const ok = await printDirectText(generateKOTText());
+    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   const saveInvoice = async (print = false) => {
@@ -569,9 +637,9 @@ export default function CreateBill() {
         printKOT();
       }
 
-      if (print && branch?.receipt_required !== false && printTextRef.current) {
-        printTextRef.current.textContent = generateBillText(res.data.invoice_number);
-        setTimeout(() => window.print(), 600);
+      if (print && branch?.receipt_required !== false) {
+        const ok = await printDirectText(generateBillText(res.data.invoice_number));
+        if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
       } else if (print && branch?.receipt_required === false) {
         showToast("Receipt printing disabled for this branch", "warning");
       }
@@ -587,13 +655,13 @@ export default function CreateBill() {
       setSplitEnabled(false);
       setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
       setGiftCardCode("");
-      setDefaultDiscountApplied(false);
+      defaultDiscountBranchRef.current = null;
       await loadData({ forceDefaultDiscount: true });
     } catch (err) {
       const isNetworkError = !err?.response || !navigator.onLine;
       if (isNetworkError) {
-        pushOfflineBill(payload);
-        showToast("Saved offline. Sync later from Offline Sync.", "warning");
+        addOfflineBill(payload);
+        showToast("Saved offline. It will auto-sync when internet returns.", "warning");
 
         setCart([]);
         setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
@@ -683,7 +751,7 @@ export default function CreateBill() {
       setSplitEnabled(false);
       setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
       setGiftCardCode("");
-      setDefaultDiscountApplied(false);
+      defaultDiscountBranchRef.current = null;
       await loadData({ forceDefaultDiscount: true });
     } catch (err) {
       const msg = err?.response?.data?.detail || "Draft save failed";
@@ -715,13 +783,22 @@ export default function CreateBill() {
       `}</style>
 
       {/* Back button - no extra margin/padding above */}
-      <div className="px-2 sm:px-4 pt-2 pb-1">
+      <div className="px-2 sm:px-4 pt-2 pb-1 flex items-center justify-between gap-3">
         <button
           onClick={() => navigate("/home", { replace: true })}
           className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
         >
           &larr; Back
         </button>
+        <span
+          className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+            offlineMode
+              ? "bg-amber-100 text-amber-700 border border-amber-300"
+              : "bg-emerald-100 text-emerald-700 border border-emerald-300"
+          }`}
+        >
+          {offlineMode ? "Offline mode" : "Online"}
+        </span>
       </div>
 
       {/* Main content - full remaining height, no page scroll */}

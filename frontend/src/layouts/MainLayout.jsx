@@ -11,10 +11,15 @@ import {
   isSessionExpired,
   refreshSessionActivity
 } from "../utils/auth";
+import { useToast } from "../components/Toast";
 
 import defaultLogo from "../assets/logo.png";
 import SupportChat from "../components/SupportChat";
 import { getShopLogoUrl } from "../utils/shopLogo";
+import {
+  hasPendingOfflineBills,
+  syncOfflineBills,
+} from "../utils/offlineBills";
 
 import { FaBars, FaExclamationTriangle, FaThumbtack } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
@@ -33,6 +38,9 @@ export default function MainLayout({ hideSidebar = false }) {
   const location = useLocation();
 
   const [session, setSessionState] = useState(() => getSession() || {});
+  const { showToast } = useToast();
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [offlineSyncing, setOfflineSyncing] = useState(false);
 
   const setSessionAndRerender = (updater) => {
     const current = getSession() || {};
@@ -94,6 +102,34 @@ export default function MainLayout({ hideSidebar = false }) {
     }
     refreshSessionActivity();
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    const attemptSync = async () => {
+      if (!navigator.onLine) return;
+      if (!hasPendingOfflineBills()) return;
+      setOfflineSyncing(true);
+      showToast("Syncing offline bills...", "info");
+      const res = await syncOfflineBills({ showToast });
+      if (res.synced > 0) showToast(`Synced ${res.synced} offline bills`, "success");
+      if (res.failed > 0) showToast(`${res.failed} offline bills failed to sync`, "error");
+      setOfflineSyncing(false);
+    };
+
+    attemptSync();
+    window.addEventListener("online", attemptSync);
+    return () => window.removeEventListener("online", attemptSync);
+  }, [showToast]);
 
   /* ================= SHOP DETAILS ================= */
   useEffect(() => {
@@ -461,11 +497,11 @@ export default function MainLayout({ hideSidebar = false }) {
                 <div className="text-xs text-gray-500 capitalize">{roleLower}</div>
               </div>
 
-              {isActualAdmin && branches.length > 0 && (
-                <select
-                  value={Number(branchId) || ""}
-                  onChange={e => switchBranch(Number(e.target.value))}
-                  className="border rounded px-2 py-1 text-sm max-w-[150px]"
+            {isActualAdmin && branches.length > 0 && (
+              <select
+                value={Number(branchId) || ""}
+                onChange={e => switchBranch(Number(e.target.value))}
+                className="border rounded px-2 py-1 text-sm max-w-[150px]"
               >
                 {branches.map(b => (
                   <option key={b.branch_id} value={b.branch_id}>
@@ -473,6 +509,21 @@ export default function MainLayout({ hideSidebar = false }) {
                   </option>
                 ))}
               </select>
+            )}
+
+            <span
+              className={`border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap ${
+                online
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
+              }`}
+            >
+              {online ? "Online" : "Offline"}
+            </span>
+            {offlineSyncing && (
+              <span className="border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
+                Syncing offline bills…
+              </span>
             )}
 
             <span className="border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap">

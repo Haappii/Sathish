@@ -16,6 +16,8 @@ It does **not** bundle the Python backend. It simply opens the configured web UR
 
 - `cd desktop-app`
 - `npm install`
+- build the web UI once so it can be used offline: `cd ../frontend && npm run build && cd ../desktop-app`
+- copy the build into the desktop app: `npm run sync-offline-ui`
 - (Optional) set runtime URL for local testing: `set APP_URL=https://your-web-app-domain` (or use PowerShell `$env:APP_URL="..."`)
 - `npm run dist:win`
 
@@ -31,7 +33,7 @@ From the About page, clicking "Open Desktop App" will attempt to open `poss://op
 
 ## Configure server URL (installed desktop app)
 
-If the installed desktop app opens a blank page, it usually means it is trying to load `http://localhost:8000` (default).
+If the installed desktop app opens a blank page, it usually means it is trying to load `http://localhost:5180` (default) and your web app isn't running there.
 
 Run it once with the server URL; it will be saved to `%APPDATA%` user config for future launches:
 
@@ -39,3 +41,12 @@ Run it once with the server URL; it will be saved to `%APPDATA%` user config for
 
 Example:
 - `POSS.exe --url=http://13.60.186.234:5180`
+
+## Build + copy installer into `/downloads`
+
+This repo serves the `downloads/` folder from the backend at `/downloads/*`.
+To update the file that the About page downloads, run:
+
+- `cd desktop-app`
+- `npm install`
+- `npm run dist:win:to-downloads`

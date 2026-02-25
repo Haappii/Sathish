@@ -5,6 +5,7 @@ import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { printDirectText } from "../utils/printDirect";
 import { isHotelShop } from "../utils/shopType";
 
 
@@ -279,19 +280,21 @@ export default function TableOrder() {
   }; 
 
   const printInvoice = async invoiceNo => {
-    if (!printTextRef.current || !invoiceNo) return;
+    if (!invoiceNo) return;
     const res = await api.get(`/invoice/by-number/${invoiceNo}`);
     const invoice = res.data || {};
-    printTextRef.current.textContent = generateBillText({
-      invoiceNumber: invoice.invoice_number || invoiceNo,
-      invoiceCreatedAt: invoice.created_time,
-      invoiceItems: invoice.items || orderItems,
-      invoiceTax: invoice.tax_amt,
-      invoiceServiceCharge: invoice?.payment_split?.service_charge ?? toAmount(serviceCharge || 0),
-      invoiceDiscount: invoice.discounted_amt,
-      invoiceTotal: invoice.total_amount,
-    });
-    setTimeout(() => window.print(), 300);
+    const ok = await printDirectText(
+      generateBillText({
+        invoiceNumber: invoice.invoice_number || invoiceNo,
+        invoiceCreatedAt: invoice.created_time,
+        invoiceItems: invoice.items || orderItems,
+        invoiceTax: invoice.tax_amt,
+        invoiceServiceCharge: invoice?.payment_split?.service_charge ?? toAmount(serviceCharge || 0),
+        invoiceDiscount: invoice.discounted_amt,
+        invoiceTotal: invoice.total_amount,
+      })
+    );
+    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   const generateKOTText = kotItems => {
@@ -327,7 +330,7 @@ export default function TableOrder() {
     return t;
   };
 
-  const printKOT = kotItems => {
+  const printKOT = async kotItems => {
     const rows = (Array.isArray(kotItems) ? kotItems : []).filter(
       it => Number(it.quantity || 0) > 0
     );
@@ -335,20 +338,8 @@ export default function TableOrder() {
       showToast("Add items before printing KOT", "warning");
       return;
     }
-    if (!kotPrintRef.current) return;
-    kotPrintRef.current.textContent = generateKOTText(rows);
-    const w = window.open("", "KOT_PRINT");
-    if (!w) {
-      showToast("Popup blocked. Allow popups to print KOT.", "warning");
-      return;
-    }
-    w.document.write("<pre style='font-family: monospace; font-size: 12px;'>" + kotPrintRef.current.textContent + "</pre>");
-    w.document.close();
-    w.focus();
-    setTimeout(() => {
-      w.print();
-      w.close();
-    }, 200);
+    const ok = await printDirectText(generateKOTText(rows));
+    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   const confirmOrderAndPrintKOT = async () => {
@@ -364,7 +355,7 @@ export default function TableOrder() {
         return;
       }
       if (kotRequired) {
-        printKOT(latestItems);
+        await printKOT(latestItems);
         showToast("Order confirmed and KOT printed", "success");
       } else {
         showToast("Order confirmed", "success");

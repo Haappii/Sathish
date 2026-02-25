@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // src/pages/setup/Branches.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
@@ -25,7 +26,7 @@ export default function Branches() {
   const [loading, setLoading] = useState(false);
   const [hotelShop, setHotelShop] = useState(false);
 
-  const emptyForm = {
+  const emptyForm = useMemo(() => ({
     branch_name: "",
     address_line1: "",
     address_line2: "",
@@ -39,31 +40,47 @@ export default function Branches() {
     discount_value: 0,
     kot_required: true,
     receipt_required: true,
-  };
+  }), []);
 
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
 
-  /* ===== LOAD ===== */
-  const loadBranches = async () => {
-    const res = await api.get("/branch/scoped");
-    const rows = res.data || [];
-    setBranches(rows);
+  const editBranch = useCallback(b => {
+    setEditingId(b.branch_id);
+    setForm({
+      ...emptyForm,
+      ...b,
+      discount_enabled: Boolean(b?.discount_enabled),
+      discount_type: (b?.discount_type || "flat").toLowerCase(),
+      discount_value: Number(b?.discount_value || 0),
+    });
+  }, [emptyForm]);
 
-    if (!isAdmin) {
-      const first = rows?.[0] || null;
-      if (first?.branch_id) editBranch(first);
+  /* ===== LOAD ===== */
+  const loadBranches = useCallback(async () => {
+    try {
+      const res = await api.get("/branch/scoped");
+      const rows = res.data || [];
+      setBranches(rows);
+
+      if (!isAdmin) {
+        const first = rows?.[0] || null;
+        if (first?.branch_id) editBranch(first);
+      }
+    } catch (err) {
+      setBranches([]);
+      const msg = err?.response?.data?.detail || "Failed to load branches";
+      showToast(msg, "error");
     }
-  };
+  }, [editBranch, isAdmin, showToast]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadBranches();
     api
       .get("/shop/details")
       .then((res) => setHotelShop(isHotelShop(res.data || {})))
       .catch(() => setHotelShop(false));
-  }, []);
+  }, [loadBranches]);
 
   /* ===== SAVE ===== */
   const saveBranch = async () => {
@@ -108,17 +125,6 @@ export default function Branches() {
     setLoading(false);
   };
 
-  const editBranch = b => {
-    setEditingId(b.branch_id);
-    setForm({
-      ...emptyForm,
-      ...b,
-      discount_enabled: Boolean(b?.discount_enabled),
-      discount_type: (b?.discount_type || "flat").toLowerCase(),
-      discount_value: Number(b?.discount_value || 0),
-    });
-  };
-
   const toggleStatus = async (id, status) => {
     if (!isAdmin) {
       showToast("Only Admin can change branch status", "error");
@@ -159,6 +165,7 @@ export default function Branches() {
               onChange={e => setForm({ ...form, branch_name: e.target.value })}
             />
             <select className="border rounded-lg px-3 py-2"
+              disabled
               value={form.type}
               onChange={e => setForm({ ...form, type: e.target.value })}
             >
@@ -237,7 +244,7 @@ export default function Branches() {
               />
             </label>
             <div className="text-[12px] text-slate-500">
-              If disabled, the app will skip printing KOT / receipts for this branch.
+              
             </div>
           </div>
 
@@ -252,7 +259,6 @@ export default function Branches() {
           </button>
           {!isAdmin && (
             <div className="mt-2 text-[11px] text-gray-500">
-              Branch creation / status changes are Admin-only. Managers can edit only their own branch.
             </div>
           )}
         </div>
@@ -324,6 +330,3 @@ export default function Branches() {
     </div>
   );
 }
-
-
-

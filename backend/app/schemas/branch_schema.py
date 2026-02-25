@@ -1,8 +1,10 @@
 from pydantic import BaseModel
 from typing import Optional
 
+
 class BranchBase(BaseModel):
-    branch_name: str
+    # Some legacy rows may have NULL branch_name; default to empty string to avoid 422 validation errors.
+    branch_name: Optional[str] = ""
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     city: Optional[str] = None

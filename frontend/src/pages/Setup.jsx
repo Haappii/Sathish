@@ -13,7 +13,6 @@ import {
   FaBell,
   FaLifeRing,
   FaUserShield,
-  FaRupeeSign,
   FaTags,
   FaBook,
   FaClipboardCheck,
@@ -123,13 +122,6 @@ export default function Setup() {
       desc: "Create and receive POs",
       icon: FaClipboardList,
       color: "text-purple-600"
-    },
-    {
-      title: "Pricing / Price Levels",
-      link: "/pricing",
-      desc: "Retail / wholesale price levels",
-      icon: FaRupeeSign,
-      color: "text-emerald-700"
     },
     {
       title: "Coupons / Offers",

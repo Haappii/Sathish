@@ -4,6 +4,7 @@ import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { printDirectText } from "../utils/printDirect";
 
 export default function SalesHistory() {
   const navigate = useNavigate();
@@ -340,14 +341,13 @@ export default function SalesHistory() {
     return t;
   };
 
-  const printInvoice = () => {
+  const printInvoice = async () => {
     if (branch?.receipt_required === false) {
       showToast("Receipt printing disabled for this branch", "warning");
       return;
     }
-    if (!printTextRef.current) return;
-    printTextRef.current.textContent = generateBillText();
-    setTimeout(() => window.print(), 300);
+    const ok = await printDirectText(generateBillText());
+    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   /* ================= UI ================= */

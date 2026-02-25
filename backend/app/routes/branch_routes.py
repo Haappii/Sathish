@@ -156,9 +156,29 @@ def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> 
 
 
 def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
-    out = BranchOut.from_orm(branch).dict()
-    out.update(_read_branch_discount_from_params(pmap, int(branch.branch_id)))
-    out.update(_read_branch_print_from_params(pmap, int(branch.branch_id)))
+    """
+    Defensive serializer to tolerate legacy/nullable columns and avoid 422 validation errors.
+    """
+    try:
+        bid = int(getattr(branch, "branch_id", None))
+    except Exception:
+        return None
+
+    out = {
+        "branch_id": bid,
+        "branch_name": str(getattr(branch, "branch_name", "") or ""),
+        "address_line1": getattr(branch, "address_line1", None),
+        "address_line2": getattr(branch, "address_line2", None),
+        "city": getattr(branch, "city", None),
+        "state": getattr(branch, "state", None),
+        "country": getattr(branch, "country", None),
+        "pincode": getattr(branch, "pincode", None),
+        "type": getattr(branch, "type", None) or "Branch",
+        "status": getattr(branch, "status", None) or "ACTIVE",
+    }
+
+    out.update(_read_branch_discount_from_params(pmap, bid))
+    out.update(_read_branch_print_from_params(pmap, bid))
     return out
 
 
@@ -177,7 +197,12 @@ def get_db():
 def list_branches(db: Session = Depends(get_db), user=Depends(get_current_user)):
     branches = get_all_branches(db, user.shop_id)
     pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
-    return [_branch_out_with_discount(b, pmap) for b in branches]
+    out = []
+    for b in branches:
+        safe = _branch_out_with_discount(b, pmap)
+        if safe:
+            out.append(safe)
+    return out
 
 
 # =========================================================
@@ -194,13 +219,18 @@ def active_branches(db: Session = Depends(get_db), user=Depends(get_current_user
         if bid is not None:
             branches = [b for b in branches if int(b.branch_id) == bid]
     pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
-    return [_branch_out_with_discount(b, pmap) for b in branches]
+    out = []
+    for b in branches:
+        safe = _branch_out_with_discount(b, pmap)
+        if safe:
+            out.append(safe)
+    return out
 
 
 # =========================================================
 # 🔹 NEW — Get single branch (Footer address & details)
 # =========================================================
-@router.get("/{branch_id}", response_model=BranchOut)
+@router.get("/{branch_id:int}", response_model=BranchOut)
 def get_branch(branch_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     if _role_lower(user) != "admin":
         try:
@@ -220,7 +250,10 @@ def get_branch(branch_id: int, db: Session = Depends(get_db), user=Depends(get_c
         raise HTTPException(404, "Branch not found")
 
     pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(branch.branch_id)])
-    return _branch_out_with_discount(branch, pmap)
+    safe = _branch_out_with_discount(branch, pmap)
+    if not safe:
+        raise HTTPException(500, "Invalid branch data")
+    return safe
 
 
 # =========================================================
@@ -249,7 +282,12 @@ def scoped_branches(
             branches = [b] if b else []
 
     pmap = _load_branch_params(db, shop_id=user.shop_id, branch_ids=[int(b.branch_id) for b in branches])
-    return [_branch_out_with_discount(b, pmap) for b in branches]
+    out = []
+    for b in branches:
+        safe = _branch_out_with_discount(b, pmap)
+        if safe:
+            out.append(safe)
+    return out
 
 
 # =========================================================
@@ -286,7 +324,7 @@ def create(
 # =========================================================
 # 🔹 Update Branch (Admin Only)
 # =========================================================
-@router.put("/{branch_id}", response_model=BranchOut)
+@router.put("/{branch_id:int}", response_model=BranchOut)
 def update(branch_id: int, data: BranchUpdate,
            db: Session = Depends(get_db),
            user=Depends(require_permission("setup", "write"))):
@@ -342,7 +380,7 @@ def update(branch_id: int, data: BranchUpdate,
 # =========================================================
 # 🔹 Change Branch Status (Activate / Deactivate)
 # =========================================================
-@router.post("/{branch_id}/status", dependencies=[Depends(AdminOnly)])
+@router.post("/{branch_id:int}/status", dependencies=[Depends(AdminOnly)])
 def change_status(branch_id: int, status: str,
                   db: Session = Depends(get_db),
                   user=Depends(get_current_user)):

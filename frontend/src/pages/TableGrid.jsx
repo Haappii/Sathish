@@ -4,6 +4,7 @@ import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { printDirectText } from "../utils/printDirect";
 import { isHotelShop } from "../utils/shopType";
 
 const BLUE = "#0B3C8C";
@@ -327,10 +328,15 @@ export default function TableGrid() {
 
         const receiptRequired = branchData?.receipt_required !== false;
 
-        if (receiptRequired && printTextRef.current) {
-          printTextRef.current.textContent = generateBillText(invoice, shopRes.data || {}, branchData, items);
-          setTimeout(() => window.print(), 300);
-          showToast("Order completed and invoice printed", "success");
+        if (receiptRequired) {
+          const ok = await printDirectText(
+            generateBillText(invoice, shopRes.data || {}, branchData, items)
+          );
+          if (ok) {
+            showToast("Order completed and invoice printed", "success");
+          } else {
+            showToast("Order completed but printing failed", "warning");
+          }
         } else {
           showToast("Order completed", "success");
         }

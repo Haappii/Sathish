@@ -4,28 +4,14 @@ import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { modulesToPermMap } from "../utils/navigationMenu";
-
-const OFFLINE_KEY = "offline_bills_v1";
-
-const readOffline = () => {
-  try {
-    const raw = localStorage.getItem(OFFLINE_KEY);
-    const rows = raw ? JSON.parse(raw) : [];
-    return Array.isArray(rows) ? rows : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeOffline = (rows) => {
-  localStorage.setItem(OFFLINE_KEY, JSON.stringify(rows || []));
-};
-
-const updateRow = (rows, id, patch) => {
-  const next = rows.map((r) => (r.id === id ? { ...r, ...patch } : r));
-  writeOffline(next);
-  return next;
-};
+import {
+  getOfflineBills,
+  removeOfflineBill,
+  clearOfflineBills,
+  updateOfflineBill,
+  syncOfflineBills,
+} from "../utils/offlineBills";
+import { saveAs } from "file-saver";
 
 export default function OfflineSync() {
   const navigate = useNavigate();
@@ -36,6 +22,7 @@ export default function OfflineSync() {
 
   const [rows, setRows] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     authAxios
@@ -51,45 +38,30 @@ export default function OfflineSync() {
       });
   }, []);
 
-  const load = () => setRows(readOffline());
+  const load = () => setRows(getOfflineBills());
 
   useEffect(() => {
     if (!allowed) return;
     load();
   }, [allowed]);
 
-  const removeRow = (id) => {
-    const next = rows.filter((r) => r.id !== id);
-    setRows(next);
-    writeOffline(next);
-  };
+  const removeRow = (id) => setRows(removeOfflineBill(id));
 
   const clearAll = () => {
+    clearOfflineBills();
     setRows([]);
-    writeOffline([]);
   };
 
   const syncOne = async (row) => {
     if (!canWrite) return showToast("Not allowed", "error");
     try {
-      const nowIso = new Date().toISOString();
-      setRows((prev) => updateRow(prev, row.id, { lastAttemptAt: nowIso }));
-      const res = await authAxios.post("/invoice/", row.payload);
-      const invNo = res?.data?.invoice_number;
-      removeRow(row.id);
-      showToast(invNo ? `Synced: ${invNo}` : "Synced", "success");
-      return { ok: true, invoice_number: invNo || null };
+      updateOfflineBill(row.id, { lastAttemptAt: new Date().toISOString() });
+      const res = await syncOfflineBills({ ids: [row.id], showToast });
+      load();
+      return res;
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Sync failed";
-      setRows((prev) =>
-        updateRow(prev, row.id, {
-          attempts: Number(row.attempts || 0) + 1,
-          lastAttemptAt: new Date().toISOString(),
-          lastError: msg,
-        })
-      );
-      showToast(msg, "error");
-      return { ok: false, error: msg };
+      showToast(e?.message || "Sync failed", "error");
+      return { ok: false, error: e?.message };
     }
   };
 
@@ -98,23 +70,57 @@ export default function OfflineSync() {
     if (!canWrite) return showToast("Not allowed", "error");
     setSyncing(true);
     try {
-      let okCount = 0;
-      let failCount = 0;
-      // use snapshot to avoid skipping due to removeRow mutation
-      // eslint-disable-next-line no-restricted-syntax
-      for (const r of [...readOffline()]) {
-        // eslint-disable-next-line no-await-in-loop
-        const out = await syncOne(r);
-        if (out?.ok) okCount += 1;
-        else failCount += 1;
-      }
-      if (failCount > 0) {
-        showToast(`Sync done: ${okCount} success, ${failCount} failed`, "warning");
-      } else if (okCount > 0) {
-        showToast(`Sync done: ${okCount} success`, "success");
+      showToast("Syncing offline bills...", "info");
+      const res = await syncOfflineBills({ showToast });
+      load();
+      if (res.failed > 0) {
+        showToast(`Sync done: ${res.synced} success, ${res.failed} failed`, "warning");
+      } else if (res.synced > 0) {
+        showToast(`Sync done: ${res.synced} success`, "success");
+      } else if (res.skipped) {
+        showToast("No offline bills to sync", "info");
       }
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const exportCsv = () => {
+    if (!rows.length) {
+      showToast("No offline bills to export", "info");
+      return;
+    }
+    setExporting(true);
+    try {
+      const headers = [
+        "Created At",
+        "Customer",
+        "Mobile",
+        "Items",
+        "Payable",
+        "Attempts",
+        "Last Error",
+      ];
+      const lines = rows.map((r) => {
+        const pay = Number(r?.payload?.total_amount || 0).toFixed(2);
+        const items = Number(r?.payload?.items?.length || 0);
+        return [
+          r.createdAt || "",
+          (r?.payload?.customer_name || "").replace(/"/g, '""'),
+          r?.payload?.mobile || "",
+          items,
+          pay,
+          Number(r?.attempts || 0),
+          (r?.lastError || "").replace(/"/g, '""'),
+        ]
+          .map((v) => `"${v}"`)
+          .join(",");
+      });
+      const csv = [headers.join(","), ...lines].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      saveAs(blob, `offline-bills-${new Date().toISOString().slice(0, 10)}.csv`);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -165,7 +171,20 @@ export default function OfflineSync() {
         <div>
           Total item lines: <span className="font-bold">{totalItems}</span>
         </div>
-        <div className="ml-auto flex gap-2">
+        {syncing && (
+          <div className="text-blue-700 text-[12px] font-semibold flex items-center gap-1">
+            <span className="inline-block w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
+            Syncing…
+          </div>
+        )}
+        <div className="ml-auto flex gap-2 flex-wrap">
+          <button
+            onClick={exportCsv}
+            disabled={exporting || !rows.length}
+            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px] disabled:opacity-60"
+          >
+            {exporting ? "Exporting..." : "Export CSV"}
+          </button>
           <button
             onClick={syncAll}
             disabled={!canWrite || syncing || !rows.length}

@@ -713,7 +713,12 @@ def get_latest_customer_by_mobile(
     )
 
     if not latest_invoice:
-        raise HTTPException(404, "Customer not found")
+        # Return an empty payload so frontend can proceed without error.
+        return {
+            "customer_name": None,
+            "mobile": mobile_clean,
+            "gst_number": None
+        }
 
     latest_with_name = (
         base_query

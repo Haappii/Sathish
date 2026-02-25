@@ -19,6 +19,24 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  FaShoppingCart,
+  FaUsers,
+  FaUserTie,
+  FaUndo,
+  FaMoneyBillWave,
+  FaBoxes,
+  FaTruck,
+  FaCashRegister,
+  FaGift,
+  FaChartBar,
+  FaFileInvoice,
+  FaBell,
+  FaLifeRing,
+  FaCloudUploadAlt,
+  FaTools,
+  FaStar,
+} from "react-icons/fa";
 
 const COLORS = [
   "#6366f1",
@@ -41,7 +59,6 @@ const MENU_GROUPS = [
   { key: "suppliers", title: "Purchase & Suppliers", paths: ["/supplier-ledger"] },
   { key: "cash_drawer", title: "Cash Drawer / Shift", paths: ["/cash-drawer"] },
   { key: "loyalty", title: "Loyalty & Coupons", paths: ["/loyalty", "/gift-cards", "/coupons"] },
-  { key: "pricing", title: "Pricing", paths: ["/pricing"] },
   { key: "analytics", title: "Analytics & Trends", paths: ["/analytics", "/trends"] },
   { key: "reports", title: "Reports", paths: ["/reports"] },
   { key: "alerts", title: "Alerts", paths: ["/alerts"] },
@@ -49,6 +66,25 @@ const MENU_GROUPS = [
   { key: "offline", title: "Offline / Sync", paths: ["/offline-sync"] },
   { key: "admin", title: "Admin & Setup", paths: ["/setup"] },
 ];
+
+const GROUP_EMOJI = {
+  billing: FaShoppingCart,
+  customers: FaUsers,
+  employees: FaUserTie,
+  returns: FaUndo,
+  expenses: FaMoneyBillWave,
+  inventory: FaBoxes,
+  suppliers: FaTruck,
+  cash_drawer: FaCashRegister,
+  loyalty: FaGift,
+  analytics: FaChartBar,
+  reports: FaFileInvoice,
+  alerts: FaBell,
+  support: FaLifeRing,
+  offline: FaCloudUploadAlt,
+  admin: FaTools,
+  other: FaStar,
+};
 
 const SHORTCUT_PATHS = [
   "/sales/create",
@@ -60,6 +96,9 @@ const SHORTCUT_PATHS = [
   "/cash-drawer",
   "/setup",
 ];
+
+// Keep menu and shortcut tiles compact but equal height
+const MENU_TILE_MIN_HEIGHT = "min-h-[80px]";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -100,6 +139,7 @@ export default function Home() {
     payment_mode: "cash",
     note: "",
   });
+  const [expandedGroup, setExpandedGroup] = useState(null);
 
   const hasValidCustomRange =
     reportMode !== "custom" || Boolean(fromDate && toDate);
@@ -418,9 +458,9 @@ export default function Home() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
         {/* MENUS */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {quickShortcuts.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border p-6">
+            <div className="sm:col-span-2 xl:col-span-3 bg-[#f5f7ff] rounded-2xl shadow-sm border border-indigo-100 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Quick Shortcuts
@@ -435,62 +475,89 @@ export default function Home() {
                   <Link
                     key={`shortcut-${m.path}`}
                     to={m.path}
-                    className="group rounded-xl border bg-indigo-50 hover:bg-indigo-100 p-4 transition-all hover:shadow-sm"
+                    className={`group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-4 transition-all flex items-center justify-between gap-3 ${MENU_TILE_MIN_HEIGHT}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-base">
-                          {m.icon}
-                        </div>
-                        <div className="text-sm font-medium text-gray-700 group-hover:text-indigo-700">
-                          {m.name}
-                        </div>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+                        {m.icon}
                       </div>
-                      <span className="text-[11px] font-semibold text-indigo-700 bg-white border border-indigo-200 rounded px-2 py-1">
-                        Alt+{idx + 1}
-                      </span>
+                      <div className="text-base font-medium text-gray-800 group-hover:text-indigo-700 truncate">
+                        {m.name}
+                      </div>
                     </div>
+                    <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
+                      Alt+{idx + 1}
+                    </span>
                   </Link>
                 ))}
               </div>
             </div>
           )}
 
-          {groupedMenus.map((g) => (
-            <div
-              key={g.key}
-              className="bg-white rounded-2xl shadow-sm border p-6"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {g.title}
-                </h2>
-                <span className="text-sm text-gray-500">
-                  {g.items.length} Modules
-                </span>
-              </div>
+          {groupedMenus.map((g) => {
+            const hasTabs = g.items.length > 1;
+            const expanded = expandedGroup === g.key;
+            const primary = g.items[0];
+            const Icon = GROUP_EMOJI[g.key] || GROUP_EMOJI.other;
 
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {g.items.map((m) => (
-                  <Link
-                    key={m.path}
-                    to={m.path}
-                    className="group rounded-xl border bg-gray-50 hover:bg-indigo-50 p-5 transition-all hover:shadow-md"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
-                        {m.icon}
-                      </div>
+            const handleCardClick = () => {
+              if (!hasTabs && primary) {
+                navigate(primary.path);
+              } else {
+                setExpandedGroup(expanded ? null : g.key);
+              }
+            };
 
-                      <div className="text-sm font-medium text-gray-700 group-hover:text-indigo-600">
-                        {m.name}
-                      </div>
+            return (
+              <div
+                key={g.key}
+                className={`group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-4 cursor-pointer transition flex flex-col gap-3 ${MENU_TILE_MIN_HEIGHT}`}
+                onClick={handleCardClick}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+                      <Icon />
                     </div>
-                  </Link>
-                ))}
+                    <div className="text-base font-medium text-gray-800 group-hover:text-indigo-700 truncate">
+                      {g.title}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      hasTabs
+                        ? setExpandedGroup(expanded ? null : g.key)
+                        : handleCardClick();
+                    }}
+                    className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100"
+                  >
+                    {hasTabs ? (expanded ? "Close" : "Open") : "Open"}
+                  </button>
+                </div>
+
+                {hasTabs && expanded && (
+                  <div className="mt-3 grid w-full grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+                    {g.items.map((m) => (
+                      <button
+                        key={m.path}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(m.path);
+                        }}
+                        className="px-4 py-2 min-h-[38px] rounded-full border border-indigo-100 text-sm font-medium text-indigo-800 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition-shadow shadow-[0_6px_16px_rgba(79,70,229,0.12)] text-center"
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* SIDEBAR DASHBOARD */}

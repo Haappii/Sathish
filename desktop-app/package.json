@@ -2,12 +2,14 @@
   "name": "poss-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "POSS Desktop wrapper for the Shop Billing web app",
+  "description": "Haappii Billing Desktop (offline-capable wrapper)",
   "main": "main.js",
   "scripts": {
     "dev": "cross-env APP_URL=http://localhost:5173 electron .",
     "start": "electron .",
-    "dist:win": "electron-builder --win nsis -p never"
+    "sync-offline-ui": "node scripts/sync-offline-ui.js",
+    "dist:win": "npm run sync-offline-ui && electron-builder --win nsis -p never",
+    "dist:win:to-downloads": "npm run dist:win && node scripts/copy-installer.js"
   },
   "dependencies": {},
   "devDependencies": {
@@ -16,10 +18,17 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.haappii.poss",
-    "productName": "POSS",
+    "appId": "com.haappii.haappiibilling.desktop",
+    "productName": "Haappii Billing",
+    "artifactName": "Haappii-Billing-Setup-${version}.${ext}",
+    "directories": {
+      "buildResources": "build"
+    },
     "files": [
-      "main.js"
+      "main.js",
+      "preload.js",
+      "scripts/**/*",
+      "offline-ui/**/*"
     ],
     "protocols": [
       {
@@ -33,13 +42,17 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": true
     },
     "win": {
+      "publisherName": [
+        "Haappii Solutions"
+      ],
+      "icon": "build/icon.png",
       "target": [
         "nsis"
       ]
     }
   }
 }
-

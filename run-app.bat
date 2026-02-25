@@ -39,25 +39,54 @@ set "VITE_API_BASE=/api"
 set "VITE_WINDOWS_APP_URL=/downloads/poss-desktop-setup.exe"
 set "VITE_ANDROID_APK_URL=/downloads/haappii-billing.apk"
 
+REM Optional:
+REM   set KEEP_RUNNER_OPEN=1 (keep this launcher window open)
+if "%KEEP_RUNNER_OPEN%"=="" set KEEP_RUNNER_OPEN=1
+
 echo.
 echo API:        http://%PUBLIC_HOST%:%BACKEND_PORT%/api
 echo Web UI:     http://%PUBLIC_HOST%:%FRONTEND_PORT%
 echo Desktop UI: http://%PUBLIC_HOST%:%DESKTOP_FRONTEND_PORT%
 echo APP_URL:    %APP_URL%
+echo KEEP_OPEN:  %KEEP_RUNNER_OPEN%
 echo.
 
+REM ================================
+REM Preflight: ensure deps are installed (once)
+REM ================================
+echo Preflight: Backend venv + requirements...
+pushd backend
+if not exist venv (
+  echo [preflight][backend] Creating venv...
+  %PY_CMD% %PY_VER% -m venv venv
+)
+call venv\\Scripts\\activate
+python -m pip install -r requirements.txt
+popd
+
+echo Preflight: Frontend node_modules...
+pushd frontend
+if not exist node_modules (
+  echo [preflight][frontend] Installing npm packages...
+  call npm install
+)
+popd
+
+REM ================================
+REM Start services
+REM ================================
 echo Starting Backend...
-start "Backend" cmd /k "cd /d backend & echo [backend] Using %PY_CMD% %PY_VER% & if not exist venv (echo [backend] Creating venv... & %PY_CMD% %PY_VER% -m venv venv) & call venv\\Scripts\\activate & echo [backend] Installing deps... & python -m pip install -r requirements.txt & echo [backend] Starting API... & python -m uvicorn app.main:app --reload --host %BACKEND_HOST% --port %BACKEND_PORT%"
+start "Backend" /D backend cmd /k "call venv\\Scripts\\activate && python -m uvicorn app.main:app --reload --host %BACKEND_HOST% --port %BACKEND_PORT%"
 
 echo Starting Frontend (Web UI)...
-start "Frontend Web" cmd /k "cd /d frontend & echo [web] Installing npm packages (if needed)... & if not exist node_modules (npm install) & echo [web] Starting Vite on %FRONTEND_PORT%... & npm run dev -- --strictPort --host %FRONTEND_HOST% --port %FRONTEND_PORT%"
+start "Frontend Web" /D frontend cmd /k "call npm run dev -- --strictPort --host %FRONTEND_HOST% --port %FRONTEND_PORT%"
 
 echo Starting Frontend (Desktop UI URL)...
-start "Frontend Desktop URL" cmd /k "cd /d frontend & echo [desktop-url] Starting Vite on %DESKTOP_FRONTEND_PORT%... & npm run dev -- --strictPort --host %FRONTEND_HOST% --port %DESKTOP_FRONTEND_PORT%"
+start "Frontend Desktop URL" /D frontend cmd /k "call npm run dev -- --strictPort --host %FRONTEND_HOST% --port %DESKTOP_FRONTEND_PORT%"
 
 if /I "%RUN_DESKTOP_APP%"=="1" (
   echo Starting Desktop App (Electron)...
-  start "Desktop App" cmd /k "cd /d desktop-app & echo [desktop] APP_URL=%APP_URL% & if not exist node_modules (echo [desktop] Installing packages... & npm install) & echo [desktop] Starting Electron... & npm run start"
+  start "Desktop App" cmd /k "call scripts\\start-desktop-app.cmd"
 )
 
 REM Quick verification links
@@ -66,6 +95,15 @@ start "" "http://%PUBLIC_HOST%:%FRONTEND_PORT%/about"
 
 echo.
 echo Windows launched. Check each window for errors.
-pause
+if "%KEEP_RUNNER_OPEN%"=="1" (
+  echo.
+  echo Keeping this window open for status. Close it when you are done.
+  cmd /k
+)
 
 endlocal
+exit /b 0
+
+
+
+
