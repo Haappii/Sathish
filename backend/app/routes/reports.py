@@ -33,6 +33,7 @@ from app.models.supplier_ledger import SupplierLedgerEntry
 from app.models.online_order import OnlineOrder, OnlineOrderItem
 from app.models.loyalty import LoyaltyAccount, LoyaltyTransaction
 from app.models.coupon import Coupon, CouponRedemption
+from app.models.employee import Employee, EmployeeAttendance
 from app.services.financials_service import calc_period_financials
 from app.utils.shop_type import ensure_hotel_billing_type
 
@@ -1096,6 +1097,60 @@ def table_usage(
         )
 
     return result
+
+
+# =====================================================
+# EMPLOYEE ATTENDANCE SUMMARY
+# =====================================================
+@router.get("/employees/attendance-summary")
+def employee_attendance_summary(
+    from_date: str,
+    to_date: str,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    f, t = parse_dates(from_date, to_date)
+    t_end = t + timedelta(days=1)
+    branch_id = _force_branch(branch_id, user)
+
+    rows = (
+        db.query(
+            Employee.employee_id.label("employee_id"),
+            Employee.employee_name.label("employee_name"),
+            func.sum(case((EmployeeAttendance.status == "PRESENT", 1), else_=0)).label("present_days"),
+            func.sum(case((EmployeeAttendance.status == "ABSENT", 1), else_=0)).label("absent_days"),
+            func.sum(case((EmployeeAttendance.status == "HALF_DAY", 1), else_=0)).label("half_days"),
+            func.sum(case((EmployeeAttendance.status == "LEAVE", 1), else_=0)).label("leave_days"),
+        )
+        .join(
+            EmployeeAttendance,
+            and_(
+                EmployeeAttendance.employee_id == Employee.employee_id,
+                EmployeeAttendance.shop_id == Employee.shop_id,
+            ),
+        )
+        .filter(Employee.shop_id == user.shop_id)
+        .filter(EmployeeAttendance.attendance_date >= f)
+        .filter(EmployeeAttendance.attendance_date < t_end)
+    )
+
+    if branch_id is not None:
+        rows = rows.filter(EmployeeAttendance.branch_id == branch_id)
+
+    rows = rows.group_by(Employee.employee_id, Employee.employee_name).order_by(Employee.employee_name.asc()).all()
+
+    return [
+        {
+          "employee_id": r.employee_id,
+          "employee_name": r.employee_name,
+          "present_days": int(r.present_days or 0),
+          "absent_days": int(r.absent_days or 0),
+          "half_days": int(r.half_days or 0),
+          "leave_days": int(r.leave_days or 0),
+        }
+        for r in rows
+    ]
 
 
 # =====================================================

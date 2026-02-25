@@ -139,6 +139,13 @@ const MENU_CATALOG = [
     perm: { module: "employees", action: "read" },
   },
   {
+    key: "employee_onboarding",
+    name: "Onboarding Docs",
+    path: "/employees/onboarding",
+    icon: <FaClipboardCheck />,
+    perm: { module: "employees", action: "read" },
+  },
+  {
     key: "loyalty",
     name: "Loyalty",
     path: "/loyalty",

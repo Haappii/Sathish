@@ -98,7 +98,8 @@ const SHORTCUT_PATHS = [
 ];
 
 // Keep menu and shortcut tiles compact but equal height
-const MENU_TILE_MIN_HEIGHT = "min-h-[80px]";
+// Keep shortcut and menu tiles aligned; fixed height when collapsed
+const MENU_TILE_HEIGHT = "h-[74px]";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -454,31 +455,28 @@ export default function Home() {
 
   /* ================== UI ================== */
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="min-h-screen bg-gray-100 p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 items-start">
 
         {/* MENUS */}
-        <div className="lg:col-span-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="lg:col-span-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 self-start mt-8">
           {quickShortcuts.length > 0 && (
-            <div className="sm:col-span-2 xl:col-span-3 bg-[#f5f7ff] rounded-2xl shadow-sm border border-indigo-100 p-5">
-              <div className="flex items-center justify-between mb-4">
+            <div className="sm:col-span-2 xl:col-span-3 bg-[#f5f7ff] rounded-2xl shadow-sm border border-indigo-100 p-2.5 pb-2 self-start">
+              <div className="flex items-center justify-between mb-2">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Quick Shortcuts
                 </h2>
-                <span className="text-sm text-gray-500">
-                  Use Alt + 1..{quickShortcuts.length}
-                </span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
                 {quickShortcuts.map((m, idx) => (
                   <Link
                     key={`shortcut-${m.path}`}
                     to={m.path}
-                    className={`group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-4 transition-all flex items-center justify-between gap-3 ${MENU_TILE_MIN_HEIGHT}`}
+                    className={`group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-2 transition-all flex items-center justify-between gap-3 ${MENU_TILE_HEIGHT}`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
                         {m.icon}
                       </div>
                       <div className="text-base font-medium text-gray-800 group-hover:text-indigo-700 truncate">
@@ -492,6 +490,11 @@ export default function Home() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Spacer between shortcuts and main menus */}
+          {quickShortcuts.length > 0 && (
+            <div className="sm:col-span-2 xl:col-span-3 h-6" />
           )}
 
           {groupedMenus.map((g) => {
@@ -508,13 +511,19 @@ export default function Home() {
               }
             };
 
+            const collapsed = !hasTabs || !expanded;
             return (
               <div
                 key={g.key}
-                className={`group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-4 cursor-pointer transition flex flex-col gap-3 ${MENU_TILE_MIN_HEIGHT}`}
+                className={
+                  `group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-2 cursor-pointer transition `
+                  + (collapsed
+                    ? `flex items-center justify-between ${MENU_TILE_HEIGHT}`
+                    : `flex flex-col gap-2 min-h-[90px] pb-2`)
+                }
                 onClick={handleCardClick}
               >
-                <div className="flex items-center justify-between gap-3">
+                <div className={`flex items-center justify-between gap-3 w-full ${collapsed ? "" : "pb-1"}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
                       <Icon />
@@ -539,7 +548,7 @@ export default function Home() {
                 </div>
 
                 {hasTabs && expanded && (
-                  <div className="mt-3 grid w-full grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+                  <div className="mt-2 grid w/full grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
                     {g.items.map((m) => (
                       <button
                         key={m.path}
@@ -548,7 +557,7 @@ export default function Home() {
                           e.stopPropagation();
                           navigate(m.path);
                         }}
-                        className="px-4 py-2 min-h-[38px] rounded-full border border-indigo-100 text-sm font-medium text-indigo-800 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition-shadow shadow-[0_6px_16px_rgba(79,70,229,0.12)] text-center"
+                        className="px-3 py-2 min-h-[36px] rounded-full border border-indigo-100 text-sm font-medium text-indigo-800 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition-shadow shadow-[0_6px_16px_rgba(79,70,229,0.12)] text-center"
                       >
                         {m.name}
                       </button>

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { addEmployeeDoc, listEmployeeDocs, removeEmployeeDoc } from "../utils/hrmsLocalStore";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const firstDay = (isoDate) => {
@@ -14,6 +15,7 @@ const firstDay = (isoDate) => {
 
 const WAGE_TYPES = ["DAILY", "MONTHLY", "ON_DEMAND"];
 const PAYMENT_MODES = ["CASH", "UPI", "BANK", "CARD", "OTHER"];
+const DOC_TYPES = ["ID_PROOF", "ADDRESS_PROOF", "CONTRACT", "OFFER_LETTER", "OTHER"];
 
 const money = (v) => `Rs. ${Number(v || 0).toFixed(2)}`;
 
@@ -41,6 +43,13 @@ export default function Employees() {
   const [employeeSummary, setEmployeeSummary] = useState(null);
   const [paymentRows, setPaymentRows] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [docs, setDocs] = useState([]);
+  const [docForm, setDocForm] = useState({
+    doc_type: "ID_PROOF",
+    doc_number: "",
+    fileData: null,
+    fileName: "",
+  });
 
   const [employeeForm, setEmployeeForm] = useState({
     employee_code: "",
@@ -64,6 +73,13 @@ export default function Employees() {
     notes: "",
   });
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [docAddForm, setDocAddForm] = useState({
+    doc_type: "ID_PROOF",
+    doc_number: "",
+    fileData: null,
+    fileName: "",
+    mime: "",
+  });
 
   const dueMap = useMemo(() => {
     const map = {};
@@ -175,6 +191,7 @@ export default function Employees() {
 
   useEffect(() => {
     loadSelectedEmployeeDetails(selectedEmployeeId);
+    setDocs(listEmployeeDocs(selectedEmployeeId));
   }, [selectedEmployeeId, asOfDate]);
 
   const resetEmployeeForm = () => {
@@ -191,6 +208,13 @@ export default function Employees() {
       active: true,
     });
     setEditingId(null);
+    setDocAddForm({
+      doc_type: "ID_PROOF",
+      doc_number: "",
+      fileData: null,
+      fileName: "",
+      mime: "",
+    });
   };
 
   const saveEmployee = async () => {
@@ -230,8 +254,31 @@ export default function Employees() {
         await api.put(`/employees/${editingId}`, payload);
         showToast("Employee updated", "success");
       } else {
-        await api.post("/employees", payload);
+        const res = await api.post("/employees", payload);
+        const newId =
+          res?.data?.employee_id ||
+          res?.data?.id ||
+          res?.data?.employee?.employee_id ||
+          null;
         showToast("Employee created", "success");
+        if (newId && docAddForm.fileData) {
+          addEmployeeDoc(newId, {
+            doc_type: docAddForm.doc_type,
+            doc_number: docAddForm.doc_number.trim(),
+            name: docAddForm.fileName,
+            type: docAddForm.mime,
+            data: docAddForm.fileData,
+          });
+          setSelectedEmployeeId(newId);
+          setDocs(listEmployeeDocs(newId));
+          setDocAddForm({
+            doc_type: "ID_PROOF",
+            doc_number: "",
+            fileData: null,
+            fileName: "",
+            mime: "",
+          });
+        }
       }
       resetEmployeeForm();
       await loadPage();
@@ -292,6 +339,76 @@ export default function Employees() {
     } finally {
       setPaymentSaving(false);
     }
+  };
+
+  const handleDocFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setDocForm((p) => ({ ...p, fileData: null, fileName: "", mime: "" }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () =>
+      setDocForm((p) => ({
+        ...p,
+        fileData: reader.result,
+        fileName: file.name,
+        mime: file.type || "application/octet-stream",
+      }));
+    reader.readAsDataURL(file);
+  };
+
+  const saveDocument = () => {
+    if (!selectedEmployeeId) {
+      showToast("Select an employee first", "error");
+      return;
+    }
+    if (!docForm.doc_number.trim()) {
+      showToast("Doc number is required", "error");
+      return;
+    }
+    if (!docForm.fileData) {
+      showToast("Attach a document file", "error");
+      return;
+    }
+    const updated = addEmployeeDoc(selectedEmployeeId, {
+      doc_type: docForm.doc_type,
+      doc_number: docForm.doc_number.trim(),
+      name: docForm.fileName,
+      type: docForm.mime,
+      data: docForm.fileData,
+    });
+    setDocs(updated);
+    setDocForm({
+      doc_type: "ID_PROOF",
+      doc_number: "",
+      fileData: null,
+      fileName: "",
+      mime: "",
+    });
+    showToast("Document saved (local)", "success");
+  };
+
+  const removeDoc = (id) => {
+    setDocs(removeEmployeeDoc(selectedEmployeeId, id));
+    showToast("Document removed", "info");
+  };
+
+  const handleDocAddFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setDocAddForm((p) => ({ ...p, fileData: null, fileName: "", mime: "" }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () =>
+      setDocAddForm((p) => ({
+        ...p,
+        fileData: reader.result,
+        fileName: file.name,
+        mime: file.type || "application/octet-stream",
+      }));
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -438,6 +555,35 @@ export default function Employees() {
             />
             Active
           </label>
+
+          <div className="border-t pt-2 space-y-2">
+            <div className="text-[11px] text-slate-500 font-semibold">
+              Onboarding Document (optional for new employee)
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                className="border rounded-lg px-2 py-1.5 text-[12px] w-full"
+                value={docAddForm.doc_type}
+                onChange={(e) => setDocAddForm((p) => ({ ...p, doc_type: e.target.value }))}
+              >
+                {DOC_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="border rounded-lg px-2 py-1.5 text-[12px] w-full"
+                placeholder="Doc number"
+                value={docAddForm.doc_number}
+                onChange={(e) => setDocAddForm((p) => ({ ...p, doc_number: e.target.value }))}
+              />
+            </div>
+            <input type="file" onChange={handleDocAddFile} className="text-[12px]" />
+            {docAddForm.fileName && (
+              <div className="text-[12px] text-slate-600">Selected: {docAddForm.fileName}</div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-2 pt-1">
             {editingId && (
@@ -625,6 +771,102 @@ export default function Employees() {
             </tbody>
           </table>
         </div>
+      </div>
+      <div className="rounded-xl border bg-white p-4 space-y-2">
+        <div className="text-sm font-semibold">
+          Documents {selectedEmployee ? `- ${selectedEmployee.employee_name}` : ""}
+        </div>
+
+        {!selectedEmployee && (
+          <div className="text-[12px] text-slate-500">Select an employee to manage documents.</div>
+        )}
+
+        {selectedEmployee && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <select
+                className="border rounded-lg px-2 py-1.5 text-[12px]"
+                value={docForm.doc_type}
+                onChange={(e) => setDocForm((p) => ({ ...p, doc_type: e.target.value }))}
+              >
+                {DOC_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="border rounded-lg px-2 py-1.5 text-[12px]"
+                placeholder="Doc number"
+                value={docForm.doc_number}
+                onChange={(e) => setDocForm((p) => ({ ...p, doc_number: e.target.value }))}
+              />
+              <input
+                type="file"
+                onChange={handleDocFile}
+                className="text-[12px]"
+              />
+              <button
+                onClick={saveDocument}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[12px] disabled:opacity-60"
+              >
+                Save Document
+              </button>
+            </div>
+            {docForm.fileName && (
+              <div className="text-[12px] text-slate-600">
+                Selected: {docForm.fileName}
+              </div>
+            )}
+
+            <div className="border rounded-lg overflow-auto max-h-[260px]">
+              <table className="w-full text-[12px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left p-2">Type</th>
+                    <th className="text-left p-2">Doc #</th>
+                    <th className="text-left p-2">File</th>
+                    <th className="text-right p-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {docs.length === 0 ? (
+                    <tr>
+                      <td className="p-2 text-slate-500" colSpan={4}>
+                        No documents yet
+                      </td>
+                    </tr>
+                  ) : (
+                    docs.map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <td className="p-2">{d.doc_type}</td>
+                        <td className="p-2">{d.doc_number}</td>
+                        <td className="p-2">
+                          <a
+                            className="text-indigo-600"
+                            href={d.data}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {d.name || "View"}
+                          </a>
+                        </td>
+                        <td className="p-2 text-right">
+                          <button
+                            className="px-2 py-1 rounded border text-[11px]"
+                            onClick={() => removeDoc(d.id)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

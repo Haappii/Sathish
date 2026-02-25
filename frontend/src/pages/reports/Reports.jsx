@@ -12,6 +12,20 @@ import { saveAs } from "file-saver";
 import defaultLogo from "../../assets/logo.png";
 import { getShopLogoUrl } from "../../utils/shopLogo";
 import { isHotelShop } from "../../utils/shopType";
+import {
+  FaChartBar,
+  FaMoneyBillWave,
+  FaUndo,
+  FaBoxes,
+  FaTruckLoading,
+  FaCashRegister,
+  FaClipboardCheck,
+  FaMotorcycle,
+  FaGift,
+  FaTags,
+  FaShieldAlt,
+  FaTable,
+} from "react-icons/fa";
 
 /* =====================================================
    REPORT DEFINITIONS
@@ -77,6 +91,11 @@ const REPORTS = [
   { key: "audit/logs", label: "Audit Logs", group: "Audit" },
   { key: "audit/deleted-invoices", label: "Deleted Invoices", group: "Audit" },
   { key: "table/usage", label: "Table Usage", group: "Table" },
+
+  // Employees / HR
+  { key: "employees/wages-summary", label: "Employee Wages Summary", group: "Employees", requiresDateRange: false },
+  { key: "employees/due-list", label: "Employee Due List", group: "Employees", requiresDateRange: false },
+  { key: "employees/attendance-summary", label: "Employee Attendance Summary", group: "Employees" },
 ];
 
 const NO_USER_FILTER_KEYS = new Set([
@@ -98,6 +117,9 @@ const NO_USER_FILTER_KEYS = new Set([
   "coupons/summary",
   "loyalty/balances",
   "supplier-ledger/balances",
+  "employees/wages-summary",
+  "employees/due-list",
+  "employees/attendance-summary",
 ]);
 
 const REPORT_GROUP_ORDER = [
@@ -115,6 +137,7 @@ const REPORT_GROUP_ORDER = [
   "Coupons",
   "Audit",
   "Table",
+  "Employees",
 ];
 
 export default function Reports() {
@@ -174,6 +197,7 @@ export default function Reports() {
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState(null);
 
   const reportOptions = REPORTS.filter(
     r => hotelShop || r.key !== "table/usage"
@@ -425,12 +449,26 @@ export default function Reports() {
         ? `profit/${profitType}`
         : activeReport.key;
 
-      const r = await api.get(`/reports/${reportKey}`, { params });
-      const raw = r.data;
-      const rows = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+      let rows = [];
+
+      if (reportKey === "employees/wages-summary" || reportKey === "employees/due-list") {
+        const asOf = toDate || fromDate || new Date().toISOString().slice(0, 10);
+        const r = await api.get("/employees/wages/summary", {
+          params: { branch_id: params.branch_id, as_of_date: asOf },
+        });
+        const raw = r?.data || {};
+        const wageRows = Array.isArray(raw.rows) ? raw.rows : [];
+        rows = reportKey === "employees/due-list"
+          ? wageRows.filter(r => Number(r.due_till_as_of || 0) > 0)
+          : wageRows;
+      } else {
+        const r = await api.get(`/reports/${reportKey}`, { params });
+        const raw = r.data;
+        rows = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+      }
 
       if (activeReport?.key === "gst/summary") {
-        const obj = raw && !Array.isArray(raw) ? raw : {};
+        const obj = data && !Array.isArray(data) ? data : {};
         const normalized = Object.entries(obj || {}).map(([k, v]) => ({
           metric: k,
           amount: Number(v || 0),
@@ -618,28 +656,93 @@ export default function Reports() {
      UI
      ===================================================== */
   if (!activeReport) {
+    const GROUP_ICONS = {
+      Sales: <FaChartBar />,
+      Profit: <FaMoneyBillWave />,
+      Receivables: <FaMoneyBillWave />,
+      Returns: <FaUndo />,
+      Inventory: <FaBoxes />,
+      Purchases: <FaTruckLoading />,
+      "Stock Transfers": <FaTruckLoading />,
+      "Cash Drawer": <FaCashRegister />,
+      "Stock Audit": <FaClipboardCheck />,
+      "Online Orders": <FaMotorcycle />,
+      Loyalty: <FaGift />,
+      Coupons: <FaTags />,
+      Audit: <FaShieldAlt />,
+      Table: <FaTable />,
+      Default: <FaClipboardCheck />,
+    };
+
+    const tileBase =
+      "group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-3 cursor-pointer transition flex flex-col gap-2 min-h-[84px]";
+
     return (
-      <div className="p-6 bg-slate-100 min-h-screen">
-        <h2 className="text-xl font-semibold mb-4">Reports</h2>
-        <div className="space-y-6">
-          {reportGroups.map(g => (
-            <div key={g.group}>
-              <div className="text-xs font-semibold tracking-wide text-slate-600 uppercase mb-2">
-                {g.group}
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {g.reports.map(r => (
+      <div className="p-4 sm:p-6 bg-slate-100 min-h-screen">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xl font-semibold text-gray-800">Reports</h2>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {reportGroups.map(g => {
+            const hasMany = g.reports.length > 1;
+            const isOpen = expandedGroup === g.group;
+            const Icon = GROUP_ICONS[g.group] || GROUP_ICONS.Default;
+            const primary = g.reports[0];
+
+            return (
+              <div
+                key={g.group}
+                className={tileBase}
+                onClick={() =>
+                  hasMany
+                    ? setExpandedGroup(isOpen ? null : g.group)
+                    : setActiveReport(primary)
+                }
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+                      {Icon}
+                    </div>
+                    <div className="text-base font-medium text-gray-800 truncate">
+                      {g.group}
+                    </div>
+                  </div>
                   <button
-                    key={r.key}
-                    onClick={() => setActiveReport(r)}
-                    className="bg-white border rounded-xl p-4 hover:bg-slate-50"
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      hasMany
+                        ? setExpandedGroup(isOpen ? null : g.group)
+                        : setActiveReport(primary);
+                    }}
+                    className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100"
                   >
-                    {r.label}
+                    {hasMany ? (isOpen ? "Close" : "Open") : "Open"}
                   </button>
-                ))}
+                </div>
+
+                {hasMany && isOpen && (
+                  <div className="mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
+                    {g.reports.map(r => (
+                      <button
+                        key={r.key}
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setActiveReport(r);
+                        }}
+                        className="px-3 py-2 min-h-[36px] rounded-full border border-indigo-100 text-sm font-medium text-indigo-800 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition-shadow shadow-[0_6px_16px_rgba(79,70,229,0.12)] text-center"
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -885,8 +988,4 @@ export default function Reports() {
     </div>
   );
 }
-
-
-
-
 
