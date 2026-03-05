@@ -23,23 +23,32 @@ def resolve_branch(branch_id_param, user):
         raise HTTPException(400, "Branch required")
 
 
+def resolve_branch_optional(branch_id_param, user):
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        if branch_id_param in (None, ""):
+            return None
+        try:
+            return int(branch_id_param)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
+    return resolve_branch(branch_id_param, user)
+
+
 @router.get("/", response_model=list[SupplierResponse])
 def list_suppliers(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
     user=Depends(require_permission("suppliers", "read")),
 ):
-    bid = resolve_branch(branch_id, user)
-    return (
-        db.query(Supplier)
-        .filter(
-            Supplier.shop_id == user.shop_id,
-            Supplier.branch_id == bid,
-            Supplier.status == "ACTIVE"
-        )
-        .order_by(Supplier.supplier_name)
-        .all()
+    bid = resolve_branch_optional(branch_id, user)
+    q = db.query(Supplier).filter(
+        Supplier.shop_id == user.shop_id,
+        Supplier.status == "ACTIVE"
     )
+    if bid is not None:
+        q = q.filter(Supplier.branch_id == bid)
+    return q.order_by(Supplier.supplier_name).all()
 
 
 @router.post("/", response_model=SupplierResponse)

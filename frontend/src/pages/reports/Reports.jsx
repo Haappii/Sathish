@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import api from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
+import BackButton from "../../components/BackButton";
 import { getSession } from "../../utils/auth";
 import { FaCalendarAlt } from "react-icons/fa";
 
@@ -87,6 +88,29 @@ const REPORTS = [
   { key: "coupons/redemptions", label: "Coupon Redemptions", group: "Coupons" },
   { key: "coupons/summary", label: "Coupons Summary", group: "Coupons" },
 
+  // GST & Tax
+  { key: "gst/gstr1", label: "GSTR-1 (Monthly)", group: "GST" },
+  { key: "gst/gstr3b", label: "GSTR-3B (Monthly)", group: "GST" },
+  { key: "gst/hsn-summary", label: "HSN/SAC Summary", group: "GST" },
+  { key: "gst/itc-register", label: "ITC Register (Purchases)", group: "GST" },
+
+  // Accounting
+  { key: "accounting/cash-bank-book", label: "Cash / Bank Book", group: "Accounting" },
+  { key: "accounting/day-book", label: "Day Book", group: "Accounting" },
+  { key: "accounting/trial-balance", label: "Trial Balance", group: "Accounting", requiresDateRange: false },
+  { key: "accounting/pnl", label: "Profit & Loss", group: "Accounting" },
+  { key: "accounting/balance-sheet", label: "Balance Sheet", group: "Accounting", requiresDateRange: false },
+
+  // Reconciliation
+  { key: "recon/payments-gateway", label: "Payment Gateway Reco", group: "Reconciliation" },
+  { key: "recon/stock-valuation", label: "Stock Valuation (FIFO/Avg)", group: "Reconciliation" },
+
+  // Compliance
+  { key: "compliance/e-invoice-status", label: "E-Invoice Status", group: "Compliance", requiresDateRange: false },
+  { key: "compliance/e-waybill-status", label: "E-Waybill Status", group: "Compliance" },
+  { key: "compliance/tds-vendor-payments", label: "TDS on Vendor Payments", group: "Compliance" },
+  { key: "compliance/tcs-sales", label: "TCS on Sales", group: "Compliance" },
+
   // Audit & Table
   { key: "audit/logs", label: "Audit Logs", group: "Audit" },
   { key: "audit/deleted-invoices", label: "Deleted Invoices", group: "Audit" },
@@ -120,6 +144,21 @@ const NO_USER_FILTER_KEYS = new Set([
   "employees/wages-summary",
   "employees/due-list",
   "employees/attendance-summary",
+  "gst/gstr1",
+  "gst/gstr3b",
+  "gst/hsn-summary",
+  "gst/itc-register",
+  "accounting/cash-bank-book",
+  "accounting/day-book",
+  "accounting/trial-balance",
+  "accounting/pnl",
+  "accounting/balance-sheet",
+  "recon/payments-gateway",
+  "recon/stock-valuation",
+  "compliance/e-invoice-status",
+  "compliance/e-waybill-status",
+  "compliance/tds-vendor-payments",
+  "compliance/tcs-sales",
 ]);
 
 const REPORT_GROUP_ORDER = [
@@ -135,6 +174,10 @@ const REPORT_GROUP_ORDER = [
   "Online Orders",
   "Loyalty",
   "Coupons",
+  "GST",
+  "Accounting",
+  "Reconciliation",
+  "Compliance",
   "Audit",
   "Table",
   "Employees",
@@ -489,7 +532,6 @@ export default function Reports() {
         setData(rows);
       }
     } catch {
-      showToast("Failed to load report", "error");
       setData([]);
     } finally {
       setLoading(false);
@@ -669,6 +711,10 @@ export default function Reports() {
       "Online Orders": <FaMotorcycle />,
       Loyalty: <FaGift />,
       Coupons: <FaTags />,
+      GST: <FaShieldAlt />,
+      Accounting: <FaMoneyBillWave />,
+      Reconciliation: <FaClipboardCheck />,
+      Compliance: <FaShieldAlt />,
       Audit: <FaShieldAlt />,
       Table: <FaTable />,
       Default: <FaClipboardCheck />,
@@ -679,8 +725,11 @@ export default function Reports() {
 
     return (
       <div className="p-4 sm:p-6 bg-slate-100 min-h-screen">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xl font-semibold text-gray-800">Reports</h2>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <BackButton />
+            <h2 className="text-xl font-semibold text-gray-800">Reports</h2>
+          </div>
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -759,6 +808,10 @@ export default function Reports() {
         </button>
         <h2 className="text-xl font-semibold">{activeReport.label}</h2>
       </div>
+
+      {loading && (
+        <div className="w-full h-1 rounded-full bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600 animate-pulse" />
+      )}
 
       <div className="bg-white rounded-xl p-4 flex flex-wrap gap-4 items-center">
         {requiresDateRange ? (
@@ -988,4 +1041,3 @@ export default function Reports() {
     </div>
   );
 }
-

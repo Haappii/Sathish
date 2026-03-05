@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { API_BASE } from "../config/api";
@@ -35,11 +35,11 @@ export default function CreateBill() {
 
   const [cart, setCart] = useState([]);
 
-  const [customer, setCustomer] = useState({
-    mobile: DEFAULT_MOBILE,
-    name: "",
-    gst_number: ""
-  });
+const [customer, setCustomer] = useState({
+  mobile: DEFAULT_MOBILE,
+  name: "NA",
+  gst_number: ""
+});
 
   const [discountType, setDiscountType] = useState("flat");
   const [discount, setDiscount] = useState(0);
@@ -63,6 +63,7 @@ export default function CreateBill() {
     wallet: "",
   });
   const [giftCardCode, setGiftCardCode] = useState("");
+  const selectedItemIds = useMemo(() => new Set(cart.map((c) => c.item_id)), [cart]);
 
   const paymentModeLabel = m => {
     const map = {
@@ -86,6 +87,10 @@ export default function CreateBill() {
   const printTextRef = useRef(null);
   const kotPrintRef = useRef(null);
   const navigate = useNavigate();
+  const isHotel = useMemo(
+    () => String(shop?.billing_type || shop?.shop_type || "").toLowerCase() === "hotel",
+    [shop]
+  );
 
   /* ---------------- LOAD DATA ---------------- */
   const applyCachedData = useCallback((cached, { forceDefaultDiscount = false } = {}) => {
@@ -257,18 +262,49 @@ export default function CreateBill() {
   const fetchCustomerByMobile = async mobile => {
     if (!mobile || mobile.length !== 10) return;
 
+    const extractName = data =>
+      (data?.customer_name ||
+        data?.customerName ||
+        data?.name ||
+        data?.customer?.customer_name ||
+        data?.customer?.name ||
+        "").trim();
+
+    const extractGst = data =>
+      (data?.gst_number ||
+        data?.gstNumber ||
+        data?.customer?.gst_number ||
+        data?.customer?.gstNumber ||
+        "").trim();
+
+    const applyCustomer = (name, gst) => {
+      if (!name) return false;
+      setCustomer(prev => ({
+        ...prev,
+        name,
+        gst_number: prev.gst_number || gst || "",
+      }));
+      showToast("Customer loaded from previous bill", "success");
+      return true;
+    };
+
     try {
       const res = await authAxios.get(
         `/invoice/customer/by-mobile/${mobile}`
       );
 
-      if (res.data?.customer_name) {
-        setCustomer(prev => ({
-          ...prev,
-          name: prev.name || res.data.customer_name,
-          gst_number: prev.gst_number || res.data.gst_number || ""
-        }));
-        showToast("Customer loaded from previous bill", "success");
+      const fetchedName = extractName(res.data);
+      const fetchedGst = extractGst(res.data);
+      const applied = applyCustomer(fetchedName, fetchedGst);
+
+      // Fallback: master customers table (in case invoices don't have names).
+      if (!applied) {
+        try {
+          const res2 = await authAxios.get(`/customers/by-mobile/${mobile}`);
+          applyCustomer(extractName(res2.data), extractGst(res2.data));
+        } catch (fallbackErr) {
+          console.warn("No customer record found for mobile", fallbackErr?.response?.status);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch customer by mobile", err);
@@ -280,13 +316,13 @@ export default function CreateBill() {
     let value = e.target.value.replace(/\D/g, "");
     if (value.length > 10) value = value.slice(0, 10);
 
-    setCustomer(prev => ({ ...prev, mobile: value }));
+    setCustomer(prev => ({ ...prev, mobile: value, name: value ? prev.name : "NA" }));
     if (value.length === 10) fetchCustomerByMobile(value);
   };
 
   const handleMobileBlur = () => {
     if (!customer.mobile || customer.mobile.length < 10) {
-      setCustomer(prev => ({ ...prev, mobile: DEFAULT_MOBILE }));
+      setCustomer(prev => ({ ...prev, mobile: DEFAULT_MOBILE, name: "NA" }));
     } else {
       fetchCustomerByMobile(customer.mobile);
     }
@@ -294,7 +330,7 @@ export default function CreateBill() {
 
   const handleNameChange = e => {
     const value = e.target.value.replace(/[^a-zA-Z\s]/g, "");
-    setCustomer(prev => ({ ...prev, name: value }));
+    setCustomer(prev => ({ ...prev, name: value || "NA" }));
   };
 
   /* ---------------- STOCK HELPERS ---------------- */
@@ -327,7 +363,8 @@ export default function CreateBill() {
 
   /* ---------------- CART FUNCTIONS ---------------- */
   const addToCart = item => {
-    if (inventoryEnabled && getEffectiveStock(item.item_id) <= 0)
+    const isRaw = Boolean(item?.is_raw_material);
+    if (inventoryEnabled && (!isHotel || isRaw) && getEffectiveStock(item.item_id) <= 0)
       return showToast("Out of stock", "error");
 
     setCart(prev => {
@@ -359,7 +396,9 @@ export default function CreateBill() {
 
   const setQty = (id, val) => {
     const q = Math.max(1, Number(val) || 1);
-    if (inventoryEnabled && q > getStock(id))
+    const item = itemsData.find(i => i.item_id === id);
+    const isRaw = Boolean(item?.is_raw_material);
+    if (inventoryEnabled && (!isHotel || isRaw) && q > getStock(id))
       return showToast("Exceeds stock limit", "error");
 
     setCart(prev =>
@@ -535,7 +574,7 @@ export default function CreateBill() {
     return t;
   };
 
-  const generateKOTText = () => {
+  const generateKOTText = (invoiceNumber, customerName) => {
     const WIDTH = 32;
     const NAME_COL = 22;
     const COUNT_COL = 8;
@@ -554,6 +593,9 @@ export default function CreateBill() {
     t += center(new Date().toLocaleString()) + "\n";
     t += center("Take way") + "\n";
     t += line + "\n";
+    t += `Invoice : ${invoiceNumber || "N/A"}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";
+    t += `Customer: ${(customerName || "N/A").slice(0, 22)}`.padEnd(WIDTH) + "\n";
+    t += line + "\n";
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
     t += line + "\n";
     cart.forEach(i => {
@@ -568,8 +610,8 @@ export default function CreateBill() {
     return t;
   };
 
-  const printKOT = async () => {
-    const ok = await printDirectText(generateKOTText());
+  const printKOT = async (invoiceNumber, customerName) => {
+    const ok = await printDirectText(generateKOTText(invoiceNumber, customerName));
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
@@ -634,7 +676,7 @@ export default function CreateBill() {
       const res = await authAxios.post(`/invoice/`, payload);
 
       if (branch?.kot_required !== false) {
-        printKOT();
+        printKOT(res?.data?.invoice_number, customer.name);
       }
 
       if (print && branch?.receipt_required !== false) {
@@ -646,7 +688,7 @@ export default function CreateBill() {
 
       showToast("Bill saved", "success");
       setCart([]);
-      setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
+      setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
       setDiscount(0);
       setCouponCode("");
       setCouponDiscount(0);
@@ -664,7 +706,7 @@ export default function CreateBill() {
         showToast("Saved offline. It will auto-sync when internet returns.", "warning");
 
         setCart([]);
-        setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
+        setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
         setDiscount(0);
         setCouponCode("");
         setCouponDiscount(0);
@@ -761,7 +803,7 @@ export default function CreateBill() {
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         html, body, #root {
           height: 100%;
           margin: 0;
@@ -856,11 +898,14 @@ export default function CreateBill() {
             <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
               {filteredItems.map(item => {
                 const stock = getEffectiveStock(item.item_id);
-                const out = inventoryEnabled && stock <= 0;
+                const isRaw = Boolean(item?.is_raw_material);
+                const out = inventoryEnabled && (!isHotel || isRaw) && stock <= 0;
                 const imgUrl = item.image_filename
                   ? `${API_BASE}/item-images/${item.image_filename}`
                   : "";
+                const showStockLabel = inventoryEnabled && (isRaw || !isHotel);
 
+                const isSelected = selectedItemIds.has(item.item_id);
                 return (
                   <button
                     key={item.item_id}
@@ -872,6 +917,12 @@ export default function CreateBill() {
                       hover:bg-blue-50
                       ${out ? "bg-red-50 border-red-300 opacity-70 cursor-not-allowed" : ""}
                     `}
+                    style={{
+                      outline: isSelected ? "3px solid #1d4ed8" : "none",
+                      outlineOffset: "4px",
+                      boxShadow: isSelected ? "0 0 0 3px rgba(59,130,246,0.25)" : "none",
+                      padding: isSelected ? "10px" : "12px",
+                    }}
                   >
                     <div className="flex items-start gap-2">
                       <div className="w-10 h-10 rounded-md border bg-gray-50 overflow-hidden flex-shrink-0">
@@ -896,7 +947,7 @@ export default function CreateBill() {
                         <div className="text-[12px] mt-1 font-medium">
                           RS.{Number(getPriceForItem(item)).toFixed(0)}
                         </div>
-                        {inventoryEnabled && (
+                        {showStockLabel && (
                           <div className={`text-[11px] mt-1 ${getStockColor(stock)}`}>
                             Stock - {stock}
                           </div>
@@ -959,6 +1010,12 @@ export default function CreateBill() {
                 className="border rounded-lg px-2 py-1 w-full text-[11px]"
                 value={customer.name}
                 onChange={handleNameChange}
+                onFocus={() => {
+                  if (customer.name === "NA") setCustomer(prev => ({ ...prev, name: "" }));
+                }}
+                onBlur={() => {
+                  if (!customer.name?.trim()) setCustomer(prev => ({ ...prev, name: "NA" }));
+                }}
               />
             </div>
           </div>

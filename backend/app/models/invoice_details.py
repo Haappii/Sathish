@@ -15,6 +15,12 @@ class InvoiceDetail(Base):
     amount = Column(Numeric(10,2), nullable=False)
     buy_price = Column(Float, nullable=False, default=0)
     mrp_price = Column(Float, nullable=False, default=0)
+    tax_rate = Column(Numeric(5,2), nullable=False, default=0)
+    taxable_value = Column(Numeric(12,2), nullable=False, default=0)
+    cgst_amt = Column(Numeric(12,2), nullable=False, default=0)
+    sgst_amt = Column(Numeric(12,2), nullable=False, default=0)
+    igst_amt = Column(Numeric(12,2), nullable=False, default=0)
+    cess_amt = Column(Numeric(12,2), nullable=False, default=0)
 
     invoice = relationship("Invoice", back_populates="details")
     item = relationship("Item")

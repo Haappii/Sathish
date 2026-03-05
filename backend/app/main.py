@@ -57,6 +57,7 @@ import app.models.employee
 import app.models.customer_wallet_txn
 import app.models.gift_card
 import app.models.gift_card_txn
+import app.models.subscription_plan
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing

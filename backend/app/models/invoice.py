@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, TIMESTAMP, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Numeric, TIMESTAMP, ForeignKey, JSON, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db import Base
@@ -22,6 +22,9 @@ class Invoice(Base):
     customer_name = Column(String(120))
     mobile = Column(String(20))
     gst_number = Column(String(100))
+    place_of_supply = Column(String(20))
+    supply_type = Column(String(10), default="B2C")  # B2B / B2C
+    reverse_charge = Column(Boolean, default=False)
 
     branch = relationship("Branch")
     user = relationship("User")

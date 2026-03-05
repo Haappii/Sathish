@@ -12,6 +12,7 @@ from app.utils.permissions import require_permission
 
 from app.models.table_billing import TableMaster, Order, OrderItem
 from app.models.items import Item
+from app.models.branch_item_price import BranchItemPrice
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.shop_details import ShopDetails
@@ -225,6 +226,19 @@ def add_order_item(
     if not item:
         raise HTTPException(404, "Item not found")
 
+    override = (
+        db.query(BranchItemPrice)
+        .filter(
+            BranchItemPrice.shop_id == user.shop_id,
+            BranchItemPrice.branch_id == user.branch_id,
+            BranchItemPrice.item_id == item_id,
+        )
+        .first()
+    )
+    if override and not override.item_status:
+        raise HTTPException(400, "Item unavailable in this branch")
+    price_to_use = float(override.price) if override else float(item.price or 0)
+
     existing = (
         db.query(OrderItem)
         .filter(
@@ -237,6 +251,7 @@ def add_order_item(
 
     if existing:
         existing.quantity += qty
+        existing.price = price_to_use
         if existing.quantity <= 0:
             db.delete(existing)
     else:
@@ -246,7 +261,7 @@ def add_order_item(
                 order_id=order_id,
                 item_id=item_id,
                 quantity=qty,
-                price=item.price
+                price=price_to_use
             ))
 
     db.commit()

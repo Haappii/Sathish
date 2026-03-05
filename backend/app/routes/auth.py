@@ -29,6 +29,8 @@ def login(request: dict, db: Session = Depends(get_db)):
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
     if not shop:
         raise HTTPException(400, "Invalid Shop ID")
+    if str(getattr(shop, "plan", "") or "").upper() == "DISABLED":
+        raise HTTPException(403, "Shop disabled by platform")
     if getattr(shop, "expires_on", None):
         today = datetime.utcnow().date()
         if today > shop.expires_on:

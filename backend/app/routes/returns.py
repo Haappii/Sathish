@@ -36,10 +36,17 @@ from app.utils.permissions import require_permission
 router = APIRouter(prefix="/returns", tags=["Sales Returns"])
 
 
-def _require_admin(user):
-    role = str(getattr(user, "role_name", "") or "").lower()
-    if role != "admin":
-        raise HTTPException(403, "Admin access required")
+def _is_admin(user) -> bool:
+    return str(getattr(user, "role_name", "") or "").strip().lower() == "admin"
+
+
+def _resolve_branch_optional(user, branch_id: int | None):
+    if _is_admin(user):
+        return branch_id  # admins can see all when None
+    try:
+        return int(getattr(user, "branch_id", None))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 def _get_business_date(db: Session, shop_id: int):

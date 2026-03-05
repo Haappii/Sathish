@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import func, cast, Integer, and_, or_, case
+from sqlalchemy import func, cast, Integer, and_, or_, case, inspect, literal
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
+from collections import defaultdict
 
 from app.db import get_db
 from app.utils.permissions import require_permission
@@ -16,6 +18,7 @@ from app.models.category import Category
 from app.models.users import User
 from app.models.branch import Branch
 from app.models.customer import Customer
+from app.models.branch_item_price import BranchItemPrice
 from app.models.invoice_archive import InvoiceArchive
 from app.models.stock import Inventory
 from app.models.stock_ledger import StockLedger
@@ -25,7 +28,7 @@ from app.models.table_billing import TableMaster, Order
 from app.models.branch_expense import BranchExpense
 from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.models.supplier import Supplier
-from app.models.purchase_order import PurchaseOrder
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 from app.models.stock_transfer import StockTransfer, StockTransferItem
 from app.models.cash_drawer import CashShift, CashMovement
 from app.models.stock_audit import StockAudit, StockAuditLine
@@ -34,6 +37,7 @@ from app.models.online_order import OnlineOrder, OnlineOrderItem
 from app.models.loyalty import LoyaltyAccount, LoyaltyTransaction
 from app.models.coupon import Coupon, CouponRedemption
 from app.models.employee import Employee, EmployeeAttendance
+from app.models.shop_details import ShopDetails
 from app.services.financials_service import calc_period_financials
 from app.utils.shop_type import ensure_hotel_billing_type
 
@@ -83,6 +87,197 @@ def parse_optional_dates(from_date: str | None, to_date: str | None):
     if from_date or to_date:
         raise HTTPException(400, "Provide both from_date and to_date")
     return None, None
+
+
+def _dec(val) -> Decimal:
+    try:
+        return Decimal(str(val or 0))
+    except Exception:
+        return Decimal("0.00")
+
+
+def _q(val) -> Decimal:
+    return _dec(val).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _state_eq(a, b) -> bool:
+    return (a or "").strip().lower() == (b or "").strip().lower()
+
+
+def _as_float(val) -> float:
+    try:
+        return float(_q(val))
+    except Exception:
+        return 0.0
+
+
+def _detail_tax_breakup(detail, inv_ctx: dict) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
+    """
+    Returns (taxable, cgst, sgst, igst, cess) using stored split when present
+    and falling back to proportional split from invoice tax.
+    """
+    taxable = _dec(getattr(detail, "taxable_value", 0))
+    cgst = _dec(getattr(detail, "cgst_amt", 0))
+    sgst = _dec(getattr(detail, "sgst_amt", 0))
+    igst = _dec(getattr(detail, "igst_amt", 0))
+    cess = _dec(getattr(detail, "cess_amt", 0))
+    amt = _dec(getattr(detail, "amount", 0))
+
+    if (
+        inv_ctx
+        and inv_ctx.get("gst_enabled")
+        and inv_ctx.get("subtotal") > 0
+        and inv_ctx.get("tax") > 0
+        and (cgst + sgst + igst + cess) == 0
+    ):
+        subtotal = inv_ctx["subtotal"]
+        tax_total = inv_ctx["tax"]
+        gst_mode = inv_ctx.get("gst_mode", "inclusive")
+        if gst_mode == "inclusive":
+            base_total = subtotal - tax_total
+            if base_total <= 0:
+                base_total = subtotal
+            taxable = amt * (base_total / subtotal)
+            tax_amt = amt - taxable
+        else:
+            taxable = amt
+            tax_amt = tax_total * (amt / subtotal)
+        taxable = _q(taxable)
+        tax_amt = _q(tax_amt)
+        if inv_ctx.get("intra_state", True):
+            cgst = _q(tax_amt / 2)
+            sgst = _q(tax_amt - cgst)
+            igst = Decimal("0.00")
+        else:
+            cgst = Decimal("0.00")
+            sgst = Decimal("0.00")
+            igst = tax_amt
+        cess = Decimal("0.00")
+    else:
+        if taxable == 0:
+            taxable = amt
+        if (cgst + sgst + igst + cess) == 0:
+            cess = Decimal("0.00")
+    return taxable, cgst, sgst, igst, cess
+
+
+def _build_invoice_context(inv_rows, detail_rows):
+    subtotal_map: dict[int, Decimal] = defaultdict(Decimal)
+    for d in detail_rows:
+        try:
+            subtotal_map[int(d.invoice_id)] += _dec(getattr(d, "amount", 0))
+        except Exception:
+            continue
+
+    ctx: dict[int, dict] = {}
+    for inv in inv_rows:
+        inv_id = int(getattr(inv, "invoice_id"))
+        subtotal = subtotal_map.get(inv_id, _dec(getattr(inv, "total_amount", 0)))
+        tax_total = _dec(getattr(inv, "tax_amt", 0))
+        pos = getattr(inv, "place_of_supply", None) or getattr(inv, "branch_state", None)
+        shop_state = getattr(inv, "shop_state", None)
+        ctx[inv_id] = {
+            "subtotal": subtotal if subtotal > 0 else _dec(getattr(inv, "total_amount", 0)),
+            "tax": tax_total,
+            "gst_mode": getattr(inv, "gst_mode", "inclusive") or "inclusive",
+            "gst_enabled": bool(getattr(inv, "gst_enabled", False)),
+            "intra_state": _state_eq(pos, shop_state),
+        }
+    return ctx, subtotal_map
+
+
+def _has_column(db: Session, table: str, column: str) -> bool:
+    try:
+        insp = inspect(db.get_bind())
+        return insp.has_column(table, column)
+    except Exception:
+        return False
+
+
+def _compute_itc_rows(db: Session, user, f_dt: datetime, t_dt: datetime, branch_id: int | None):
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    shop_state = getattr(shop, "state", None)
+    has_pos = _has_column(db, "invoice", "place_of_supply")
+    gst_default = _dec(getattr(shop, "gst_percent", 0))
+    start_date = f_dt.date()
+    end_date = (t_dt - timedelta(days=1)).date()
+
+    q = (
+        db.query(
+            PurchaseOrder.po_number,
+            PurchaseOrder.order_date,
+            Supplier.supplier_name,
+            Supplier.gstin,
+            Supplier.state.label("supplier_state"),
+            PurchaseOrderItem.qty_received,
+            PurchaseOrderItem.qty_ordered,
+            PurchaseOrderItem.unit_cost,
+            PurchaseOrderItem.item_name,
+            Item.hsn_code,
+            Item.gst_rate,
+        )
+        .join(PurchaseOrder, PurchaseOrder.po_id == PurchaseOrderItem.po_id)
+        .join(Supplier, Supplier.supplier_id == PurchaseOrder.supplier_id)
+        .outerjoin(Item, Item.item_id == PurchaseOrderItem.item_id)
+        .filter(PurchaseOrder.shop_id == user.shop_id)
+        .filter(PurchaseOrder.order_date >= start_date)
+        .filter(PurchaseOrder.order_date <= end_date)
+    )
+    if branch_id:
+        q = q.filter(PurchaseOrder.branch_id == branch_id)
+
+    rows = []
+    totals = {
+        "taxable": Decimal("0.00"),
+        "cgst": Decimal("0.00"),
+        "sgst": Decimal("0.00"),
+        "igst": Decimal("0.00"),
+        "cess": Decimal("0.00"),
+    }
+
+    for r in q.all():
+        qty = r.qty_received if r.qty_received is not None else r.qty_ordered
+        qty = qty if qty is not None else 0
+        qty_dec = _dec(qty)
+        taxable = _q(_dec(r.unit_cost) * qty_dec)
+        rate = _dec(r.gst_rate or gst_default)
+        tax_amt = _q(taxable * (rate / Decimal("100")))
+        intra = _state_eq(r.supplier_state, shop_state)
+        if intra:
+            cgst = _q(tax_amt / 2)
+            sgst = _q(tax_amt - cgst)
+            igst = Decimal("0.00")
+        else:
+            cgst = Decimal("0.00")
+            sgst = Decimal("0.00")
+            igst = tax_amt
+        cess = Decimal("0.00")
+
+        totals["taxable"] += taxable
+        totals["cgst"] += cgst
+        totals["sgst"] += sgst
+        totals["igst"] += igst
+        totals["cess"] += cess
+
+        rows.append(
+            {
+                "po_date": r.order_date.strftime("%d %b %Y") if r.order_date else "",
+                "po_number": r.po_number,
+                "supplier": r.supplier_name,
+                "supplier_gst": r.gstin or "",
+                "hsn": r.hsn_code or "",
+                "item": r.item_name,
+                "quantity": int(qty_dec),
+                "taxable_value": _as_float(taxable),
+                "cgst": _as_float(cgst),
+                "sgst": _as_float(sgst),
+                "igst": _as_float(igst),
+                "cess": _as_float(cess),
+                "total_value": _as_float(taxable + cgst + sgst + igst + cess),
+            }
+        )
+
+    return rows, totals
 
 
 # =====================================================
@@ -824,15 +1019,54 @@ def inventory_current(
     user=Depends(require_permission("reports", "read")),
 ):
     branch_id = _force_branch(branch_id, user)
+
+    totals_sq = (
+        db.query(
+            Inventory.item_id.label("item_id"),
+            func.coalesce(func.sum(Inventory.quantity), 0).label("shop_qty"),
+        )
+        .filter(Inventory.shop_id == user.shop_id)
+        .group_by(Inventory.item_id)
+        .subquery()
+    )
+
+    price_sq = (
+        db.query(
+            ItemPrice.item_id.label("item_id"),
+            func.string_agg(
+                func.concat(ItemPrice.level, ":", ItemPrice.price), "; "
+            ).label("price_levels"),
+        )
+        .filter(ItemPrice.shop_id == user.shop_id)
+        .group_by(ItemPrice.item_id)
+        .subquery()
+    )
+
     q = (
         db.query(
             Item.item_name.label("item"),
             Branch.branch_name.label("branch"),
             Inventory.quantity.label("qty"),
             Inventory.min_stock.label("min_stock"),
+            Item.price.label("price"),
+            Item.buy_price.label("buy_price"),
+            totals_sq.c.shop_qty.label("shop_qty"),
+            price_sq.c.price_levels.label("price_levels"),
+            BranchItemPrice.price.label("branch_price"),
+            BranchItemPrice.item_status.label("branch_item_status"),
         )
         .join(Inventory, Inventory.item_id == Item.item_id)
         .outerjoin(Branch, Branch.branch_id == Inventory.branch_id)
+        .join(totals_sq, totals_sq.c.item_id == Inventory.item_id)
+        .outerjoin(price_sq, price_sq.c.item_id == Inventory.item_id)
+        .outerjoin(
+            BranchItemPrice,
+            and_(
+                BranchItemPrice.item_id == Inventory.item_id,
+                BranchItemPrice.branch_id == Inventory.branch_id,
+                BranchItemPrice.shop_id == user.shop_id,
+            ),
+        )
         .filter(Inventory.shop_id == user.shop_id)
     )
 
@@ -846,7 +1080,11 @@ def inventory_current(
             "item": r.item,
             "branch": r.branch,
             "qty": r.qty,
+            "shop_qty": r.shop_qty,
+            "price": float(r.branch_price or r.price or 0),
+            "buy_price": float(r.buy_price or 0),
             "status": "LOW" if r.qty <= r.min_stock else "OK",
+            "item_status": bool(r.branch_item_status) if r.branch_item_status is not None else True,
         }
         for r in rows
     ]
@@ -2519,3 +2757,1110 @@ def inventory_expiry_lots(
         }
         for r in rows
     ]
+
+
+# =====================================================
+# PLACEHOLDER REPORTS (GST / ACCOUNTING / RECON / COMPLIANCE)
+# These return an empty list with 200 to avoid 404 until implemented.
+# =====================================================
+def _empty_report():
+    return []
+
+
+@router.get("/gst/gstr1")
+def gst_gstr1(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    has_pos = _has_column(db, "invoice", "place_of_supply")
+    has_supply_type = _has_column(db, "invoice", "supply_type")
+    has_reverse = _has_column(db, "invoice", "reverse_charge")
+
+    inv_rows = (
+        db.query(
+            Invoice.invoice_id,
+            Invoice.invoice_number,
+            Invoice.created_time,
+            Invoice.customer_name,
+            Invoice.gst_number,
+            Invoice.total_amount,
+            Invoice.discounted_amt,
+            Invoice.tax_amt,
+            (Invoice.place_of_supply if has_pos else literal(None)).label("place_of_supply"),
+            (Invoice.supply_type if has_supply_type else literal(None)).label("supply_type"),
+            (Invoice.reverse_charge if has_reverse else literal(False)).label("reverse_charge"),
+            Branch.state.label("branch_state"),
+            ShopDetails.state.label("shop_state"),
+            ShopDetails.gst_mode,
+            ShopDetails.gst_enabled,
+        )
+        .join(ShopDetails, ShopDetails.shop_id == Invoice.shop_id)
+        .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        inv_rows = inv_rows.filter(Invoice.branch_id == branch_id)
+    inv_rows = inv_rows.order_by(Invoice.created_time).all()
+    if not inv_rows:
+        return []
+
+    inv_ids = [r.invoice_id for r in inv_rows]
+    has_taxable = _has_column(db, "invoice_details", "taxable_value")
+    has_cgst = _has_column(db, "invoice_details", "cgst_amt")
+    has_sgst = _has_column(db, "invoice_details", "sgst_amt")
+    has_igst = _has_column(db, "invoice_details", "igst_amt")
+    has_cess = _has_column(db, "invoice_details", "cess_amt")
+    has_tax_rate = _has_column(db, "invoice_details", "tax_rate")
+    detail_rows = (
+        db.query(
+            InvoiceDetail.invoice_id,
+            InvoiceDetail.amount,
+            (InvoiceDetail.taxable_value if has_taxable else literal(None)).label("taxable_value"),
+            (InvoiceDetail.cgst_amt if has_cgst else literal(None)).label("cgst_amt"),
+            (InvoiceDetail.sgst_amt if has_sgst else literal(None)).label("sgst_amt"),
+            (InvoiceDetail.igst_amt if has_igst else literal(None)).label("igst_amt"),
+            (InvoiceDetail.cess_amt if has_cess else literal(None)).label("cess_amt"),
+            (InvoiceDetail.tax_rate if has_tax_rate else literal(None)).label("tax_rate"),
+            InvoiceDetail.quantity,
+            Item.hsn_code,
+            Item.item_name,
+            Item.gst_rate,
+        )
+        .join(Item, Item.item_id == InvoiceDetail.item_id)
+        .filter(InvoiceDetail.invoice_id.in_(inv_ids))
+        .all()
+    )
+
+    ctx_map, _ = _build_invoice_context(inv_rows, detail_rows)
+    agg = defaultdict(
+        lambda: {
+            "taxable": Decimal("0.00"),
+            "cgst": Decimal("0.00"),
+            "sgst": Decimal("0.00"),
+            "igst": Decimal("0.00"),
+            "cess": Decimal("0.00"),
+        }
+    )
+
+    for d in detail_rows:
+        inv_id = int(d.invoice_id)
+        taxable, cgst, sgst, igst, cess = _detail_tax_breakup(d, ctx_map.get(inv_id, {}))
+        agg[inv_id]["taxable"] += taxable
+        agg[inv_id]["cgst"] += cgst
+        agg[inv_id]["sgst"] += sgst
+        agg[inv_id]["igst"] += igst
+        agg[inv_id]["cess"] += cess
+
+    results = []
+    for inv in inv_rows:
+        sums = agg[inv.invoice_id]
+        total_value = sums["taxable"] + sums["cgst"] + sums["sgst"] + sums["igst"] + sums["cess"]
+        total_value -= _dec(inv.discounted_amt or 0)
+        if total_value < 0:
+            total_value = Decimal("0.00")
+
+        results.append(
+            {
+                "invoice_date": inv.created_time.strftime("%d %b %Y"),
+                "invoice_number": inv.invoice_number,
+                "customer": inv.customer_name or "",
+                "customer_gst": inv.gst_number or "",
+                "supply_type": inv.supply_type or ("B2B" if inv.gst_number else "B2C"),
+                "place_of_supply": inv.place_of_supply or inv.branch_state or inv.shop_state or "",
+                "taxable_value": _as_float(sums["taxable"]),
+                "cgst": _as_float(sums["cgst"]),
+                "sgst": _as_float(sums["sgst"]),
+                "igst": _as_float(sums["igst"]),
+                "cess": _as_float(sums["cess"]),
+                "total_value": _as_float(total_value),
+                "reverse_charge": "Yes" if inv.reverse_charge else "No",
+            }
+        )
+
+    return results
+
+
+@router.get("/gst/gstr3b")
+def gst_gstr3b(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    outward_rows = gst_gstr1(from_date, to_date, branch_id, db, user)
+    out_taxable = sum((_dec(r.get("taxable_value")) for r in outward_rows), Decimal("0.00"))
+    out_igst = sum((_dec(r.get("igst")) for r in outward_rows), Decimal("0.00"))
+    out_cgst = sum((_dec(r.get("cgst")) for r in outward_rows), Decimal("0.00"))
+    out_sgst = sum((_dec(r.get("sgst")) for r in outward_rows), Decimal("0.00"))
+    out_cess = sum((_dec(r.get("cess")) for r in outward_rows), Decimal("0.00"))
+
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    shop_state = getattr(shop, "state", None)
+    has_pos = _has_column(db, "invoice", "place_of_supply")
+
+    ret_q = (
+        db.query(
+            SalesReturn.subtotal_amount,
+            SalesReturn.tax_amount,
+            SalesReturn.created_on,
+            (Invoice.place_of_supply if has_pos else literal(None)).label("place_of_supply"),
+            Branch.state.label("branch_state"),
+        )
+        .join(Invoice, Invoice.invoice_id == SalesReturn.invoice_id)
+        .outerjoin(Branch, Branch.branch_id == SalesReturn.branch_id)
+        .filter(SalesReturn.shop_id == user.shop_id)
+        .filter(SalesReturn.status != "CANCELLED")
+        .filter(SalesReturn.created_on >= f)
+        .filter(SalesReturn.created_on < t_end)
+    )
+    if branch_id:
+        ret_q = ret_q.filter(SalesReturn.branch_id == branch_id)
+    ret_rows = ret_q.all()
+
+    ret_taxable = Decimal("0.00")
+    ret_cgst = Decimal("0.00")
+    ret_sgst = Decimal("0.00")
+    ret_igst = Decimal("0.00")
+    ret_cess = Decimal("0.00")
+
+    for r in ret_rows:
+        taxable = _dec(r.subtotal_amount)
+        tax_amt = _dec(r.tax_amount)
+        ret_taxable += taxable
+        intra = _state_eq(r.place_of_supply or r.branch_state, shop_state)
+        if intra:
+            cg = _q(tax_amt / 2)
+            sg = _q(tax_amt - cg)
+            ret_cgst += cg
+            ret_sgst += sg
+        else:
+            ret_igst += tax_amt
+
+    net_taxable = out_taxable - ret_taxable
+    net_cgst = out_cgst - ret_cgst
+    net_sgst = out_sgst - ret_sgst
+    net_igst = out_igst - ret_igst
+    net_cess = out_cess - ret_cess
+
+    itc_rows, itc_totals = _compute_itc_rows(db, user, f, t_end, branch_id)
+
+    payable_cgst = net_cgst - itc_totals["cgst"]
+    payable_sgst = net_sgst - itc_totals["sgst"]
+    payable_igst = net_igst - itc_totals["igst"]
+    payable_cess = net_cess - itc_totals["cess"]
+
+    return [
+        {
+            "section": "Outward Supplies",
+            "taxable_value": _as_float(out_taxable),
+            "igst": _as_float(out_igst),
+            "cgst": _as_float(out_cgst),
+            "sgst": _as_float(out_sgst),
+            "cess": _as_float(out_cess),
+        },
+        {
+            "section": "Credit Notes / Returns",
+            "taxable_value": _as_float(-ret_taxable),
+            "igst": _as_float(-ret_igst),
+            "cgst": _as_float(-ret_cgst),
+            "sgst": _as_float(-ret_sgst),
+            "cess": _as_float(-ret_cess),
+        },
+        {
+            "section": "Net Outward",
+            "taxable_value": _as_float(net_taxable),
+            "igst": _as_float(net_igst),
+            "cgst": _as_float(net_cgst),
+            "sgst": _as_float(net_sgst),
+            "cess": _as_float(net_cess),
+        },
+        {
+            "section": "Input Tax Credit (Purchases)",
+            "taxable_value": _as_float(itc_totals["taxable"]),
+            "igst": _as_float(itc_totals["igst"]),
+            "cgst": _as_float(itc_totals["cgst"]),
+            "sgst": _as_float(itc_totals["sgst"]),
+            "cess": _as_float(itc_totals["cess"]),
+        },
+        {
+            "section": "Net GST Payable",
+            "taxable_value": _as_float(net_taxable),
+            "igst": _as_float(payable_igst),
+            "cgst": _as_float(payable_cgst),
+            "sgst": _as_float(payable_sgst),
+            "cess": _as_float(payable_cess),
+        },
+    ]
+
+
+@router.get("/gst/hsn-summary")
+def gst_hsn_summary(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    inv_rows = (
+        db.query(
+            Invoice.invoice_id,
+            Invoice.tax_amt,
+            Invoice.total_amount,
+            (Invoice.place_of_supply if _has_column(db, "invoice", "place_of_supply") else literal(None)).label(
+                "place_of_supply"
+            ),
+            Branch.state.label("branch_state"),
+            ShopDetails.state.label("shop_state"),
+            ShopDetails.gst_mode,
+            ShopDetails.gst_enabled,
+        )
+        .join(ShopDetails, ShopDetails.shop_id == Invoice.shop_id)
+        .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        inv_rows = inv_rows.filter(Invoice.branch_id == branch_id)
+    inv_rows = inv_rows.all()
+    if not inv_rows:
+        return []
+
+    inv_ids = [r.invoice_id for r in inv_rows]
+    has_taxable = _has_column(db, "invoice_details", "taxable_value")
+    has_cgst = _has_column(db, "invoice_details", "cgst_amt")
+    has_sgst = _has_column(db, "invoice_details", "sgst_amt")
+    has_igst = _has_column(db, "invoice_details", "igst_amt")
+    has_cess = _has_column(db, "invoice_details", "cess_amt")
+    has_tax_rate = _has_column(db, "invoice_details", "tax_rate")
+
+    detail_rows = (
+        db.query(
+            InvoiceDetail.invoice_id,
+            InvoiceDetail.quantity,
+            InvoiceDetail.amount,
+            (InvoiceDetail.taxable_value if has_taxable else literal(None)).label("taxable_value"),
+            (InvoiceDetail.cgst_amt if has_cgst else literal(None)).label("cgst_amt"),
+            (InvoiceDetail.sgst_amt if has_sgst else literal(None)).label("sgst_amt"),
+            (InvoiceDetail.igst_amt if has_igst else literal(None)).label("igst_amt"),
+            (InvoiceDetail.cess_amt if has_cess else literal(None)).label("cess_amt"),
+            (InvoiceDetail.tax_rate if has_tax_rate else literal(None)).label("tax_rate"),
+            Item.hsn_code,
+            Item.item_name,
+            Item.gst_rate,
+        )
+        .join(Item, Item.item_id == InvoiceDetail.item_id)
+        .filter(InvoiceDetail.invoice_id.in_(inv_ids))
+        .all()
+    )
+
+    ctx_map, _ = _build_invoice_context(inv_rows, detail_rows)
+    agg = defaultdict(
+        lambda: {
+            "description": "",
+            "quantity": 0,
+            "taxable": Decimal("0.00"),
+            "cgst": Decimal("0.00"),
+            "sgst": Decimal("0.00"),
+            "igst": Decimal("0.00"),
+            "cess": Decimal("0.00"),
+        }
+    )
+
+    for d in detail_rows:
+        inv_id = int(d.invoice_id)
+        taxable, cgst, sgst, igst, cess = _detail_tax_breakup(d, ctx_map.get(inv_id, {}))
+        hsn = (d.hsn_code or "NA").strip() or "NA"
+        agg[hsn]["description"] = agg[hsn]["description"] or (d.item_name or "")
+        agg[hsn]["quantity"] += int(d.quantity or 0)
+        agg[hsn]["taxable"] += taxable
+        agg[hsn]["cgst"] += cgst
+        agg[hsn]["sgst"] += sgst
+        agg[hsn]["igst"] += igst
+        agg[hsn]["cess"] += cess
+
+    results = []
+    for hsn, vals in sorted(agg.items(), key=lambda x: x[0]):
+        total = vals["taxable"] + vals["cgst"] + vals["sgst"] + vals["igst"] + vals["cess"]
+        results.append(
+            {
+                "hsn": hsn,
+                "description": vals["description"],
+                "quantity": vals["quantity"],
+                "taxable_value": _as_float(vals["taxable"]),
+                "cgst": _as_float(vals["cgst"]),
+                "sgst": _as_float(vals["sgst"]),
+                "igst": _as_float(vals["igst"]),
+                "cess": _as_float(vals["cess"]),
+                "total_value": _as_float(total),
+            }
+        )
+
+    return results
+
+
+@router.get("/gst/itc-register")
+def gst_itc_register(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+    rows, _ = _compute_itc_rows(db, user, f, t_end, branch_id)
+    return rows
+
+
+@router.get("/accounting/cash-bank-book")
+def accounting_cash_bank_book(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    pay_q = (
+        db.query(
+            InvoicePayment.payment_mode,
+            func.coalesce(func.sum(InvoicePayment.amount), 0).label("amount"),
+            func.count(InvoicePayment.payment_id).label("count"),
+        )
+        .filter(InvoicePayment.shop_id == user.shop_id)
+        .filter(InvoicePayment.paid_on >= f)
+        .filter(InvoicePayment.paid_on < t_end)
+        .group_by(InvoicePayment.payment_mode)
+    )
+    if branch_id:
+        pay_q = pay_q.filter(InvoicePayment.branch_id == branch_id)
+    pay_rows = pay_q.all()
+    inflow = {r.payment_mode or "cash": _dec(r.amount) for r in pay_rows}
+
+    exp_q = (
+        db.query(
+            BranchExpense.payment_mode,
+            func.coalesce(func.sum(BranchExpense.amount), 0).label("amount"),
+            func.count(BranchExpense.expense_id).label("count"),
+        )
+        .filter(BranchExpense.shop_id == user.shop_id)
+        .filter(BranchExpense.expense_date >= f.date())
+        .filter(BranchExpense.expense_date <= (t_end - timedelta(days=1)).date())
+        .group_by(BranchExpense.payment_mode)
+    )
+    if branch_id:
+        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
+    exp_rows = exp_q.all()
+    outflow = {r.payment_mode or "cash": _dec(r.amount) for r in exp_rows}
+
+    modes = set(inflow.keys()) | set(outflow.keys())
+    if not modes:
+        return []
+
+    results = []
+    for mode in sorted(modes):
+        inflow_amt = inflow.get(mode, Decimal("0.00"))
+        outflow_amt = outflow.get(mode, Decimal("0.00"))
+        results.append(
+            {
+                "payment_mode": (mode or "cash").replace("_", " ").title(),
+                "inflow": _as_float(inflow_amt),
+                "outflow": _as_float(outflow_amt),
+                "net": _as_float(inflow_amt - outflow_amt),
+            }
+        )
+    return results
+
+
+@router.get("/accounting/day-book")
+def accounting_day_book(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    entries = []
+
+    inv_q = (
+        db.query(
+            Invoice.invoice_number,
+            Invoice.customer_name,
+            Invoice.total_amount,
+            Invoice.discounted_amt,
+            Invoice.payment_mode,
+            Invoice.created_time,
+        )
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        inv_q = inv_q.filter(Invoice.branch_id == branch_id)
+    for r in inv_q.all():
+        amount = _dec(r.total_amount) - _dec(r.discounted_amt)
+        entries.append(
+            {
+                "date": r.created_time.strftime("%d %b %Y"),
+                "type": "Sale",
+                "reference": r.invoice_number,
+                "particulars": r.customer_name or "",
+                "payment_mode": (r.payment_mode or "cash").title(),
+                "inflow": _as_float(amount),
+                "outflow": 0.0,
+                "_sort": r.created_time,
+            }
+        )
+
+    exp_q = (
+        db.query(
+            BranchExpense.expense_id,
+            BranchExpense.expense_date,
+            BranchExpense.category,
+            BranchExpense.amount,
+            BranchExpense.payment_mode,
+        )
+        .filter(BranchExpense.shop_id == user.shop_id)
+        .filter(BranchExpense.expense_date >= f.date())
+        .filter(BranchExpense.expense_date <= (t_end - timedelta(days=1)).date())
+    )
+    if branch_id:
+        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
+    for r in exp_q.all():
+        sort_dt = datetime.combine(r.expense_date, datetime.min.time())
+        entries.append(
+            {
+                "date": r.expense_date.strftime("%d %b %Y"),
+                "type": "Expense",
+                "reference": r.category,
+                "particulars": r.category,
+                "payment_mode": (r.payment_mode or "cash").title(),
+                "inflow": 0.0,
+                "outflow": _as_float(r.amount),
+                "_sort": sort_dt,
+            }
+        )
+
+    entries = sorted(entries, key=lambda x: x.get("_sort"))
+    for e in entries:
+        e.pop("_sort", None)
+    return entries
+
+
+@router.get("/accounting/trial-balance")
+def accounting_trial_balance(
+    as_of: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not as_of:
+        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+    try:
+        dt = datetime.strptime(as_of, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Invalid as_of date")
+
+    # Use range from beginning to as_of inclusive
+    f = datetime.combine(dt.date(), datetime.min.time())
+    t_end = f + timedelta(days=1)
+    branch_id = _force_branch(branch_id, user)
+
+    sales_q = (
+        db.query(
+            func.coalesce(
+                func.sum(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0)),
+                0,
+            ).label("sales"),
+            func.coalesce(func.sum(func.coalesce(Invoice.tax_amt, 0)), 0).label("gst"),
+            func.coalesce(func.sum(func.coalesce(Invoice.discounted_amt, 0)), 0).label("discounts"),
+        )
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        sales_q = sales_q.filter(Invoice.branch_id == branch_id)
+    sales_row = sales_q.first()
+    sales = _dec(getattr(sales_row, "sales", 0))
+    gst_out = _dec(getattr(sales_row, "gst", 0))
+    discounts = _dec(getattr(sales_row, "discounts", 0))
+
+    returns_q = (
+        db.query(func.coalesce(func.sum(func.coalesce(SalesReturn.refund_amount, 0)), 0))
+        .filter(SalesReturn.shop_id == user.shop_id)
+        .filter(SalesReturn.status != "CANCELLED")
+        .filter(SalesReturn.created_on < t_end)
+    )
+    if branch_id:
+        returns_q = returns_q.filter(SalesReturn.branch_id == branch_id)
+    returns_amt = _dec(returns_q.scalar() or 0)
+
+    exp_q = (
+        db.query(func.coalesce(func.sum(func.coalesce(BranchExpense.amount, 0)), 0))
+        .filter(BranchExpense.shop_id == user.shop_id)
+        .filter(BranchExpense.expense_date <= dt.date())
+    )
+    if branch_id:
+        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
+    expenses = _dec(exp_q.scalar() or 0)
+
+    cogs_q = (
+        db.query(func.coalesce(func.sum(InvoiceDetail.buy_price * InvoiceDetail.quantity), 0))
+        .join(Invoice, Invoice.invoice_id == InvoiceDetail.invoice_id)
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        cogs_q = cogs_q.filter(Invoice.branch_id == branch_id)
+    cogs = _dec(cogs_q.scalar() or 0)
+
+    recv_q = (
+        db.query(func.coalesce(func.sum(func.coalesce(InvoiceDue.original_amount, 0)), 0))
+        .filter(InvoiceDue.shop_id == user.shop_id)
+        .filter(InvoiceDue.status == "OPEN")
+        .filter(InvoiceDue.created_on <= t_end)
+    )
+    if branch_id:
+        recv_q = recv_q.filter(InvoiceDue.branch_id == branch_id)
+    receivables = _dec(recv_q.scalar() or 0)
+
+    pay_q = (
+        db.query(
+            func.coalesce(func.sum(func.coalesce(SupplierLedgerEntry.credit, 0)), 0).label("credit"),
+            func.coalesce(func.sum(func.coalesce(SupplierLedgerEntry.debit, 0)), 0).label("debit"),
+        )
+        .filter(SupplierLedgerEntry.shop_id == user.shop_id)
+        .filter(SupplierLedgerEntry.entry_time < t_end)
+    )
+    if branch_id:
+        pay_q = pay_q.filter(SupplierLedgerEntry.branch_id == branch_id)
+    pay_row = pay_q.first()
+    payables_net = _dec(getattr(pay_row, "credit", 0)) - _dec(getattr(pay_row, "debit", 0))
+
+    rows = [
+        {"account": "Sales", "debit": 0.0, "credit": _as_float(sales)},
+        {"account": "Output GST", "debit": 0.0, "credit": _as_float(gst_out)},
+        {"account": "Discount Allowed", "debit": _as_float(discounts), "credit": 0.0},
+        {"account": "Sales Returns", "debit": _as_float(returns_amt), "credit": 0.0},
+        {"account": "Cost of Goods Sold", "debit": _as_float(cogs), "credit": 0.0},
+        {"account": "Expenses", "debit": _as_float(expenses), "credit": 0.0},
+        {"account": "Accounts Receivable", "debit": _as_float(receivables), "credit": 0.0},
+    ]
+
+    if payables_net >= 0:
+        rows.append({"account": "Accounts Payable", "debit": 0.0, "credit": _as_float(payables_net)})
+    else:
+        rows.append({"account": "Accounts Payable", "debit": _as_float(-payables_net), "credit": 0.0})
+
+    debit_total = sum(r["debit"] for r in rows)
+    credit_total = sum(r["credit"] for r in rows)
+    diff = debit_total - credit_total
+    if abs(diff) >= 0.01:
+        if diff > 0:
+            rows.append({"account": "Balancing Figure", "debit": 0.0, "credit": _as_float(diff)})
+        else:
+            rows.append({"account": "Balancing Figure", "debit": _as_float(-diff), "credit": 0.0})
+
+    return rows
+
+
+@router.get("/accounting/pnl")
+def accounting_pnl(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t = parse_dates(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+    fin = calc_period_financials(
+        db,
+        shop_id=user.shop_id,
+        branch_id=branch_id,
+        from_dt=f.date(),
+        to_dt=t.date(),
+    )
+
+    return [
+        {"metric": "Sales (Ex GST)", "amount": _as_float(fin.get("sales_ex_tax", 0))},
+        {"metric": "GST Output", "amount": _as_float(fin.get("gst", 0))},
+        {"metric": "Discounts", "amount": _as_float(fin.get("discount", 0))},
+        {"metric": "Returns (Ex GST)", "amount": _as_float(fin.get("returns_sales_ex_tax", 0))},
+        {"metric": "Returns GST", "amount": _as_float(fin.get("returns_tax", 0))},
+        {"metric": "COGS", "amount": _as_float(fin.get("cogs_net", 0))},
+        {"metric": "Expenses", "amount": _as_float(fin.get("expense", 0))},
+        {"metric": "Gross Profit", "amount": _as_float(fin.get("gross_profit", 0))},
+        {"metric": "Net Profit", "amount": _as_float(fin.get("net_profit", 0))},
+    ]
+
+
+@router.get("/accounting/balance-sheet")
+def accounting_balance_sheet(
+    as_of: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not as_of:
+        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+    try:
+        dt = datetime.strptime(as_of, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Invalid as_of date")
+
+    branch_id = _force_branch(branch_id, user)
+    f_anchor = datetime(2000, 1, 1)
+    t_end = datetime.combine(dt.date(), datetime.min.time()) + timedelta(days=1)
+
+    pay_q = (
+        db.query(func.coalesce(func.sum(InvoicePayment.amount), 0))
+        .filter(InvoicePayment.shop_id == user.shop_id)
+        .filter(InvoicePayment.paid_on < t_end)
+    )
+    if branch_id:
+        pay_q = pay_q.filter(InvoicePayment.branch_id == branch_id)
+    receipts = _dec(pay_q.scalar() or 0)
+
+    exp_q = (
+        db.query(func.coalesce(func.sum(BranchExpense.amount), 0))
+        .filter(BranchExpense.shop_id == user.shop_id)
+        .filter(BranchExpense.expense_date <= dt.date())
+    )
+    if branch_id:
+        exp_q = exp_q.filter(BranchExpense.branch_id == branch_id)
+    payouts = _dec(exp_q.scalar() or 0)
+    cash_bank = receipts - payouts
+
+    inv_q = (
+        db.query(
+            func.coalesce(func.sum(func.coalesce(Inventory.quantity, 0) * func.coalesce(Item.buy_price, 0)), 0)
+        )
+        .join(Item, Item.item_id == Inventory.item_id)
+        .filter(Inventory.shop_id == user.shop_id)
+    )
+    if branch_id:
+        inv_q = inv_q.filter(Inventory.branch_id == branch_id)
+    inventory_val = _dec(inv_q.scalar() or 0)
+
+    recv_q = (
+        db.query(func.coalesce(func.sum(func.coalesce(InvoiceDue.original_amount, 0)), 0))
+        .filter(InvoiceDue.shop_id == user.shop_id)
+        .filter(InvoiceDue.status == "OPEN")
+        .filter(InvoiceDue.created_on <= t_end)
+    )
+    if branch_id:
+        recv_q = recv_q.filter(InvoiceDue.branch_id == branch_id)
+    receivables = _dec(recv_q.scalar() or 0)
+
+    payables_q = (
+        db.query(
+            func.coalesce(func.sum(func.coalesce(SupplierLedgerEntry.credit, 0)), 0).label("credit"),
+            func.coalesce(func.sum(func.coalesce(SupplierLedgerEntry.debit, 0)), 0).label("debit"),
+        )
+        .filter(SupplierLedgerEntry.shop_id == user.shop_id)
+        .filter(SupplierLedgerEntry.entry_time < t_end)
+    )
+    if branch_id:
+        payables_q = payables_q.filter(SupplierLedgerEntry.branch_id == branch_id)
+    payables_row = payables_q.first()
+    payables = _dec(getattr(payables_row, "credit", 0)) - _dec(getattr(payables_row, "debit", 0))
+
+    # GST payable (net output - ITC)
+    gst_out_q = (
+        db.query(func.coalesce(func.sum(func.coalesce(Invoice.tax_amt, 0)), 0))
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        gst_out_q = gst_out_q.filter(Invoice.branch_id == branch_id)
+    gst_output = _dec(gst_out_q.scalar() or 0)
+
+    ret_tax_q = (
+        db.query(func.coalesce(func.sum(func.coalesce(SalesReturn.tax_amount, 0)), 0))
+        .filter(SalesReturn.shop_id == user.shop_id)
+        .filter(SalesReturn.status != "CANCELLED")
+        .filter(SalesReturn.created_on < t_end)
+    )
+    if branch_id:
+        ret_tax_q = ret_tax_q.filter(SalesReturn.branch_id == branch_id)
+    gst_output -= _dec(ret_tax_q.scalar() or 0)
+
+    _, itc_totals = _compute_itc_rows(db, user, f_anchor, t_end, branch_id)
+    gst_itc_total = itc_totals["cgst"] + itc_totals["sgst"] + itc_totals["igst"] + itc_totals["cess"]
+    gst_payable = gst_output - gst_itc_total
+
+    assets_total = cash_bank + receivables + inventory_val
+    liabilities_total = Decimal("0.00")
+    rows = [
+        {"head": "Cash & Bank", "type": "Asset", "amount": _as_float(cash_bank)},
+        {"head": "Accounts Receivable", "type": "Asset", "amount": _as_float(receivables)},
+        {"head": "Inventory", "type": "Asset", "amount": _as_float(inventory_val)},
+    ]
+
+    if payables >= 0:
+        rows.append({"head": "Accounts Payable", "type": "Liability", "amount": _as_float(payables)})
+        liabilities_total += payables
+    else:
+        assets_total += -payables
+        rows.append({"head": "Accounts Payable", "type": "Asset", "amount": _as_float(-payables)})
+
+    if gst_payable >= 0:
+        rows.append({"head": "GST Payable", "type": "Liability", "amount": _as_float(gst_payable)})
+        liabilities_total += gst_payable
+    else:
+        rows.append({"head": "GST Credit", "type": "Asset", "amount": _as_float(-gst_payable)})
+        assets_total += -gst_payable
+
+    equity = assets_total - liabilities_total
+    if abs(equity) >= Decimal("0.01"):
+        rows.append({"head": "Equity / Retained", "type": "Liability", "amount": _as_float(equity)})
+
+    return rows
+
+
+@router.get("/recon/payments-gateway")
+def recon_payments_gateway(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+    pay_q = (
+        db.query(
+            InvoicePayment.payment_mode,
+            func.count(InvoicePayment.payment_id).label("txns"),
+            func.coalesce(func.sum(InvoicePayment.amount), 0).label("amount"),
+        )
+        .filter(InvoicePayment.shop_id == user.shop_id)
+        .filter(InvoicePayment.paid_on >= f)
+        .filter(InvoicePayment.paid_on < t_end)
+        .group_by(InvoicePayment.payment_mode)
+    )
+    if branch_id:
+        pay_q = pay_q.filter(InvoicePayment.branch_id == branch_id)
+
+    rows = []
+    for r in pay_q.all():
+        mode = (r.payment_mode or "cash").lower()
+        rows.append(
+            {
+                "gateway": mode.upper(),
+                "transactions": int(r.txns or 0),
+                "amount": _as_float(r.amount),
+            }
+        )
+    return rows
+
+
+@router.get("/recon/stock-valuation")
+def recon_stock_valuation(
+    as_of: str | None = None,
+    method: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not as_of:
+        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+    try:
+        _ = datetime.strptime(as_of, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Invalid as_of date")
+
+    branch_id = _force_branch(branch_id, user)
+    q = (
+        db.query(
+            Item.item_name,
+            Item.hsn_code,
+            Item.buy_price,
+            Inventory.quantity,
+            Inventory.branch_id,
+        )
+        .join(Item, Item.item_id == Inventory.item_id)
+        .filter(Inventory.shop_id == user.shop_id)
+    )
+    if branch_id:
+        q = q.filter(Inventory.branch_id == branch_id)
+
+    rows = []
+    for r in q.all():
+        qty = int(r.quantity or 0)
+        rate = _dec(r.buy_price)
+        valuation = rate * qty
+        rows.append(
+            {
+                "item": r.item_name,
+                "hsn": r.hsn_code or "",
+                "method": (method or "AVG").upper(),
+                "quantity": qty,
+                "rate": _as_float(rate),
+                "valuation": _as_float(valuation),
+            }
+        )
+
+    return rows
+
+
+@router.get("/compliance/e-invoice-status")
+def compliance_e_invoice_status(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    # Default to last 30 days when range not provided
+    if from_date and to_date:
+        f, t_end = parse_dt_range(from_date, to_date)
+    else:
+        today = datetime.utcnow().date()
+        f = datetime.combine(today - timedelta(days=29), datetime.min.time())
+        t_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+
+    branch_id = _force_branch(branch_id, user)
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    gst_enabled = bool(getattr(shop, "gst_enabled", False))
+
+    has_supply_type = _has_column(db, "invoice", "supply_type")
+    q = (
+        db.query(
+            Invoice.invoice_number,
+            Invoice.created_time,
+            Invoice.customer_name,
+            Invoice.gst_number,
+            Invoice.total_amount,
+            Invoice.discounted_amt,
+            (Invoice.supply_type if has_supply_type else literal(None)).label("supply_type"),
+        )
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        q = q.filter(Invoice.branch_id == branch_id)
+
+    rows = []
+    for r in q.all():
+        total_val = _dec(r.total_amount) - _dec(r.discounted_amt)
+        required = gst_enabled and (r.supply_type or "B2C").upper() == "B2B" and total_val >= 50000
+        status = "PENDING" if required else "NOT REQUIRED"
+        rows.append(
+            {
+                "invoice_date": r.created_time.strftime("%d %b %Y"),
+                "invoice_number": r.invoice_number,
+                "customer": r.customer_name or "",
+                "gstin": r.gst_number or "",
+                "total_value": _as_float(total_val),
+                "status": status,
+            }
+        )
+
+    return rows
+
+
+@router.get("/compliance/e-waybill-status")
+def compliance_e_waybill_status(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if from_date and to_date:
+        f, t_end = parse_dt_range(from_date, to_date)
+    else:
+        today = datetime.utcnow().date()
+        f = datetime.combine(today - timedelta(days=29), datetime.min.time())
+        t_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+
+    branch_id = _force_branch(branch_id, user)
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    shop_state = getattr(shop, "state", None)
+
+    has_pos = _has_column(db, "invoice", "place_of_supply")
+    q = (
+        db.query(
+            Invoice.invoice_number,
+            Invoice.created_time,
+            Invoice.customer_name,
+            Invoice.gst_number,
+            Invoice.total_amount,
+            Invoice.discounted_amt,
+            (Invoice.place_of_supply if has_pos else literal(None)).label("place_of_supply"),
+            Branch.state.label("branch_state"),
+        )
+        .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        q = q.filter(Invoice.branch_id == branch_id)
+
+    rows = []
+    for r in q.all():
+        total_val = _dec(r.total_amount) - _dec(r.discounted_amt)
+        supply_state = r.place_of_supply or r.branch_state or shop_state
+        interstate = not _state_eq(supply_state, shop_state)
+        required = interstate and total_val >= 50000
+        status = "PENDING" if required else "NOT REQUIRED"
+        rows.append(
+            {
+                "invoice_date": r.created_time.strftime("%d %b %Y"),
+                "invoice_number": r.invoice_number,
+                "customer": r.customer_name or "",
+                "gstin": r.gst_number or "",
+                "total_value": _as_float(total_val),
+                "status": status,
+            }
+        )
+
+    return rows
+
+
+@router.get("/compliance/tds-vendor-payments")
+def compliance_tds_vendor_payments(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    q = (
+        db.query(
+            SupplierLedgerEntry.entry_time,
+            SupplierLedgerEntry.debit,
+            SupplierLedgerEntry.credit,
+            SupplierLedgerEntry.reference_no,
+            Supplier.supplier_name,
+        )
+        .join(Supplier, Supplier.supplier_id == SupplierLedgerEntry.supplier_id)
+        .filter(SupplierLedgerEntry.shop_id == user.shop_id)
+        .filter(SupplierLedgerEntry.entry_type == "PAYMENT")
+        .filter(SupplierLedgerEntry.entry_time >= f)
+        .filter(SupplierLedgerEntry.entry_time < t_end)
+    )
+    if branch_id:
+        q = q.filter(SupplierLedgerEntry.branch_id == branch_id)
+
+    rows = []
+    for r in q.all():
+        amt = _dec(r.debit or r.credit)
+        tds_amt = _q(amt * Decimal("0.01"))
+        rows.append(
+            {
+                "payment_date": r.entry_time.strftime("%d %b %Y"),
+                "supplier": r.supplier_name or "",
+                "reference": r.reference_no or "",
+                "amount": _as_float(amt),
+                "tds_amount": _as_float(tds_amt),
+            }
+        )
+
+    return rows
+
+
+@router.get("/compliance/tcs-sales")
+def compliance_tcs_sales(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    if not from_date or not to_date:
+        raise HTTPException(400, "from_date and to_date are required")
+
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    q = (
+        db.query(
+            Invoice.invoice_number,
+            Invoice.created_time,
+            Invoice.customer_name,
+            Invoice.gst_number,
+            Invoice.total_amount,
+            Invoice.discounted_amt,
+        )
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+    )
+    if branch_id:
+        q = q.filter(Invoice.branch_id == branch_id)
+
+    rows = []
+    for r in q.all():
+        total_val = _dec(r.total_amount) - _dec(r.discounted_amt)
+        if r.gst_number:
+            continue
+        if total_val < 50000:
+            continue
+        tcs_amt = _q(total_val * Decimal("0.001"))
+        rows.append(
+            {
+                "invoice_date": r.created_time.strftime("%d %b %Y"),
+                "invoice_number": r.invoice_number,
+                "customer": r.customer_name or "",
+                "total_value": _as_float(total_val),
+                "tcs_amount": _as_float(tcs_amt),
+            }
+        )
+
+    return rows

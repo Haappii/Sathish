@@ -27,7 +27,10 @@ def _resolve_branch(branch_id: int | None, user):
     role = str(getattr(user, "role_name", "") or "").lower()
     if role == "admin":
         return int(branch_id) if branch_id is not None else None
-    return int(user.branch_id)
+    try:
+        return int(user.branch_id)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
 
 
 def _build_due_summary(db: Session, due: InvoiceDue) -> DueSummary:

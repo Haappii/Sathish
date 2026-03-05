@@ -36,6 +36,7 @@ import {
   FaCloudUploadAlt,
   FaTools,
   FaStar,
+  FaChevronDown,
 } from "react-icons/fa";
 
 const COLORS = [
@@ -141,6 +142,8 @@ export default function Home() {
     note: "",
   });
   const [expandedGroup, setExpandedGroup] = useState(null);
+  const [branchSalesOpen, setBranchSalesOpen] = useState(true);
+  const [categorySalesOpen, setCategorySalesOpen] = useState(true);
 
   const hasValidCustomRange =
     reportMode !== "custom" || Boolean(fromDate && toDate);
@@ -656,10 +659,22 @@ export default function Home() {
           {/* Branch Sales */}
           {isAdmin && (
             <div className="bg-white rounded-2xl shadow-sm border p-5">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  Branch Sales
-                </h3>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setBranchSalesOpen((v) => !v)}
+                  className="flex items-center gap-2 text-left"
+                  aria-expanded={branchSalesOpen}
+                >
+                  <h3 className="text-sm font-semibold text-gray-700">
+                    Branch Sales
+                  </h3>
+                  <FaChevronDown
+                    className={`text-gray-500 transition-transform ${
+                      branchSalesOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
                 <button
                   onClick={handleAllBranchesClick}
                   className={`px-2 py-1 text-[11px] rounded border transition ${
@@ -671,66 +686,186 @@ export default function Home() {
                   All Branches
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mb-3">
-                Category filter: {selectedCategoryBranchName}
-              </p>
-
-              {branchSales.length === 0 ? (
-                <p className="text-xs text-gray-500">
-                  No branch sales for selected range.
-                </p>
-              ) : (
+              {branchSalesOpen && (
                 <>
-                  <div className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={branchSales}
-                          dataKey="total_sales"
-                          nameKey="branch_name"
-                          innerRadius={40}
-                          outerRadius={80}
-                        >
-                          {branchSales.map((row, i) => (
-                            <Cell
-                              key={i}
-                              fill={COLORS[i % COLORS.length]}
-                              style={{ cursor: "pointer" }}
-                              onClick={() => handleBranchSalesClick(row, i)}
-                              stroke={
-                                String(row?.branch_id ?? "") ===
-                                String(selectedCategoryBranchId ?? "")
-                                  ? "#111827"
-                                  : "#ffffff"
-                              }
-                              strokeWidth={
-                                String(row?.branch_id ?? "") ===
-                                String(selectedCategoryBranchId ?? "")
-                                  ? 2
-                                  : 1
-                              }
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(v) => `Rs. ${v}`} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Category filter: {selectedCategoryBranchName}
+                  </p>
 
-                  <div className="mt-3 border-t pt-2">
-                    <div className="text-xs font-semibold text-gray-600 mb-2">
-                      Branch Names
-                    </div>
+                  {branchSales.length === 0 ? (
+                    <p className="text-xs text-gray-500">
+                      No branch sales for selected range.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={branchSales}
+                              dataKey="total_sales"
+                              nameKey="branch_name"
+                              innerRadius={40}
+                              outerRadius={80}
+                            >
+                              {branchSales.map((row, i) => (
+                                <Cell
+                                  key={i}
+                                  fill={COLORS[i % COLORS.length]}
+                                  style={{ cursor: "pointer" }}
+                                  onClick={() => handleBranchSalesClick(row, i)}
+                                  stroke={
+                                    String(row?.branch_id ?? "") ===
+                                    String(selectedCategoryBranchId ?? "")
+                                      ? "#111827"
+                                      : "#ffffff"
+                                  }
+                                  strokeWidth={
+                                    String(row?.branch_id ?? "") ===
+                                    String(selectedCategoryBranchId ?? "")
+                                      ? 2
+                                      : 1
+                                  }
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(v) => `Rs. ${v}`} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      <div className="mt-3 border-t pt-2">
+                        <div className="text-xs font-semibold text-gray-600 mb-2">
+                          Branch Names
+                        </div>
+                        <div className="max-h-32 overflow-auto space-y-1">
+                          {branchSales.map((row, i) => {
+                            const isSelected =
+                              String(row?.branch_id ?? "") ===
+                              String(selectedCategoryBranchId ?? "");
+
+                            return (
+                              <button
+                                key={`branch-name-${row?.branch_id ?? i}`}
+                                onClick={() => handleBranchSalesClick(row, i)}
+                                className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                }`}
+                              >
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full flex-none"
+                                    style={{
+                                      backgroundColor: COLORS[i % COLORS.length],
+                                    }}
+                                  />
+                                  <span className="truncate">
+                                    {row?.branch_name ||
+                                      (row?.branch_id != null
+                                        ? `Branch ${row.branch_id}`
+                                        : "-")}
+                                  </span>
+                                </span>
+                                <span className="font-medium flex-none">
+                                  Rs. {Number(row?.total_sales || 0).toFixed(2)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Category Sales */}
+          <div className="bg-white rounded-2xl shadow-sm border p-5">
+            <div className="flex items-center justify-between mb-2">
+              <button
+                type="button"
+                onClick={() => setCategorySalesOpen((v) => !v)}
+                className="flex items-center gap-2 text-left"
+                aria-expanded={categorySalesOpen}
+              >
+                <h3 className="text-sm font-semibold text-gray-700">
+                  Category Sales
+                </h3>
+                <FaChevronDown
+                  className={`text-gray-500 transition-transform ${
+                    categorySalesOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
+
+            {categorySalesOpen && (
+              <>
+                {isAdmin && (
+                  <p className="text-xs text-gray-500 -mt-2 mb-3">
+                    Filtered by: {selectedCategoryBranchName}
+                  </p>
+                )}
+
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categorySales}
+                        dataKey="total_sales"
+                        nameKey="category_name"
+                        innerRadius={40}
+                        outerRadius={80}
+                      >
+                        {categorySales.map((row, i) => (
+                          <Cell
+                            key={i}
+                            fill={COLORS[i % COLORS.length]}
+                            style={{ cursor: "pointer" }}
+                            onClick={() => handleCategorySalesClick(row, i)}
+                            stroke={
+                              String(row?.category_id ?? "") ===
+                              String(selectedCategory?.category_id ?? "")
+                                ? "#111827"
+                                : "#ffffff"
+                            }
+                            strokeWidth={
+                              String(row?.category_id ?? "") ===
+                              String(selectedCategory?.category_id ?? "")
+                                ? 2
+                                : 1
+                            }
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => `Rs. ${v}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-3 border-t pt-2">
+                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                    Category Names
+                  </div>
+                  {categorySales.length === 0 ? (
+                    <p className="text-xs text-gray-500">
+                      No category sales for selected range.
+                    </p>
+                  ) : (
                     <div className="max-h-32 overflow-auto space-y-1">
-                      {branchSales.map((row, i) => {
+                      {categorySales.map((row, i) => {
                         const isSelected =
-                          String(row?.branch_id ?? "") ===
-                          String(selectedCategoryBranchId ?? "");
+                          String(row?.category_id ?? "") ===
+                          String(selectedCategory?.category_id ?? "");
 
                         return (
                           <button
-                            key={`branch-name-${row?.branch_id ?? i}`}
-                            onClick={() => handleBranchSalesClick(row, i)}
+                            key={`cat-name-${row?.category_id ?? i}`}
+                            onClick={() => handleCategorySalesClick(row, i)}
                             className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
                               isSelected
                                 ? "border-indigo-500 bg-indigo-50 text-indigo-700"
@@ -745,10 +880,7 @@ export default function Home() {
                                 }}
                               />
                               <span className="truncate">
-                                {row?.branch_name ||
-                                  (row?.branch_id != null
-                                    ? `Branch ${row.branch_id}`
-                                    : "-")}
+                                {row?.category_name || "-"}
                               </span>
                             </span>
                             <span className="font-medium flex-none">
@@ -758,189 +890,95 @@ export default function Home() {
                         );
                       })}
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Category Sales */}
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">
-              Category Sales
-            </h3>
-            {isAdmin && (
-              <p className="text-xs text-gray-500 -mt-2 mb-3">
-                Filtered by: {selectedCategoryBranchName}
-              </p>
-            )}
-
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categorySales}
-                    dataKey="total_sales"
-                    nameKey="category_name"
-                    innerRadius={40}
-                    outerRadius={80}
-                  >
-                    {categorySales.map((row, i) => (
-                      <Cell
-                        key={i}
-                        fill={COLORS[i % COLORS.length]}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => handleCategorySalesClick(row, i)}
-                        stroke={
-                          String(row?.category_id ?? "") ===
-                          String(selectedCategory?.category_id ?? "")
-                            ? "#111827"
-                            : "#ffffff"
-                        }
-                        strokeWidth={
-                          String(row?.category_id ?? "") ===
-                          String(selectedCategory?.category_id ?? "")
-                            ? 2
-                            : 1
-                        }
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => `Rs. ${v}`} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="mt-3 border-t pt-2">
-              <div className="text-xs font-semibold text-gray-600 mb-2">
-                Category Names
-              </div>
-              {categorySales.length === 0 ? (
-                <p className="text-xs text-gray-500">
-                  No category sales for selected range.
-                </p>
-              ) : (
-                <div className="max-h-32 overflow-auto space-y-1">
-                  {categorySales.map((row, i) => {
-                    const isSelected =
-                      String(row?.category_id ?? "") ===
-                      String(selectedCategory?.category_id ?? "");
-
-                    return (
-                      <button
-                        key={`cat-name-${row?.category_id ?? i}`}
-                        onClick={() => handleCategorySalesClick(row, i)}
-                        className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
-                          isSelected
-                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full flex-none"
-                            style={{
-                              backgroundColor: COLORS[i % COLORS.length],
-                            }}
-                          />
-                          <span className="truncate">
-                            {row?.category_name || "-"}
-                          </span>
-                        </span>
-                        <span className="font-medium flex-none">
-                          Rs. {Number(row?.total_sales || 0).toFixed(2)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {selectedCategory && (
-              <div className="mt-4 rounded-xl border bg-gray-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs text-gray-500">
-                      Selected Category
-                    </div>
-                    <div className="text-sm font-semibold text-gray-800">
-                      {selectedCategory.category_name}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      Sales: Rs.{" "}
-                      {Number(selectedCategory?.total_sales || 0).toFixed(2)}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      Total Items Sold: {selectedCategoryItemsSold}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      setCategoryItemDetails([]);
-                    }}
-                    className="text-[11px] text-red-600 hover:text-red-700"
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                <div className="mt-3 border-t pt-2">
-                  <div className="text-xs font-semibold text-gray-600 mb-2">
-                    Item-wise Quantity
-                  </div>
-
-                  {categoryItemsLoading ? (
-                    <p className="text-xs text-gray-500">Loading...</p>
-                  ) : categoryItemDetails.length === 0 ? (
-                    <p className="text-xs text-gray-500">
-                      No item sales found for this category.
-                    </p>
-                  ) : (
-                    <div className="max-h-36 overflow-auto divide-y">
-                      {categoryItemDetails.map((item, idx) => {
-                        const rawAmount =
-                          item?.total_sales ??
-                          item?.total_amount ??
-                          item?.total_amt ??
-                          item?.amount ??
-                          item?.total_price ??
-                          item?.total_value ??
-                          null;
-
-                        const amountNumber =
-                          rawAmount == null || rawAmount === ""
-                            ? null
-                            : Number(rawAmount);
-
-                        return (
-                          <div
-                            key={`${item?.item_name || "item"}-${idx}`}
-                            className="py-1.5 flex items-start justify-between gap-2 text-xs"
-                          >
-                            <span className="truncate pr-2">
-                              {item?.item_name || "-"}
-                            </span>
-
-                            <span className="flex flex-col items-end flex-none leading-tight">
-                              <span className="font-semibold">
-                                {Number(item?.total_qty || 0)}
-                              </span>
-                              <span className="text-[11px] text-gray-600">
-                                {amountNumber == null || Number.isNaN(amountNumber)
-                                  ? "Rs. -"
-                                  : `Rs. ${amountNumber.toFixed(2)}`}
-                              </span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
                   )}
                 </div>
-              </div>
+
+                {selectedCategory && (
+                  <div className="mt-4 rounded-xl border bg-gray-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-xs text-gray-500">
+                          Selected Category
+                        </div>
+                        <div className="text-sm font-semibold text-gray-800">
+                          {selectedCategory.category_name}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          Sales: Rs.{" "}
+                          {Number(selectedCategory?.total_sales || 0).toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          Total Items Sold: {selectedCategoryItemsSold}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedCategory(null);
+                          setCategoryItemDetails([]);
+                        }}
+                        className="text-[11px] text-red-600 hover:text-red-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="mt-3 border-t pt-2">
+                      <div className="text-xs font-semibold text-gray-600 mb-2">
+                        Item-wise Quantity
+                      </div>
+
+                      {categoryItemsLoading ? (
+                        <p className="text-xs text-gray-500">Loading...</p>
+                      ) : categoryItemDetails.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                          No item sales found for this category.
+                        </p>
+                      ) : (
+                        <div className="max-h-36 overflow-auto divide-y">
+                          {categoryItemDetails.map((item, idx) => {
+                            const rawAmount =
+                              item?.total_sales ??
+                              item?.total_amount ??
+                              item?.total_amt ??
+                              item?.amount ??
+                              item?.total_price ??
+                              item?.total_value ??
+                              null;
+
+                            const amountNumber =
+                              rawAmount == null || rawAmount === ""
+                                ? null
+                                : Number(rawAmount);
+
+                            return (
+                              <div
+                                key={`${item?.item_name || "item"}-${idx}`}
+                                className="py-1.5 flex items-start justify-between gap-2 text-xs"
+                              >
+                                <span className="truncate pr-2">
+                                  {item?.item_name || "-"}
+                                </span>
+
+                                <span className="flex flex-col items-end flex-none leading-tight">
+                                  <span className="font-semibold">
+                                    {Number(item?.total_qty || 0)}
+                                  </span>
+                                  <span className="text-[11px] text-gray-600">
+                                    {amountNumber == null || Number.isNaN(amountNumber)
+                                      ? "Rs. -"
+                                      : `Rs. ${amountNumber.toFixed(2)}`}
+                                  </span>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

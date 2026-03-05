@@ -179,204 +179,169 @@ export default function ShopDetails() {
 
   if (loading) return <div className="p-6">Loading…</div>;
 
+  const SummaryPill = ({ label, value, tone = "gray" }) => {
+    const tones = {
+      blue: "bg-blue-50 text-blue-700 border-blue-100",
+      amber: "bg-amber-50 text-amber-700 border-amber-100",
+      green: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      gray: "bg-slate-50 text-slate-700 border-slate-100",
+    };
+    return (
+      <div className={`px-3 py-2 rounded-xl border text-xs font-semibold ${tones[tone] || tones.gray}`}>
+        <div className="text-[11px] uppercase tracking-wide opacity-70">{label}</div>
+        <div className="text-sm">{value}</div>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-4">
-
-      <div className="flex items-center gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
         <BackButton />
-
-        <h2 className="text-2xl font-bold">
-          Shop Management
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold">Shop Management</h2>
+          <p className="text-sm text-gray-500">Edit branding, address, tax, and integrations in one place.</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryPill label="Business Type" value={String(form.billing_type || "").toLowerCase() === "hotel" ? "Hotel / Restaurant" : "Store / Retail"} tone="blue" />
+        <SummaryPill label="GST" value={form.gst_enabled ? `Enabled • ${form.gst_percent || 0}%` : "Disabled"} tone="amber" />
+        <SummaryPill label="Inventory" value={form.inventory_enabled ? `On (${String(form.inventory_cost_method || "LAST").toUpperCase()})` : "Off"} tone="green" />
+        <SummaryPill label="Online Orders" value={form.online_orders_auto_accept ? "Auto-accept ON" : "Manual accept"} />
+      </div>
 
-        {/* LEFT PANEL */}
-        <div className="border rounded-2xl bg-white p-6 space-y-3">
-
-          <Field label="Shop Logo">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-16 rounded-xl border bg-gray-50 overflow-hidden flex items-center justify-center">
+      <div className="grid xl:grid-cols-[1.15fr,0.85fr] gap-5">
+        <div className="space-y-4">
+          <section className="bg-white shadow-sm border rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Identity</h3>
+              <span className="text-xs text-gray-400">Brand + contact</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="w-20 h-20 rounded-xl border bg-gray-50 overflow-hidden flex items-center justify-center">
                 <img
                   src={currentLogoSrc}
                   alt="Shop Logo"
                   className="w-full h-full object-cover"
-                  onError={e => { e.currentTarget.src = defaultLogo; }}
+                  onError={(e) => {
+                    e.currentTarget.src = defaultLogo;
+                  }}
                 />
               </div>
-
-              <div className="flex-1">
+              <div className="flex-1 min-w-[220px] space-y-2">
                 <input
                   type="file"
                   accept="image/png,image/jpeg"
                   className={input}
                   onChange={handleLogoChange}
                 />
-                <div className="text-[11px] text-gray-500 mt-1">
-                  PNG / JPG / JPEG
-                </div>
+                <div className="text-[11px] text-gray-500">PNG / JPG / JPEG</div>
               </div>
             </div>
-          </Field>
 
-          <Field label="Shop Name">
-            <input
-              className={input}
-              value={form.shop_name}
-              onChange={e => setField("shop_name", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Owner Name">
-            <input
-              className={input}
-              value={form.owner_name}
-              onChange={e => setField("owner_name", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Mobile Number">
-            <input
-              className={input}
-              value={form.mobile}
-              onChange={e => setField("mobile", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Email ID">
-            <input
-              className={input}
-              value={form.mailid}
-              onChange={e => setField("mailid", e.target.value)}
-            />
-          </Field>
-
-          {/* Business Type */}
-          <Field label="Business Type">
-            <div className="text-sm text-gray-700">
-              {String(form.billing_type || "").toLowerCase() === "hotel"
-                ? "Hotel / Restaurant"
-                : "Store / Retail"}
+            <div className="grid md:grid-cols-2 gap-3">
+              <Field label="Shop Name">
+                <input className={input} value={form.shop_name} onChange={(e) => setField("shop_name", e.target.value)} />
+              </Field>
+              <Field label="Owner Name">
+                <input className={input} value={form.owner_name} onChange={(e) => setField("owner_name", e.target.value)} />
+              </Field>
+              <Field label="Mobile Number">
+                <input className={input} value={form.mobile} onChange={(e) => setField("mobile", e.target.value)} />
+              </Field>
+              <Field label="Email ID">
+                <input className={input} value={form.mailid} onChange={(e) => setField("mailid", e.target.value)} />
+              </Field>
             </div>
-          </Field>
+          </section>
 
+          <section className="bg-white shadow-sm border rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Address</h3>
+              <span className="text-xs text-gray-400">Location details</span>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <Field label="Address Line 1">
+                <input className={input} value={form.address_line1} onChange={(e) => setField("address_line1", e.target.value)} />
+              </Field>
+              <Field label="Address Line 2">
+                <input className={input} value={form.address_line2} onChange={(e) => setField("address_line2", e.target.value)} />
+              </Field>
+              <Field label="Address Line 3">
+                <input className={input} value={form.address_line3} onChange={(e) => setField("address_line3", e.target.value)} />
+              </Field>
+              <Field label="City">
+                <input className={input} value={form.city} onChange={(e) => setField("city", e.target.value)} />
+              </Field>
+              <Field label="State">
+                <input className={input} value={form.state} onChange={(e) => setField("state", e.target.value)} />
+              </Field>
+              <Field label="Pincode">
+                <input className={input} value={form.pincode} onChange={(e) => setField("pincode", e.target.value)} />
+              </Field>
+            </div>
+          </section>
+
+          <section className="bg-white shadow-sm border rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">GST & Taxes</h3>
+              <span className="text-xs text-gray-400">Fiscal settings</span>
+            </div>
+            <Field label="GST Enabled">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={form.gst_enabled} onChange={(e) => setField("gst_enabled", e.target.checked)} />
+                Enable GST
+              </label>
+            </Field>
+            {form.gst_enabled && (
+              <div className="grid md:grid-cols-3 gap-3">
+                <Field label="GST Number">
+                  <input className={input} value={form.gst_number} onChange={(e) => setField("gst_number", e.target.value)} />
+                </Field>
+                <Field label="GST %">
+                  <input
+                    type="number"
+                    className={input}
+                    value={form.gst_percent}
+                    onChange={(e) => setField("gst_percent", e.target.value)}
+                  />
+                </Field>
+                <Field label="GST Mode">
+                  <select className={input} value={form.gst_mode} onChange={(e) => setField("gst_mode", e.target.value)}>
+                    <option value="inclusive">Price Includes GST</option>
+                    <option value="exclusive">Add GST on Top</option>
+                  </select>
+                </Field>
+              </div>
+            )}
+          </section>
         </div>
 
-        {/* RIGHT PANEL */}
-        <div className="border rounded-2xl bg-white p-6 space-y-3">
+        <div className="space-y-4">
+          <section className="bg-white shadow-sm border rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Inventory & Orders</h3>
+              <span className="text-xs text-gray-400">Control toggles</span>
+            </div>
+            <Field label="Inventory Mode">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.inventory_enabled ? "YES" : "NO"}
+                onChange={(e) => setField("inventory_enabled", e.target.value === "YES")}
+              >
+                <option value="NO">Disabled</option>
+                <option value="YES">Enabled</option>
+              </select>
+            </Field>
 
-          <Field label="Address Line 1">
-            <input
-              className={input}
-              value={form.address_line1}
-              onChange={e => setField("address_line1", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Address Line 2">
-            <input
-              className={input}
-              value={form.address_line2}
-              onChange={e => setField("address_line2", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Address Line 3">
-            <input
-              className={input}
-              value={form.address_line3}
-              onChange={e => setField("address_line3", e.target.value)}
-            />
-          </Field>
-
-          <Field label="City">
-            <input
-              className={input}
-              value={form.city}
-              onChange={e => setField("city", e.target.value)}
-            />
-          </Field>
-
-          <Field label="State">
-            <input
-              className={input}
-              value={form.state}
-              onChange={e => setField("state", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Pincode">
-            <input
-              className={input}
-              value={form.pincode}
-              onChange={e => setField("pincode", e.target.value)}
-            />
-          </Field>
-
-          {/* GST Section */}
-          <Field label="GST Enabled">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.gst_enabled}
-                onChange={e => setField("gst_enabled", e.target.checked)}
-              />
-              Enable GST
-            </label>
-          </Field>
-
-          {form.gst_enabled && (
-            <>
-              <Field label="GST Number">
-                <input
-                  className={input}
-                  value={form.gst_number}
-                  onChange={e => setField("gst_number", e.target.value)}
-                />
-              </Field>
-
-              <Field label="GST %">
-                <input
-                  type="number"
-                  className={input}
-                  value={form.gst_percent}
-                  onChange={e => setField("gst_percent", e.target.value)}
-                />
-              </Field>
-
-              <Field label="GST Mode">
-                <select
-                  className={input}
-                  value={form.gst_mode}
-                  onChange={e => setField("gst_mode", e.target.value)}
-                >
-                  <option value="inclusive">Price Includes GST</option>
-                  <option value="exclusive">Add GST on Top</option>
-                </select>
-              </Field>
-            </>
-          )}
-
-          {/* Inventory Mode */}
-          <Field label="Inventory Mode">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.inventory_enabled ? "YES" : "NO"}
-              onChange={e => setField("inventory_enabled", e.target.value === "YES")}
-            >
-              <option value="NO">Disabled</option>
-              <option value="YES">Enabled</option>
-            </select>
-          </Field>
-
-          <Field label="Inventory Cost Method">
+            <Field label="Inventory Cost Method">
               <select
                 disabled={!isSuperAdmin}
                 className={input}
                 value={String(form.inventory_cost_method || "LAST").toUpperCase()}
-                onChange={e => setField("inventory_cost_method", e.target.value)}
+                onChange={(e) => setField("inventory_cost_method", e.target.value)}
               >
                 <option value="LAST">Last Purchase Cost</option>
                 <option value="WAVG">Weighted Average Cost</option>
@@ -387,197 +352,185 @@ export default function ShopDetails() {
               </div>
             </Field>
 
-          <Field label="Swiggy Partner ID">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.swiggy_partner_id || ""}
-              onChange={e => setField("swiggy_partner_id", e.target.value)}
-            />
-          </Field>
+            <Field label="Swiggy Partner ID">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.swiggy_partner_id || ""}
+                onChange={(e) => setField("swiggy_partner_id", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Zomato Partner ID">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.zomato_partner_id || ""}
-              onChange={e => setField("zomato_partner_id", e.target.value)}
-            />
-          </Field>
+            <Field label="Zomato Partner ID">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.zomato_partner_id || ""}
+                onChange={(e) => setField("zomato_partner_id", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Swiggy Integration">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.swiggy_enabled ? "YES" : "NO"}
-              onChange={e => setField("swiggy_enabled", e.target.value === "YES")}
-            >
-              <option value="NO">Disabled</option>
-              <option value="YES">Enabled</option>
-            </select>
-          </Field>
+            <Field label="Swiggy Integration">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.swiggy_enabled ? "YES" : "NO"}
+                onChange={(e) => setField("swiggy_enabled", e.target.value === "YES")}
+              >
+                <option value="NO">Disabled</option>
+                <option value="YES">Enabled</option>
+              </select>
+            </Field>
 
-          <Field label="Zomato Integration">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.zomato_enabled ? "YES" : "NO"}
-              onChange={e => setField("zomato_enabled", e.target.value === "YES")}
-            >
-              <option value="NO">Disabled</option>
-              <option value="YES">Enabled</option>
-            </select>
-          </Field>
+            <Field label="Zomato Integration">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.zomato_enabled ? "YES" : "NO"}
+                onChange={(e) => setField("zomato_enabled", e.target.value === "YES")}
+              >
+                <option value="NO">Disabled</option>
+                <option value="YES">Enabled</option>
+              </select>
+            </Field>
 
-          <Field label="Auto Accept Online Orders">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.online_orders_auto_accept ? "YES" : "NO"}
-              onChange={e => setField("online_orders_auto_accept", e.target.value === "YES")}
-            >
-              <option value="NO">Disabled</option>
-              <option value="YES">Enabled</option>
-            </select>
-          </Field>
+            <Field label="Auto Accept Online Orders">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.online_orders_auto_accept ? "YES" : "NO"}
+                onChange={(e) => setField("online_orders_auto_accept", e.target.value === "YES")}
+              >
+                <option value="NO">Disabled</option>
+                <option value="YES">Enabled</option>
+              </select>
+            </Field>
 
-          <Field label="Webhook Token">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.online_orders_webhook_token || ""}
-              onChange={e => setField("online_orders_webhook_token", e.target.value)}
-            />
-          </Field>
+            <Field label="Webhook Token">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.online_orders_webhook_token || ""}
+                onChange={(e) => setField("online_orders_webhook_token", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Require HMAC Signature">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.online_orders_signature_required ? "YES" : "NO"}
-              onChange={e => setField("online_orders_signature_required", e.target.value === "YES")}
-            >
-              <option value="NO">No</option>
-              <option value="YES">Yes</option>
-            </select>
-          </Field>
+            <Field label="Require HMAC Signature">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.online_orders_signature_required ? "YES" : "NO"}
+                onChange={(e) => setField("online_orders_signature_required", e.target.value === "YES")}
+              >
+                <option value="NO">No</option>
+                <option value="YES">Yes</option>
+              </select>
+            </Field>
+          </section>
 
-          <Field label="Swiggy Webhook Secret">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.swiggy_webhook_secret || ""}
-              onChange={e => setField("swiggy_webhook_secret", e.target.value)}
-            />
-          </Field>
+          <section className="bg-white shadow-sm border rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Webhook & Sync</h3>
+              <span className="text-xs text-gray-400">Status sync options</span>
+            </div>
+            <Field label="Status Sync Enabled">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.online_orders_status_sync_enabled ? "YES" : "NO"}
+                onChange={(e) => setField("online_orders_status_sync_enabled", e.target.value === "YES")}
+              >
+                <option value="YES">Enabled</option>
+                <option value="NO">Disabled</option>
+              </select>
+            </Field>
 
-          <Field label="Zomato Webhook Secret">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.zomato_webhook_secret || ""}
-              onChange={e => setField("zomato_webhook_secret", e.target.value)}
-            />
-          </Field>
+            <Field label="Status Sync Strict Mode">
+              <select
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.online_orders_status_sync_strict ? "YES" : "NO"}
+                onChange={(e) => setField("online_orders_status_sync_strict", e.target.value === "YES")}
+              >
+                <option value="NO">No</option>
+                <option value="YES">Yes</option>
+              </select>
+            </Field>
 
-          <Field label="Status Sync Enabled">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.online_orders_status_sync_enabled ? "YES" : "NO"}
-              onChange={e => setField("online_orders_status_sync_enabled", e.target.value === "YES")}
-            >
-              <option value="YES">Enabled</option>
-              <option value="NO">Disabled</option>
-            </select>
-          </Field>
+            <Field label="Status Sync Timeout (sec)">
+              <input
+                disabled={!isSuperAdmin}
+                type="number"
+                min="3"
+                max="30"
+                className={input}
+                value={form.online_orders_status_sync_timeout_sec || 8}
+                onChange={(e) => setField("online_orders_status_sync_timeout_sec", Number(e.target.value || 8))}
+              />
+            </Field>
 
-          <Field label="Status Sync Strict Mode">
-            <select
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.online_orders_status_sync_strict ? "YES" : "NO"}
-              onChange={e => setField("online_orders_status_sync_strict", e.target.value === "YES")}
-            >
-              <option value="NO">No</option>
-              <option value="YES">Yes</option>
-            </select>
-          </Field>
+            <Field label="Swiggy Status Sync URL">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.swiggy_status_sync_url || ""}
+                onChange={(e) => setField("swiggy_status_sync_url", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Status Sync Timeout (sec)">
-            <input
-              disabled={!isSuperAdmin}
-              type="number"
-              min="3"
-              max="30"
-              className={input}
-              value={form.online_orders_status_sync_timeout_sec || 8}
-              onChange={e => setField("online_orders_status_sync_timeout_sec", Number(e.target.value || 8))}
-            />
-          </Field>
+            <Field label="Swiggy Status Sync Token">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.swiggy_status_sync_token || ""}
+                onChange={(e) => setField("swiggy_status_sync_token", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Swiggy Status Sync URL">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.swiggy_status_sync_url || ""}
-              onChange={e => setField("swiggy_status_sync_url", e.target.value)}
-            />
-          </Field>
+            <Field label="Swiggy Status Sync Secret">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.swiggy_status_sync_secret || ""}
+                onChange={(e) => setField("swiggy_status_sync_secret", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Swiggy Status Sync Token">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.swiggy_status_sync_token || ""}
-              onChange={e => setField("swiggy_status_sync_token", e.target.value)}
-            />
-          </Field>
+            <Field label="Zomato Status Sync URL">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.zomato_status_sync_url || ""}
+                onChange={(e) => setField("zomato_status_sync_url", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Swiggy Status Sync Secret">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.swiggy_status_sync_secret || ""}
-              onChange={e => setField("swiggy_status_sync_secret", e.target.value)}
-            />
-          </Field>
+            <Field label="Zomato Status Sync Token">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.zomato_status_sync_token || ""}
+                onChange={(e) => setField("zomato_status_sync_token", e.target.value)}
+              />
+            </Field>
 
-          <Field label="Zomato Status Sync URL">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.zomato_status_sync_url || ""}
-              onChange={e => setField("zomato_status_sync_url", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Zomato Status Sync Token">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.zomato_status_sync_token || ""}
-              onChange={e => setField("zomato_status_sync_token", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Zomato Status Sync Secret">
-            <input
-              disabled={!isSuperAdmin}
-              className={input}
-              value={form.zomato_status_sync_secret || ""}
-              onChange={e => setField("zomato_status_sync_secret", e.target.value)}
-            />
-          </Field>
+            <Field label="Zomato Status Sync Secret">
+              <input
+                disabled={!isSuperAdmin}
+                className={input}
+                value={form.zomato_status_sync_secret || ""}
+                onChange={(e) => setField("zomato_status_sync_secret", e.target.value)}
+              />
+            </Field>
+          </section>
 
           <button
             onClick={saveShop}
             disabled={saving}
-            className="w-full py-3 rounded-xl bg-blue-600 text-white"
+            className="w-full py-3 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-100"
           >
             {saving ? "Saving…" : "Save Changes"}
           </button>
-
         </div>
       </div>
     </div>

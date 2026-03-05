@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, ForeignKey, Float, Numeric
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db import Base
@@ -9,9 +9,12 @@ class Item(Base):
 
     item_id = Column(Integer, primary_key=True, index=True)
     shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)
+    branch_id = Column(Integer, ForeignKey("branch.branch_id"), nullable=True)
     category_id = Column(Integer, ForeignKey("category.category_id"), nullable=False)
 
     item_name = Column(String(150), nullable=False)
+    hsn_code = Column(String(30), nullable=True)
+    gst_rate = Column(Numeric(5, 2), nullable=False, default=0)
     price = Column(Float, nullable=False, default=0)  # selling price
     buy_price = Column(Float, nullable=False, default=0)
     mrp_price = Column(Float, nullable=False, default=0)

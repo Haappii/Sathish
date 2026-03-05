@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 
 from app.db import get_db
@@ -10,6 +10,8 @@ from app.models.invoice_details import InvoiceDetail
 from app.models.items import Item
 from app.models.invoice_archive import InvoiceArchive
 from app.models.shop_details import ShopDetails
+from app.models.customer import Customer
+from app.models.branch import Branch
 
 from app.schemas.invoice import (
     InvoiceCreate,
@@ -42,6 +44,7 @@ from app.services.wallet_service import (
     get_wallet_balance,
     as_money as wallet_money,
 )
+from app.utils.shop_type import get_shop_billing_type
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -56,6 +59,23 @@ def resolve_branch(user, override_branch=None):
 
     try:
         return int(branch_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Branch required")
+
+
+def resolve_branch_optional(user, override_branch=None) -> int | None:
+    """Admins can see all branches when no override is passed; others are restricted to their branch."""
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        if override_branch in (None, ""):
+            return None  # all branches
+        try:
+            return int(override_branch)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
+    # non-admin
+    try:
+        return int(getattr(user, "branch_id", None))
     except (TypeError, ValueError):
         raise HTTPException(400, "Branch required")
 
@@ -142,6 +162,30 @@ def create_invoice(
         subtotal += Decimal(it.amount)
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    branch_row = (
+        db.query(Branch).filter(Branch.branch_id == branch_id).first()
+        if branch_id is not None
+        else None
+    )
+    existing_customer = None
+    if payload.mobile:
+        existing_customer = (
+            db.query(Customer)
+            .filter(
+                Customer.shop_id == user.shop_id,
+                Customer.mobile == payload.mobile,
+            )
+            .first()
+        )
+    customer_state = getattr(existing_customer, "state", None)
+    place_of_supply = (
+        (customer_state or None)
+        or (branch_row.state if branch_row and branch_row.state else None)
+        or (shop.state if shop else None)
+    )
+    supply_type = "B2B" if (payload.customer_gst or "").strip() else "B2C"
+    reverse_charge = False
+
     tax, total = calculate_gst(subtotal, shop)
     payable = total - Decimal(str(payload.discounted_amt or 0))
     if payable < 0:
@@ -150,6 +194,12 @@ def create_invoice(
     gift_code, gift_amt = _extract_gift_card_payment(payload)
     wallet_mobile, wallet_amt = _extract_wallet_payment(payload)
     pay_mode = (payload.payment_mode or "cash").strip().lower()
+
+    # Basic GSTIN format sanity (15 chars, alnum)
+    if payload.customer_gst:
+        gstin = payload.customer_gst.strip().upper()
+        if len(gstin) != 15 or not gstin.isalnum():
+            raise HTTPException(400, "Invalid GST number format")
 
     if pay_mode == "gift_card" and gift_amt <= 0:
         raise HTTPException(400, "Gift card amount required")
@@ -202,6 +252,9 @@ def create_invoice(
         customer_name=payload.customer_name,
         mobile=payload.mobile,
         gst_number=payload.customer_gst,
+        place_of_supply=place_of_supply,
+        supply_type=supply_type,
+        reverse_charge=reverse_charge,
         payment_mode=payload.payment_mode or "cash",
         payment_split=payload.payment_split
     )
@@ -236,17 +289,40 @@ def create_invoice(
     if cost_method not in {"LAST", "WAVG", "FIFO"}:
         cost_method = "LAST"
 
+    shop_billing_type = get_shop_billing_type(db, int(user.shop_id))
+    is_hotel = shop_billing_type == "hotel"
+
+    def enforce_stock(item_id: int) -> bool:
+        itm = item_map.get(item_id)
+        if is_hotel:
+            return bool(getattr(itm, "is_raw_material", False))
+        return True
+
     if inv_enabled:
         for it in payload.items:
+            if not enforce_stock(it.item_id):
+                continue
             available = get_stock(db, user.shop_id, it.item_id, branch_id)
             if available < int(it.quantity or 0):
                 raise HTTPException(400, f"Insufficient stock for item {it.item_id} (available {available})")
+
+    gst_enabled = bool(shop and getattr(shop, "gst_enabled", False))
+    gst_mode = (shop.gst_mode or "inclusive") if shop else "inclusive"
+    subtotal_dec = subtotal
+    total_tax_dec = tax
+    tax_allocated_total = Decimal("0.00")
 
     for it in payload.items:
         item = item_map.get(it.item_id)
         buy_price = (item.buy_price if item else 0)
 
-        if inv_enabled and cost_method == "FIFO":
+        # Validate GST rate bounds (0-100)
+        if item and getattr(item, "gst_rate", 0) is not None:
+            rate_val = float(item.gst_rate or 0)
+            if rate_val < 0 or rate_val > 100:
+                raise HTTPException(400, f"Invalid GST rate {rate_val} for item {item.item_name}")
+
+        if inv_enabled and enforce_stock(it.item_id) and cost_method == "FIFO":
             try:
                 buy_price = float(
                     consume_lots_fifo(
@@ -263,6 +339,44 @@ def create_invoice(
                 # don't block sales if lot consumption fails
                 buy_price = (item.buy_price if item else 0)
 
+        amt_dec = Decimal(str(it.amount))
+        rate_dec = Decimal(str(getattr(item, "gst_rate", 0) or getattr(shop, "gst_percent", 0) or 0))
+
+        taxable_value = amt_dec
+        tax_line = Decimal("0.00")
+        if gst_enabled and subtotal_dec > 0 and rate_dec > 0:
+            if gst_mode == "inclusive":
+                # Line amount already includes GST; back out taxable portion proportionally.
+                base_total = subtotal_dec - total_tax_dec
+                if base_total <= 0:
+                    base_total = subtotal_dec
+                taxable_value = amt_dec * (base_total / subtotal_dec)
+                tax_line = amt_dec - taxable_value
+            else:
+                taxable_value = amt_dec
+                tax_line = total_tax_dec * (amt_dec / subtotal_dec)
+
+        taxable_value = taxable_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        tax_line = tax_line.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Guard against over-allocation when rounding on the last line
+        remaining_tax = (total_tax_dec - tax_allocated_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if remaining_tax < 0:
+            remaining_tax = Decimal("0.00")
+        tax_line = min(tax_line, remaining_tax) if remaining_tax > 0 else tax_line
+
+        intra_state = str(place_of_supply or "").strip().lower() == str(getattr(shop, "state", "") or "").strip().lower()
+        if intra_state:
+            cgst_amt = (tax_line / 2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            sgst_amt = (tax_line - cgst_amt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            igst_amt = Decimal("0.00")
+        else:
+            cgst_amt = Decimal("0.00")
+            sgst_amt = Decimal("0.00")
+            igst_amt = tax_line
+        cess_amt = Decimal("0.00")
+        tax_allocated_total += tax_line
+
         db.add(InvoiceDetail(
             invoice_id=invoice.invoice_id,
             shop_id=user.shop_id,
@@ -271,10 +385,16 @@ def create_invoice(
             quantity=it.quantity,
             amount=it.amount,
             buy_price=buy_price,
-            mrp_price=(item.mrp_price if item else 0)
+            mrp_price=(item.mrp_price if item else 0),
+            tax_rate=rate_dec,
+            taxable_value=taxable_value,
+            cgst_amt=cgst_amt,
+            sgst_amt=sgst_amt,
+            igst_amt=igst_amt,
+            cess_amt=cess_amt,
         ))
 
-        if inv_enabled:
+        if inv_enabled and enforce_stock(it.item_id):
             ok = adjust_stock(
                 db, user.shop_id, it.item_id, branch_id,
                 it.quantity, "REMOVE",
@@ -383,10 +503,14 @@ def get_invoice(
     db: Session = Depends(get_db),
     user=Depends(require_permission("billing", "read")),
 ):
-    invoice = db.query(Invoice).filter(
+    branch_id = resolve_branch_optional(user, None)
+    q = db.query(Invoice).filter(
         Invoice.invoice_number == invoice_number,
         Invoice.shop_id == user.shop_id
-    ).first()
+    )
+    if branch_id is not None:
+        q = q.filter(Invoice.branch_id == branch_id)
+    invoice = q.first()
 
     if not invoice:
         raise HTTPException(404, "Invoice not found")
@@ -448,10 +572,14 @@ def modify_invoice(
     if str(getattr(user, "role_name", "") or "").lower() == "cashier":
         raise HTTPException(403, "Manager/Admin access required")
 
-    invoice = db.query(Invoice).filter(
+    branch_id = resolve_branch_optional(user, None)
+    q = db.query(Invoice).filter(
         Invoice.invoice_id == invoice_id,
         Invoice.shop_id == user.shop_id
-    ).first()
+    )
+    if branch_id is not None:
+        q = q.filter(Invoice.branch_id == branch_id)
+    invoice = q.first()
 
     if not invoice:
         raise HTTPException(404, "Invoice not found")
@@ -689,7 +817,9 @@ def get_latest_customer_by_mobile(
     db: Session = Depends(get_db),
     user=Depends(require_permission("billing", "read")),
 ):
-    branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
+    # Branch is used elsewhere for permissions; for lookup we consider all branches
+    # in the same shop so historical bills from other branches still populate.
+    _ = resolve_branch(user, request.headers.get("x-branch-id"))
 
     mobile_clean = "".join(ch for ch in str(mobile) if ch.isdigit())
     if len(mobile_clean) > 10:
@@ -702,7 +832,6 @@ def get_latest_customer_by_mobile(
         .filter(
             Invoice.mobile == mobile_clean,
             Invoice.shop_id == user.shop_id,
-            or_(Invoice.branch_id == branch_id, Invoice.branch_id.is_(None))
         )
     )
 
@@ -713,6 +842,17 @@ def get_latest_customer_by_mobile(
     )
 
     if not latest_invoice:
+        # No invoice yet – try master customer table first.
+        cust = get_customer_by_mobile(
+            db, shop_id=user.shop_id, mobile=mobile_clean
+        )
+        if cust:
+            return {
+                "customer_name": cust.customer_name,
+                "mobile": cust.mobile,
+                "gst_number": cust.gst_number,
+            }
+
         # Return an empty payload so frontend can proceed without error.
         return {
             "customer_name": None,
@@ -734,10 +874,22 @@ def get_latest_customer_by_mobile(
         .first()
     )
 
+    customer_name = (latest_with_name or latest_invoice).customer_name
+    gst_number = (latest_with_gst or latest_invoice).gst_number
+
+    # If invoices don't carry a usable name/GST, fall back to master customer.
+    if not customer_name or str(customer_name).strip() == "":
+        cust = get_customer_by_mobile(
+            db, shop_id=user.shop_id, mobile=mobile_clean
+        )
+        if cust:
+            customer_name = cust.customer_name
+            gst_number = gst_number or cust.gst_number
+
     return {
-        "customer_name": (latest_with_name or latest_invoice).customer_name,
+        "customer_name": customer_name,
         "mobile": latest_invoice.mobile,
-        "gst_number": (latest_with_gst or latest_invoice).gst_number
+        "gst_number": gst_number
     }
 # =====================================================
 # RESTORE ARCHIVED INVOICE (ONLY DELETED)

@@ -45,6 +45,19 @@ def resolve_branch(branch_id_param, user):
         raise HTTPException(400, "Branch required")
 
 
+def resolve_branch_optional(branch_id_param, user) -> int | None:
+    """Admins: None means all branches. Non-admins: forced to their branch."""
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        if branch_id_param in (None, ""):
+            return None
+        try:
+            return int(branch_id_param)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
+    return resolve_branch(branch_id_param, user)
+
+
 def get_business_date(db: Session, shop_id: int):
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
     return shop.app_date if shop and shop.app_date else datetime.utcnow().date()
@@ -60,13 +73,11 @@ def list_pos(
     db: Session = Depends(get_db),
     user=Depends(require_permission("purchase_orders", "read")),
 ):
-    bid = resolve_branch(branch_id, user)
-    rows = (
-        db.query(PurchaseOrder)
-        .filter(PurchaseOrder.branch_id == bid, PurchaseOrder.shop_id == user.shop_id)
-        .order_by(PurchaseOrder.po_id.desc())
-        .all()
-    )
+    bid = resolve_branch_optional(branch_id, user)
+    q = db.query(PurchaseOrder).filter(PurchaseOrder.shop_id == user.shop_id)
+    if bid is not None:
+        q = q.filter(PurchaseOrder.branch_id == bid)
+    rows = q.order_by(PurchaseOrder.po_id.desc()).all()
     return rows
 
 
@@ -76,10 +87,14 @@ def get_po(
     db: Session = Depends(get_db),
     user=Depends(require_permission("purchase_orders", "read")),
 ):
-    po = db.query(PurchaseOrder).filter(
+    bid = resolve_branch_optional(None, user)
+    q = db.query(PurchaseOrder).filter(
         PurchaseOrder.po_id == po_id,
         PurchaseOrder.shop_id == user.shop_id
-    ).first()
+    )
+    if bid is not None:
+        q = q.filter(PurchaseOrder.branch_id == bid)
+    po = q.first()
     if not po:
         raise HTTPException(404, "PO not found")
     if str(user.role_name).lower() != "admin" and po.branch_id != user.branch_id:

@@ -45,6 +45,19 @@ def resolve_branch(branch_id_param, user) -> int:
         raise HTTPException(400, "Branch required")
 
 
+def resolve_branch_optional(branch_id_param, user) -> int | None:
+    """Admins can request all branches by omitting branch_id; others are restricted."""
+    role = str(getattr(user, "role_name", "") or "").strip().lower()
+    if role == "admin":
+        if branch_id_param in (None, ""):
+            return None
+        try:
+            return int(branch_id_param)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
+    return resolve_branch(branch_id_param, user)
+
+
 def get_business_datetime(db: Session, shop_id: int) -> datetime:
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
     business_date = shop.app_date if shop and shop.app_date else datetime.utcnow().date()
@@ -423,14 +436,11 @@ def list_shifts(
     db: Session = Depends(get_db),
     user=Depends(require_permission("cash_drawer", "read")),
 ):
-    bid = resolve_branch(branch_id, user)
-    return (
-        db.query(CashShift)
-        .filter(CashShift.shop_id == user.shop_id, CashShift.branch_id == bid)
-        .order_by(CashShift.shift_id.desc())
-        .limit(limit)
-        .all()
-    )
+    bid = resolve_branch_optional(branch_id, user)
+    q = db.query(CashShift).filter(CashShift.shop_id == user.shop_id)
+    if bid is not None:
+        q = q.filter(CashShift.branch_id == bid)
+    return q.order_by(CashShift.shift_id.desc()).limit(limit).all()
 
 
 @router.get("/shifts/{shift_id}")

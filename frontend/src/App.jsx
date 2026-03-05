@@ -56,6 +56,7 @@ import About from "./pages/About";
 
 import PlatformLogin from "./pages/platform/PlatformLogin";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
+import SupportDesk from "./pages/platform/SupportDesk";
 
 import Reports from "./pages/reports/Reports";
 
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/setup/onboard" element={<SetupOnboard />} />
           <Route path="/platform/login" element={<PlatformLogin />} />
           <Route path="/platform/dashboard" element={<PlatformDashboard />} />
+          <Route path="/platform/support" element={<SupportDesk />} />
           <Route path="/qr/:token" element={<PublicQrMenu />} />
 
           {/* MAIN LAYOUT */}

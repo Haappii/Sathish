@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pathlib import Path
 import shutil
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from app.db import get_db
 from app.models.items import Item
+from app.models.branch_item_price import BranchItemPrice
 from app.models.category import Category
 from app.models.stock import Inventory
 from app.schemas.items import ItemCreate, ItemUpdate, ItemResponse
@@ -13,6 +14,8 @@ from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
 from app.utils.shop_type import get_shop_billing_type
+from app.services.branch_item_price_service import upsert_branch_item_price
+from app.routes.invoice import resolve_branch_optional
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -65,28 +68,93 @@ def _resolve_image_ext(upload: UploadFile) -> str:
 
 # ---------- LIST ----------
 @router.get("/", response_model=list[ItemResponse])
-def list_items(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return (
-        db.query(Item)
-        .filter(Item.shop_id == user.shop_id)
-        .order_by(Item.item_name)
-        .all()
-    )
+def list_items(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+
+    q = db.query(Item).filter(Item.shop_id == user.shop_id)
+    if branch_id is not None:
+        # Branch view: show branch-specific + shared items
+        q = q.filter(or_(Item.branch_id == branch_id, Item.branch_id.is_(None)))
+    else:
+        # Admin "all branches" view: show shared items only (no branch override applied)
+        q = q.filter(Item.branch_id.is_(None))
+
+    items = q.order_by(Item.item_name).all()
+
+    if branch_id:
+        overrides = {
+            int(r.item_id): r
+            for r in db.query(BranchItemPrice)
+            .filter(
+                BranchItemPrice.shop_id == user.shop_id,
+                BranchItemPrice.branch_id == branch_id,
+                BranchItemPrice.item_id.in_([i.item_id for i in items]),
+            )
+            .all()
+        }
+        for it in items:
+            o = overrides.get(int(it.item_id))
+            if o:
+                it.price = o.price
+                it.buy_price = o.buy_price
+                it.mrp_price = o.mrp_price
+                it.item_status = o.item_status
+    else:
+        # Admin all-branch: keep shared items only; branch-specific items excluded without a branch filter.
+        items = [it for it in items if it.branch_id is None]
+
+    return items
 
 
 # ---------- BY CATEGORY ----------
 @router.get("/by-category/{category_id}", response_model=list[ItemResponse])
-def list_items_by_category(category_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return (
-        db.query(Item)
-        .filter(
-            Item.shop_id == user.shop_id,
-            Item.category_id == category_id,
-            Item.item_status == True
-        )
-        .order_by(Item.item_name)
-        .all()
+def list_items_by_category(
+    category_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+
+    q = db.query(Item).filter(
+        Item.shop_id == user.shop_id,
+        Item.category_id == category_id,
+        Item.item_status == True
     )
+    if branch_id is not None:
+        q = q.filter(or_(Item.branch_id == branch_id, Item.branch_id.is_(None)))
+    else:
+        q = q.filter(Item.branch_id.is_(None))
+
+    items = q.order_by(Item.item_name).all()
+
+    if branch_id:
+        overrides = {
+            int(r.item_id): r
+            for r in db.query(BranchItemPrice)
+            .filter(
+                BranchItemPrice.shop_id == user.shop_id,
+                BranchItemPrice.branch_id == branch_id,
+                BranchItemPrice.item_id.in_([i.item_id for i in items]),
+            )
+            .all()
+        }
+        items = [it for it in items if overrides.get(int(it.item_id), None) is None or overrides[int(it.item_id)].item_status]
+        for it in items:
+            o = overrides.get(int(it.item_id))
+            if o:
+                it.price = o.price
+                it.buy_price = o.buy_price
+                it.mrp_price = o.mrp_price
+                it.item_status = o.item_status
+    else:
+        items = [it for it in items if it.branch_id is None]
+
+    return items
 
 
 # ---------- CREATE ----------
@@ -128,6 +196,7 @@ def create_item(
 
     item = Item(
         shop_id=user.shop_id,
+        branch_id=branch_id if branch_id is not None else getattr(user, "branch_id", None),
         item_name=request_data.item_name,
         category_id=request_data.category_id,
         item_status=request_data.item_status,
@@ -140,6 +209,16 @@ def create_item(
     )
 
     db.add(item)
+    upsert_branch_item_price(
+        db,
+        shop_id=user.shop_id,
+        branch_id=branch_id,
+        item_id=item.item_id,
+        price=float(item.price or 0),
+        buy_price=float(item.buy_price or 0),
+        mrp_price=float(item.mrp_price or 0),
+        item_status=bool(item.item_status),
+    )
     db.commit()
     db.refresh(item)
 
@@ -152,6 +231,16 @@ def create_item(
         min_stock=0   # 👈 kept as dummy
     )
     db.add(stock)
+    upsert_branch_item_price(
+        db,
+        shop_id=user.shop_id,
+        branch_id=branch_id,
+        item_id=item.item_id,
+        price=request_data.price,
+        buy_price=request_data.buy_price or 0,
+        mrp_price=request_data.mrp_price or 0,
+        item_status=request_data.item_status,
+    )
     db.commit()
 
     log_action(
@@ -185,9 +274,12 @@ def update_item(
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
 ):
-    branch_id = resolve_branch_for_user(user=user, request=request)
+    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
 
-    item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
+    q = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+    if branch_id is not None:
+        q = q.filter((Item.branch_id == branch_id) | (Item.branch_id.is_(None)))
+    item = q.first()
     if not item:
         raise HTTPException(404, "Item not found")
 
@@ -406,10 +498,17 @@ def upload_item_image(
 @router.delete("/{item_id}")
 def delete_item(
     item_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
 ):
-    item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id).first()
+
+    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+
+    q = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
+    if branch_id is not None:
+        q = q.filter(or_(Item.branch_id == branch_id, Item.branch_id.is_(None)))
+    item = q.first()
     if not item:
         raise HTTPException(404, "Item not found")
 

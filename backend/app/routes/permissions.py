@@ -189,10 +189,19 @@ def bootstrap_default_permissions(
     roles = db.query(Role).filter(Role.status == True).all()  # noqa: E712
     modules = [m["key"] for m in PERMISSION_MODULES]
 
+    existing = {
+        (rp.role_id, rp.module)
+        for rp in db.query(RolePermission.role_id, RolePermission.module)
+        .filter(RolePermission.shop_id == user.shop_id)
+        .all()
+    }
+
     created = 0
     for role in roles:
         role_lower = str(role.role_name or "").strip().lower()
         for mod in modules:
+            if (role.role_id, mod) in existing:
+                continue
             rules = DEFAULT_ROLE_PERMISSIONS.get(mod, {})
             if role_lower == "admin":
                 can_read = True

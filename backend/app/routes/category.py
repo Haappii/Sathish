@@ -10,19 +10,23 @@ from app.schemas.category import (
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+from app.routes.invoice import resolve_branch_optional
 
 router = APIRouter(prefix="/category", tags=["Category"])
 
 
 # ---------- LIST ----------
 @router.get("/", response_model=list[CategoryResponse])
-def list_categories(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return (
-        db.query(Category)
-        .filter(Category.shop_id == user.shop_id)
-        .order_by(Category.category_name)
-        .all()
-    )
+def list_categories(
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    bid = resolve_branch_optional(user, branch_id)
+    q = db.query(Category).filter(Category.shop_id == user.shop_id)
+    if bid is not None:
+        q = q.filter((Category.branch_id == bid) | (Category.branch_id.is_(None)))
+    return q.order_by(Category.category_name).all()
 
 
 # ---------- CREATE ----------
@@ -32,6 +36,7 @@ def create_category(
     db: Session = Depends(get_db),
     user=Depends(require_permission("categories", "write")),
 ):
+    bid = resolve_branch_optional(user, request.__dict__.get("branch_id"))
 
     exists = db.query(Category).filter(
         Category.category_name == request.category_name,
@@ -43,6 +48,7 @@ def create_category(
 
     category = Category(
         shop_id=user.shop_id,
+        branch_id=bid,
         category_name=request.category_name,
         category_status=request.category_status,
         created_by=user.user_id
@@ -73,10 +79,15 @@ def update_category(category_id: int, request: CategoryUpdate,
                     db: Session = Depends(get_db),
                     user=Depends(require_permission("categories", "write"))):
 
-    category = db.query(Category).filter(
+    bid = resolve_branch_optional(user, None)
+
+    q = db.query(Category).filter(
         Category.category_id == category_id,
         Category.shop_id == user.shop_id
-    ).first()
+    )
+    if bid is not None:
+        q = q.filter((Category.branch_id == bid) | (Category.branch_id.is_(None)))
+    category = q.first()
 
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -115,24 +126,35 @@ def update_category(category_id: int, request: CategoryUpdate,
 @router.delete("/{category_id}")
 def delete_category(
     category_id: int,
+    branch_id: int | None = None,
     db: Session = Depends(get_db),
     user=Depends(require_permission("categories", "write")),
 ):
 
-    category = db.query(Category).filter(
+    bid = resolve_branch_optional(user, branch_id)
+
+    q = db.query(Category).filter(
         Category.category_id == category_id,
         Category.shop_id == user.shop_id
-    ).first()
+    )
+    if bid is not None:
+        q = q.filter((Category.branch_id == bid) | (Category.branch_id.is_(None)))
+
+    category = q.first()
 
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
     # 🚫 BLOCK DELETE IF ITEMS EXIST
-    active_items = db.query(Item).filter(
+    item_q = db.query(Item).filter(
         Item.category_id == category_id,
         Item.item_status == True,
         Item.shop_id == user.shop_id
-    ).count()
+    )
+    if bid is not None:
+        item_q = item_q.filter((Item.branch_id == bid) | (Item.branch_id.is_(None)))
+
+    active_items = item_q.count()
 
     if active_items > 0:
         raise HTTPException(

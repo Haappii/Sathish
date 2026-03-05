@@ -11,9 +11,11 @@ import smtplib
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+from typing import Literal, List
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import Numeric, cast, func
+from sqlalchemy import Date
 
 from app.db import get_db
 from app.models.branch import Branch
@@ -24,6 +26,7 @@ from app.models.shop_details import ShopDetails
 from app.models.support_ticket import SupportTicket
 from app.models.users import User
 from app.models.invoice import Invoice
+from app.models.subscription_plan import SubscriptionPlan
 from app.utils.jwt_token import create_access_token
 from app.utils.passwords import encode_password, password_needs_upgrade, verify_password
 from app.utils.platform_owner_auth import PlatformOwnerOnly
@@ -44,6 +47,22 @@ SENDER_EMAIL = (os.getenv("SUPPORT_SENDER_EMAIL") or "").strip()
 SENDER_PASSWORD = (os.getenv("SUPPORT_SENDER_PASSWORD") or "").strip()
 SMTP_HOST = (os.getenv("SUPPORT_SMTP_HOST") or "smtp.gmail.com").strip()
 SMTP_PORT = int((os.getenv("SUPPORT_SMTP_PORT") or "465").strip())
+
+
+ALLOWED_BILLING_TYPES = {"store", "hotel"}
+
+
+def _normalize_billing_type(raw: str | None, *, default: str = "store") -> str:
+    """
+    Ensure billing/shop type is one of the allowed values.
+    Falls back to the provided default when missing.
+    """
+    val = (raw or "").strip().lower() or (default or "").strip().lower()
+    if val == "restaurant":
+        val = "hotel"
+    if val not in ALLOWED_BILLING_TYPES:
+        raise HTTPException(400, "Invalid shop type; choose store or hotel")
+    return val
 
 
 class PlatformLoginIn(BaseModel):
@@ -96,7 +115,8 @@ def platform_login(payload: PlatformLoginIn, db: Session = Depends(get_db)):
 
 
 def _can_send_mail() -> bool:
-    return bool(SUPPORT_EMAIL_ENABLED and SENDER_EMAIL and SENDER_PASSWORD and SMTP_HOST and SMTP_PORT)
+    # Fall back to sending when SMTP creds exist even if SUPPORT_EMAIL_ENABLED flag is missing.
+    return bool(SENDER_EMAIL and SENDER_PASSWORD and SMTP_HOST and SMTP_PORT)
 
 
 def _send_credentials_email(*, to_email: str, subject: str, content: str) -> bool:
@@ -112,10 +132,14 @@ def _send_credentials_email(*, to_email: str, subject: str, content: str) -> boo
     email["To"] = to_addr
     email.set_content(content)
 
-    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as smtp:
-        smtp.login(SENDER_EMAIL, SENDER_PASSWORD)
-        smtp.send_message(email)
-    return True
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
+            smtp.login(SENDER_EMAIL, SENDER_PASSWORD)
+            smtp.send_message(email)
+        return True
+    except Exception as e:
+        logging.getLogger("uvicorn.error").warning("Email send failed: %s", e)
+        return False
 
 
 class OnboardRequestIn(BaseModel):
@@ -154,8 +178,14 @@ class OnboardRequestIn(BaseModel):
     admin_name: str | None = None
 
 
+class AcceptOnboardPayload(BaseModel):
+    billing_type: str | None = None
+    monthly_amount: float | None = None
+
+
 @router.post("/onboard/requests")
 def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_db)):
+    billing_type = _normalize_billing_type(payload.billing_type)
     row = PlatformOnboardRequest(
         status="PENDING",
         created_at=datetime.utcnow(),
@@ -169,7 +199,7 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
         mobile=(payload.mobile or "").strip() or None,
         mailid=(payload.mailid or "").strip() or None,
         gst_number=(payload.gst_number or "").strip() or None,
-        billing_type=(payload.billing_type or "store"),
+        billing_type=billing_type,
         gst_enabled=bool(payload.gst_enabled),
         gst_percent=payload.gst_percent or 0,
         gst_mode=(payload.gst_mode or "inclusive"),
@@ -230,6 +260,7 @@ def _generate_password() -> str:
 @router.post("/onboard/requests/{request_id}/accept")
 def accept_onboard_request(
     request_id: int,
+    payload: AcceptOnboardPayload | None = None,
     note: str | None = None,
     db: Session = Depends(get_db),
     owner=Depends(PlatformOwnerOnly),
@@ -239,6 +270,22 @@ def accept_onboard_request(
         raise HTTPException(404, "Request not found")
     if row.status != "PENDING":
         raise HTTPException(400, f"Request already {row.status}")
+
+    confirmed_billing_type = _normalize_billing_type(
+        payload.billing_type if payload else row.billing_type,
+        default=row.billing_type or "store",
+    )
+    row.billing_type = confirmed_billing_type
+    monthly_amount = None
+    if payload and payload.monthly_amount is not None:
+        try:
+            monthly_amount = round(float(payload.monthly_amount), 2)
+        except Exception:
+            raise HTTPException(400, "Invalid monthly amount")
+    row.decision_note = (note or "").strip() or None
+    if monthly_amount is not None:
+        extra = f"Monthly Amount: {monthly_amount}"
+        row.decision_note = f"{row.decision_note + ' | ' if row.decision_note else ''}{extra}"
 
     admin_role = _ensure_admin_role(db)
     _ensure_manager_role(db)
@@ -252,7 +299,7 @@ def accept_onboard_request(
             mobile=row.mobile,
             mailid=row.mailid,
             gst_number=row.gst_number,
-            billing_type=row.billing_type or "store",
+            billing_type=confirmed_billing_type,
             gst_enabled=bool(row.gst_enabled),
             gst_percent=row.gst_percent or 0,
             gst_mode=row.gst_mode or "inclusive",
@@ -268,9 +315,16 @@ def accept_onboard_request(
         db.commit()
         db.refresh(shop)
 
+        # Ensure branch name uniqueness (DB has uq on branch_name)
+        base_branch_name = (row.branch_name or "").strip() or "Head Office"
+        branch_name = base_branch_name
+        existing = db.query(Branch).filter(Branch.branch_name == branch_name).first()
+        if existing:
+            branch_name = f"{base_branch_name} #{shop.shop_id}"
+
         branch = Branch(
             shop_id=shop.shop_id,
-            branch_name=(row.branch_name or "").strip(),
+            branch_name=branch_name,
             address_line1=row.branch_address_line1,
             address_line2=row.branch_address_line2,
             city=row.branch_city,
@@ -305,25 +359,29 @@ def accept_onboard_request(
         row.status = "ACCEPTED"
         row.decided_at = datetime.utcnow()
         row.decided_by = str(owner.get("platform_username") or "")
-        row.decision_note = (note or "").strip() or None
         row.created_shop_id = shop.shop_id
         row.created_branch_id = branch.branch_id
         row.created_admin_user_id = user.user_id
         db.commit()
         db.refresh(row)
 
+        recipient = (row.requester_email or row.mailid or "").strip()
         email_sent = False
         try:
+            content = (
+                "Your request is approved.\n\n"
+                f"Shop ID: {shop.shop_id}\n"
+                f"Username: {admin_username}\n"
+                f"Password: {admin_password}\n\n"
+            )
+            if monthly_amount is not None:
+                content += f"Monthly Amount: {monthly_amount}\n\n"
+            content += "Login URL: / (open the app and login)\n"
+
             email_sent = _send_credentials_email(
-                to_email=(row.requester_email or ""),
+                to_email=recipient,
                 subject="Your shop has been activated",
-                content=(
-                    "Your request is approved.\n\n"
-                    f"Shop ID: {shop.shop_id}\n"
-                    f"Username: {admin_username}\n"
-                    f"Password: {admin_password}\n\n"
-                    "Login URL: / (open the app and login)\n"
-                ),
+                content=content,
             )
         except Exception:
             # Don't fail provisioning due to email issues.
@@ -366,6 +424,25 @@ def reject_onboard_request(
     row.decision_note = (note or "").strip() or None
     db.commit()
     db.refresh(row)
+
+    recipient = (row.requester_email or row.mailid or "").strip()
+    if recipient:
+        try:
+            content = (
+                "We are unable to approve your onboarding request at this time.\n\n"
+                f"Request ID: {row.request_id}\n"
+            )
+            if row.decision_note:
+                content += f"Reason: {row.decision_note}\n\n"
+            content += "You may reply to this email for clarification or submit a new request."
+
+            _send_credentials_email(
+                to_email=recipient,
+                subject="Your onboarding request was rejected",
+                content=content,
+            )
+        except Exception:
+            pass
     return {"success": True, "request_id": row.request_id, "status": row.status}
 
 
@@ -408,6 +485,154 @@ def platform_revenue(
     return {"days": int(days), "total": float(amt)}
 
 
+@router.get("/revenue/daily")
+def platform_revenue_daily(
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    since = datetime.utcnow() - timedelta(days=int(days))
+    amt = (
+        db.query(
+            cast(func.date(Invoice.created_time), Date).label("day"),
+            func.coalesce(
+                func.sum(
+                    cast(
+                        func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0),
+                        Numeric(12, 2),
+                    )
+                ),
+                0,
+            ).label("revenue"),
+        )
+        .filter(Invoice.created_time >= since)
+        .group_by(cast(func.date(Invoice.created_time), Date))
+        .order_by(cast(func.date(Invoice.created_time), Date))
+        .all()
+    )
+    return [{"date": str(r.day), "revenue": float(r.revenue or 0)} for r in amt]
+
+
+@router.get("/plans")
+def list_plans(
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    q = db.query(SubscriptionPlan)
+    if not include_inactive:
+        q = q.filter(SubscriptionPlan.is_active == True)  # noqa: E712
+    rows = q.order_by(SubscriptionPlan.plan_id.desc()).all()
+    return [
+        {
+            "plan_id": r.plan_id,
+            "name": r.name,
+            "duration_months": r.duration_months,
+            "price": float(r.price or 0),
+            "is_active": bool(r.is_active),
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/plans")
+def create_plan(payload: PlanCreateIn, db: Session = Depends(get_db), owner=Depends(PlatformOwnerOnly)):
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name required")
+    exists = db.query(SubscriptionPlan).filter(SubscriptionPlan.name.ilike(name)).first()
+    if exists:
+        raise HTTPException(400, "Plan name already exists")
+    row = SubscriptionPlan(
+        name=name,
+        duration_months=int(payload.duration_months),
+        price=float(payload.price),
+        is_active=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"success": True, "plan_id": row.plan_id}
+
+
+@router.post("/plans/{plan_id}/status")
+def update_plan_status(
+    plan_id: int,
+    is_active: bool = True,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = db.query(SubscriptionPlan).filter(SubscriptionPlan.plan_id == plan_id).first()
+    if not row:
+        raise HTTPException(404, "Plan not found")
+    row.is_active = bool(is_active)
+    db.commit()
+    db.refresh(row)
+    return {"success": True, "plan_id": row.plan_id, "is_active": row.is_active}
+
+
+@router.get("/shops/{shop_id}/detail")
+def platform_shop_detail(
+    shop_id: int,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    s = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not s:
+        raise HTTPException(404, "Shop not found")
+    today = datetime.utcnow().date()
+    expires = getattr(s, "expires_on", None)
+    paid_until = getattr(s, "paid_until", None)
+    plan_upper = (getattr(s, "plan", None) or "TRIAL").upper()
+    status = "ACTIVE"
+    if plan_upper == "DISABLED":
+        status = "DISABLED"
+    elif expires and today > expires:
+        status = "EXPIRED"
+    elif paid_until and today > paid_until:
+        status = "EXPIRED"
+    elif plan_upper == "TRIAL":
+        status = "TRIAL"
+    return {
+        "shop_id": s.shop_id,
+        "shop_name": s.shop_name,
+        "owner_name": s.owner_name,
+        "mobile": s.mobile,
+        "mailid": s.mailid,
+        "billing_type": s.billing_type,
+        "address_line1": s.address_line1,
+        "address_line2": s.address_line2,
+        "address_line3": s.address_line3,
+        "city": s.city,
+        "state": s.state,
+        "pincode": s.pincode,
+        "plan": plan_upper,
+        "expires_on": expires,
+        "paid_until": paid_until,
+        "last_payment_on": getattr(s, "last_payment_on", None),
+        "total_paid": float(getattr(s, "total_paid", 0) or 0),
+        "status": status,
+    }
+
+
+@router.post("/shops/{shop_id}/billing-type")
+def update_shop_billing_type(
+    shop_id: int,
+    payload: BillingTypeIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    s = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not s:
+        raise HTTPException(404, "Shop not found")
+    new_type = _normalize_billing_type(payload.billing_type)
+    s.billing_type = new_type
+    db.commit()
+    db.refresh(s)
+    return {"success": True, "billing_type": s.billing_type}
+
+
 @router.get("/shops")
 def platform_list_shops(
     db: Session = Depends(get_db),
@@ -436,22 +661,26 @@ def platform_list_shops(
         expires = getattr(s, "expires_on", None)
         paid_until = getattr(s, "paid_until", None)
         status = "ACTIVE"
-        if expires and today > expires:
+        plan_upper = (getattr(s, "plan", None) or "TRIAL").upper()
+        if plan_upper == "DISABLED":
+            status = "DISABLED"
+        elif expires and today > expires:
             status = "EXPIRED"
         elif paid_until and today > paid_until:
             status = "EXPIRED"
-        elif getattr(s, "plan", None) == "TRIAL":
+        elif plan_upper == "TRIAL":
             status = "TRIAL"
 
         out.append(
             {
                 "shop_id": s.shop_id,
                 "shop_name": s.shop_name,
-                "mailid": getattr(s, "mailid", None),
-                "mobile": getattr(s, "mobile", None),
-                "is_demo": bool(getattr(s, "is_demo", False)),
-                "expires_on": str(expires) if expires else None,
-                "plan": getattr(s, "plan", None) or "TRIAL",
+            "mailid": getattr(s, "mailid", None),
+            "mobile": getattr(s, "mobile", None),
+            "billing_type": getattr(s, "billing_type", None),
+            "is_demo": bool(getattr(s, "is_demo", False)),
+            "expires_on": str(expires) if expires else None,
+            "plan": plan_upper or "TRIAL",
                 "last_payment_on": str(getattr(s, "last_payment_on", None)) if getattr(s, "last_payment_on", None) else None,
                 "next_renewal": str(paid_until) if paid_until else None,
                 "total_paid": float(getattr(s, "total_paid", 0) or 0),
@@ -464,9 +693,24 @@ def platform_list_shops(
 
 class ShopPaymentUpdateIn(BaseModel):
     plan: str | None = None
+    plan_id: int | None = None
     extend_days: int | None = Field(default=None, ge=1, le=3650)
     paid_until: str | None = None  # YYYY-MM-DD
     amount: float | None = Field(default=None, ge=0)
+
+
+class ShopStatusUpdateIn(BaseModel):
+    status: Literal["ACTIVE", "DISABLED"]
+
+
+class PlanCreateIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    duration_months: int = Field(ge=1, le=36)
+    price: float = Field(ge=0)
+
+
+class BillingTypeIn(BaseModel):
+    billing_type: str
 
 
 @router.post("/shops/{shop_id}/update-payment")
@@ -480,10 +724,24 @@ def update_shop_payment(
     if not s:
         raise HTTPException(404, "Shop not found")
 
-    if payload.plan:
+    today = datetime.utcnow().date()
+    # If plan_id is provided, it takes precedence and auto-sets plan, paid_until, total_paid, last_payment_on
+    if payload.plan_id is not None:
+        plan_row = (
+            db.query(SubscriptionPlan)
+            .filter(SubscriptionPlan.plan_id == int(payload.plan_id), SubscriptionPlan.is_active == True)  # noqa: E712
+            .first()
+        )
+        if not plan_row:
+            raise HTTPException(404, "Plan not found or inactive")
+        s.plan = (plan_row.name or "").strip().upper()[:30] or "PLAN"
+        days = int(plan_row.duration_months) * 30
+        s.paid_until = today + timedelta(days=days)
+        s.total_paid = float(getattr(s, "total_paid", 0) or 0) + float(plan_row.price or 0)
+        s.last_payment_on = today
+    elif payload.plan:
         s.plan = (payload.plan or "").strip().upper()[:30] or s.plan
 
-    today = datetime.utcnow().date()
     if payload.paid_until:
         try:
             y, m, d = [int(x) for x in str(payload.paid_until).split("-")]
@@ -501,6 +759,32 @@ def update_shop_payment(
     db.commit()
     db.refresh(s)
     return {"success": True}
+
+
+@router.post("/shops/{shop_id}/status")
+def update_shop_status(
+    shop_id: int,
+    payload: ShopStatusUpdateIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    s = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not s:
+        raise HTTPException(404, "Shop not found")
+
+    status = (payload.status or "").strip().upper()
+    today = datetime.utcnow().date()
+    if status == "DISABLED":
+        s.plan = "DISABLED"
+        s.expires_on = today - timedelta(days=1)
+    else:
+        s.plan = "ACTIVE"
+        # Allow immediate access; keep paid_until untouched.
+        s.expires_on = None
+
+    db.commit()
+    db.refresh(s)
+    return {"success": True, "status": status}
 
 
 @router.post("/shops/{shop_id}/reminder")

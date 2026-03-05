@@ -8,6 +8,7 @@ class Category(Base):
 
     category_id = Column(Integer, primary_key=True, index=True)
     shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)
+    branch_id = Column(Integer, ForeignKey("branch.branch_id"), nullable=True)
     category_name = Column(String(120), nullable=False)
     category_status = Column(Boolean, default=True)
     created_on = Column(TIMESTAMP(timezone=True), server_default=func.now())

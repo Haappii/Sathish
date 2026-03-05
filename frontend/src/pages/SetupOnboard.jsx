@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
@@ -7,7 +6,6 @@ import { useToast } from "../components/Toast";
 const steps = ["Business", "Branch", "Contact"];
 
 export default function SetupOnboard() {
-  const navigate = useNavigate();
   const { showToast } = useToast();
 
   const [step, setStep] = useState(0);
@@ -78,6 +76,7 @@ export default function SetupOnboard() {
       return "Business type required";
     }
     if (step === 1 && !form.branch_name.trim()) return "Branch name required";
+    if (step === 2 && !form.business.trim()) return "Business type required";
     if (step === 2 && !String(form.requester_email || "").includes("@")) return "Valid email required";
     return null;
   };
@@ -107,8 +106,7 @@ export default function SetupOnboard() {
       });
 
       setResult(res.data);
-      showToast("Request sent. We will contact you soon.", "success");
-      setTimeout(() => navigate("/"), 1500);
+      showToast("Request sent. Admin will review your request.", "success");
     } catch (e) {
       showToast(e?.response?.data?.detail || "Request failed", "error");
     } finally {
@@ -281,7 +279,9 @@ export default function SetupOnboard() {
         </div>
 
         {result?.request_id ? (
-          <div className="info">Request created: #{result.request_id}. Redirecting to login…</div>
+          <div className="info">
+            Request created: #{result.request_id}. Admin will review the request. Check your registered email for updates.
+          </div>
         ) : null}
 
         {step === 0 && (
@@ -294,10 +294,28 @@ export default function SetupOnboard() {
               <input placeholder="Email" value={form.mailid} onChange={(e) => update("mailid", e.target.value)} />
               <input placeholder="City" value={form.city} onChange={(e) => update("city", e.target.value)} />
               <input placeholder="State" value={form.state} onChange={(e) => update("state", e.target.value)} />
-              <select value={form.billing_type} onChange={(e) => update("billing_type", e.target.value)}>
-                <option value="store">Store / Retail</option>
-                <option value="hotel">Hotel / Restaurant</option>
-              </select>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="billing_type"
+                    value="store"
+                    checked={String(form.billing_type || "").toLowerCase() === "store"}
+                    onChange={(e) => update("billing_type", e.target.value)}
+                  />
+                  Store / Retail
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="billing_type"
+                    value="hotel"
+                    checked={String(form.billing_type || "").toLowerCase() === "hotel"}
+                    onChange={(e) => update("billing_type", e.target.value)}
+                  />
+                  Hotel / Restaurant
+                </label>
+              </div>
               <input type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} />
             </div>
 
@@ -343,7 +361,7 @@ export default function SetupOnboard() {
               <input placeholder="Your Name" value={form.requester_name} onChange={(e) => update("requester_name", e.target.value)} />
               <input placeholder="Your Email *" value={form.requester_email} onChange={(e) => update("requester_email", e.target.value)} />
               <input placeholder="Your Phone" value={form.requester_phone} onChange={(e) => update("requester_phone", e.target.value)} />
-              <input placeholder="Business Type" value={form.business} onChange={(e) => update("business", e.target.value)} />
+              <input placeholder="Business Type *" value={form.business} onChange={(e) => update("business", e.target.value)} />
               <textarea placeholder="Message (optional)" value={form.message} onChange={(e) => update("message", e.target.value)} />
             </div>
             <div className="info">
