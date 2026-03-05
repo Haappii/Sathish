@@ -6,6 +6,9 @@ const https = require("https");
 
 const PROTOCOL = "poss";
 const CONFIG_FILE = "config.json";
+// Default URL the packaged desktop app will open if nothing else is configured.
+// Point this to the hosted frontend that talks to your backend API.
+const DEFAULT_APP_URL = process.env.APP_URL_DEFAULT || "http://13.60.186.234:5173";
 
 function safeParseJson(text) {
   try {
@@ -51,13 +54,14 @@ function resolveAppUrl() {
   if (urlArg) return String(urlArg).slice("--url=".length);
 
   if (process.env.APP_URL) return String(process.env.APP_URL);
+  // Optional: allow a build-time / deployment default via APP_URL_DEFAULT.
+  if (process.env.APP_URL_DEFAULT) return String(process.env.APP_URL_DEFAULT);
 
   const cfg = readUserConfig();
   if (cfg && cfg.app_url) return String(cfg.app_url);
 
-  // Default to the Desktop UI port used by the repo's local runners.
-  // (The backend API is typically on :8000, while the UI is on :5173/:5180.)
-  return "http://localhost:5180";
+  // Fallback to the hosted production/staging URL so first-run succeeds for users.
+  return DEFAULT_APP_URL;
 }
 
 function persistAppUrl(url) {

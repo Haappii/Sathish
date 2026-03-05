@@ -4,6 +4,11 @@ This is a thin desktop wrapper around the existing POSS web app.
 
 It does **not** bundle the Python backend. It simply opens the configured web URL in a native window.
 
+**Default URL baked in:** the packaged app now falls back to `http://13.60.186.234:5173`. Override it with:
+- CLI: `POSS.exe --url=http://YOUR_SERVER:5173`
+- Env at build/run: `APP_URL` (highest priority) or `APP_URL_DEFAULT`
+- User config: `%APPDATA%/POSS/config.json` (`app_url`)
+
 ## Dev
 
 1. Start the frontend (`frontend`) and backend (`backend`) as usual.
