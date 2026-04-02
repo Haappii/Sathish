@@ -3,8 +3,11 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d "%~dp0"
 
-if exist ".env" (
-  for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+set "CONFIG_FILE=config.txt"
+if not exist "%CONFIG_FILE%" if exist ".env" set "CONFIG_FILE=.env"
+
+if exist "%CONFIG_FILE%" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%CONFIG_FILE%") do (
     set "ENV_KEY=%%~A"
     set "ENV_VAL=%%~B"
     if defined ENV_KEY (

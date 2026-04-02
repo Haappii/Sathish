@@ -1,6 +1,5 @@
 # Global application config
-# Legacy fallback example.
-# Preferred shared config file: `config.txt`
+# Copy this file to `config.txt` and edit it for your environment.
 
 # App mode
 APP_ENV=development

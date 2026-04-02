@@ -1,5 +1,41 @@
+import fs from 'fs'
+import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
+function loadSharedConfig() {
+  const candidates = [
+    path.resolve(__dirname, '..', 'config.txt'),
+    path.resolve(__dirname, '..', '.env'),
+  ]
+
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue
+
+    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/)
+    for (const rawLine of lines) {
+      const line = String(rawLine || '').trim()
+      if (!line || line.startsWith('#')) continue
+
+      const equalsIndex = line.indexOf('=')
+      if (equalsIndex <= 0) continue
+
+      const key = line.slice(0, equalsIndex).trim()
+      if (!key || process.env[key]) continue
+
+      let value = line.slice(equalsIndex + 1).trim()
+      const quoted =
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      if (quoted) value = value.slice(1, -1)
+
+      process.env[key] = value
+    }
+    break
+  }
+}
+
+loadSharedConfig()
 
 // https://vite.dev/config/
 export default defineConfig({

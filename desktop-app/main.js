@@ -9,27 +9,34 @@ const PROTOCOL = "poss";
 const CONFIG_FILE = "config.json";
 
 function loadSharedEnv() {
-  const envPath = path.resolve(__dirname, "..", ".env");
-  if (!fs.existsSync(envPath)) return;
+  const candidates = [
+    path.resolve(__dirname, "..", "config.txt"),
+    path.resolve(__dirname, "..", ".env"),
+  ];
 
-  const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
-  for (const rawLine of lines) {
-    const line = String(rawLine || "").trim();
-    if (!line || line.startsWith("#")) continue;
+  for (const envPath of candidates) {
+    if (!fs.existsSync(envPath)) continue;
 
-    const idx = line.indexOf("=");
-    if (idx <= 0) continue;
+    const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = String(rawLine || "").trim();
+      if (!line || line.startsWith("#")) continue;
 
-    const key = line.slice(0, idx).trim();
-    if (!key || process.env[key]) continue;
+      const idx = line.indexOf("=");
+      if (idx <= 0) continue;
 
-    let value = line.slice(idx + 1).trim();
-    const quoted =
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"));
-    if (quoted) value = value.slice(1, -1);
+      const key = line.slice(0, idx).trim();
+      if (!key || process.env[key]) continue;
 
-    process.env[key] = value;
+      let value = line.slice(idx + 1).trim();
+      const quoted =
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"));
+      if (quoted) value = value.slice(1, -1);
+
+      process.env[key] = value;
+    }
+    break;
   }
 }
 

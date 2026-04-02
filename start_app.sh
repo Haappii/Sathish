@@ -5,9 +5,15 @@ set -euo pipefail
 # to 0.0.0.0 so they are reachable from any IP.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${ROOT_DIR}/config.txt"
 ENV_FILE="${ROOT_DIR}/.env"
 
-if [[ -f "${ENV_FILE}" ]]; then
+if [[ -f "${CONFIG_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source <(sed 's/\r$//' "${CONFIG_FILE}")
+  set +a
+elif [[ -f "${ENV_FILE}" ]]; then
   set -a
   # shellcheck disable=SC1090
   source <(sed 's/\r$//' "${ENV_FILE}")
