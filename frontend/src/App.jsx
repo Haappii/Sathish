@@ -52,7 +52,6 @@ import PublicQrMenu from "./pages/PublicQrMenu";
 
 // ⭐ HOTEL FEATURES
 import KitchenDisplay from "./pages/KitchenDisplay";
-import Takeaway from "./pages/Takeaway";
 import Reservations from "./pages/Reservations";
 import RecipeManagement from "./pages/RecipeManagement";
 import DeliveryManagement from "./pages/DeliveryManagement";
@@ -76,6 +75,7 @@ import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import SupportDesk from "./pages/platform/SupportDesk";
 
 import Reports from "./pages/reports/Reports";
+import PublicReservation from "./pages/PublicReservation";
 
 import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
 
@@ -100,6 +100,7 @@ export default function App() {
           <Route path="/platform/dashboard" element={<PlatformDashboard />} />
           <Route path="/platform/support" element={<SupportDesk />} />
           <Route path="/qr/:token" element={<PublicQrMenu />} />
+          <Route path="/book" element={<PublicReservation />} />
 
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>
@@ -169,8 +170,7 @@ export default function App() {
             <Route path="/qr-orders" element={<QrOrders />} />
 
             {/* ⭐ HOTEL-ONLY FEATURES */}
-            <Route path="/takeaway" element={<ShopTypeGuard requireHotel><Takeaway /></ShopTypeGuard>} />
-            <Route path="/reservations" element={<ShopTypeGuard requireHotel><Reservations /></ShopTypeGuard>} />
+            <Route path="/reservations" element={<Reservations />} />
             <Route path="/recipes" element={<ShopTypeGuard requireHotel><RecipeManagement /></ShopTypeGuard>} />
             <Route path="/delivery" element={<ShopTypeGuard requireHotel><DeliveryManagement /></ShopTypeGuard>} />
           </Route>

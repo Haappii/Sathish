@@ -19,7 +19,6 @@ import {
   FaBarcode,
   FaCloudUploadAlt,
   FaMotorcycle,
-  FaShoppingBag,
   FaCalendarAlt,
   FaUtensils,
   FaConciergeBell,
@@ -80,20 +79,11 @@ const MENU_CATALOG = [
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
-    key: "takeaway",
-    name: "Takeaway",
-    path: "/takeaway",
-    icon: <FaShoppingBag />,
-    perm: { module: "billing", action: "write" },
-    when: ({ showTableBilling }) => Boolean(showTableBilling),
-  },
-  {
     key: "reservations",
     name: "Reservations",
     path: "/reservations",
     icon: <FaCalendarAlt />,
     perm: { module: "billing", action: "read" },
-    when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
     key: "delivery",
@@ -371,12 +361,11 @@ export const buildRoleMenu = ({
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
-            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
-            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
             { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
           ]
         : []),
+      { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
@@ -392,11 +381,10 @@ export const buildRoleMenu = ({
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
-            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
-            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
           ]
         : []),
+      { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
     ];
   } else if (roleLower === "manager") {
     menuItems = [
@@ -406,13 +394,12 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
       ...(showTableBilling
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
-            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
-            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
             { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
             { name: "Recipes", path: "/recipes", icon: <FaUtensils /> },
           ]
@@ -454,13 +441,12 @@ export const buildRoleMenu = ({
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
       { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
+      { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
       ...(showTableBilling
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
-            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
-            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
             { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
             { name: "Recipes", path: "/recipes", icon: <FaUtensils /> },
           ]

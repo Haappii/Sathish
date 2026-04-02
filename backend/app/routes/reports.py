@@ -37,6 +37,7 @@ from app.models.online_order import OnlineOrder, OnlineOrderItem
 from app.models.loyalty import LoyaltyAccount, LoyaltyTransaction
 from app.models.coupon import Coupon, CouponRedemption
 from app.models.employee import Employee, EmployeeAttendance
+from app.models.reservation import TableReservation
 from app.models.shop_details import ShopDetails
 from app.services.financials_service import calc_period_financials
 from app.utils.shop_type import ensure_hotel_billing_type
@@ -3863,4 +3864,75 @@ def compliance_tcs_sales(
             }
         )
 
-    return rows
+
+# ── RESERVATIONS ──────────────────────────────────────────────────────────────
+@router.get("/reservations/list")
+def reservations_report(
+    from_date: str,
+    to_date: str,
+    branch_id: int | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    from datetime import date as date_type
+    try:
+        f_date = date_type.fromisoformat(from_date)
+        t_date = date_type.fromisoformat(to_date)
+    except ValueError:
+        raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD")
+
+    branch_id = _force_branch(branch_id, user)
+
+    q = (
+        db.query(
+            TableReservation.reservation_id,
+            TableReservation.reservation_date,
+            TableReservation.reservation_time,
+            TableReservation.customer_name,
+            TableReservation.mobile,
+            TableReservation.email,
+            TableReservation.guests,
+            TableReservation.status,
+            TableReservation.notes,
+            TableReservation.cancel_reason,
+            TableReservation.created_at,
+            TableReservation.confirmed_at,
+            TableReservation.seated_at,
+            TableReservation.cancelled_at,
+            Branch.branch_name.label("branch"),
+        )
+        .outerjoin(Branch, Branch.branch_id == TableReservation.branch_id)
+        .filter(TableReservation.shop_id == user.shop_id)
+        .filter(TableReservation.reservation_date >= f_date)
+        .filter(TableReservation.reservation_date <= t_date)
+        .order_by(TableReservation.reservation_date, TableReservation.reservation_time)
+    )
+
+    if branch_id is not None:
+        q = q.filter(TableReservation.branch_id == branch_id)
+
+    if status:
+        q = q.filter(TableReservation.status == status.upper())
+
+    rows = q.all()
+    return [
+        {
+            "reservation_id": r.reservation_id,
+            "reservation_date": str(r.reservation_date),
+            "reservation_time": r.reservation_time,
+            "customer_name": r.customer_name or "",
+            "mobile": r.mobile or "",
+            "email": r.email or "",
+            "guests": r.guests or 1,
+            "status": r.status or "",
+            "notes": r.notes or "",
+            "cancel_reason": r.cancel_reason or "",
+            "branch": r.branch or "",
+            "created_at": r.created_at.strftime("%d %b %Y %H:%M") if r.created_at else "",
+            "confirmed_at": r.confirmed_at.strftime("%d %b %Y %H:%M") if r.confirmed_at else "",
+            "seated_at": r.seated_at.strftime("%d %b %Y %H:%M") if r.seated_at else "",
+            "cancelled_at": r.cancelled_at.strftime("%d %b %Y %H:%M") if r.cancelled_at else "",
+        }
+        for r in rows
+    ]

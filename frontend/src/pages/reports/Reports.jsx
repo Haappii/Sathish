@@ -120,6 +120,9 @@ const REPORTS = [
   { key: "employees/wages-summary", label: "Employee Wages Summary", group: "Employees", requiresDateRange: false },
   { key: "employees/due-list", label: "Employee Due List", group: "Employees", requiresDateRange: false },
   { key: "employees/attendance-summary", label: "Employee Attendance Summary", group: "Employees" },
+
+  // Reservations
+  { key: "reservations/list", label: "Reservations Report", group: "Reservations" },
 ];
 
 const NO_USER_FILTER_KEYS = new Set([
@@ -144,6 +147,7 @@ const NO_USER_FILTER_KEYS = new Set([
   "employees/wages-summary",
   "employees/due-list",
   "employees/attendance-summary",
+  "reservations/list",
   "gst/gstr1",
   "gst/gstr3b",
   "gst/hsn-summary",
@@ -181,6 +185,7 @@ const REPORT_GROUP_ORDER = [
   "Audit",
   "Table",
   "Employees",
+  "Reservations",
 ];
 
 export default function Reports() {

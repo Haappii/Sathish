@@ -686,15 +686,15 @@ export default function Employees() {
         </div>
       </div>
     </div>
-    </div>
+  </div>
   );
 }
 
 function KpiCard({ title, value, danger = false }) {
   return (
-    <div className="rounded-xl border bg-white p-3">
-      <div className="text-[11px] text-slate-500">{title}</div>
-      <div className={`text-lg font-semibold ${danger ? "text-rose-600" : "text-slate-800"}`}>
+    <div className="bg-white border rounded-2xl shadow-sm p-3">
+      <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{title}</div>
+      <div className={`text-lg font-bold mt-1 ${danger ? "text-rose-600" : "text-gray-800"}`}>
         {value}
       </div>
     </div>

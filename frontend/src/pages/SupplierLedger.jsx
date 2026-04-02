@@ -6,6 +6,9 @@ import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { modulesToPermMap } from "../utils/navigationMenu";
 
+const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition w-full";
+const labelCls = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";
+
 export default function SupplierLedger() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -127,6 +130,11 @@ export default function SupplierLedger() {
     [suppliers, selectedSupplierId]
   );
 
+  const totalDue = useMemo(
+    () => aging.reduce((s, a) => s + Number(a.total_due || 0), 0),
+    [aging]
+  );
+
   const recordPayment = async () => {
     if (!canWrite) return showToast("Not allowed", "error");
     if (!selectedSupplierId) return showToast("Select supplier", "error");
@@ -153,235 +161,263 @@ export default function SupplierLedger() {
 
   if (allowed === null) {
     return (
-      <div className="mt-10 text-center text-sm font-medium text-gray-600">
-        Loading...
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-sm text-gray-500">Loading...</p>
       </div>
     );
   }
   if (!allowed) {
     return (
-      <div className="mt-10 text-center text-sm font-medium text-red-600">
-        You are not authorized to access this page
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-sm text-red-500 font-medium">You are not authorized to access this page</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
         >
-          &larr; Back
+          ← Back
         </button>
-        <h2 className="text-lg font-bold text-slate-800">Supplier Ledger</h2>
+        <div className="flex-1">
+          <h1 className="text-base font-bold text-gray-800">Supplier Ledger</h1>
+          {totalDue > 0 && (
+            <p className="text-[11px] text-rose-500 font-semibold">Total Due: ₹{totalDue.toFixed(2)}</p>
+          )}
+        </div>
+        {isAdmin && (
+          <select
+            className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none"
+            value={branchId}
+            onChange={(e) => setBranchId(Number(e.target.value))}
+          >
+            {branches.map((b) => (
+              <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+            ))}
+          </select>
+        )}
         <button
-          onClick={() => {
-            loadSuppliers();
-            loadAging();
-            loadSupplierDetails(selectedSupplierId);
-          }}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+          onClick={() => { loadSuppliers(); loadAging(); loadSupplierDetails(selectedSupplierId); }}
+          className="px-4 py-1.5 rounded-xl border text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition"
         >
           Refresh
         </button>
       </div>
 
-      {isAdmin && (
-        <div className="flex items-center gap-2 text-[12px]">
-          <span className="text-slate-600">Branch</span>
-          <select
-            className="border rounded-lg px-2 py-1.5 text-[12px]"
-            value={branchId}
-            onChange={(e) => setBranchId(Number(e.target.value))}
-          >
-            {branches.map((b) => (
-              <option key={b.branch_id} value={b.branch_id}>
-                {b.branch_name}
-              </option>
-              ))}
-          </select>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="rounded-xl border bg-white p-4 space-y-2">
-          <div className="text-sm font-semibold">Aging</div>
-          {aging.length === 0 ? (
-            <div className="text-[12px] text-slate-500">No dues</div>
-          ) : (
-            <div className="space-y-2">
-              {aging.map((a) => (
-                <button
-                  key={a.supplier_id}
-                  onClick={() => setSelectedSupplierId(String(a.supplier_id))}
-                  className={`w-full text-left rounded-lg border px-3 py-2 text-[12px] hover:bg-gray-50 ${
-                    Number(selectedSupplierId) === Number(a.supplier_id) ? "bg-blue-50 border-blue-200" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold truncate">{a.supplier_name}</div>
-                    <div className="font-bold text-rose-700">
-                      Rs. {Number(a.total_due || 0).toFixed(2)}
+      <div className="px-4 sm:px-6 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Aging Panel */}
+          <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b">
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Aging — Outstanding</p>
+            </div>
+            <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
+              {aging.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 gap-1">
+                  <div className="text-xl">✅</div>
+                  <p className="text-[12px] text-gray-400">No outstanding dues</p>
+                </div>
+              ) : (
+                aging.map((a) => (
+                  <button
+                    key={a.supplier_id}
+                    onClick={() => setSelectedSupplierId(String(a.supplier_id))}
+                    className={`w-full text-left px-4 py-3 transition hover:bg-gray-50 ${
+                      Number(selectedSupplierId) === Number(a.supplier_id) ? "bg-blue-50" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-semibold text-gray-800 truncate">{a.supplier_name}</span>
+                      <span className="text-[12px] font-bold text-rose-600 ml-2 flex-shrink-0">₹{Number(a.total_due || 0).toFixed(0)}</span>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 mt-1 text-[11px] text-slate-600">
-                    <div>Not due: {Number(a.not_due || 0).toFixed(0)}</div>
-                    <div>0-30: {Number(a.due_0_30 || 0).toFixed(0)}</div>
-                    <div>31-60: {Number(a.due_31_60 || 0).toFixed(0)}</div>
-                    <div>90+: {Number(a.due_90_plus || 0).toFixed(0)}</div>
-                  </div>
-                </button>
-              ))}
+                    <div className="flex gap-3 text-[10px] text-gray-400">
+                      <span>0-30: ₹{Number(a.due_0_30 || 0).toFixed(0)}</span>
+                      <span>31-60: ₹{Number(a.due_31_60 || 0).toFixed(0)}</span>
+                      <span>90+: ₹{Number(a.due_90_plus || 0).toFixed(0)}</span>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="rounded-xl border bg-white p-4 space-y-2">
-          <div className="text-sm font-semibold">Supplier</div>
-          <select
-            className="border rounded-lg px-2 py-2 text-[12px] w-full"
-            value={selectedSupplierId}
-            onChange={(e) => setSelectedSupplierId(e.target.value)}
-          >
-            <option value="">Select supplier</option>
-            {suppliers.map((s) => (
-              <option key={s.supplier_id} value={s.supplier_id}>
-                {s.supplier_name}
-              </option>
-            ))}
-          </select>
-
-          {selectedSupplier && (
-            <div className="text-[12px] text-slate-700 space-y-1">
-              <div className="font-semibold">{selectedSupplier.supplier_name}</div>
-              <div className="text-slate-500">
-                Terms: {Number(selectedSupplier.credit_terms_days || 0)} days
-              </div>
-            </div>
-          )}
-
-          <div className="pt-2 border-t">
-            <div className="text-sm font-semibold">Record Payment</div>
-            <div className="grid grid-cols-1 gap-2">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  className="border rounded-lg px-2 py-2 text-[12px]"
-                  placeholder="Amount"
-                  value={payment.amount}
-                  onChange={(e) => setPayment({ ...payment, amount: e.target.value })}
-                />
-                <select
-                  className="border rounded-lg px-2 py-2 text-[12px]"
-                  value={payment.payment_mode}
-                  onChange={(e) => setPayment({ ...payment, payment_mode: e.target.value })}
-                >
-                  <option value="cash">Cash</option>
-                  <option value="upi">UPI</option>
-                  <option value="card">Card</option>
-                  <option value="bank">Bank</option>
-                </select>
-              </div>
+          {/* Supplier + Payment */}
+          <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-4">
+            <div className="space-y-2">
+              <p className={labelCls}>Select Supplier</p>
               <select
-                className="border rounded-lg px-2 py-2 text-[12px]"
-                value={payment.po_id}
-                onChange={(e) => setPayment({ ...payment, po_id: e.target.value })}
+                className={inputCls}
+                value={selectedSupplierId}
+                onChange={(e) => setSelectedSupplierId(e.target.value)}
               >
-                <option value="">Apply to (optional) - Any PO</option>
-                {openPos.map((p) => (
-                  <option key={p.po_id} value={p.po_id}>
-                    {p.po_number} (Due Rs.{Number(p.due_amount || 0).toFixed(0)})
-                  </option>
+                <option value="">Select supplier...</option>
+                {suppliers.map((s) => (
+                  <option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</option>
                 ))}
               </select>
-              <input
-                className="border rounded-lg px-2 py-2 text-[12px]"
-                placeholder="Reference no (optional)"
-                value={payment.reference_no}
-                onChange={(e) => setPayment({ ...payment, reference_no: e.target.value })}
-              />
-              <input
-                className="border rounded-lg px-2 py-2 text-[12px]"
-                placeholder="Notes (optional)"
-                value={payment.notes}
-                onChange={(e) => setPayment({ ...payment, notes: e.target.value })}
-              />
+
+              {selectedSupplier && (
+                <div className="bg-gray-50 rounded-xl px-3 py-2">
+                  <p className="text-[12px] font-semibold text-gray-800">{selectedSupplier.supplier_name}</p>
+                  <p className="text-[11px] text-gray-400">Credit terms: {Number(selectedSupplier.credit_terms_days || 0)} days</p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Record Payment</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>Amount</label>
+                  <input
+                    type="number"
+                    className={inputCls}
+                    placeholder="0.00"
+                    value={payment.amount}
+                    onChange={(e) => setPayment({ ...payment, amount: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>Mode</label>
+                  <select
+                    className={inputCls}
+                    value={payment.payment_mode}
+                    onChange={(e) => setPayment({ ...payment, payment_mode: e.target.value })}
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="bank">Bank</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className={labelCls}>Apply to PO (optional)</label>
+                <select
+                  className={inputCls}
+                  value={payment.po_id}
+                  onChange={(e) => setPayment({ ...payment, po_id: e.target.value })}
+                >
+                  <option value="">Any PO</option>
+                  {openPos.map((p) => (
+                    <option key={p.po_id} value={p.po_id}>
+                      {p.po_number} (Due ₹{Number(p.due_amount || 0).toFixed(0)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className={labelCls}>Reference No</label>
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={payment.reference_no}
+                  onChange={(e) => setPayment({ ...payment, reference_no: e.target.value })}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className={labelCls}>Notes</label>
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={payment.notes}
+                  onChange={(e) => setPayment({ ...payment, notes: e.target.value })}
+                />
+              </div>
               <button
                 onClick={recordPayment}
                 disabled={!canWrite}
-                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-[12px] disabled:opacity-60"
+                className="w-full px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-semibold transition disabled:opacity-60"
               >
                 Save Payment
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-xl border bg-white p-4 space-y-2 overflow-x-auto">
-          <div className="text-sm font-semibold">Open POs</div>
-          {openPos.length === 0 ? (
-            <div className="text-[12px] text-slate-500">Select a supplier</div>
-          ) : (
-            <table className="min-w-[700px] w-full text-left text-[12px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-2">PO</th>
-                  <th className="p-2">Date</th>
-                  <th className="p-2 text-right">Total</th>
-                  <th className="p-2 text-right">Paid</th>
-                  <th className="p-2 text-right">Due</th>
-                </tr>
-              </thead>
-              <tbody>
-                {openPos.map((p) => (
-                  <tr key={p.po_id} className="border-t">
-                    <td className="p-2 font-semibold">{p.po_number}</td>
-                    <td className="p-2">{p.order_date}</td>
-                    <td className="p-2 text-right">{Number(p.total_amount || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right">{Number(p.paid_amount || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right font-bold text-rose-700">
-                      {Number(p.due_amount || 0).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          {/* Open POs + Statement */}
+          <div className="space-y-4">
+            {/* Open POs */}
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Open Purchase Orders</p>
+              </div>
+              {openPos.length === 0 ? (
+                <div className="flex items-center justify-center h-24">
+                  <p className="text-[12px] text-gray-400">{selectedSupplierId ? "No open POs" : "Select a supplier"}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[360px] w-full text-[12px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">PO</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Date</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Total</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Due</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {openPos.map((p, idx) => (
+                        <tr key={p.po_id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
+                          <td className="px-3 py-2 font-semibold text-gray-800">{p.po_number}</td>
+                          <td className="px-3 py-2 text-gray-600">{p.order_date}</td>
+                          <td className="px-3 py-2 text-right text-gray-600">₹{Number(p.total_amount || 0).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-rose-600">₹{Number(p.due_amount || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
-          <div className="pt-3 border-t">
-            <div className="text-sm font-semibold">Statement</div>
-            {statement.length === 0 ? (
-              <div className="text-[12px] text-slate-500">No entries</div>
-            ) : (
-              <table className="min-w-[700px] w-full text-left text-[12px]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="p-2">Time</th>
-                    <th className="p-2">Type</th>
-                    <th className="p-2">Ref</th>
-                    <th className="p-2 text-right">Debit</th>
-                    <th className="p-2 text-right">Credit</th>
-                    <th className="p-2">Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {statement.map((e) => (
-                    <tr key={e.entry_id} className="border-t">
-                      <td className="p-2">
-                        {e.entry_time ? new Date(e.entry_time).toLocaleString() : "-"}
-                      </td>
-                      <td className="p-2 font-semibold">{e.entry_type}</td>
-                      <td className="p-2">{e.reference_no || "-"}</td>
-                      <td className="p-2 text-right">{Number(e.debit || 0).toFixed(2)}</td>
-                      <td className="p-2 text-right">{Number(e.credit || 0).toFixed(2)}</td>
-                      <td className="p-2">{e.notes || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {/* Statement */}
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Ledger Statement</p>
+              </div>
+              {statement.length === 0 ? (
+                <div className="flex items-center justify-center h-24">
+                  <p className="text-[12px] text-gray-400">{selectedSupplierId ? "No entries" : "Select a supplier"}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[480px] w-full text-[12px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Time</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Type</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Debit</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Credit</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {statement.map((e, idx) => (
+                        <tr key={e.entry_id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
+                          <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                            {e.entry_time ? new Date(e.entry_time).toLocaleString() : "—"}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-gray-800">{e.entry_type}</td>
+                          <td className="px-3 py-2 text-right text-rose-600 font-semibold">
+                            {Number(e.debit || 0) > 0 ? `₹${Number(e.debit).toFixed(2)}` : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right text-emerald-600 font-semibold">
+                            {Number(e.credit || 0) > 0 ? `₹${Number(e.credit).toFixed(2)}` : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">{e.notes || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

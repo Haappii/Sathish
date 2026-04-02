@@ -433,6 +433,7 @@ from app.routes.table_billing import router as table_billing_router
 from app.routes.table_management import router as table_management_router
 from app.routes.table_qr import router as table_qr_router
 from app.routes.public_qr import router as public_qr_router
+from app.routes.public_reservation import router as public_reservation_router
 from app.routes.qr_orders import router as qr_orders_router
 
 # ⭐ HOTEL FEATURE ROUTERS
@@ -502,6 +503,7 @@ app.include_router(table_billing_router, prefix="/api")
 app.include_router(table_management_router, prefix="/api")
 app.include_router(table_qr_router, prefix="/api")
 app.include_router(public_qr_router, prefix="/api")
+app.include_router(public_reservation_router, prefix="/api")
 app.include_router(qr_orders_router, prefix="/api")
 
 # ⭐ HOTEL FEATURES ----------

@@ -390,69 +390,72 @@ export default function MainLayout({ hideSidebar = false }) {
         <>
           {/* Hover/click handle */}
           <div
-            className="fixed inset-y-0 left-0 w-3 z-40 cursor-pointer bg-gradient-to-r from-black/10 to-transparent"
+            className="fixed inset-y-0 left-0 w-3 z-40 cursor-pointer"
             onMouseEnter={openSidebar}
             onClick={togglePin}
-            title="Menu"
           />
 
-          {/* Mobile backdrop (tap to close) */}
+          {/* Mobile backdrop */}
           {sidebarVisible && !sidebarPinned && (
             <div
-              className="fixed inset-0 bg-black/30 z-30 sm:hidden"
+              className="fixed inset-0 bg-black/40 z-30 sm:hidden"
               onClick={() => setSidebarOpen(false)}
             />
           )}
 
           <aside
-            className={`fixed inset-y-0 left-0 w-56 flex flex-col shadow-2xl z-50 transform transition-transform duration-200 ${
+            className={`fixed inset-y-0 left-0 w-60 flex flex-col z-50 transform transition-transform duration-200 ${
               sidebarVisible ? "translate-x-0" : "-translate-x-full"
             }`}
-            style={{ background: BLUE }}
+            style={{ background: "linear-gradient(180deg, #0B3C8C 0%, #071f4f 100%)" }}
             onMouseEnter={openSidebar}
             onMouseLeave={closeSidebar}
           >
-            <div className="pt-10 pb-4 px-6 text-white text-center relative">
+            {/* Sidebar brand */}
+            <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white font-black text-sm">H</div>
+                <div>
+                  <p className="text-white font-bold text-sm leading-tight">HAAPPII</p>
+                  <p className="text-white/50 text-[10px] leading-tight">BILLING</p>
+                </div>
+              </div>
               <button
                 onClick={togglePin}
-                className={`absolute top-3 right-3 p-2 rounded hover:bg-white/10 ${
-                  sidebarPinned ? "bg-white/15" : ""
-                }`}
+                className={`p-1.5 rounded-lg transition ${sidebarPinned ? "bg-white/20 text-white" : "text-white/50 hover:bg-white/10 hover:text-white"}`}
                 title={sidebarPinned ? "Unpin menu" : "Pin menu"}
                 type="button"
               >
-                <FaThumbtack
-                  className={`text-white ${sidebarPinned ? "rotate-45" : ""}`}
-                />
+                <FaThumbtack className={`text-[11px] ${sidebarPinned ? "rotate-45" : ""}`} />
               </button>
-
-              <p className="text-4xl font-extrabold">HAAPPII</p>
-              <p className="text-4xl font-extrabold -mt-1">BILLING</p>
-              <div className="w-16 h-[3px] bg-white mx-auto mt-3 rounded-full" />
             </div>
 
-            <nav className="px-3 mt-2 space-y-1 text-white flex-1 min-h-0 overflow-y-auto pb-3">
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5 min-h-0" style={{ scrollbarWidth: "none" }}>
               {menuItems.map(m => (
                 <NavLink
                   key={m.path}
                   to={m.path}
-                  onClick={() => {
-                    if (!sidebarPinned) setSidebarOpen(false);
-                  }}
+                  onClick={() => { if (!sidebarPinned) setSidebarOpen(false); }}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-xl font-semibold
-                    ${isActive ? "bg-white/25" : "hover:bg-white/10"}`
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+                      isActive
+                        ? "bg-white text-[#0B3C8C] shadow-sm"
+                        : "text-white/75 hover:bg-white/10 hover:text-white"
+                    }`
                   }
                 >
-                  <span className="text-lg">{m.icon}</span>
-                  <span>{m.name}</span>
+                  <span className="text-base w-5 flex-shrink-0 text-center">{m.icon}</span>
+                  <span className="truncate">{m.name}</span>
                 </NavLink>
               ))}
             </nav>
 
-            <div className="px-6 py-3 text-xs text-white/90">
-              <p>Version {APP_VERSION}</p>
-              <p>Build {BUILD_CODE}</p>
+            {/* Sidebar footer */}
+            <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
+              <div className="text-[10px] text-white/40">
+                <p>v{APP_VERSION} · {BUILD_CODE}</p>
+              </div>
             </div>
           </aside>
         </>
@@ -466,73 +469,78 @@ export default function MainLayout({ hideSidebar = false }) {
       >
 
         {/* HEADER */}
-        <header className="px-3 sm:px-6 py-2 sm:py-3 border-b flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3 flex-1">
+        <header className="bg-white border-b px-3 sm:px-5 py-2 flex items-center justify-between gap-3">
+          {/* Left: hamburger + logo + shop name */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {sidebarEnabled && (
               <button
                 onClick={togglePin}
-                className="border rounded px-2 py-2 hover:bg-gray-50"
+                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition flex-shrink-0"
                 title={sidebarPinned ? "Hide menu" : "Show menu"}
                 type="button"
               >
-                <FaBars />
+                <FaBars className="text-[13px]" />
               </button>
             )}
             <img
               src={logoSrc}
               alt="Logo"
-              className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
-              onError={() => {
-                if (logoSrc !== defaultLogo) setLogoSrc(defaultLogo);
-              }}
+              className="w-8 h-8 rounded-lg flex-shrink-0 object-cover"
+              onError={() => { if (logoSrc !== defaultLogo) setLogoSrc(defaultLogo); }}
             />
-            <span
-              className="text-lg sm:text-2xl lg:text-3xl font-extrabold truncate"
-              style={{ color: BLUE }}
-            >
+            <span className="text-base sm:text-lg font-extrabold truncate" style={{ color: BLUE }}>
               {shopName}
             </span>
           </div>
 
-          <div className="w-full sm:w-auto flex items-center justify-end gap-2 sm:gap-4 flex-wrap">
-              <div className="text-right leading-tight min-w-[64px]">
-                <div className="text-xs sm:text-sm font-semibold text-gray-700">{userName}</div>
-                <div className="text-xs text-gray-500 capitalize">{roleLower}</div>
+          {/* Right: controls */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* User pill */}
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style={{ backgroundColor: BLUE }}>
+                {userName.charAt(0).toUpperCase()}
               </div>
+              <div className="leading-tight">
+                <div className="text-[11px] font-semibold text-gray-700">{userName}</div>
+                <div className="text-[9px] text-gray-400 capitalize">{roleLower}</div>
+              </div>
+            </div>
 
+            {/* Branch switcher */}
             {isActualAdmin && branches.length > 0 && (
               <select
                 value={Number(branchId) || ""}
                 onChange={e => switchBranch(Number(e.target.value))}
-                className="border rounded px-2 py-1 text-sm max-w-[150px]"
+                className="border border-gray-200 rounded-xl px-2 py-1.5 text-[11px] bg-gray-50 max-w-[130px] focus:outline-none"
               >
                 {branches.map(b => (
-                  <option key={b.branch_id} value={b.branch_id}>
-                    {b.branch_name}
-                  </option>
+                  <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
                 ))}
               </select>
             )}
 
-            <span
-              className={`border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap ${
-                online
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-amber-50 text-amber-700 border-amber-200"
-              }`}
-            >
+            {/* Online/Offline */}
+            <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border ${
+              online
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-amber-50 text-amber-700 border-amber-200"
+            }`}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: online ? "#059669" : "#d97706" }} />
               {online ? "Online" : "Offline"}
             </span>
+
             {offlineSyncing && (
-              <span className="border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
-                Syncing offline bills…
+              <span className="hidden sm:inline px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200">
+                Syncing…
               </span>
             )}
 
-            <span className="border px-2 py-1 rounded text-xs sm:text-sm whitespace-nowrap">
+            {/* Date */}
+            <span className="hidden md:inline px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-100 whitespace-nowrap">
               {appDateDisplay}
             </span>
 
+            {/* Low Stock */}
             {shop?.inventory_enabled && (
               <div className="relative">
                 <button
@@ -543,13 +551,12 @@ export default function MainLayout({ hideSidebar = false }) {
                     setLowStockOpen(next);
                     if (next) await loadLowStock();
                   }}
-                  className="relative border rounded px-2 py-1 text-xs sm:text-sm hover:bg-gray-50 flex items-center gap-2"
+                  className="relative w-8 h-8 rounded-xl border border-amber-200 bg-amber-50 text-amber-600 flex items-center justify-center hover:bg-amber-100 transition"
                   title="Low stock alerts"
                 >
-                  <FaExclamationTriangle className="text-amber-600" />
-                  <span className="hidden sm:inline">Low Stock</span>
+                  <FaExclamationTriangle className="text-[12px]" />
                   {lowStockItems.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
+                    <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
                       {lowStockItems.length}
                     </span>
                   )}
@@ -558,60 +565,37 @@ export default function MainLayout({ hideSidebar = false }) {
                 {lowStockOpen && (
                   <div
                     ref={lowStockPopupRef}
-                    className="absolute right-0 mt-2 w-[320px] max-w-[calc(100vw-24px)] bg-white border rounded-xl shadow-lg z-50 overflow-hidden"
+                    className="absolute right-0 mt-2 w-[300px] max-w-[calc(100vw-24px)] bg-white border rounded-2xl shadow-xl z-50 overflow-hidden"
                   >
-                    <div className="px-3 py-2 border-b flex items-center justify-between">
-                      <div className="text-[12px] font-semibold text-slate-800">
-                        Low Stock Items
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setLowStockOpen(false)}
-                        className="text-[12px] text-slate-500 hover:text-slate-800"
-                      >
-                        ✕
-                      </button>
+                    <div className="px-4 py-3 border-b flex items-center justify-between">
+                      <div className="text-[12px] font-bold text-gray-800">Low Stock Items</div>
+                      <button type="button" onClick={() => setLowStockOpen(false)} className="text-gray-400 hover:text-gray-700 text-[12px]">✕</button>
                     </div>
-
-                    <div className="max-h-[280px] overflow-auto">
+                    <div className="max-h-[260px] overflow-auto divide-y">
                       {lowStockLoading ? (
-                        <div className="p-3 text-[12px] text-slate-500">Loading...</div>
+                        <div className="p-4 text-[12px] text-gray-400">Loading...</div>
                       ) : lowStockItems.length === 0 ? (
-                        <div className="p-3 text-[12px] text-slate-500">No low stock items</div>
+                        <div className="p-4 text-[12px] text-gray-400">No low stock items</div>
                       ) : (
-                        <div className="divide-y">
-                          {lowStockItems.slice(0, 10).map((r) => (
-                            <div key={r.item_id} className="px-3 py-2 text-[12px]">
-                              <div className="font-semibold text-slate-800 truncate">
-                                {r.item_name}
-                              </div>
-                              <div className="text-[11px] text-slate-500 flex justify-between">
-                                <span>Qty: {Number(r.quantity || 0)}</span>
-                                <span>Min: {Number(r.min_stock || 0)}</span>
-                              </div>
+                        lowStockItems.slice(0, 10).map((r) => (
+                          <div key={r.item_id} className="px-4 py-2.5 text-[12px]">
+                            <div className="font-semibold text-gray-800 truncate">{r.item_name}</div>
+                            <div className="text-[11px] text-gray-400 flex justify-between mt-0.5">
+                              <span>Qty: {Number(r.quantity || 0)}</span>
+                              <span>Min: {Number(r.min_stock || 0)}</span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))
                       )}
                     </div>
-
-                    <div className="px-3 py-2 border-t flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLowStockOpen(false);
-                          navigate("/reorder-alerts");
-                        }}
-                        className="px-3 py-1.5 rounded-lg border text-[12px] hover:bg-gray-50"
-                      >
-                        Open Alerts
+                    <div className="px-4 py-2.5 border-t flex items-center justify-between gap-2">
+                      <button type="button" onClick={() => { setLowStockOpen(false); navigate("/reorder-alerts"); }}
+                        className="px-3 py-1.5 rounded-xl border text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition">
+                        View All
                       </button>
-                      <button
-                        type="button"
-                        onClick={async () => await loadLowStock()}
-                        className="px-3 py-1.5 rounded-lg border text-[12px] hover:bg-gray-50"
-                      >
-                        Refresh
+                      <button type="button" onClick={async () => await loadLowStock()}
+                        className="px-3 py-1.5 rounded-xl border text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition">
+                        ↻ Refresh
                       </button>
                     </div>
                   </div>
@@ -619,29 +603,27 @@ export default function MainLayout({ hideSidebar = false }) {
               </div>
             )}
 
+            {/* QR Orders */}
             {canQrOrders && (
               <button
                 type="button"
                 onClick={() => navigate("/qr-orders")}
-                className="relative border rounded px-2 py-1 text-xs sm:text-sm hover:bg-gray-50 flex items-center gap-2"
+                className="relative w-8 h-8 rounded-xl border border-gray-200 bg-gray-50 text-gray-600 flex items-center justify-center hover:bg-gray-100 transition"
                 title="QR table orders"
               >
-                <MdTableRestaurant className="text-slate-700" />
-                <span className="hidden sm:inline">QR Orders</span>
+                <MdTableRestaurant className="text-[14px]" />
                 {qrPendingCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
+                  <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
                     {qrPendingCount}
                   </span>
                 )}
               </button>
             )}
 
+            {/* Logout */}
             <button
-              onClick={() => {
-                clearSession();
-                navigate("/");
-              }}
-              className="px-3 sm:px-4 py-1 rounded text-sm text-white whitespace-nowrap"
+              onClick={() => { clearSession(); navigate("/"); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-white transition hover:opacity-90"
               style={{ backgroundColor: BLUE }}
             >
               Logout
@@ -655,21 +637,28 @@ export default function MainLayout({ hideSidebar = false }) {
         </main>
 
         {/* FOOTER */}
-        <footer
-          className="px-3 sm:px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-          style={{ background: BLUE, color: "white" }}
-        >
-          <div>
-            <div className="font-bold">{branchName || "No Branch Selected"}</div>
-            <div className="text-xs opacity-90">{branchAddress}</div>
+        <footer className="bg-white border-t px-4 sm:px-6 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: BLUE }}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1.447.894L10 14.118l-4.553 2.776A1 1 0 014 16V4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-gray-800 leading-tight truncate">{branchName || "No Branch Selected"}</p>
+              {branchAddress && <p className="text-[10px] text-gray-400 leading-tight truncate">{branchAddress}</p>}
+            </div>
           </div>
 
           <button
             onClick={() => setChatOpen(true)}
-            className="bg-white px-3 py-1 rounded text-xs self-start sm:self-auto"
-            style={{ color: BLUE }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition hover:bg-gray-50 flex-shrink-0"
+            style={{ color: BLUE, borderColor: "#d1d5db" }}
           >
-            Support Chat
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+            </svg>
+            Support
           </button>
         </footer>
 
