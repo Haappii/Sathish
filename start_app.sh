@@ -88,6 +88,48 @@ resolve_venv_python() {
   return 1
 }
 
+require_node_runtime() {
+  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+Node.js and npm are required for the frontend.
+This project uses Vite 7, which requires Node.js 20.19+ or 22.12+.
+
+Install Node.js 22.x on Ubuntu with:
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+
+Then rerun:
+  ./start_app.sh
+EOF
+    exit 1
+  fi
+
+  local node_version
+  node_version="$(node -p "process.versions.node")"
+
+  local major=0
+  local minor=0
+  local patch=0
+  IFS=. read -r major minor patch <<< "${node_version}"
+
+  if (( major < 20 )) || \
+     (( major == 20 && minor < 19 )) || \
+     (( major == 21 )) || \
+     (( major == 22 && minor < 12 )); then
+    cat >&2 <<EOF
+Detected Node.js ${node_version}, but this project uses Vite 7 and needs Node.js 20.19+ or 22.12+.
+
+Recommended Ubuntu install:
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+
+Then rerun:
+  ./start_app.sh
+EOF
+    exit 1
+  fi
+}
+
 # Create venv if missing, or recreate it if the directory exists but is invalid.
 if [[ ! -d "venv" ]]; then
   create_backend_venv
@@ -119,11 +161,7 @@ trap 'kill ${BACKEND_PID} 2>/dev/null || true' EXIT
 # --- Frontend ---
 cd "${ROOT_DIR}/frontend"
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "npm not found. Install Node.js and npm." >&2
-  kill "${BACKEND_PID}" 2>/dev/null || true
-  exit 1
-fi
+require_node_runtime
 
 if [[ ! -d "node_modules" ]]; then
   npm install
