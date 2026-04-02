@@ -10,9 +10,11 @@ const CONFIG_FILE = "config.json";
 
 function loadSharedEnv() {
   const candidates = [
-    path.resolve(__dirname, "..", "config.txt"),
     path.resolve(__dirname, "..", ".env"),
+    path.resolve(__dirname, "..", "config.example.txt"),
+    path.resolve(__dirname, "..", "config.txt"),
   ];
+  const merged = {};
 
   for (const envPath of candidates) {
     if (!fs.existsSync(envPath)) continue;
@@ -26,7 +28,7 @@ function loadSharedEnv() {
       if (idx <= 0) continue;
 
       const key = line.slice(0, idx).trim();
-      if (!key || process.env[key]) continue;
+      if (!key) continue;
 
       let value = line.slice(idx + 1).trim();
       const quoted =
@@ -34,9 +36,14 @@ function loadSharedEnv() {
         (value.startsWith("'") && value.endsWith("'"));
       if (quoted) value = value.slice(1, -1);
 
+      merged[key] = value;
+    }
+  }
+
+  for (const [key, value] of Object.entries(merged)) {
+    if (!process.env[key]) {
       process.env[key] = value;
     }
-    break;
   }
 }
 

@@ -1,5 +1,6 @@
 # Global application config
-# Copy this file to `config.txt` and edit it for your environment.
+# Tracked production/shared config file.
+# Local `config.txt` can override these values without being committed.
 
 # App mode
 APP_ENV=development

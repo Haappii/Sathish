@@ -3,27 +3,26 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d "%~dp0"
 
-set "CONFIG_FILE=config.txt"
-if not exist "%CONFIG_FILE%" if exist ".env" set "CONFIG_FILE=.env"
-
-if exist "%CONFIG_FILE%" (
-  for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%CONFIG_FILE%") do (
-    set "ENV_KEY=%%~A"
-    set "ENV_VAL=%%~B"
-    if defined ENV_KEY (
-      for /f "tokens=* delims= " %%K in ("!ENV_KEY!") do set "ENV_KEY=%%~K"
-      if /I "!ENV_KEY!"=="PUBLIC_HOST" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="BACKEND_HOST" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="BACKEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="FRONTEND_HOST" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="FRONTEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="DESKTOP_FRONTEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="APP_URL" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="APP_URL_DEFAULT" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="VITE_API_BASE" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="VITE_WINDOWS_APP_URL" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="VITE_ANDROID_APK_URL" set "!ENV_KEY!=!ENV_VAL!"
-      if /I "!ENV_KEY!"=="VITE_IOS_APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+for %%F in (".env" "config.example.txt" "config.txt") do (
+  if exist %%~F (
+    for /f "usebackq eol=# tokens=1,* delims==" %%A in (%%~F) do (
+      set "ENV_KEY=%%~A"
+      set "ENV_VAL=%%~B"
+      if defined ENV_KEY (
+        for /f "tokens=* delims= " %%K in ("!ENV_KEY!") do set "ENV_KEY=%%~K"
+        if /I "!ENV_KEY!"=="PUBLIC_HOST" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="BACKEND_HOST" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="BACKEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="FRONTEND_HOST" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="FRONTEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="DESKTOP_FRONTEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="APP_URL_DEFAULT" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="VITE_API_BASE" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="VITE_WINDOWS_APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="VITE_ANDROID_APK_URL" set "!ENV_KEY!=!ENV_VAL!"
+        if /I "!ENV_KEY!"=="VITE_IOS_APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+      )
     )
   )
 )

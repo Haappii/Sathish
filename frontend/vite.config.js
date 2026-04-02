@@ -5,9 +5,11 @@ import react from '@vitejs/plugin-react'
 
 function loadSharedConfig() {
   const candidates = [
-    path.resolve(__dirname, '..', 'config.txt'),
     path.resolve(__dirname, '..', '.env'),
+    path.resolve(__dirname, '..', 'config.example.txt'),
+    path.resolve(__dirname, '..', 'config.txt'),
   ]
+  const merged = {}
 
   for (const filePath of candidates) {
     if (!fs.existsSync(filePath)) continue
@@ -21,7 +23,7 @@ function loadSharedConfig() {
       if (equalsIndex <= 0) continue
 
       const key = line.slice(0, equalsIndex).trim()
-      if (!key || process.env[key]) continue
+      if (!key) continue
 
       let value = line.slice(equalsIndex + 1).trim()
       const quoted =
@@ -29,9 +31,14 @@ function loadSharedConfig() {
         (value.startsWith("'") && value.endsWith("'"))
       if (quoted) value = value.slice(1, -1)
 
+      merged[key] = value
+    }
+  }
+
+  for (const [key, value] of Object.entries(merged)) {
+    if (!process.env[key]) {
       process.env[key] = value
     }
-    break
   }
 }
 
