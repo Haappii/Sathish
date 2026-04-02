@@ -1,19 +1,18 @@
 # Global application config
-# Tracked production/shared config file.
-# Local `config.txt` can override these values without being committed.
+# Edit this single file for local/prod hosts, database, frontend API, and download links.
 
 # App mode
-APP_ENV=development
+APP_ENV=production
 
 # Backend
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shop_billing
+DATABASE_URL=postgresql://shopser:postgres@localhost:5432/shopdb
 JWT_SECRET=change-this-before-production
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5180,http://127.0.0.1:5173,http://127.0.0.1:5180
+ALLOWED_ORIGINS=http://51.21.224.224,http://51.21.224.224:5173,http://51.21.224.224:5180,http://localhost:5173,http://localhost:5180,http://127.0.0.1:5173,http://127.0.0.1:5180
 
 # Local runner / deploy hosts and ports
-PUBLIC_HOST=localhost
+PUBLIC_HOST=51.21.224.224
 BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
 FRONTEND_HOST=0.0.0.0
@@ -21,14 +20,14 @@ FRONTEND_PORT=5173
 DESKTOP_FRONTEND_PORT=5180
 
 # Frontend / API / links
-VITE_API_BASE=/api
+VITE_API_BASE=http://51.21.224.224:8000/api
 VITE_WINDOWS_APP_URL=/downloads/poss-desktop-setup.exe
 VITE_ANDROID_APK_URL=/downloads/haappii-billing.apk
 VITE_IOS_APP_URL=
 
 # Desktop wrapper
-APP_URL=http://localhost:5180
-APP_URL_DEFAULT=http://localhost:5180
+APP_URL=http://51.21.224.224:5180
+APP_URL_DEFAULT=http://51.21.224.224:5180
 
 # Optional support email config
 SUPPORT_EMAIL_ENABLED=false
