@@ -63,8 +63,7 @@ echo "Windows EXE expected at: ${ROOT_DIR}/downloads/poss-desktop-setup.exe"
 # --- Backend ---
 cd "${ROOT_DIR}/backend"
 
-# python -m venv venv
-if [[ ! -d "venv" ]]; then
+create_backend_venv() {
   if command -v python3 >/dev/null 2>&1; then
     python3 -m venv venv
   elif command -v python >/dev/null 2>&1; then
@@ -73,14 +72,33 @@ if [[ ! -d "venv" ]]; then
     echo "Python 3 not found. Install python3 and python3-venv." >&2
     exit 1
   fi
+}
+
+resolve_venv_python() {
+  if [[ -x "venv/bin/python" ]]; then
+    echo "venv/bin/python"
+    return 0
+  fi
+
+  if [[ -x "venv/Scripts/python.exe" ]]; then
+    echo "venv/Scripts/python.exe"
+    return 0
+  fi
+
+  return 1
+}
+
+# Create venv if missing, or recreate it if the directory exists but is invalid.
+if [[ ! -d "venv" ]]; then
+  create_backend_venv
+elif ! VENV_PYTHON="$(resolve_venv_python)"; then
+  echo "Existing backend/venv is incomplete. Recreating it..."
+  rm -rf venv
+  create_backend_venv
 fi
 
-if [[ -x "venv/bin/python" ]]; then
-  VENV_PYTHON="venv/bin/python"
-elif [[ -x "venv/Scripts/python.exe" ]]; then
-  VENV_PYTHON="venv/Scripts/python.exe"
-else
-  echo "venv python executable not found" >&2
+if ! VENV_PYTHON="$(resolve_venv_python)"; then
+  echo "venv python executable not found after recreation. Install python3-venv and try again." >&2
   exit 1
 fi
 
