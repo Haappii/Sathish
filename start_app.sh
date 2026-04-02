@@ -53,6 +53,13 @@ export VITE_ANDROID_APK_URL="${VITE_ANDROID_APK_URL:-/downloads/haappii-billing.
 
 DOWNLOADS_BASE_URL="${DOWNLOADS_BASE_URL:-http://${PUBLIC_HOST}:${BACKEND_PORT}/downloads}"
 
+if [[ "${APP_ENV:-development}" == "production" ]]; then
+  echo "Production config detected."
+  echo "Use: bash deploy/install_production.sh"
+  echo "This script is for local/dev mode and starts Vite on ports ${FRONTEND_PORT} and ${DESKTOP_FRONTEND_PORT}."
+  exit 1
+fi
+
 # Helpful startup info
 echo "API:        http://${PUBLIC_HOST}:${BACKEND_PORT}/api"
 echo "Web UI:     http://${PUBLIC_HOST}:${FRONTEND_PORT}"

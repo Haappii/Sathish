@@ -1,16 +1,15 @@
 [Unit]
-Description=POSS Backend (FastAPI/Uvicorn)
+Description=Haappii Billing Backend (FastAPI/Uvicorn)
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/POSS/backend
+WorkingDirectory=/home/ubuntu/Sathish/backend
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/ubuntu/POSS/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+ExecStart=/home/ubuntu/Sathish/backend/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-

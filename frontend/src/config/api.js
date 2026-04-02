@@ -26,6 +26,11 @@ const fallbackBase = (() => {
     return `${window.location.origin}/api`;
   }
 
+  // For non-localhost production hosting behind Nginx/Apache, prefer same-origin /api.
+  if (!isLocalHost()) {
+    return `${window.location.origin}/api`;
+  }
+
   // Default local/dev: frontend on :5173, backend on :8000.
   const proto = window.location?.protocol || "http:";
   const host = window.location?.hostname || "localhost";

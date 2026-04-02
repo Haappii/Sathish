@@ -8,43 +8,47 @@ Goal: expose the app on **port 80** (no `:5173` / `:8000`), and keep Postgres pr
 - Allow **22** only from your IP: `<your-ip>/32`
 - Remove public access to **5173**, **8000**, **5432**
 
-## 2) Build frontend
-
-```bash
-cd ~/POSS/frontend
-npm install
-npm run build
-```
-
-## 3) Run backend as a service (localhost only)
-
-```bash
-cd ~/POSS
-sudo cp deploy/pos-backend.service /etc/systemd/system/pos-backend.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now pos-backend
-sudo systemctl status pos-backend --no-pager
-```
-
-Health check:
-```bash
-curl -I http://127.0.0.1:8000/api/health
-```
-
-## 4) Nginx (serve frontend + proxy /api)
+## 2) Install runtime prerequisites
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y nginx
-sudo cp ~/POSS/deploy/nginx-pos.conf /etc/nginx/sites-available/pos
-sudo ln -sf /etc/nginx/sites-available/pos /etc/nginx/sites-enabled/pos
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
+sudo apt-get install -y python3 python3-venv nginx
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+## 3) Pull latest code
+
+```bash
+cd ~/Sathish
+git pull origin main
+```
+
+## 4) Run the production installer
+
+```bash
+bash deploy/install_production.sh
+```
+
+This script will:
+
+- create/fix `backend/venv`
+- install backend requirements
+- build the frontend with `VITE_API_BASE=/api`
+- install the backend systemd service
+- install the Nginx site on port `80`
+
+## 5) Verify
+
+Health check:
+
+```bash
+curl -I http://127.0.0.1:8000/api/health
+systemctl status pos-backend --no-pager
+systemctl status nginx --no-pager
 ```
 
 Open in browser:
 ```text
-http://13.60.186.234/
+http://51.21.224.224/
 ```
-
