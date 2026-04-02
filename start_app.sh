@@ -65,38 +65,51 @@ cd "${ROOT_DIR}/backend"
 
 # python -m venv venv
 if [[ ! -d "venv" ]]; then
-  if command -v python >/dev/null 2>&1; then
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -m venv venv
+  elif command -v python >/dev/null 2>&1; then
     python -m venv venv
   else
-    python3 -m venv venv
+    echo "Python 3 not found. Install python3 and python3-venv." >&2
+    exit 1
   fi
 fi
 
-# venv\Scripts\activate (Windows) or venv/bin/activate (Linux/macOS)
-if [[ -f "venv/bin/activate" ]]; then
-  # shellcheck disable=SC1091
-  source venv/bin/activate
-elif [[ -f "venv/Scripts/activate" ]]; then
-  # shellcheck disable=SC1091
-  source venv/Scripts/activate
+if [[ -x "venv/bin/python" ]]; then
+  VENV_PYTHON="venv/bin/python"
+elif [[ -x "venv/Scripts/python.exe" ]]; then
+  VENV_PYTHON="venv/Scripts/python.exe"
 else
-  echo "venv activate script not found" >&2
+  echo "venv python executable not found" >&2
   exit 1
 fi
 
-# pip install fastapi uvicorn sqlalchemy psycopg2-binary python-dotenv passlib[bcrypt] bcrypt==4.0.1
-pip install fastapi uvicorn sqlalchemy psycopg2-binary python-dotenv "passlib[bcrypt]" "bcrypt==4.0.1"
+if [[ ! -f "requirements.txt" ]]; then
+  echo "backend/requirements.txt not found" >&2
+  exit 1
+fi
 
-# pip freeze > requirements.txt
-pip freeze > requirements.txt
+# Install dependencies into the virtualenv itself.
+"${VENV_PYTHON}" -m pip install --upgrade pip
+"${VENV_PYTHON}" -m pip install -r requirements.txt
 
 # uvicorn app.main:app --reload (bind all interfaces)
-uvicorn app.main:app --reload --host "${BACKEND_HOST}" --port "${BACKEND_PORT}" &
+"${VENV_PYTHON}" -m uvicorn app.main:app --reload --host "${BACKEND_HOST}" --port "${BACKEND_PORT}" &
 BACKEND_PID=$!
 trap 'kill ${BACKEND_PID} 2>/dev/null || true' EXIT
 
 # --- Frontend ---
 cd "${ROOT_DIR}/frontend"
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "npm not found. Install Node.js and npm." >&2
+  kill "${BACKEND_PID}" 2>/dev/null || true
+  exit 1
+fi
+
+if [[ ! -d "node_modules" ]]; then
+  npm install
+fi
 
 # Desktop port (background)
 npm run dev -- --strictPort --host "${FRONTEND_HOST}" --port "${DESKTOP_FRONTEND_PORT}" &
