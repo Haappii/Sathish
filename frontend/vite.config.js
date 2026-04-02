@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  envDir: '..',
   plugins: [react()],
   build: {
     // Split large dependencies into dedicated chunks to keep the main bundle lean

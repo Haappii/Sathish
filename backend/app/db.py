@@ -1,16 +1,14 @@
  
-from pathlib import Path
 import os
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import logging
 from logging.handlers import RotatingFileHandler
+from app.env import load_project_env
 
-# Load backend/.env early (if present)
-_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
-load_dotenv(dotenv_path=_ENV_PATH, override=False)
+# Load shared root .env first, then backend/.env as a fallback.
+load_project_env()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

@@ -5,7 +5,7 @@
   "description": "Haappii Billing Desktop (offline-capable wrapper)",
   "main": "main.js",
   "scripts": {
-    "dev": "cross-env APP_URL=http://localhost:5173 electron .",
+    "dev": "electron .",
     "start": "electron .",
     "sync-offline-ui": "node scripts/sync-offline-ui.js",
     "dist:win": "npm run sync-offline-ui && electron-builder --win nsis -p never",

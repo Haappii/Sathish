@@ -1,5 +1,29 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
+
+cd /d "%~dp0"
+
+if exist ".env" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+    set "ENV_KEY=%%~A"
+    set "ENV_VAL=%%~B"
+    if defined ENV_KEY (
+      for /f "tokens=* delims= " %%K in ("!ENV_KEY!") do set "ENV_KEY=%%~K"
+      if /I "!ENV_KEY!"=="PUBLIC_HOST" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="BACKEND_HOST" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="BACKEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="FRONTEND_HOST" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="FRONTEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="DESKTOP_FRONTEND_PORT" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="APP_URL_DEFAULT" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="VITE_API_BASE" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="VITE_WINDOWS_APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="VITE_ANDROID_APK_URL" set "!ENV_KEY!=!ENV_VAL!"
+      if /I "!ENV_KEY!"=="VITE_IOS_APP_URL" set "!ENV_KEY!=!ENV_VAL!"
+    )
+  )
+)
 
 REM ================================
 REM Local Windows runner (dev)
@@ -34,10 +58,10 @@ if "%FRONTEND_PORT%"=="" set FRONTEND_PORT=5173
 if "%DESKTOP_FRONTEND_PORT%"=="" set DESKTOP_FRONTEND_PORT=5180
 if "%PUBLIC_HOST%"=="" set PUBLIC_HOST=localhost
 
-set "APP_URL=http://%PUBLIC_HOST%:%DESKTOP_FRONTEND_PORT%"
-set "VITE_API_BASE=/api"
-set "VITE_WINDOWS_APP_URL=/downloads/poss-desktop-setup.exe"
-set "VITE_ANDROID_APK_URL=/downloads/haappii-billing.apk"
+if "%APP_URL%"=="" set "APP_URL=http://%PUBLIC_HOST%:%DESKTOP_FRONTEND_PORT%"
+if "%VITE_API_BASE%"=="" set "VITE_API_BASE=/api"
+if "%VITE_WINDOWS_APP_URL%"=="" set "VITE_WINDOWS_APP_URL=/downloads/poss-desktop-setup.exe"
+if "%VITE_ANDROID_APK_URL%"=="" set "VITE_ANDROID_APK_URL=/downloads/haappii-billing.apk"
 
 REM Optional:
 REM   set KEEP_RUNNER_OPEN=1 (keep this launcher window open)

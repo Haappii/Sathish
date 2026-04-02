@@ -1,13 +1,9 @@
-# app/config.py
-from pathlib import Path
 import os
 import logging
 
-from dotenv import load_dotenv
+from app.env import load_project_env
 
-# Load backend/.env early (if present)
-_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
-load_dotenv(dotenv_path=_ENV_PATH, override=False)
+load_project_env()
 
 _logger = logging.getLogger(__name__)
 

@@ -7,9 +7,37 @@ const https = require("https");
 
 const PROTOCOL = "poss";
 const CONFIG_FILE = "config.json";
+
+function loadSharedEnv() {
+  const envPath = path.resolve(__dirname, "..", ".env");
+  if (!fs.existsSync(envPath)) return;
+
+  const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = String(rawLine || "").trim();
+    if (!line || line.startsWith("#")) continue;
+
+    const idx = line.indexOf("=");
+    if (idx <= 0) continue;
+
+    const key = line.slice(0, idx).trim();
+    if (!key || process.env[key]) continue;
+
+    let value = line.slice(idx + 1).trim();
+    const quoted =
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"));
+    if (quoted) value = value.slice(1, -1);
+
+    process.env[key] = value;
+  }
+}
+
+loadSharedEnv();
+
 // Default URL the packaged desktop app will open if nothing else is configured.
 // Point this to the hosted frontend that talks to your backend API.
-const DEFAULT_APP_URL = process.env.APP_URL_DEFAULT || "http://13.60.186.234:5173";
+const DEFAULT_APP_URL = process.env.APP_URL_DEFAULT || "http://localhost:5180";
 
 function findBluetoothPrinterPort() {
   try {
