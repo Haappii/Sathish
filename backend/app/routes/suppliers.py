@@ -113,7 +113,7 @@ def update_supplier(
 
     if supplier.shop_id != user.shop_id:
         raise HTTPException(403, "Not allowed")
-    if str(user.role_name).lower() != "admin" and supplier.branch_id != user.branch_id:
+    if (user.role_name or "").lower() != "admin" and supplier.branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
 
     old = {
@@ -164,7 +164,7 @@ def delete_supplier(
 
     if supplier.shop_id != user.shop_id:
         raise HTTPException(403, "Not allowed")
-    if str(user.role_name).lower() != "admin" and supplier.branch_id != user.branch_id:
+    if (user.role_name or "").lower() != "admin" and supplier.branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
 
     old_status = supplier.status

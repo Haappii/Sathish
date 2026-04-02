@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -9,6 +9,8 @@ class Customer(Base):
     __tablename__ = "customers"
     __table_args__ = (
         UniqueConstraint("shop_id", "mobile", name="uq_customers_shop_mobile"),
+        Index("ix_customers_shop_status", "shop_id", "status"),
+        Index("ix_customers_shop_name", "shop_id", "customer_name"),
     )
 
     customer_id = Column(Integer, primary_key=True, index=True)

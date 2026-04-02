@@ -19,6 +19,10 @@ import {
   FaBarcode,
   FaCloudUploadAlt,
   FaMotorcycle,
+  FaShoppingBag,
+  FaCalendarAlt,
+  FaUtensils,
+  FaConciergeBell,
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
@@ -73,6 +77,46 @@ const MENU_CATALOG = [
     path: "/qr-orders",
     icon: <MdTableRestaurant />,
     perm: { module: "qr_orders", action: "read" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
+    key: "takeaway",
+    name: "Takeaway",
+    path: "/takeaway",
+    icon: <FaShoppingBag />,
+    perm: { module: "billing", action: "write" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
+    key: "reservations",
+    name: "Reservations",
+    path: "/reservations",
+    icon: <FaCalendarAlt />,
+    perm: { module: "billing", action: "read" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
+    key: "delivery",
+    name: "Delivery",
+    path: "/delivery",
+    icon: <FaMotorcycle />,
+    perm: { module: "billing", action: "write" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
+    key: "recipes",
+    name: "Recipes",
+    path: "/recipes",
+    icon: <FaUtensils />,
+    perm: { module: "inventory", action: "read" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
+    key: "kot_management",
+    name: "KOT",
+    path: "/kot",
+    icon: <FaConciergeBell />,
+    perm: { module: "billing", action: "write" },
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
@@ -186,6 +230,7 @@ const MENU_CATALOG = [
     path: "/item-lots",
     icon: <FaBarcode />,
     perm: { module: "item_lots", action: "read" },
+    when: ({ showTableBilling }) => !Boolean(showTableBilling),
   },
   {
     key: "labels",
@@ -193,6 +238,7 @@ const MENU_CATALOG = [
     path: "/labels",
     icon: <FaBarcode />,
     perm: { module: "items", action: "read" },
+    when: ({ showTableBilling }) => !Boolean(showTableBilling),
   },
   {
     key: "transfers",
@@ -323,16 +369,12 @@ export const buildRoleMenu = ({
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       ...(showTableBilling
         ? [
-            {
-              name: "Table Billing",
-              path: "/table-billing",
-              icon: <MdTableRestaurant />,
-            },
-            {
-              name: "QR Orders",
-              path: "/qr-orders",
-              icon: <MdTableRestaurant />,
-            },
+            { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
+            { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
+            { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
+            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
+            { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
           ]
         : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
@@ -348,16 +390,11 @@ export const buildRoleMenu = ({
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       ...(showTableBilling
         ? [
-            {
-              name: "Table Billing",
-              path: "/table-billing",
-              icon: <MdTableRestaurant />,
-            },
-            {
-              name: "QR Orders",
-              path: "/qr-orders",
-              icon: <MdTableRestaurant />,
-            },
+            { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
+            { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
+            { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
+            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
           ]
         : []),
     ];
@@ -371,16 +408,13 @@ export const buildRoleMenu = ({
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       ...(showTableBilling
         ? [
-            {
-              name: "Table Billing",
-              path: "/table-billing",
-              icon: <MdTableRestaurant />,
-            },
-            {
-              name: "QR Orders",
-              path: "/qr-orders",
-              icon: <MdTableRestaurant />,
-            },
+            { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
+            { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
+            { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
+            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
+            { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
+            { name: "Recipes", path: "/recipes", icon: <FaUtensils /> },
           ]
         : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
@@ -397,15 +431,15 @@ export const buildRoleMenu = ({
       { name: "Coupons", path: "/coupons", icon: <FaTags /> },
       { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
       { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
-      { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
-      { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
+      ...(!showTableBilling
+        ? [
+            { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
+            { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
+          ]
+        : []),
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
-      {
-        name: "Deleted Invoice",
-        path: "/deleted-invoices",
-        icon: <FaFileInvoice />,
-      },
+      { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
       { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
       { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
@@ -422,16 +456,13 @@ export const buildRoleMenu = ({
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       ...(showTableBilling
         ? [
-            {
-              name: "Table Billing",
-              path: "/table-billing",
-              icon: <MdTableRestaurant />,
-            },
-            {
-              name: "QR Orders",
-              path: "/qr-orders",
-              icon: <MdTableRestaurant />,
-            },
+            { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
+            { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Takeaway", path: "/takeaway", icon: <FaShoppingBag /> },
+            { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
+            { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
+            { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
+            { name: "Recipes", path: "/recipes", icon: <FaUtensils /> },
           ]
         : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
@@ -448,17 +479,17 @@ export const buildRoleMenu = ({
       { name: "Coupons", path: "/coupons", icon: <FaTags /> },
       { name: "Supplier Ledger", path: "/supplier-ledger", icon: <FaBook /> },
       { name: "Stock Audit", path: "/stock-audit", icon: <FaClipboardCheck /> },
-      { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
-      { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
+      ...(!showTableBilling
+        ? [
+            { name: "Item Lots", path: "/item-lots", icon: <FaBarcode /> },
+            { name: "Labels / Barcode", path: "/labels", icon: <FaBarcode /> },
+          ]
+        : []),
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
-      {
-        name: "Deleted Invoice",
-        path: "/deleted-invoices",
-        icon: <FaFileInvoice />,
-      },
+      { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
       { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
       { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> },

@@ -36,6 +36,15 @@ from app.services.credit_service import ensure_invoice_due, upsert_customer
 from app.services.gst_service import calculate_gst
 from app.services.inventory_service import adjust_stock, is_inventory_enabled
 from app.services.invoice_service import generate_invoice_number
+from app.utils.branch_online_orders import (
+    BRANCH_ONLINE_ORDER_BOOL_FIELDS,
+    BRANCH_ONLINE_ORDER_INT_FIELDS,
+    BRANCH_ONLINE_ORDER_TEXT_FIELDS,
+    get_branch_online_order_settings,
+    load_branch_online_order_param_map,
+    normalize_online_order_timeout,
+    read_branch_online_order_settings_from_map,
+)
 from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/online-orders", tags=["Online Orders"])
@@ -173,23 +182,68 @@ def _get_param(db: Session, shop_id: int, key: str) -> str | None:
     return (row.param_value or "").strip() if row and row.param_value is not None else None
 
 
-def _provider_enabled(db: Session, shop_id: int, provider: str) -> bool:
-    key = f"{provider.lower()}_enabled"
-    val = _get_param(db, shop_id, key)
-    if val is None:
-        return True
-    return val.strip().upper() == "YES"
-
-
-def _provider_partner_id(db: Session, shop_id: int, provider: str) -> str | None:
-    return _get_param(db, shop_id, f"{provider.lower()}_partner_id")
-
-
 def _param_yes(db: Session, shop_id: int, key: str, *, default: bool = False) -> bool:
     v = _get_param(db, shop_id, key)
     if v is None:
         return default
     return str(v).strip().upper() == "YES"
+
+
+def _shop_online_order_settings(db: Session, shop_id: int) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for field in BRANCH_ONLINE_ORDER_BOOL_FIELDS:
+        default = bool(field == "online_orders_status_sync_enabled")
+        out[field] = _param_yes(db, shop_id, field, default=default)
+    for field in BRANCH_ONLINE_ORDER_INT_FIELDS:
+        out[field] = normalize_online_order_timeout(_get_param(db, shop_id, field), default=8)
+    for field in BRANCH_ONLINE_ORDER_TEXT_FIELDS:
+        out[field] = _get_param(db, shop_id, field) or ""
+    return out
+
+
+def _online_order_settings(db: Session, shop_id: int, branch_id: int | None = None) -> dict[str, Any]:
+    if branch_id:
+        return get_branch_online_order_settings(
+            db,
+            shop_id=shop_id,
+            branch_id=int(branch_id),
+            include_legacy_shop_fallback=True,
+        )
+    return _shop_online_order_settings(db, shop_id)
+
+
+def _provider_enabled_from_settings(settings: dict[str, Any], provider: str) -> bool:
+    key = f"{provider.lower()}_enabled"
+    return bool(settings.get(key))
+
+
+def _provider_enabled(
+    db: Session,
+    shop_id: int,
+    provider: str,
+    *,
+    branch_id: int | None = None,
+    settings: dict[str, Any] | None = None,
+) -> bool:
+    cfg = settings or _online_order_settings(db, shop_id, branch_id)
+    return _provider_enabled_from_settings(cfg, provider)
+
+
+def _provider_partner_id_from_settings(settings: dict[str, Any], provider: str) -> str | None:
+    value = settings.get(f"{provider.lower()}_partner_id")
+    return str(value).strip() if value not in (None, "") else None
+
+
+def _provider_partner_id(
+    db: Session,
+    shop_id: int,
+    provider: str,
+    *,
+    branch_id: int | None = None,
+    settings: dict[str, Any] | None = None,
+) -> str | None:
+    cfg = settings or _online_order_settings(db, shop_id, branch_id)
+    return _provider_partner_id_from_settings(cfg, provider)
 
 
 def _extract_signature(headers, provider: str) -> str | None:
@@ -237,10 +291,13 @@ def _webhook_auth_ok(
     body: bytes,
     headers,
     x_webhook_token: str | None,
+    branch_id: int | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
     provider_l = provider.lower()
-    secret = _get_param(db, shop_id, f"{provider_l}_webhook_secret")
-    signature_required = _param_yes(db, shop_id, "online_orders_signature_required", default=False)
+    cfg = settings or _online_order_settings(db, shop_id, branch_id)
+    secret = str(cfg.get(f"{provider_l}_webhook_secret") or "").strip()
+    signature_required = bool(cfg.get("online_orders_signature_required"))
     signature = _extract_signature(headers, provider)
 
     if secret:
@@ -253,9 +310,9 @@ def _webhook_auth_ok(
     if signature_required:
         return False, "Signature verification is enabled but provider secret is not configured"
 
-    configured_token = _get_param(db, shop_id, "online_orders_webhook_token")
+    configured_token = str(cfg.get("online_orders_webhook_token") or "").strip()
     if configured_token:
-        if str(x_webhook_token or "").strip() != str(configured_token).strip():
+        if str(x_webhook_token or "").strip() != configured_token:
             return False, "Invalid webhook token"
         return True, "token"
 
@@ -263,24 +320,27 @@ def _webhook_auth_ok(
     return True, "open"
 
 
-def _provider_sync_config(db: Session, shop_id: int, provider: str) -> dict[str, Any]:
+def _provider_sync_config(
+    db: Session,
+    shop_id: int,
+    provider: str,
+    *,
+    branch_id: int | None = None,
+    settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     provider_l = provider.lower()
-    timeout_raw = _get_param(db, shop_id, "online_orders_status_sync_timeout_sec")
-    timeout_sec = 8
-    if timeout_raw:
-        try:
-            timeout_sec = int(timeout_raw)
-        except Exception:
-            timeout_sec = 8
-    timeout_sec = max(3, min(timeout_sec, 30))
+    cfg = settings or _online_order_settings(db, shop_id, branch_id)
 
     return {
-        "enabled": _param_yes(db, shop_id, "online_orders_status_sync_enabled", default=True),
-        "strict": _param_yes(db, shop_id, "online_orders_status_sync_strict", default=False),
-        "url": _get_param(db, shop_id, f"{provider_l}_status_sync_url"),
-        "token": _get_param(db, shop_id, f"{provider_l}_status_sync_token"),
-        "secret": _get_param(db, shop_id, f"{provider_l}_status_sync_secret"),
-        "timeout_sec": timeout_sec,
+        "enabled": bool(cfg.get("online_orders_status_sync_enabled", True)),
+        "strict": bool(cfg.get("online_orders_status_sync_strict", False)),
+        "url": str(cfg.get(f"{provider_l}_status_sync_url") or "").strip(),
+        "token": str(cfg.get(f"{provider_l}_status_sync_token") or "").strip(),
+        "secret": str(cfg.get(f"{provider_l}_status_sync_secret") or "").strip(),
+        "timeout_sec": normalize_online_order_timeout(
+            cfg.get("online_orders_status_sync_timeout_sec"),
+            default=8,
+        ),
     }
 
 
@@ -325,7 +385,12 @@ def _post_json(url: str, payload: dict[str, Any], *, token: str | None, secret: 
 
 
 def _sync_status_to_provider(db: Session, *, order: OnlineOrder, status: str) -> dict[str, Any]:
-    config = _provider_sync_config(db, order.shop_id, order.provider)
+    config = _provider_sync_config(
+        db,
+        order.shop_id,
+        order.provider,
+        branch_id=int(order.branch_id) if order.branch_id else None,
+    )
     if not config.get("enabled", True):
         return {"ok": True, "skipped": True, "reason": "sync_disabled", "strict": bool(config.get("strict"))}
     url = str(config.get("url") or "").strip()
@@ -363,7 +428,14 @@ def _resolve_user_branch(branch_id_param: int | None, user) -> int:
         raise HTTPException(400, "Branch required")
 
 
-def _resolve_webhook_branch(db: Session, shop_id: int, branch_id: int | None) -> int | None:
+def _resolve_webhook_branch(
+    db: Session,
+    shop_id: int,
+    branch_id: int | None,
+    *,
+    provider: str | None = None,
+    partner_id: str | None = None,
+) -> int | None:
     if branch_id:
         branch = (
             db.query(Branch)
@@ -373,13 +445,37 @@ def _resolve_webhook_branch(db: Session, shop_id: int, branch_id: int | None) ->
         if branch:
             return int(branch.branch_id)
 
-    fallback = (
+    active_branches = (
         db.query(Branch)
         .filter(Branch.shop_id == shop_id, Branch.status == "ACTIVE")
         .order_by(Branch.branch_id.asc())
-        .first()
+        .all()
     )
-    return int(fallback.branch_id) if fallback else None
+    if not active_branches:
+        return None
+
+    partner_id_text = str(partner_id or "").strip()
+    provider_text = str(provider or "").strip().upper()
+    if partner_id_text and provider_text in PROVIDERS:
+        branch_ids = [int(branch.branch_id) for branch in active_branches]
+        pmap = load_branch_online_order_param_map(
+            db,
+            shop_id=shop_id,
+            branch_ids=branch_ids,
+            include_legacy_shop=False,
+        )
+        partner_field = f"{provider_text.lower()}_partner_id"
+        for branch in active_branches:
+            settings = read_branch_online_order_settings_from_map(
+                pmap,
+                int(branch.branch_id),
+                include_legacy_shop_fallback=False,
+            )
+            configured_partner = str(settings.get(partner_field) or "").strip()
+            if configured_partner and configured_partner == partner_id_text:
+                return int(branch.branch_id)
+
+    return int(active_branches[0].branch_id)
 
 
 def _assert_branch_access(order: OnlineOrder, user):
@@ -1199,9 +1295,6 @@ async def online_order_webhook(
 ):
     provider_u = _normalize_provider(provider)
 
-    if not _provider_enabled(db, shop_id, provider_u):
-        raise HTTPException(403, f"{provider_u} integration is disabled")
-
     raw_body = await request.body()
     if not raw_body:
         raise HTTPException(400, "Empty webhook payload")
@@ -1210,6 +1303,19 @@ async def online_order_webhook(
     except Exception:
         raise HTTPException(400, "Invalid JSON payload")
 
+    normalized = _normalize_webhook_payload(provider_u, payload or {})
+    normalized.branch_id = _resolve_webhook_branch(
+        db,
+        shop_id,
+        normalized.branch_id,
+        provider=provider_u,
+        partner_id=normalized.partner_id,
+    )
+    settings = _online_order_settings(db, shop_id, normalized.branch_id)
+
+    if not _provider_enabled(db, shop_id, provider_u, branch_id=normalized.branch_id, settings=settings):
+        raise HTTPException(403, f"{provider_u} integration is disabled")
+
     auth_ok, auth_mode = _webhook_auth_ok(
         db,
         shop_id=shop_id,
@@ -1217,16 +1323,22 @@ async def online_order_webhook(
         body=raw_body,
         headers=request.headers,
         x_webhook_token=x_webhook_token,
+        branch_id=normalized.branch_id,
+        settings=settings,
     )
     if not auth_ok:
         raise HTTPException(401, auth_mode)
 
-    configured_partner = _provider_partner_id(db, shop_id, provider_u)
-    normalized = _normalize_webhook_payload(provider_u, payload or {})
+    configured_partner = _provider_partner_id(
+        db,
+        shop_id,
+        provider_u,
+        branch_id=normalized.branch_id,
+        settings=settings,
+    )
     if configured_partner and normalized.partner_id and configured_partner != normalized.partner_id:
         raise HTTPException(403, "partner_id mismatch")
 
-    normalized.branch_id = _resolve_webhook_branch(db, shop_id, normalized.branch_id)
     if normalized.partner_id is None and configured_partner:
         normalized.partner_id = configured_partner
 
@@ -1250,7 +1362,7 @@ async def online_order_webhook(
         actor_user_id=None,
     )
 
-    auto_accept = (_get_param(db, shop_id, "online_orders_auto_accept") or "").strip().upper() == "YES"
+    auto_accept = bool(settings.get("online_orders_auto_accept"))
     if auto_accept and order.status == "NEW":
         order.status = "ACCEPTED"
         _set_status_timestamps(order, "ACCEPTED")

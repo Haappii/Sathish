@@ -698,91 +698,82 @@ export default function Reports() {
      UI
      ===================================================== */
   if (!activeReport) {
-    const GROUP_ICONS = {
-      Sales: <FaChartBar />,
-      Profit: <FaMoneyBillWave />,
-      Receivables: <FaMoneyBillWave />,
-      Returns: <FaUndo />,
-      Inventory: <FaBoxes />,
-      Purchases: <FaTruckLoading />,
-      "Stock Transfers": <FaTruckLoading />,
-      "Cash Drawer": <FaCashRegister />,
-      "Stock Audit": <FaClipboardCheck />,
-      "Online Orders": <FaMotorcycle />,
-      Loyalty: <FaGift />,
-      Coupons: <FaTags />,
-      GST: <FaShieldAlt />,
-      Accounting: <FaMoneyBillWave />,
-      Reconciliation: <FaClipboardCheck />,
-      Compliance: <FaShieldAlt />,
-      Audit: <FaShieldAlt />,
-      Table: <FaTable />,
-      Default: <FaClipboardCheck />,
+    const GROUP_META = {
+      Sales:            { icon: <FaChartBar />,       color: "bg-blue-600" },
+      Profit:           { icon: <FaMoneyBillWave />,  color: "bg-emerald-600" },
+      Receivables:      { icon: <FaMoneyBillWave />,  color: "bg-amber-500" },
+      Returns:          { icon: <FaUndo />,            color: "bg-rose-500" },
+      Inventory:        { icon: <FaBoxes />,           color: "bg-violet-600" },
+      Purchases:        { icon: <FaTruckLoading />,   color: "bg-orange-500" },
+      "Stock Transfers":{ icon: <FaTruckLoading />,   color: "bg-cyan-600" },
+      "Cash Drawer":    { icon: <FaCashRegister />,   color: "bg-teal-600" },
+      "Stock Audit":    { icon: <FaClipboardCheck />, color: "bg-indigo-600" },
+      "Online Orders":  { icon: <FaMotorcycle />,     color: "bg-pink-600" },
+      Loyalty:          { icon: <FaGift />,            color: "bg-purple-600" },
+      Coupons:          { icon: <FaTags />,            color: "bg-yellow-500" },
+      GST:              { icon: <FaShieldAlt />,      color: "bg-red-600" },
+      Accounting:       { icon: <FaMoneyBillWave />,  color: "bg-blue-700" },
+      Reconciliation:   { icon: <FaClipboardCheck />, color: "bg-slate-600" },
+      Compliance:       { icon: <FaShieldAlt />,      color: "bg-gray-700" },
+      Audit:            { icon: <FaShieldAlt />,      color: "bg-zinc-600" },
+      Table:            { icon: <FaTable />,           color: "bg-sky-600" },
+      Employees:        { icon: <FaClipboardCheck />, color: "bg-lime-600" },
     };
-
-    const tileBase =
-      "group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-3 cursor-pointer transition flex flex-col gap-2 min-h-[84px]";
+    const DEFAULT_META = { icon: <FaClipboardCheck />, color: "bg-slate-500" };
 
     return (
-      <div className="p-4 sm:p-6 bg-slate-100 min-h-screen">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-          <div className="flex items-center gap-3">
-            <BackButton />
-            <h2 className="text-xl font-semibold text-gray-800">Reports</h2>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3">
+          <BackButton />
+          <div className="flex-1">
+            <h1 className="text-base font-bold text-gray-800">Reports</h1>
+            <p className="text-[11px] text-gray-400">{reportGroups.length} categories · {reportOptions.length} reports</p>
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="px-4 sm:px-6 py-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {reportGroups.map(g => {
             const hasMany = g.reports.length > 1;
             const isOpen = expandedGroup === g.group;
-            const Icon = GROUP_ICONS[g.group] || GROUP_ICONS.Default;
+            const meta = GROUP_META[g.group] || DEFAULT_META;
             const primary = g.reports[0];
 
             return (
               <div
                 key={g.group}
-                className={tileBase}
-                onClick={() =>
-                  hasMany
-                    ? setExpandedGroup(isOpen ? null : g.group)
-                    : setActiveReport(primary)
-                }
+                className="bg-white border rounded-2xl shadow-sm overflow-hidden"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
-                      {Icon}
-                    </div>
-                    <div className="text-base font-medium text-gray-800 truncate">
-                      {g.group}
-                    </div>
+                {/* Card header row */}
+                <div
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition"
+                  onClick={() =>
+                    hasMany
+                      ? setExpandedGroup(isOpen ? null : g.group)
+                      : setActiveReport(primary)
+                  }
+                >
+                  <div className={`w-9 h-9 rounded-xl ${meta.color} text-white flex items-center justify-center text-[15px] flex-shrink-0 shadow-sm`}>
+                    {meta.icon}
                   </div>
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation();
-                      hasMany
-                        ? setExpandedGroup(isOpen ? null : g.group)
-                        : setActiveReport(primary);
-                    }}
-                    className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100"
-                  >
-                    {hasMany ? (isOpen ? "Close" : "Open") : "Open"}
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-gray-800 truncate">{g.group}</div>
+                    <div className="text-[10px] text-gray-400">{g.reports.length} report{g.reports.length !== 1 ? "s" : ""}</div>
+                  </div>
+                  <span className="text-[11px] text-gray-400 flex-shrink-0">
+                    {hasMany ? (isOpen ? "▲" : "▼") : "→"}
+                  </span>
                 </div>
 
+                {/* Sub-reports (expanded) */}
                 {hasMany && isOpen && (
-                  <div className="mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
+                  <div className="border-t bg-gray-50 px-4 py-3 flex flex-wrap gap-2">
                     {g.reports.map(r => (
                       <button
                         key={r.key}
                         type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          setActiveReport(r);
-                        }}
-                        className="px-3 py-2 min-h-[36px] rounded-full border border-indigo-100 text-sm font-medium text-indigo-800 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition-shadow shadow-[0_6px_16px_rgba(79,70,229,0.12)] text-center"
+                        onClick={() => setActiveReport(r)}
+                        className="px-3 py-1.5 rounded-xl border border-gray-200 text-[11px] font-medium text-gray-700 bg-white hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition shadow-sm"
                       >
                         {r.label}
                       </button>
@@ -797,244 +788,296 @@ export default function Reports() {
     );
   }
 
+  /* ── Active report view ── */
+  const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition";
+
+  const buildDisplayRows = () => {
+    const isInvoiceDetail =
+      activeReport?.key === "sales/invoice-details" ||
+      activeReport?.key === "sales/customer-invoices";
+
+    if (!isInvoiceDetail) return data;
+
+    const grouped = {};
+    data.forEach(row => {
+      const key = row.invoice_number;
+      if (!grouped[key]) {
+        grouped[key] = {
+          invoice_date: row.invoice_date,
+          invoice_time: row.invoice_time,
+          invoice_number: row.invoice_number,
+          customer: row.customer,
+          item_name: [],
+          quantity: [],
+          price: [],
+          total_items: row.total_items,
+          sub_total: row.sub_total,
+          gst: row.gst,
+          discount: row.discount,
+          grand_total:
+            Number(row.sub_total || 0) +
+            Number(row.gst || 0) -
+            Number(row.discount || 0),
+          payment_mode: row.payment_mode,
+          created_user: row.created_user,
+        };
+      }
+      grouped[key].item_name.push(row.item_name);
+      grouped[key].quantity.push(row.quantity);
+      grouped[key].price.push(row.price);
+    });
+
+    return Object.values(grouped).map(r => ({
+      ...r,
+      item_name: r.item_name.join("\n"),
+      quantity: r.quantity.join("\n"),
+      price: r.price.join("\n"),
+    }));
+  };
+
   return (
-    <div className="p-6 bg-slate-100 min-h-screen space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3">
         <button
           onClick={() => setActiveReport(null)}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
         >
-          &larr; Back
+          ← Back
         </button>
-        <h2 className="text-xl font-semibold">{activeReport.label}</h2>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-bold text-gray-800 truncate">{activeReport.label}</h1>
+          {data.length > 0 && (
+            <p className="text-[11px] text-gray-400">{data.length} rows</p>
+          )}
+        </div>
+        {data.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportPDF}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 transition"
+            >
+              ↓ PDF
+            </button>
+            <button
+              onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition"
+            >
+              ↓ Excel
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Progress bar */}
       {loading && (
-        <div className="w-full h-1 rounded-full bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600 animate-pulse" />
+        <div className="h-0.5 bg-blue-100">
+          <div className="h-full bg-blue-500 animate-pulse w-full" />
+        </div>
       )}
 
-      <div className="bg-white rounded-xl p-4 flex flex-wrap gap-4 items-center">
+      {/* Filters */}
+      <div className="px-4 sm:px-6 py-3 bg-white border-b flex flex-wrap gap-3 items-end">
         {requiresDateRange ? (
           <>
-            <div className="relative">
-              <FaCalendarAlt
-                className="absolute left-2 top-2.5 text-slate-500 cursor-pointer"
-                onClick={() => setShowFromPicker(v => !v)}
-              />
-              <input
-                value={fromInput}
-                placeholder="From (DD/MM/YYYY)"
-                onChange={e => {
-                  const v = formatInputDate(e.target.value);
-                  setFromInput(v);
-                  setFromDate(toApiDate(v));
-                }}
-                onFocus={() => setShowFromPicker(true)}
-                onBlur={() => {
-                  if (isFullDate(fromInput)) setShowFromPicker(false);
-                }}
-                className="border rounded pl-8 pr-3 py-2 w-40"
-              />
-              {showFromPicker && (
-                <div className="absolute left-0 top-full mt-2 z-20 bg-white border rounded-lg shadow-lg p-2">
-                  <input
-                    ref={fromPickerRef}
-                    type="date"
-                    value={fromDate || ""}
-                    onChange={e => {
-                      const v = e.target.value;
-                      if (!v) return;
-                      const [yyyy, mm, dd] = v.split("-");
-                      const display = `${dd}/${mm}/${yyyy}`;
-                      setFromInput(display);
-                      setFromDate(v);
-                      setShowFromPicker(false);
-                    }}
-                    className="border rounded px-2 py-1 bg-white"
-                  />
-                </div>
-              )}
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[10px] text-gray-500 font-medium">From Date</label>
+              <div className="relative">
+                <FaCalendarAlt
+                  className="absolute left-2.5 top-2 text-gray-400 text-[11px] cursor-pointer"
+                  onClick={() => setShowFromPicker(v => !v)}
+                />
+                <input
+                  value={fromInput}
+                  placeholder="DD/MM/YYYY"
+                  onChange={e => {
+                    const v = formatInputDate(e.target.value);
+                    setFromInput(v);
+                    setFromDate(toApiDate(v));
+                  }}
+                  onFocus={() => setShowFromPicker(true)}
+                  onBlur={() => { if (isFullDate(fromInput)) setShowFromPicker(false); }}
+                  className={`${inputCls} pl-7 w-36`}
+                />
+                {showFromPicker && (
+                  <div className="absolute left-0 top-full mt-1 z-20 bg-white border rounded-xl shadow-lg p-2">
+                    <input
+                      ref={fromPickerRef}
+                      type="date"
+                      value={fromDate || ""}
+                      onChange={e => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        const [yyyy, mm, dd] = v.split("-");
+                        setFromInput(`${dd}/${mm}/${yyyy}`);
+                        setFromDate(v);
+                        setShowFromPicker(false);
+                      }}
+                      className="border rounded-lg px-2 py-1 text-sm bg-white"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="relative">
-              <FaCalendarAlt
-                className="absolute left-2 top-2.5 text-slate-500 cursor-pointer"
-                onClick={() => setShowToPicker(v => !v)}
-              />
-              <input
-                value={toInput}
-                placeholder="To (DD/MM/YYYY)"
-                onChange={e => {
-                  const v = formatInputDate(e.target.value);
-                  setToInput(v);
-                  setToDate(toApiDate(v));
-                }}
-                onFocus={() => setShowToPicker(true)}
-                onBlur={() => {
-                  if (isFullDate(toInput)) setShowToPicker(false);
-                }}
-                className="border rounded pl-8 pr-3 py-2 w-40"
-              />
-              {showToPicker && (
-                <div className="absolute left-0 top-full mt-2 z-20 bg-white border rounded-lg shadow-lg p-2">
-                  <input
-                    ref={toPickerRef}
-                    type="date"
-                    value={toDate || ""}
-                    onChange={e => {
-                      const v = e.target.value;
-                      if (!v) return;
-                      const [yyyy, mm, dd] = v.split("-");
-                      const display = `${dd}/${mm}/${yyyy}`;
-                      setToInput(display);
-                      setToDate(v);
-                      setShowToPicker(false);
-                    }}
-                    className="border rounded px-2 py-1 bg-white"
-                  />
-                </div>
-              )}
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[10px] text-gray-500 font-medium">To Date</label>
+              <div className="relative">
+                <FaCalendarAlt
+                  className="absolute left-2.5 top-2 text-gray-400 text-[11px] cursor-pointer"
+                  onClick={() => setShowToPicker(v => !v)}
+                />
+                <input
+                  value={toInput}
+                  placeholder="DD/MM/YYYY"
+                  onChange={e => {
+                    const v = formatInputDate(e.target.value);
+                    setToInput(v);
+                    setToDate(toApiDate(v));
+                  }}
+                  onFocus={() => setShowToPicker(true)}
+                  onBlur={() => { if (isFullDate(toInput)) setShowToPicker(false); }}
+                  className={`${inputCls} pl-7 w-36`}
+                />
+                {showToPicker && (
+                  <div className="absolute left-0 top-full mt-1 z-20 bg-white border rounded-xl shadow-lg p-2">
+                    <input
+                      ref={toPickerRef}
+                      type="date"
+                      value={toDate || ""}
+                      onChange={e => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        const [yyyy, mm, dd] = v.split("-");
+                        setToInput(`${dd}/${mm}/${yyyy}`);
+                        setToDate(v);
+                        setShowToPicker(false);
+                      }}
+                      className="border rounded-lg px-2 py-1 text-sm bg-white"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </>
         ) : (
-          <div className="text-sm text-slate-600">
-            {formatRangeLabel(true)}
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">Period</label>
+            <div className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-600">{formatRangeLabel(true)}</div>
           </div>
         )}
 
         {!NO_USER_FILTER_KEYS.has(activeReport?.key) && (
-          <select value={userId} onChange={e => setUserId(e.target.value)} className="border rounded px-3 py-2">
-            <option value="">All Users</option>
-            {users.map(u => <option key={u.user_id} value={u.user_id}>{u.user_name}</option>)}
-          </select>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">User</label>
+            <select value={userId} onChange={e => setUserId(e.target.value)} className={inputCls}>
+              <option value="">All Users</option>
+              {users.map(u => <option key={u.user_id} value={u.user_id}>{u.user_name}</option>)}
+            </select>
+          </div>
         )}
 
-        <select
-          value={branchId}
-          onChange={e => {
-            setBranchId(e.target.value);
-          }}
-          className="border rounded px-3 py-2"
-        >
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[10px] text-gray-500 font-medium">Branch</label>
+          <select value={branchId} onChange={e => setBranchId(e.target.value)} className={inputCls}>
             <option value="">All Branches</option>
             {branches.map(b => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
-        </select>
-
-        {(activeReport?.key === "sales/summary" ||
-          activeReport?.key === "sales/invoice-details") && (
-          <select
-            value={paymentMode}
-            onChange={e => setPaymentMode(e.target.value)}
-            className="border rounded px-3 py-2"
-          >
-            <option value="">All Payment Modes</option>
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="upi">UPI</option>
-            <option value="split">Split</option>
           </select>
+        </div>
+
+        {(activeReport?.key === "sales/summary" || activeReport?.key === "sales/invoice-details") && (
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">Payment Mode</label>
+            <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} className={inputCls}>
+              <option value="">All Modes</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="upi">UPI</option>
+              <option value="split">Split</option>
+            </select>
+          </div>
         )}
 
         {activeReport?.key === "sales/customer-invoices" && (
-          <input
-            value={customerNumber}
-            onChange={e => setCustomerNumber(e.target.value)}
-            placeholder="Customer Number"
-            className="border rounded px-3 py-2 w-44"
-          />
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">Customer No.</label>
+            <input
+              value={customerNumber}
+              onChange={e => setCustomerNumber(e.target.value)}
+              placeholder="Customer number"
+              className={`${inputCls} w-40`}
+            />
+          </div>
         )}
 
         {activeReport?.key === "profit" && (
-          <select
-            value={profitType}
-            onChange={e => setProfitType(e.target.value)}
-            className="border rounded px-3 py-2"
-          >
-            <option value="date">Date-wise</option>
-            <option value="items">Item-wise</option>
-            <option value="category">Category-wise</option>
-          </select>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">Profit By</label>
+            <select value={profitType} onChange={e => setProfitType(e.target.value)} className={inputCls}>
+              <option value="date">Date-wise</option>
+              <option value="items">Item-wise</option>
+              <option value="category">Category-wise</option>
+            </select>
+          </div>
         )}
 
-        <button onClick={loadReport} className="px-5 py-2 bg-blue-600 text-white rounded">
-          View Report
-        </button>
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[10px] text-transparent select-none">.</label>
+          <button
+            onClick={loadReport}
+            disabled={loading}
+            className="px-5 py-1.5 rounded-xl text-[12px] font-semibold text-white shadow-sm transition disabled:opacity-60"
+            style={{ backgroundColor: "#0B3C8C" }}
+          >
+            {loading ? "Loading..." : "View Report"}
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-2 justify-end">
-        <button onClick={exportPDF} className="px-4 py-2 bg-red-600 text-white rounded">Export PDF</button>
-        <button onClick={exportExcel} className="px-4 py-2 bg-emerald-600 text-white rounded">Export Excel</button>
-      </div>
-
-      <div className="bg-white rounded-xl p-4 overflow-auto">
-        {loading ? "Loading..." : data.length === 0 ? "No data" : (() => {
-          const isInvoiceDetail =
-            activeReport?.key === "sales/invoice-details" ||
-            activeReport?.key === "sales/customer-invoices";
-
-          let displayRows = data;
-          if (isInvoiceDetail) {
-            const grouped = {};
-            data.forEach(row => {
-              const key = row.invoice_number;
-              if (!grouped[key]) {
-                grouped[key] = {
-                  invoice_date: row.invoice_date,
-                  invoice_time: row.invoice_time,
-                  invoice_number: row.invoice_number,
-                  customer: row.customer,
-                  item_name: [],
-                  quantity: [],
-                  price: [],
-                  total_items: row.total_items,
-                  sub_total: row.sub_total,
-                  gst: row.gst,
-                  discount: row.discount,
-                  grand_total:
-                    Number(row.sub_total || 0) +
-                    Number(row.gst || 0) -
-                    Number(row.discount || 0),
-                  payment_mode: row.payment_mode,
-                  created_user: row.created_user,
-                };
-              }
-
-              grouped[key].item_name.push(row.item_name);
-              grouped[key].quantity.push(row.quantity);
-              grouped[key].price.push(row.price);
-            });
-
-            displayRows = Object.values(grouped).map(r => ({
-              ...r,
-              item_name: r.item_name.join("\n"),
-              quantity: r.quantity.join("\n"),
-              price: r.price.join("\n"),
-            }));
-          }
-
+      {/* Table */}
+      <div className="px-4 sm:px-6 py-4">
+        {loading ? (
+          <div className="bg-white border rounded-2xl shadow-sm flex items-center justify-center h-48 text-sm text-gray-400">
+            Loading report data...
+          </div>
+        ) : data.length === 0 ? (
+          <div className="bg-white border rounded-2xl shadow-sm flex flex-col items-center justify-center h-48 gap-2">
+            <div className="text-3xl">📊</div>
+            <div className="text-sm text-gray-400">Set your filters and click View Report</div>
+          </div>
+        ) : (() => {
+          const displayRows = buildDisplayRows();
           return (
-            <table className="w-full text-sm border-collapse">
-              <thead className="bg-slate-100">
-                <tr>
-                  {Object.keys(displayRows[0]).map(k => (
-                    <th key={k} className="border px-3 py-2">
-                      {k.replaceAll("_", " ").toUpperCase()}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((r, i) => (
-                  <tr key={i}>
-                    {Object.values(r).map((v, j) => (
-                      <td key={j} className="border px-3 py-2 whitespace-pre-line">
-                        {v}
-                      </td>
+            <div className="bg-white border rounded-2xl shadow-sm overflow-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    {Object.keys(displayRows[0]).map(k => (
+                      <th
+                        key={k}
+                        className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r last:border-r-0"
+                      >
+                        {k.replaceAll("_", " ")}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {displayRows.map((r, i) => (
+                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}>
+                      {Object.values(r).map((v, j) => (
+                        <td
+                          key={j}
+                          className="px-3 py-2 text-gray-700 whitespace-pre-line border-r last:border-r-0"
+                        >
+                          {v}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           );
         })()}
       </div>

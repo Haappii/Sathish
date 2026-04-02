@@ -1,10 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import engine, Base, SessionLocal
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.config import settings
 import logging
 import os
 from pathlib import Path
@@ -65,6 +71,13 @@ import app.models.table_qr
 import app.models.platform_onboard_request
 import app.models.platform_user
 
+# ⭐ HOTEL FEATURE MODELS
+import app.models.kot
+import app.models.modifier
+import app.models.reservation
+import app.models.recipe
+import app.models.delivery
+
 
 from app.models.users import User
 from app.models.roles import Role
@@ -73,12 +86,20 @@ from app.models.platform_user import PlatformUser
 
 
 # ======================================================
+# RATE LIMITER
+# ======================================================
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
+# ======================================================
 # FASTAPI APP
 # ======================================================
 app = FastAPI(
     title="Shop Billing Application API",
     version="1.0.0"
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -133,11 +154,17 @@ app.mount(
 
 
 # ======================================================
+# MIDDLEWARES (order matters — outermost first)
+# ======================================================
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
+
+# ======================================================
 # CORS
 # ======================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # adjust in production
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -270,18 +297,73 @@ def _auto_migrate_demo_expiry() -> None:
         logger.exception("Auto-migration (demo expiry) failed: %s", e)
 
 
+def _auto_migrate_table_billing() -> None:
+    """
+    Backfill schema changes for table billing on existing Postgres databases.
+
+    SQLAlchemy create_all() will not alter existing tables, so newer ORM fields
+    such as orders.order_type must be added explicitly to avoid runtime 500s.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS tables_master
+                      ADD COLUMN IF NOT EXISTS table_start_time TIMESTAMP;
+
+                    ALTER TABLE IF EXISTS orders
+                      ADD COLUMN IF NOT EXISTS order_type VARCHAR(20),
+                      ADD COLUMN IF NOT EXISTS customer_name VARCHAR(120),
+                      ADD COLUMN IF NOT EXISTS mobile VARCHAR(20),
+                      ADD COLUMN IF NOT EXISTS notes VARCHAR(300),
+                      ADD COLUMN IF NOT EXISTS token_number VARCHAR(20);
+
+                    UPDATE orders
+                    SET order_type = 'DINE_IN'
+                    WHERE order_type IS NULL;
+
+                    ALTER TABLE IF EXISTS orders
+                      ALTER COLUMN order_type SET DEFAULT 'DINE_IN',
+                      ALTER COLUMN order_type SET NOT NULL;
+
+                    ALTER TABLE IF EXISTS order_items
+                      ADD COLUMN IF NOT EXISTS notes VARCHAR(300),
+                      ADD COLUMN IF NOT EXISTS kot_sent BOOLEAN,
+                      ADD COLUMN IF NOT EXISTS kot_sent_at TIMESTAMP;
+
+                    UPDATE order_items
+                    SET kot_sent = FALSE
+                    WHERE kot_sent IS NULL;
+
+                    ALTER TABLE IF EXISTS order_items
+                      ALTER COLUMN kot_sent SET DEFAULT FALSE,
+                      ALTER COLUMN kot_sent SET NOT NULL;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (table billing) failed: %s", e)
+
+
 @app.on_event("startup")
 def _startup_db_init():
     """
     Initialize DB schema and seed defaults.
     Keep startup resilient: if DB is down/misconfigured, don't hang the web server.
     """
+    # Validate security config — warns in dev, raises in production.
+    settings.validate()
+
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         logger.exception("DB create_all failed: %s", e)
 
     _auto_migrate_demo_expiry()
+    _auto_migrate_table_billing()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
@@ -353,6 +435,14 @@ from app.routes.table_qr import router as table_qr_router
 from app.routes.public_qr import router as public_qr_router
 from app.routes.qr_orders import router as qr_orders_router
 
+# ⭐ HOTEL FEATURE ROUTERS
+from app.routes.kot import router as kot_router
+from app.routes.modifiers import router as modifiers_router
+from app.routes.reservation import router as reservation_router
+from app.routes.recipe import router as recipe_router
+from app.routes.delivery import router as delivery_router
+from app.routes.kds import router as kds_router
+
 
 # ======================================================
 # CORE ROUTES
@@ -414,6 +504,14 @@ app.include_router(table_qr_router, prefix="/api")
 app.include_router(public_qr_router, prefix="/api")
 app.include_router(qr_orders_router, prefix="/api")
 
+# ⭐ HOTEL FEATURES ----------
+app.include_router(kot_router,         prefix="/api")   # /api/kot
+app.include_router(modifiers_router,   prefix="/api")   # /api/modifiers
+app.include_router(reservation_router, prefix="/api")   # /api/reservations
+app.include_router(recipe_router,      prefix="/api")   # /api/recipes
+app.include_router(delivery_router,    prefix="/api")   # /api/delivery
+app.include_router(kds_router,         prefix="/api")   # /api/kds
+
 
 # ======================================================
 # FRONTEND (serve built React app from backend)
@@ -429,6 +527,21 @@ def _frontend_ready() -> bool:
 @app.get("/api/health")
 def api_health():
     return {"status": "ok"}
+
+
+@app.get("/api/items", include_in_schema=False)
+def legacy_items_redirect():
+    return RedirectResponse(url="/api/items/", status_code=307)
+
+
+@app.get("/api/category", include_in_schema=False)
+def legacy_category_redirect():
+    return RedirectResponse(url="/api/category/", status_code=307)
+
+
+@app.get("/api/categories", include_in_schema=False)
+def legacy_categories_redirect():
+    return RedirectResponse(url="/api/category/", status_code=307)
 
 
 @app.get("/")

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const child_process = require("child_process");
 const http = require("http");
 const https = require("https");
 
@@ -9,6 +10,25 @@ const CONFIG_FILE = "config.json";
 // Default URL the packaged desktop app will open if nothing else is configured.
 // Point this to the hosted frontend that talks to your backend API.
 const DEFAULT_APP_URL = process.env.APP_URL_DEFAULT || "http://13.60.186.234:5173";
+
+function findBluetoothPrinterPort() {
+  try {
+    const script =
+      "$targets='MPT|POS|PRT|THERMAL|SC588|PRINTER';" +
+      "$dev=Get-ChildItem HKLM:\\\\SYSTEM\\\\CurrentControlSet\\\\Services\\\\BTHPORT\\\\Parameters\\\\Devices | " +
+      "ForEach-Object { try { $n=[System.Text.Encoding]::ASCII.GetString((Get-ItemProperty -Path $_.PSPath -Name Name -ErrorAction Stop).Name).Trim([char]0); " +
+      "if($n -match $targets){ [PSCustomObject]@{Addr=$_.PSChildName; Name=$n} } } catch {} } | Select-Object -First 1;" +
+      "if($dev){ $addr=$dev.Addr.ToUpper(); $key=\"HKLM:\\\\SYSTEM\\\\CurrentControlSet\\\\Enum\\\\BTHENUM\\\\{00001101-0000-1000-8000-00805f9b34fb}_LOCALMFG*\\\\*${addr}_*\\\\Device Parameters\"; " +
+      "$pn=Get-ItemProperty -Path $key -Name PortName -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PortName -First 1; if($pn){ $pn } }";
+    const out = child_process.execSync(`powershell -NoProfile -Command "${script}"`, {
+      encoding: "utf8",
+    });
+    const port = String(out || "").trim();
+    return port || null;
+  } catch {
+    return null;
+  }
+}
 
 function safeParseJson(text) {
   try {
@@ -44,6 +64,40 @@ function writeUserConfig(nextConfig) {
     fs.writeFileSync(cfgPath, JSON.stringify(nextConfig, null, 2), "utf-8");
     return true;
   } catch {
+    return false;
+  }
+}
+
+function isThermalDriverInstalled() {
+  try {
+    const out = child_process.execSync("pnputil /enum-drivers", { encoding: "utf8" });
+    return /pos-?58|58mm series printer|sp-drv|pos58/i.test(out);
+  } catch {
+    return false;
+  }
+}
+
+function findBundledDriverInstaller() {
+  const candidates = [
+    path.join(process.resourcesPath || "", "drivers", "SP-DRV2155Win.exe"),
+    path.resolve(__dirname, "..", "drivers", "SC588", "SP-DRV2155Win.exe"),
+    path.resolve(__dirname, "drivers", "SC588", "SP-DRV2155Win.exe"),
+  ].filter(Boolean);
+  return candidates.find((p) => fs.existsSync(p));
+}
+
+function ensureThermalDriverInstalled() {
+  if (isThermalDriverInstalled()) return true;
+  const installer = findBundledDriverInstaller();
+  if (!installer) {
+    console.warn("Printer driver installer not found in resources.");
+    return false;
+  }
+  try {
+    child_process.execFileSync(installer, ["/VERYSILENT", "/NORESTART"], { stdio: "ignore" });
+    return true;
+  } catch (err) {
+    console.error("Printer driver install failed:", err.message || err);
     return false;
   }
 }
@@ -272,24 +326,120 @@ function escapeHtml(text) {
 ipcMain.handle("silent-print-text", async (_event, payload) => {
   const { text = "", options = {} } = payload || {};
   const fontSize = Number(options.fontSize || 12) || 12;
+  const scale = fontSize <= 8 ? Math.max(0.4, fontSize / 12) : 1; // shrink aggressively for tiny receipts
 
   const printWin = new BrowserWindow({
     show: false,
     webPreferences: { offscreen: true },
   });
 
-  const html = `<pre style="font-family: monospace; font-size: ${fontSize}px; margin:0;">${escapeHtml(
-    text
-  )}</pre>`;
+  const html = `<!DOCTYPE html><html><head><style>
+    @page { size: 58mm auto; margin: 0; }
+    body { margin: 0; padding: 0; }
+    pre {
+      margin: 0;
+      padding: 0;
+      font-family: monospace;
+      font-size: ${Math.max(fontSize, 6)}px;
+      line-height: 1.1;
+      width: 58mm;
+      transform: scale(${scale.toFixed(2)});
+      transform-origin: top left;
+      white-space: pre;
+    }
+  </style></head><body><pre>${escapeHtml(text)}</pre></body></html>`;
 
   await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 
   return new Promise((resolve, reject) => {
-    printWin.webContents.print({ silent: true, printBackground: false }, (success, failureReason) => {
+    const opts = {
+      silent: true,
+      printBackground: false,
+      margins: { marginType: "none" },
+      pageSize: { width: 58000, height: 200000 }, // 58mm wide roll; tall enough for long bills
+    };
+    if (process.env.THERMAL_PRINTER_NAME) opts.deviceName = process.env.THERMAL_PRINTER_NAME;
+
+    printWin.webContents.print(opts, (success, failureReason) => {
       setTimeout(() => printWin.close(), 200);
       if (success) resolve(true);
       else reject(new Error(failureReason || "print failed"));
     });
+  });
+});
+
+function buildEscPosBuffer(text, { codepage = 0, fontSize = 12, feedLines = 4 } = {}) {
+  const chunks = [];
+  const useFontB = Number(fontSize) <= 9; // choose smaller built-in font
+  const normalizedFeed = Math.min(12, Math.max(4, Math.round(feedLines)));
+  const safeText = String(text || "").replace(/\r\n/g, "\n");
+  const body = safeText.endsWith("\n") ? safeText : `${safeText}\n`;
+
+  // Initialize printer, select codepage, font, and default line spacing
+  chunks.push(Buffer.from([0x1b, 0x40])); // ESC @
+  chunks.push(Buffer.from([0x1b, 0x74, codepage])); // ESC t n
+  chunks.push(Buffer.from([0x1b, 0x4d, useFontB ? 0x01 : 0x00])); // ESC M n (Font B for compact)
+  chunks.push(Buffer.from([0x1b, 0x32])); // ESC 2 (default line spacing)
+  chunks.push(Buffer.from([0x1d, 0x21, 0x00])); // GS ! 0 (no double-size)
+
+  // Content + trailing line to guarantee footer prints before feed/cut
+  chunks.push(Buffer.from(body, "binary"));
+
+  // Feed a few blank lines so the last line clears the cutter, then cut
+  chunks.push(Buffer.from([0x1b, 0x64, normalizedFeed])); // ESC d n (feed n lines)
+  chunks.push(Buffer.from([0x1d, 0x56, 0x00])); // GS V 0 (full cut, if supported)
+  return Buffer.concat(chunks);
+}
+
+ipcMain.handle("raw-print-text", async (_event, payload) => {
+  const { text = "", port, codepage, fontSize, feedLines } = payload || {};
+  ensureThermalDriverInstalled();
+  const detected = findBluetoothPrinterPort();
+  const candidates = Array.from(
+    new Set([
+      port,
+      process.env.THERMAL_PORT,
+      detected,
+      "COM7",
+      "COM5",
+      "COM3",
+      "COM4",
+      "COM6",
+      "COM8",
+    ].filter(Boolean))
+  );
+
+  return new Promise((resolve, reject) => {
+    const tryNext = () => {
+      if (!candidates.length) return reject(new Error("No available COM port for printer"));
+      const targetPort = candidates.shift();
+      try {
+        try {
+          child_process.execSync(`mode ${targetPort}: BAUD=9600 PARITY=N data=8 stop=1 xon=on`, { stdio: "ignore" });
+        } catch {
+          // ignore mode failures; will still attempt open
+        }
+        const path = `\\\\.\\${targetPort}`;
+        const fd = fs.openSync(path, "w");
+        const buf = buildEscPosBuffer(text, {
+          codepage: typeof codepage === "number" ? codepage : 0,
+          fontSize: typeof fontSize === "number" ? fontSize : 12,
+          feedLines: typeof feedLines === "number" ? feedLines : 4,
+        });
+        fs.writeSync(fd, buf);
+        try {
+          fs.fsyncSync(fd); // ensure buffer is flushed before closing so footer doesn't drift to next job
+        } catch {
+          // ignore fsync failures
+        }
+        fs.closeSync(fd);
+        console.log(`raw-print-text: sent to ${targetPort}`);
+        resolve(true);
+      } catch (err) {
+        tryNext();
+      }
+    };
+    tryNext();
   });
 });
 

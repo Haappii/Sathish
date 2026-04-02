@@ -7,7 +7,6 @@ import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 import { isHotelShop } from "../utils/shopType";
 
-const BLUE = "#0B3C8C";
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES = ["cash", "card", "upi"];
 const toAmount = (v) => {
@@ -166,7 +165,11 @@ export default function TableGrid() {
   }; 
 
   const generateBillText = (invoice, shop, branch, items) => {
-    const WIDTH = 48;
+    const WIDTH = 32;
+    const ITEM_COL = 14;
+    const QTY_COL = 4;
+    const RATE_COL = 6;
+    const TOTAL_COL = WIDTH - ITEM_COL - QTY_COL - RATE_COL;
     const line = "-".repeat(WIDTH);
 
     const center = txt => {
@@ -216,14 +219,19 @@ export default function TableGrid() {
 
     t += line + "\n";
 
-    t += "Item".padEnd(22) + "Qty".padStart(4) + "Rate".padStart(10) + "Total".padStart(12) + "\n";
+    t +=
+      "Item".padEnd(ITEM_COL) +
+      "Qty".padStart(QTY_COL) +
+      "Rate".padStart(RATE_COL) +
+      "Total".padStart(TOTAL_COL) +
+      "\n";
     t += line + "\n";
 
     items.forEach(i => {
-      const name = i.item_name.slice(0, 22).padEnd(22);
-      const qty = String(i.quantity).padStart(4);
-      const rate = i.price.toFixed(2).padStart(10);
-      const total = (i.quantity * i.price).toFixed(2).padStart(12);
+      const name = i.item_name.slice(0, ITEM_COL).padEnd(ITEM_COL);
+      const qty = String(i.quantity).padStart(QTY_COL);
+      const rate = i.price.toFixed(2).padStart(RATE_COL);
+      const total = (i.quantity * i.price).toFixed(2).padStart(TOTAL_COL);
       t += name + qty + rate + total + "\n";
     });
 
@@ -249,7 +257,8 @@ export default function TableGrid() {
 
     t += rightKV("Grand Total", (invoice.total_amount || 0).toFixed(2)) + "\n";
     t += line + "\n";
-    t += center("Thank You! Visit Again") + "\n";
+    // Footer + 4 blank lines to keep the message with the same receipt
+    t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
 
     return t;
   };
@@ -330,7 +339,8 @@ export default function TableGrid() {
 
         if (receiptRequired) {
           const ok = await printDirectText(
-            generateBillText(invoice, shopRes.data || {}, branchData, items)
+            generateBillText(invoice, shopRes.data || {}, branchData, items),
+            { fontSize: 6 }
           );
           if (ok) {
             showToast("Order completed and invoice printed", "success");
@@ -361,175 +371,172 @@ export default function TableGrid() {
       : t.status === "OCCUPIED"
   );
 
+  const freeCount = tables.filter(t => t.status === "FREE").length;
+  const occupiedCount = tables.filter(t => t.status === "OCCUPIED").length;
+
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="space-y-3">
 
       <style>{`
-        /* Hide print area on screen, show only during print */
         #bill-print-area { display: none; }
-
         @media print {
           body * { visibility: hidden; }
-          #bill-print-area, #bill-print-area * {
-            visibility: visible;
-            font-family: monospace;
-          }
-          #bill-print-area {
-            display: block !important;
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 80mm;
-            padding: 6px;
-          }
+          #bill-print-area, #bill-print-area * { visibility: visible; font-family: monospace; }
+          #bill-print-area { display: block !important; position: absolute; top: 0; left: 0; width: 80mm; padding: 6px; }
         }
       `}</style>
 
-      {/* ================= HEADER ================= */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: BLUE }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/home", { replace: true })}
-            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-          >
-            &larr; Back
-          </button>
-          <h1 className="text-lg font-extrabold" style={{ color: BLUE }}>
-            TABLE BILLING
-          </h1>
-        </div>
+      {/* ── Header ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => navigate("/home", { replace: true })}
+          className="px-3 py-1.5 rounded-lg border bg-white text-[12px] hover:bg-gray-50"
+        >
+          ← Back
+        </button>
+        <h1 className="text-base font-semibold text-gray-700">Table Billing</h1>
 
-        <div className="flex border rounded-md overflow-hidden">
-          {["IDLE", "RUNNING"].map(x => (
-            <button
-              key={x}
-              onClick={() => setTab(x)}
-              className="px-4 py-1.5 text-xs font-bold"
-              style={{
-                background: tab === x ? BLUE : "white",
-                color: tab === x ? "white" : "black"
-              }}
-            >
-              {x}
-            </button>
-          ))}
+        {/* Tab toggle */}
+        <div className="ml-auto flex rounded-lg border overflow-hidden bg-white">
+          <button
+            onClick={() => setTab("IDLE")}
+            className={`px-4 py-1.5 text-xs font-semibold transition ${
+              tab === "IDLE"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Free
+            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              tab === "IDLE" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+            }`}>{freeCount}</span>
+          </button>
+          <button
+            onClick={() => setTab("RUNNING")}
+            className={`px-4 py-1.5 text-xs font-semibold transition border-l ${
+              tab === "RUNNING"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Occupied
+            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              tab === "RUNNING" ? "bg-white/20 text-white" : "bg-orange-100 text-orange-600"
+            }`}>{occupiedCount}</span>
+          </button>
         </div>
       </div>
 
-      {/* ================= TABLE GRID ================= */}
-      <div className="flex-1 p-4 overflow-auto">
-        <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      {/* ── Table grid ── */}
+      {list.length === 0 ? (
+        <div className="py-12 text-center text-sm text-gray-400">No tables available</div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {list.map(t => {
             const mins = runningMinutes(t.opened_at);
+            const isOccupied = t.status === "OCCUPIED";
 
             return (
               <div
                 key={t.table_id}
                 onClick={() => navigate(`/table-order/${t.table_id}`)}
-                className="rounded-lg border px-3 py-2 text-left transition active:scale-[0.97] cursor-pointer"
-                style={{
-                  borderColor: BLUE,
-                  background: t.status === "FREE" ? "white" : "#E8F0FF"
-                }}
+                className={`rounded-xl border cursor-pointer transition active:scale-[0.97] overflow-hidden ${
+                  isOccupied
+                    ? "border-orange-200 bg-orange-50"
+                    : "border-gray-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30"
+                }`}
               >
-                {/* HEADER */}
-                <div className="flex justify-between items-center">
-                  <span
-                    className="text-sm font-extrabold"
-                    style={{ color: BLUE }}
-                  >
+                {/* Card header */}
+                <div className={`px-3 py-2 flex items-center justify-between ${
+                  isOccupied ? "bg-orange-100" : "bg-gray-50"
+                }`}>
+                  <span className={`text-sm font-bold truncate ${
+                    isOccupied ? "text-orange-700" : "text-indigo-700"
+                  }`}>
                     {t.table_name}
                   </span>
-
-                  <span className="text-[11px] font-semibold">
-                    👥 {t.capacity}
+                  <span className="text-[10px] text-gray-500 shrink-0 ml-1">
+                    {t.capacity} seats
                   </span>
                 </div>
 
-                {/* BODY */}
-                {t.status === "OCCUPIED" ? (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-[11px] text-black">
-                      Started: {formatStartTime(t.opened_at)}
+                {/* Card body */}
+                <div className="px-3 py-2.5">
+                  {isOccupied ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-gray-500">{formatStartTime(t.opened_at)}</span>
+                        <span className="text-[10px] text-orange-600 font-medium">{mins ?? 0}m</span>
+                      </div>
+                      <div className="text-lg font-bold text-gray-800 leading-none">
+                        ₹{Number(t.running_total || 0).toFixed(0)}
+                      </div>
+                      <div className="flex gap-1.5 pt-1" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (!t.order_id) { showToast("No active order for this table", "error"); return; }
+                            setConfirming({
+                              order_id: t.order_id,
+                              table: t,
+                              customer_name: t.customer_name || "NA",
+                              mobile: t.mobile || DEFAULT_MOBILE,
+                              service_charge: "",
+                              payment_mode: "cash",
+                              split_enabled: false,
+                              split: { cash: "", card: "", upi: "" }
+                            });
+                          }}
+                          className="flex-1 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold"
+                        >
+                          Complete
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); navigate(`/table-order/${t.table_id}`); }}
+                          className="flex-1 py-1 rounded-lg border bg-white hover:bg-gray-50 text-[11px] text-gray-600"
+                        >
+                          Open
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="text-[12px] font-semibold text-black">
-                      ⏱ {mins ?? 0} min running
+                  ) : (
+                    <div className="py-2 text-center text-[11px] text-gray-400">
+                      Tap to start
                     </div>
-
-                    <div
-                      className="text-lg font-extrabold leading-tight"
-                      style={{ color: BLUE }}
-                    >
-                      ₹ {Number(t.running_total || 0).toFixed(0)}
-                    </div>
-
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (!t.order_id) {
-                            showToast("No active order for this table", "error");
-                            return;
-                          }
-                          setConfirming({
-                            order_id: t.order_id,
-                            table: t,
-                            customer_name: t.customer_name || "NA",
-                            mobile: t.mobile || DEFAULT_MOBILE,
-                            service_charge: "",
-                            payment_mode: "cash",
-                            split_enabled: false,
-                            split: { cash: "", card: "", upi: "" }
-                          });
-                        }}
-                        className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
-                      >
-                        Complete
-                      </button>
-
-                      <button
-                        onClick={e => { e.stopPropagation(); navigate(`/table-order/${t.table_id}`); }}
-                        className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-                      >
-                        Open
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 text-[11px] text-black">
-                    Tap to start
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}
-
-          {!list.length && (
-            <div className="col-span-full text-center text-sm text-black">
-              No tables available
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
-      {/* CONFIRMATION MODAL */}
+      {/* ── Checkout modal ── */}
       {confirming && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold mb-2">Complete Order</h3>
-            <p className="text-sm text-gray-600 mb-4">Complete this order and print invoice for table <strong>{confirming.table?.table_name}</strong>?</p>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-xl shadow-xl flex flex-col max-h-[90vh]">
 
-            <div className="space-y-3 mb-3">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b">
               <div>
-                <label className="text-sm text-gray-600">Mobile</label>
+                <div className="font-semibold text-gray-800 text-sm">Complete Order</div>
+                <div className="text-[11px] text-gray-400">Table: {confirming.table?.table_name}</div>
+              </div>
+              <button
+                onClick={() => setConfirming(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg leading-none"
+              >×</button>
+            </div>
+
+            {/* Modal body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3.5">
+
+              <div>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wide">Mobile</label>
                 <input
                   inputMode="numeric"
                   maxLength={10}
-                  className="w-full border rounded px-2 py-1 mt-1"
+                  className="mt-0.5 w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
                   value={confirming.mobile}
                   onFocus={() => { if (confirming.mobile === DEFAULT_MOBILE) setConfirming(c => ({ ...c, mobile: "" })); }}
                   onChange={e => {
@@ -547,9 +554,9 @@ export default function TableGrid() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600">Customer Name</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wide">Customer Name</label>
                 <input
-                  className="w-full border rounded px-2 py-1 mt-1"
+                  className="mt-0.5 w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
                   value={confirming.customer_name}
                   onChange={e => setConfirming(c => ({ ...c, customer_name: e.target.value }))}
                   placeholder="Customer name"
@@ -557,10 +564,10 @@ export default function TableGrid() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600">Service Charge</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wide">Service Charge</label>
                 <input
                   inputMode="decimal"
-                  className="w-full border rounded px-2 py-1 mt-1"
+                  className="mt-0.5 w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
                   value={confirming.service_charge ?? ""}
                   onChange={e => setConfirming(c => ({ ...c, service_charge: e.target.value }))}
                   placeholder="0.00"
@@ -568,23 +575,22 @@ export default function TableGrid() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600">Payment Mode</label>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1.5 block">Payment Mode</label>
+                <div className="flex flex-wrap gap-2">
                   {PAYMENT_MODES.map(mode => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setConfirming(c => ({ ...c, payment_mode: mode, split_enabled: false }))}
-                      className={`px-3 py-1 rounded border text-sm ${
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
                         confirming.payment_mode === mode && !confirming.split_enabled
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white"
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       {mode.toUpperCase()}
                     </button>
                   ))}
-
                   <button
                     type="button"
                     onClick={() => setConfirming(c => ({
@@ -592,8 +598,10 @@ export default function TableGrid() {
                       split_enabled: !c.split_enabled,
                       payment_mode: !c.split_enabled ? "" : c.payment_mode
                     }))}
-                    className={`px-3 py-1 rounded border text-sm ${
-                      confirming.split_enabled ? "bg-emerald-600 text-white border-emerald-600" : "bg-white"
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                      confirming.split_enabled
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     SPLIT
@@ -602,82 +610,66 @@ export default function TableGrid() {
 
                 {confirming.split_enabled && (
                   <div className="mt-2 grid grid-cols-3 gap-2">
-                    <input
-                      inputMode="decimal"
-                      placeholder="Cash"
-                      className="border rounded px-2 py-1 text-sm"
-                      value={confirming.split?.cash ?? ""}
-                      onChange={e =>
-                        setConfirming(c => ({
-                          ...c,
-                          split: { ...c.split, cash: e.target.value }
-                        }))
-                      }
-                    />
-                    <input
-                      inputMode="decimal"
-                      placeholder="Card"
-                      className="border rounded px-2 py-1 text-sm"
-                      value={confirming.split?.card ?? ""}
-                      onChange={e =>
-                        setConfirming(c => ({
-                          ...c,
-                          split: { ...c.split, card: e.target.value }
-                        }))
-                      }
-                    />
-                    <input
-                      inputMode="decimal"
-                      placeholder="UPI"
-                      className="border rounded px-2 py-1 text-sm"
-                      value={confirming.split?.upi ?? ""}
-                      onChange={e =>
-                        setConfirming(c => ({
-                          ...c,
-                          split: { ...c.split, upi: e.target.value }
-                        }))
-                      }
-                    />
+                    {["cash", "card", "upi"].map(field => (
+                      <input
+                        key={field}
+                        inputMode="decimal"
+                        placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                        className="border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        value={confirming.split?.[field] ?? ""}
+                        onChange={e => setConfirming(c => ({ ...c, split: { ...c.split, [field]: e.target.value } }))}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
 
-              <div className="text-sm text-gray-700 rounded border bg-gray-50 px-2 py-2">
-                Base: ₹ {toAmount(confirming.table?.running_total || 0).toFixed(2)}{" "}
-                | Service: ₹ {toAmount(confirming.service_charge || 0).toFixed(2)}{" "}
-                | Payable: ₹ {(toAmount(confirming.table?.running_total || 0) + toAmount(confirming.service_charge || 0)).toFixed(2)}
+              {/* Payable summary */}
+              <div className="bg-slate-50 rounded-lg px-3.5 py-2.5 text-sm space-y-1">
+                <div className="flex justify-between text-gray-500">
+                  <span>Base</span>
+                  <span>₹ {toAmount(confirming.table?.running_total || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span>Service Charge</span>
+                  <span>₹ {toAmount(confirming.service_charge || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold border-t pt-1.5 text-base">
+                  <span>Payable</span>
+                  <span className="text-emerald-600">
+                    ₹ {(toAmount(confirming.table?.running_total || 0) + toAmount(confirming.service_charge || 0)).toFixed(2)}
+                  </span>
+                </div>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setConfirming(null)}
-                  className="px-4 py-2 rounded bg-gray-200"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  onClick={() => completeOrder(false)}
-                  disabled={checkoutLoading}
-                  className="px-4 py-2 rounded bg-blue-600 text-white"
-                >
-                  {checkoutLoading ? "Processing…" : "Complete"}
-                </button>
-
-                <button
-                  onClick={() => completeOrder(true)}
-                  disabled={checkoutLoading}
-                  className="px-4 py-2 rounded bg-emerald-600 text-white"
-                >
-                  {checkoutLoading ? "Processing…" : "Confirm & Print"}
-                </button>
-              </div>
+            {/* Modal footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setConfirming(null)}
+                className="px-4 py-1.5 rounded-lg border bg-white text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => completeOrder(false)}
+                disabled={checkoutLoading}
+                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-60"
+              >
+                {checkoutLoading ? "Processing…" : "Complete"}
+              </button>
+              <button
+                onClick={() => completeOrder(true)}
+                disabled={checkoutLoading}
+                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-60"
+              >
+                {checkoutLoading ? "Processing…" : "Complete & Print"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* PRINT AREA */}
       <div id="bill-print-area">
         <pre ref={printTextRef} style={{ fontSize: "12px" }} />
       </div>

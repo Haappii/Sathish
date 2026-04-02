@@ -108,147 +108,122 @@ export default function EmployeeAttendance() {
     }
   };
 
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <BackButton />
-          <h2 className="text-lg font-bold text-slate-800">Attendance</h2>
-        </div>
+  const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition";
+  const statusColor = { PRESENT: "text-emerald-600", ABSENT: "text-rose-600", HALF_DAY: "text-amber-600", LEAVE: "text-blue-600" };
 
-        <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3">
+        <BackButton />
+        <div className="flex-1">
+          <h1 className="text-base font-bold text-gray-800">Payroll Attendance</h1>
+          <p className="text-[11px] text-gray-400">{filteredEmployees.length} employee{filteredEmployees.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-2">
           <input
             type="date"
             value={attendanceDate}
             onChange={(e) => setAttendanceDate(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border bg-white text-[12px]"
+            className={inputCls}
           />
-
           <input
-            placeholder="Search Employee..."
+            placeholder="Search employee..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border bg-white text-[12px]"
+            className={`${inputCls} w-40`}
           />
         </div>
       </div>
 
-      {/* Summary Panel */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          ["Present", payrollSummary.present],
-          ["Absent", payrollSummary.absent],
-          ["Half Day", payrollSummary.half],
-          ["Leave", payrollSummary.leave],
-          ["Total Payroll", `Rs. ${payrollSummary.totalPayroll.toFixed(2)}`],
-        ].map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-xl border bg-white p-3"
-          >
-            <div className="text-[11px] text-slate-500 uppercase tracking-wide">
-              {label}
+      <div className="px-4 sm:px-6 py-4 space-y-4">
+        {/* Summary cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            { label: "Present", value: payrollSummary.present, color: "text-emerald-600" },
+            { label: "Absent", value: payrollSummary.absent, color: "text-rose-600" },
+            { label: "Half Day", value: payrollSummary.half, color: "text-amber-600" },
+            { label: "Leave", value: payrollSummary.leave, color: "text-blue-600" },
+            { label: "Total Payroll", value: `₹${payrollSummary.totalPayroll.toFixed(2)}`, color: "text-gray-800" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-white border rounded-2xl shadow-sm p-3">
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{label}</div>
+              <div className={`text-lg font-bold mt-1 ${color}`}>{value}</div>
             </div>
-            <div className="text-lg font-semibold text-slate-800 mt-1">{value}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Payroll Table */}
-      <div className="rounded-xl border bg-white overflow-hidden">
-        {loading ? (
-          <div className="p-6 text-slate-500 text-sm">Loading employees...</div>
-        ) : (
-          <div className="max-h-[600px] overflow-auto">
-            <table className="w-full text-[12px]">
-              <thead className="bg-gray-50 sticky top-0 z-10 text-slate-800">
-                <tr>
-                  <th className="p-3 text-left font-semibold">Employee</th>
-                  <th className="p-3 text-left font-semibold">Status</th>
-                  <th className="p-3 text-left font-semibold">Worked Units</th>
-                  <th className="p-3 text-left font-semibold">Daily Wage</th>
-                  <th className="p-3 text-right font-semibold">Payable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEmployees.map((emp, idx) => {
-                  const row = attendanceData[emp.employee_id];
-                  const stripe = idx % 2 === 0 ? "bg-white" : "bg-slate-50";
+        {/* Attendance table */}
+        <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-40 text-sm text-gray-400">Loading employees...</div>
+          ) : (
+            <div className="overflow-auto max-h-[520px]">
+              <table className="w-full text-[12px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-50 border-b">
+                    <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Employee</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Worked Units</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Daily Wage</th>
+                    <th className="px-4 py-2.5 text-right font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Payable</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredEmployees.map((emp, idx) => {
+                    const row = attendanceData[emp.employee_id];
+                    const payable = row.status === "ABSENT" ? 0 : Number(row.wage) * Number(row.worked_units);
+                    return (
+                      <tr key={emp.employee_id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
+                        <td className="px-4 py-2.5">
+                          <div className="font-semibold text-gray-800">{emp.employee_name}</div>
+                          {emp.designation && <div className="text-[10px] text-gray-400">{emp.designation}</div>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <select
+                            value={row.status}
+                            onChange={(e) => updateField(emp.employee_id, "status", e.target.value)}
+                            className={`border border-gray-200 rounded-xl px-2 py-1 text-[11px] bg-gray-50 focus:outline-none ${statusColor[row.status] || ""}`}
+                          >
+                            {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <input
+                            type="number" step="0.5"
+                            value={row.worked_units}
+                            onChange={(e) => updateField(emp.employee_id, "worked_units", e.target.value)}
+                            className="border border-gray-200 rounded-xl px-2 py-1 w-20 text-[12px] bg-gray-50 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <input
+                            type="number"
+                            value={row.wage}
+                            onChange={(e) => updateField(emp.employee_id, "wage", e.target.value)}
+                            className="border border-gray-200 rounded-xl px-2 py-1 w-24 text-[12px] bg-gray-50 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-bold text-gray-800">₹{payable.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-                  return (
-                    <tr key={emp.employee_id} className={`${stripe} border-t`}>
-                      <td className="p-3 font-semibold text-slate-800">
-                        {emp.employee_name}
-                      </td>
-
-                      <td className="p-3">
-                        <select
-                          value={row.status}
-                          onChange={(e) =>
-                            updateField(emp.employee_id, "status", e.target.value)
-                          }
-                          className="border rounded-lg px-2 py-1 text-[12px] bg-white"
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s}>{s}</option>
-                          ))}
-                        </select>
-                      </td>
-
-                      <td className="p-3">
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={row.worked_units}
-                          onChange={(e) =>
-                            updateField(
-                              emp.employee_id,
-                              "worked_units",
-                              e.target.value
-                            )
-                          }
-                          className="border rounded-lg px-2 py-1 w-20 text-[12px] bg-white"
-                        />
-                      </td>
-
-                      <td className="p-3">
-                        <input
-                          type="number"
-                          value={row.wage}
-                          onChange={(e) =>
-                            updateField(emp.employee_id, "wage", e.target.value)
-                          }
-                          className="border rounded-lg px-2 py-1 w-24 text-[12px] bg-white"
-                        />
-                      </td>
-
-                      <td className="p-3 text-right font-semibold text-slate-800">
-                        Rs.{" "}
-                        {(
-                          row.status === "ABSENT"
-                            ? 0
-                            : Number(row.wage) * Number(row.worked_units)
-                        ).toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Submit */}
-      <div className="flex justify-end">
-        <button
-          onClick={submitAttendance}
-          disabled={saving}
-          className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-[12px] disabled:opacity-60"
-        >
-          {saving ? "Processing Payroll..." : "Submit Payroll Attendance"}
-        </button>
+        {/* Submit */}
+        <div className="flex justify-end">
+          <button
+            onClick={submitAttendance}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-xl text-[12px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-60"
+          >
+            {saving ? "Processing..." : "Submit Payroll Attendance"}
+          </button>
+        </div>
       </div>
     </div>
   );

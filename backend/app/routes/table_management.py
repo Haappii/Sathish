@@ -11,6 +11,8 @@ router = APIRouter(
     tags=["Table Management"]
 )
 
+TAKEAWAY_TABLE_NAME = "__TAKEAWAY__"
+
 # ------------------------------
 # LIST TABLES BY BRANCH
 # ------------------------------
@@ -27,7 +29,8 @@ def list_tables(
         db.query(TableMaster)
         .filter(
             TableMaster.shop_id == user.shop_id,
-            TableMaster.branch_id == branch_id
+            TableMaster.branch_id == branch_id,
+            TableMaster.table_name != TAKEAWAY_TABLE_NAME,
         )
         .order_by(TableMaster.table_name)
         .all()
@@ -45,6 +48,8 @@ def create_table(
     ensure_hotel_billing_type(db, user.shop_id)
     if str(user.role_name).lower() != "admin" and payload.get("branch_id") != user.branch_id:
         raise HTTPException(403, "Not allowed")
+    if str(payload.get("table_name") or "").strip() == TAKEAWAY_TABLE_NAME:
+        raise HTTPException(400, "Reserved table name")
     table = TableMaster(
         shop_id=user.shop_id,
         table_name=payload["table_name"],
@@ -79,6 +84,8 @@ def update_table(
 
     if str(user.role_name).lower() != "admin" and table.branch_id != user.branch_id:
         raise HTTPException(403, "Not allowed")
+    if str(payload.get("table_name") or "").strip() == TAKEAWAY_TABLE_NAME:
+        raise HTTPException(400, "Reserved table name")
     table.table_name = payload["table_name"]
     table.capacity = payload["capacity"]
     db.commit()

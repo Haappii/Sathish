@@ -8,5 +8,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   silentPrintText: async (text, options = {}) => {
     return ipcRenderer.invoke("silent-print-text", { text, options });
   },
-});
 
+  /**
+   * Raw ESC/POS print over serial/USB (COM path on Windows).
+   * Args: { text: string, port?: string, codepage?: number }
+   * Returns true on success, throws on failure.
+   */
+  rawPrintText: async ({ text = "", port, codepage } = {}) => {
+    return ipcRenderer.invoke("raw-print-text", { text, port, codepage });
+  },
+});

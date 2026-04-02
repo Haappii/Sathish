@@ -8,14 +8,32 @@ const escapeHtml = (text) =>
  * Attempt silent print via Electron (desktop). Falls back to browser print.
  * Returns a promise resolving to true on success.
  */
-export async function printDirectText(text, { fontSize = 12 } = {}) {
+export async function printDirectText(text, { fontSize = 9, port = "COM7" } = {}) {
   // Try Electron silent print first (desktop app)
-  if (window?.electronAPI?.silentPrintText) {
-    try {
-      const ok = await window.electronAPI.silentPrintText(text, { fontSize });
-      if (ok) return true;
-    } catch (e) {
-      console.warn("Silent print failed, falling back to browser print", e);
+  if (window?.electronAPI?.rawPrintText || window?.electronAPI?.silentPrintText) {
+    const preferBrowserFonts = Number(fontSize) <= 8; // use browser path when tiny fonts are requested
+    // 1) Raw ESC/POS (only when not forcing tiny browser fonts)
+    if (!preferBrowserFonts && window.electronAPI.rawPrintText) {
+      try {
+        await window.electronAPI.rawPrintText({
+          text,
+          port,
+          fontSize: Number(fontSize) || 12,
+          feedLines: 4, // ensure footer doesn't bleed into next job
+        });
+        return true;
+      } catch (e) {
+        console.warn("Raw print failed, falling back to browser print", e);
+      }
+    }
+    // 2) Silent browser print (honors fontSize)
+    if (window.electronAPI.silentPrintText) {
+      try {
+        const ok = await window.electronAPI.silentPrintText(text, { fontSize });
+        if (ok) return true;
+      } catch (e) {
+        console.warn("Silent browser print failed", e);
+      }
     }
   }
 

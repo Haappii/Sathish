@@ -1,8 +1,11 @@
 from sqlalchemy.orm import Session
 from app.models.branch import Branch
 from app.schemas.branch_schema import BranchCreate, BranchUpdate
+from app.utils.branch_online_orders import BRANCH_ONLINE_ORDER_FIELDS
 
 _DISCOUNT_FIELDS = {"discount_enabled", "discount_type", "discount_value"}
+_PRINT_FIELDS = {"kot_required", "receipt_required"}
+_PARAM_ONLY_FIELDS = _DISCOUNT_FIELDS | _PRINT_FIELDS | set(BRANCH_ONLINE_ORDER_FIELDS)
 
 
 def get_all_branches(db: Session, shop_id: int):
@@ -32,7 +35,7 @@ def get_branch(db: Session, shop_id: int, branch_id: int):
 
 def create_branch(db: Session, data: BranchCreate, user_id: int, shop_id: int):
     branch = Branch(
-        **data.dict(exclude=_DISCOUNT_FIELDS),
+        **data.dict(exclude=_PARAM_ONLY_FIELDS),
         shop_id=shop_id,
         created_by=user_id
     )
@@ -48,7 +51,7 @@ def update_branch(db: Session, shop_id: int, branch_id: int, data: BranchUpdate)
         return None
 
     for k, v in data.dict(exclude_unset=True).items():
-        if k in _DISCOUNT_FIELDS:
+        if k in _PARAM_ONLY_FIELDS:
             continue
         if hasattr(branch, k):
             setattr(branch, k, v)

@@ -85,134 +85,141 @@ export default function Dues() {
     }
   };
 
-  return (
-    <div className="bg-gray-100 min-h-screen p-3 space-y-3 text-[11px]">
+  const totalOutstanding = rows.reduce((s, r) => s + Number(r.outstanding_amount || 0), 0);
 
-      <div className="flex items-center justify-between bg-white border rounded-lg px-3 py-2">
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate("/home", { replace: true })}
-          className="text-gray-600 hover:text-black"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
         >
-          &larr; Back
+          ← Back
         </button>
-        <div className="font-bold text-sm">Customer Dues</div>
-        <div />
+        <div className="flex-1">
+          <h1 className="text-base font-bold text-gray-800">Customer Dues</h1>
+          {rows.length > 0 && (
+            <p className="text-[11px] text-rose-500 font-semibold">
+              Total Outstanding: ₹{totalOutstanding.toFixed(2)}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white border rounded-lg p-3 space-y-2">
-        <div className="flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-[180px]">
-            <label className="text-[10px] text-gray-600">Search</label>
-            <input
-              className="w-full border rounded-lg px-2 py-1"
-              placeholder="Invoice no / mobile..."
-              value={q}
-              onChange={e => setQ(e.target.value)}
-            />
+      {/* Filters */}
+      <div className="bg-white border-b px-4 sm:px-6 py-3 flex flex-wrap gap-3 items-end">
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[10px] text-gray-500 font-medium">Search</label>
+          <input
+            className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 w-52"
+            placeholder="Invoice no / mobile..."
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && load()}
+          />
+        </div>
+        {isAdmin && (
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">Branch</label>
+            <select
+              className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400"
+              value={branchId}
+              onChange={e => setBranchId(e.target.value)}
+            >
+              <option value="">All branches</option>
+              {branches.map(b => (
+                <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+              ))}
+            </select>
           </div>
-
-          {isAdmin && (
-            <div className="min-w-[180px]">
-              <label className="text-[10px] text-gray-600">Branch (Admin)</label>
-              <select
-                className="w-full border rounded-lg px-2 py-1"
-                value={branchId}
-                onChange={e => setBranchId(e.target.value)}
-              >
-                <option value="">All branches</option>
-                {branches.map(b => (
-                  <option key={b.branch_id} value={b.branch_id}>
-                    {b.branch_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
+        )}
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[10px] text-transparent select-none">.</label>
           <button
             onClick={load}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow"
+            className="px-4 py-1.5 rounded-xl text-[12px] font-semibold text-white transition"
+            style={{ backgroundColor: "#0B3C8C" }}
           >
-            Refresh
+            {loading ? "Loading..." : "Refresh"}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border rounded-lg overflow-x-auto">
-        {loading ? (
-          <div className="p-3 text-gray-500">Loading...</div>
-        ) : rows.length === 0 ? (
-          <div className="p-3 text-gray-500">No open dues</div>
-        ) : (
-          <table className="min-w-[900px] w-full text-left">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-2">Invoice</th>
-                <th className="p-2">Customer</th>
-                <th className="p-2">Mobile</th>
-                <th className="p-2 text-right">Original</th>
-                <th className="p-2 text-right">Paid</th>
-                <th className="p-2 text-right">Returns</th>
-                <th className="p-2 text-right">Outstanding</th>
-                <th className="p-2">Pay</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => {
-                const inv = r.invoice_number;
-                const entry = payInput[inv] || { amount: "", mode: "cash", ref: "" };
-                return (
-                  <tr key={r.due_id} className="border-t">
-                    <td className="p-2 font-semibold">{inv}</td>
-                    <td className="p-2">{r.customer_name || "-"}</td>
-                    <td className="p-2">{r.mobile || "-"}</td>
-                    <td className="p-2 text-right">{Number(r.original_amount || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right">{Number(r.paid_amount || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right">{Number(r.returns_amount || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right font-bold">
-                      {Number(r.outstanding_amount || 0).toFixed(2)}
-                    </td>
-                    <td className="p-2">
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <input
-                          type="number"
-                          className="w-[90px] border rounded-lg px-2 py-1"
-                          placeholder="Amount"
-                          value={entry.amount}
-                          onChange={e => setPay(inv, { amount: e.target.value })}
-                        />
-                        <select
-                          className="border rounded-lg px-2 py-1"
-                          value={entry.mode}
-                          onChange={e => setPay(inv, { mode: e.target.value })}
-                        >
-                          <option value="cash">Cash</option>
-                          <option value="card">Card</option>
-                          <option value="upi">UPI</option>
-                          <option value="bank">Bank</option>
-                        </select>
-                        <input
-                          className="w-[140px] border rounded-lg px-2 py-1"
-                          placeholder="Ref (optional)"
-                          value={entry.ref}
-                          onChange={e => setPay(inv, { ref: e.target.value })}
-                        />
-                        <button
-                          onClick={() => pay(inv)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow"
-                        >
-                          Pay
-                        </button>
-                      </div>
-                    </td>
+      <div className="px-4 sm:px-6 py-4">
+        <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-40 text-sm text-gray-400">Loading dues...</div>
+          ) : rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-2">
+              <div className="text-2xl">✅</div>
+              <div className="text-sm text-gray-400">No open dues found</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-[1000px] w-full text-[11px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    {["Invoice", "Customer", "Mobile", "Original", "Paid", "Returns", "Outstanding", "Record Payment"].map((h, i) => (
+                      <th key={h} className={`px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] ${i >= 3 && i <= 6 ? "text-right" : "text-left"}`}>{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {rows.map((r, idx) => {
+                    const inv = r.invoice_number;
+                    const entry = payInput[inv] || { amount: "", mode: "cash", ref: "" };
+                    return (
+                      <tr key={r.due_id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
+                        <td className="px-3 py-2.5 font-semibold text-gray-800">{inv}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{r.customer_name || "—"}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{r.mobile || "—"}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-600">₹{Number(r.original_amount || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right text-emerald-600">₹{Number(r.paid_amount || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-600">₹{Number(r.returns_amount || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-rose-600">₹{Number(r.outstanding_amount || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            <input
+                              type="number"
+                              className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-[11px] bg-gray-50 focus:outline-none focus:border-blue-400"
+                              placeholder="Amount"
+                              value={entry.amount}
+                              onChange={e => setPay(inv, { amount: e.target.value })}
+                            />
+                            <select
+                              className="border border-gray-200 rounded-lg px-2 py-1 text-[11px] bg-gray-50 focus:outline-none"
+                              value={entry.mode}
+                              onChange={e => setPay(inv, { mode: e.target.value })}
+                            >
+                              <option value="cash">Cash</option>
+                              <option value="card">Card</option>
+                              <option value="upi">UPI</option>
+                              <option value="bank">Bank</option>
+                            </select>
+                            <input
+                              className="w-24 border border-gray-200 rounded-lg px-2 py-1 text-[11px] bg-gray-50 focus:outline-none"
+                              placeholder="Ref"
+                              value={entry.ref}
+                              onChange={e => setPay(inv, { ref: e.target.value })}
+                            />
+                            <button
+                              onClick={() => pay(inv)}
+                              className="px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition"
+                            >
+                              Pay
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-
     </div>
   );
 }

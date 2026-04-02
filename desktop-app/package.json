@@ -24,6 +24,12 @@
     "directories": {
       "buildResources": "build"
     },
+    "extraResources": [
+      {
+        "from": "../drivers/SC588/SP-DRV2155Win.exe",
+        "to": "drivers/SP-DRV2155Win.exe"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
@@ -43,7 +49,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "deleteAppDataOnUninstall": true
+      "deleteAppDataOnUninstall": true,
+      "include": "build/installer.nsh"
     },
     "win": {
       "publisherName": [

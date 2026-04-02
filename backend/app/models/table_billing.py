@@ -4,7 +4,8 @@ from sqlalchemy import (
     String,
     Numeric,
     ForeignKey,
-    DateTime
+    DateTime,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -54,6 +55,14 @@ class Order(Base):
     )
     branch_id = Column(Integer, nullable=False)
 
+    # DINE_IN / TAKEAWAY / DELIVERY
+    order_type = Column(String(20), default="DINE_IN", nullable=False)
+
+    customer_name = Column(String(120), nullable=True)
+    mobile = Column(String(20), nullable=True)
+    notes = Column(String(300), nullable=True)
+    token_number = Column(String(20), nullable=True)  # for takeaway token display
+
     status = Column(String(20), default="OPEN")  # OPEN / CLOSED
     opened_by = Column(Integer)
     opened_at = Column(DateTime, default=datetime.utcnow)
@@ -94,6 +103,9 @@ class OrderItem(Base):
 
     quantity = Column(Integer, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
+    notes = Column(String(300), nullable=True)        # e.g. "no onion", "extra spicy"
+    kot_sent = Column(Boolean, default=False, nullable=False)
+    kot_sent_at = Column(DateTime, nullable=True)
 
     added_at = Column(DateTime, default=datetime.utcnow)
 

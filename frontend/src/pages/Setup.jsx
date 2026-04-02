@@ -16,7 +16,8 @@ import {
   FaTags,
   FaBook,
   FaClipboardCheck,
-  FaBarcode
+  FaBarcode,
+  FaCodeBranch,
 } from "react-icons/fa";
 import api from "../utils/apiClient";
 import { getSession } from "../utils/auth";
@@ -50,7 +51,6 @@ export default function Setup() {
     );
   }
 
-  // 🚫 Not allowed → kick out
   if (!allowed) {
     return (
       <div className="mt-10 text-center text-sm font-medium text-red-600">
@@ -65,120 +65,120 @@ export default function Setup() {
       link: "/setup/categories",
       desc: "Add / Edit / Delete categories",
       icon: FaSitemap,
-      color: "text-blue-600"
+      color: "text-blue-600",
     },
     {
       title: "Item Management",
       link: "/setup/items",
       desc: "Manage items under categories",
       icon: FaList,
-      color: "text-emerald-600"
+      color: "text-emerald-600",
     },
     {
       title: "Shop Details",
       link: "/setup/shop",
       desc: "Business profile & GST info",
       icon: FaStore,
-      color: "text-amber-600"
+      color: "text-amber-600",
     },
     {
       title: "User Management",
       link: "/setup/users",
       desc: "Create & manage users",
       icon: FaUsersCog,
-      color: "text-teal-600"
+      color: "text-teal-600",
     },
     {
       title: "Role Management",
       link: "/setup/permissions",
       desc: "Create roles and set module access",
       icon: FaUserShield,
-      color: "text-indigo-700"
+      color: "text-indigo-700",
     },
     {
       title: "Branch Management",
       link: "/setup/branches",
-      desc: "Manage branches",
-      icon: FaStore,
-      color: "text-rose-600"
+      desc: "Manage branches, printing & online orders",
+      icon: FaCodeBranch,
+      color: "text-rose-600",
     },
     {
       title: "Inventory",
       link: "/inventory",
       desc: "Stock & adjustments",
       icon: FaBoxes,
-      color: "text-indigo-600"
+      color: "text-indigo-600",
     },
     {
       title: "Suppliers",
       link: "/setup/suppliers",
       desc: "Manage supplier profiles",
       icon: FaTruck,
-      color: "text-sky-600"
+      color: "text-sky-600",
     },
     {
       title: "Purchase Orders",
       link: "/setup/purchase-orders",
       desc: "Create and receive POs",
       icon: FaClipboardList,
-      color: "text-purple-600"
+      color: "text-purple-600",
     },
     {
       title: "Coupons / Offers",
       link: "/coupons",
       desc: "Discount codes and validation",
       icon: FaTags,
-      color: "text-indigo-700"
+      color: "text-indigo-700",
     },
     {
       title: "Supplier Ledger",
       link: "/supplier-ledger",
       desc: "Aging, statements, payments",
       icon: FaBook,
-      color: "text-slate-700"
+      color: "text-slate-700",
     },
     {
       title: "Stock Audit",
       link: "/stock-audit",
       desc: "Cycle count and adjustments",
       icon: FaClipboardCheck,
-      color: "text-rose-700"
+      color: "text-rose-700",
     },
     {
       title: "Item Lots",
       link: "/item-lots",
       desc: "Batch / expiry / serial tracking",
       icon: FaBarcode,
-      color: "text-sky-700"
+      color: "text-sky-700",
     },
     {
       title: "Customers",
       link: "/customers",
       desc: "Customer profiles & dues",
       icon: FaUsers,
-      color: "text-slate-700"
+      color: "text-slate-700",
     },
     {
       title: "Reorder Alerts",
       link: "/reorder-alerts",
       desc: "Items below minimum stock",
       icon: FaBell,
-      color: "text-rose-600"
+      color: "text-rose-600",
     },
     {
       title: "Support Tickets",
       link: "/support-tickets",
       desc: "View and update tickets",
       icon: FaLifeRing,
-      color: "text-orange-600"
+      color: "text-orange-600",
     },
     {
       title: "Day Close",
       link: "/day-close",
       desc: "Daily closing process",
       icon: FaCalendarAlt,
-      color: "text-emerald-700"
-    }
+      color: "text-emerald-700",
+    },
   ];
 
   const filteredMenus = menus.filter((m) => {
@@ -206,7 +206,7 @@ export default function Setup() {
         </h2>
       </div>
 
-      {/* Menu cards (content-sized, no stretch) */}
+      {/* Menu cards */}
       <div className="flex flex-wrap gap-3">
         {visibleMenus.map((m, i) => {
           const Icon = m.icon;

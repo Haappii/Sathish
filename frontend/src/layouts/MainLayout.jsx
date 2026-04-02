@@ -137,6 +137,7 @@ export default function MainLayout({ hideSidebar = false }) {
       .then(res => {
         const data = res.data || {};
         if (data.shop_name) setShopName(data.shop_name);
+        localStorage.setItem("billing_type", (data.billing_type || "shop").toLowerCase());
         setShop(data);
       })
       .catch(() => {});
@@ -303,6 +304,8 @@ export default function MainLayout({ hideSidebar = false }) {
   /* ================= SIDEBAR MENU ================= */
   const sidebarEnabled =
     !hideSidebar && !location.pathname.startsWith("/sales/create");
+
+  const isCreateBill = location.pathname.startsWith("/sales/create");
 
   const shopType = (shop?.shop_type || shop?.billing_type || "")
     .toString()
@@ -647,7 +650,7 @@ export default function MainLayout({ hideSidebar = false }) {
         </header>
 
         {/* CONTENT */}
-        <main className="flex-1 overflow-auto p-3 sm:p-8">
+        <main className="flex-1 overflow-auto" style={isCreateBill ? {} : { paddingLeft: "1cm", paddingRight: "1cm" }}>
           <Outlet />
         </main>
 

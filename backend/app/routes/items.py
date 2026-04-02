@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Query
 from pathlib import Path
 import shutil
 from sqlalchemy.orm import Session
@@ -70,6 +70,8 @@ def _resolve_image_ext(upload: UploadFile) -> str:
 @router.get("/", response_model=list[ItemResponse])
 def list_items(
     request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=500, ge=1, le=2000),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -83,7 +85,7 @@ def list_items(
         # Admin "all branches" view: show shared items only (no branch override applied)
         q = q.filter(Item.branch_id.is_(None))
 
-    items = q.order_by(Item.item_name).all()
+    items = q.order_by(Item.item_name).offset(skip).limit(limit).all()
 
     if branch_id:
         overrides = {
@@ -209,6 +211,7 @@ def create_item(
     )
 
     db.add(item)
+    db.flush()  # assigns item.item_id before it's used below
     upsert_branch_item_price(
         db,
         shop_id=user.shop_id,

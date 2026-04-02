@@ -55,7 +55,12 @@ def redeem_card(
     if amt <= 0:
         raise HTTPException(400, "Redeem amount must be > 0")
 
-    card = get_card_by_code(db, shop_id=shop_id, code=c)
+    card = (
+        db.query(GiftCard)
+        .filter(GiftCard.shop_id == shop_id, GiftCard.code == c)
+        .with_for_update()
+        .first()
+    )
     if not card:
         raise HTTPException(404, "Gift card not found")
     if str(card.status or "").upper() != "ACTIVE":

@@ -267,7 +267,11 @@ export default function SalesHistory() {
 
   /* ================= PRINT ================= */
   const generateBillText = () => {
-    const WIDTH = 48;
+    const WIDTH = 32;
+    const ITEM_COL = 14;
+    const QTY_COL = 4;
+    const RATE_COL = 6;
+    const TOTAL_COL = WIDTH - ITEM_COL - QTY_COL - RATE_COL;
     const line = "-".repeat(WIDTH);
     const center = txt => {
       const pad = Math.max(0, Math.floor((WIDTH - txt.length) / 2));
@@ -310,19 +314,19 @@ export default function SalesHistory() {
     }
     t += line + "\n";
     t +=
-      "Item".padEnd(22) +
-      "Qty".padStart(4) +
-      "Rate".padStart(10) +
-      "Total".padStart(12) +
+      "Item".padEnd(ITEM_COL) +
+      "Qty".padStart(QTY_COL) +
+      "Rate".padStart(RATE_COL) +
+      "Total".padStart(TOTAL_COL) +
       "\n";
     t += line + "\n";
     items.forEach(i => {
       const lineTotal = i.price * i.quantity;
       t +=
-        i.item_name.slice(0, 22).padEnd(22) +
-        String(i.quantity).padStart(4) +
-        i.price.toFixed(2).padStart(10) +
-        lineTotal.toFixed(2).padStart(12) +
+        i.item_name.slice(0, ITEM_COL).padEnd(ITEM_COL) +
+        String(i.quantity).padStart(QTY_COL) +
+        i.price.toFixed(2).padStart(RATE_COL) +
+        lineTotal.toFixed(2).padStart(TOTAL_COL) +
         "\n";
     });
     t += line + "\n";
@@ -337,7 +341,8 @@ export default function SalesHistory() {
       t += rightKV("Discount", Number(activeBill.discounted_amt).toFixed(2)) + "\n";
     t += rightKV("Grand Total", totals.total.toFixed(2)) + "\n";
     t += line + "\n";
-    t += center("Thank You! Visit Again") + "\n";
+    // Footer + 4 blank lines so the final message is always on the same slip
+    t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
     return t;
   };
 
@@ -346,15 +351,17 @@ export default function SalesHistory() {
       showToast("Receipt printing disabled for this branch", "warning");
       return;
     }
-    const ok = await printDirectText(generateBillText());
+    const ok = await printDirectText(generateBillText(), { fontSize: 6 });
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   /* ================= UI ================= */
   const isViewOnly = !canEdit || mode === "view";
 
+  const totalSales = filtered.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+
   return (
-    <div className="min-h-screen bg-slate-100 p-5 space-y-5">
+    <div className="space-y-3">
       <style>{`
         #bill-print-area { display: none; }
         @media print {
@@ -374,202 +381,269 @@ export default function SalesHistory() {
         }
       `}</style>
 
-      <h2 className="text-xl font-semibold">Sales History</h2>
-
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+      {/* ── Header bar ── */}
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => navigate("/home", { replace: true })}
-          className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+          className="px-3 py-1.5 rounded-lg border bg-white text-[12px] hover:bg-gray-50"
         >
-          &larr; Back
+          ← Back
         </button>
-        <div className="flex gap-2">
+        <h2 className="text-base font-semibold text-gray-700 mr-2">Sales History</h2>
+
+        <div className="flex items-center gap-1.5 ml-auto flex-wrap">
           <input
             type="date"
-            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+            className="px-2.5 py-1.5 rounded-lg border bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-400"
             value={fromDate}
             onChange={e => setFromDate(e.target.value)}
           />
+          <span className="text-xs text-gray-400">to</span>
           <input
             type="date"
-            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
+            className="px-2.5 py-1.5 rounded-lg border bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-400"
             value={toDate}
             onChange={e => setToDate(e.target.value)}
+          />
+          <input
+            className="px-2.5 py-1.5 rounded-lg border bg-white text-[12px] w-52 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            placeholder="Search invoice / customer / mobile"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      <input
-        className="w-full px-4 py-2 border rounded-xl"
-        placeholder="Search invoice / customer / mobile"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
+      {/* ── Summary strip ── */}
+      {!loading && filtered.length > 0 && (
+        <div className="flex items-center gap-4 px-4 py-2 bg-white border rounded-lg text-sm">
+          <span className="text-gray-500">
+            Bills: <span className="font-semibold text-gray-800">{filtered.length}</span>
+          </span>
+          <span className="text-gray-300">|</span>
+          <span className="text-gray-500">
+            Total: <span className="font-semibold text-emerald-600">₹ {totalSales.toFixed(2)}</span>
+          </span>
+        </div>
+      )}
 
+      {/* ── Bills table ── */}
       {loading ? (
-        <p>Loading…</p>
+        <div className="py-10 text-center text-sm text-gray-400">Loading…</div>
       ) : filtered.length === 0 ? (
-        <p className="text-gray-400">No bills found</p>
+        <div className="py-10 text-center text-sm text-gray-400">No bills found</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {filtered.map(b => (
-            <div key={b.invoice_id} className="bg-white rounded-2xl border p-4">
-              <p className="text-xs text-gray-400">Invoice</p>
-              <p className="font-semibold">{b.invoice_number}</p>
-              <p className="text-xs text-gray-400">{formatDisplayDate(b.created_time)}</p>
-              <p className="text-sm text-gray-600">
-                {b.customer_name || "Walk-in Customer"}
-              </p>
-              <p className="font-bold text-emerald-600 mt-2">
-                ₹ {Number(b.total_amount).toFixed(2)}
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => openBill(b, "view")}
-                  className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px]"
-                >
-                  View
-                </button>
-                {canEdit && isAppDateBill(b.created_time) && (
-                  <>
-                    <button
-                      onClick={() => openBill(b, "edit")}
-                      className="px-3 py-1 rounded bg-blue-600 text-white"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => openBill(b, "edit", { openDelete: true })}
-                      className="px-3 py-1 rounded bg-red-600 text-white"
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
+                <th className="px-4 py-2.5 text-left font-medium">Invoice</th>
+                <th className="px-4 py-2.5 text-left font-medium">Customer</th>
+                <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Date & Time</th>
+                <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">Payment</th>
+                <th className="px-4 py-2.5 text-right font-medium">Amount</th>
+                <th className="px-4 py-2.5 text-center font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(b => (
+                <tr key={b.invoice_id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-2.5">
+                    <span className="font-semibold text-indigo-600 text-xs">{b.invoice_number}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-700 text-xs">
+                    {b.customer_name || <span className="text-gray-400 italic">Walk-in</span>}
+                    {b.mobile && <div className="text-[11px] text-gray-400">{b.mobile}</div>}
+                  </td>
+                  <td className="px-4 py-2.5 text-[11px] text-gray-400 hidden sm:table-cell">
+                    {formatDisplayDate(b.created_time)}
+                  </td>
+                  <td className="px-4 py-2.5 hidden md:table-cell">
+                    <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 capitalize">
+                      {b.payment_mode || "cash"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-sm">
+                    ₹ {Number(b.total_amount).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => openBill(b, "view")}
+                        className="px-2.5 py-1 rounded border text-[11px] text-gray-600 hover:bg-gray-50"
+                      >
+                        View
+                      </button>
+                      {canEdit && isAppDateBill(b.created_time) && (
+                        <>
+                          <button
+                            onClick={() => openBill(b, "edit")}
+                            className="px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] hover:bg-indigo-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openBill(b, "edit", { openDelete: true })}
+                            className="px-2.5 py-1 rounded bg-red-50 text-red-600 border border-red-200 text-[11px] hover:bg-red-100"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* ================= MODAL ================= */}
       {activeBill && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white max-w-md w-full rounded-2xl p-6">
-            <div className="flex justify-between mb-4">
-              <h3 className="text-xl font-semibold">
-                {activeBill.invoice_number}
-              </h3>
-              <button onClick={() => setActiveBill(null)}>✕</button>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl shadow-xl flex flex-col max-h-[90vh]">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b">
+              <div>
+                <div className="font-semibold text-gray-800 text-sm">{activeBill.invoice_number}</div>
+                <div className="text-[11px] text-gray-400">{formatDisplayDate(activeBill.created_time)}</div>
+              </div>
+              <button
+                onClick={() => setActiveBill(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg leading-none"
+              >
+                ×
+              </button>
             </div>
 
-            {/* CUSTOMER */}
-            {isViewOnly ? (
-              <>
-                <p className="text-sm text-gray-600">
-                  Customer: {activeBill.customer_name || "Walk-in"}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Mobile: {activeBill.mobile || "-"}
-                </p>
-              </>
-            ) : (
-              <>
-                <input
-                  className="w-full border rounded px-2 py-1 mb-1"
-                  value={activeBill.customer_name || ""}
-                  onChange={e =>
-                    setActiveBill(p => ({
-                      ...p,
-                      customer_name: e.target.value
-                    }))
-                  }
-                />
-                <input
-                  className="w-full border rounded px-2 py-1"
-                  value={activeBill.mobile || ""}
-                  onChange={e =>
-                    setActiveBill(p => ({ ...p, mobile: e.target.value }))
-                  }
-                />
-              </>
-            )}
+            {/* Modal body – scrollable */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
-            {/* ITEMS */}
-            <div className="divide-y">
-              {items.map((i, idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-[1fr_80px_100px] items-center py-2 text-sm"
-                >
-                  <div className="font-medium truncate">{i.item_name}</div>
-                  <div className="text-center">
-                    {isViewOnly ? (
-                      <span className="font-semibold">{i.quantity}</span>
-                    ) : (
+              {/* Customer info */}
+              <div className="grid grid-cols-2 gap-3">
+                {isViewOnly ? (
+                  <>
+                    <div>
+                      <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Customer</div>
+                      <div className="text-sm text-gray-700">{activeBill.customer_name || "Walk-in"}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Mobile</div>
+                      <div className="text-sm text-gray-700">{activeBill.mobile || "—"}</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase tracking-wide">Customer</label>
                       <input
-                        type="number"
-                        min="1"
-                        value={i.quantity}
-                        onChange={e =>
-                          updateQty(idx, Number(e.target.value))
-                        }
-                        className="w-14 border rounded-md text-center"
+                        className="mt-0.5 w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        value={activeBill.customer_name || ""}
+                        onChange={e => setActiveBill(p => ({ ...p, customer_name: e.target.value }))}
                       />
-                    )}
-                  </div>
-                  <div className="text-right font-semibold">
-                    ₹ {(i.price * i.quantity).toFixed(2)}
-                    {!isViewOnly && (
-                      <button
-                        onClick={() => {
-                          const clone = [...items];
-                          clone.splice(idx, 1);
-                          setItems(clone);
-                        }}
-                        className="ml-2 text-red-600"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* TOTAL BREAKDOWN */}
-            <div className="mt-4 bg-slate-100 rounded-xl px-4 py-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span>₹ {totals.sub.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase tracking-wide">Mobile</label>
+                      <input
+                        className="mt-0.5 w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        value={activeBill.mobile || ""}
+                        onChange={e => setActiveBill(p => ({ ...p, mobile: e.target.value }))}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-              {shop.gst_enabled && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">
-                    GST {shop.gst_percent}%
-                  </span>
-                  <span>₹ {totals.tax.toFixed(2)}</span>
+
+              {/* Items */}
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1.5">Items</div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-[11px] text-gray-500 border-b">
+                        <th className="px-3 py-2 text-left font-medium">Item</th>
+                        <th className="px-3 py-2 text-center font-medium w-20">Qty</th>
+                        <th className="px-3 py-2 text-right font-medium w-24">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {items.map((i, idx) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2 font-medium text-gray-800 truncate max-w-[160px]">{i.item_name}</td>
+                          <td className="px-3 py-2 text-center">
+                            {isViewOnly ? (
+                              <span className="font-semibold">{i.quantity}</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="1"
+                                value={i.quantity}
+                                onChange={e => updateQty(idx, Number(e.target.value))}
+                                className="w-14 border rounded-lg text-center py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-700">
+                            ₹ {(i.price * i.quantity).toFixed(2)}
+                            {!isViewOnly && (
+                              <button
+                                onClick={() => { const clone = [...items]; clone.splice(idx, 1); setItems(clone); }}
+                                className="ml-2 text-red-400 hover:text-red-600 text-xs"
+                              >✕</button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              </div>
+
+              {/* Totals */}
+              <div className="bg-slate-50 rounded-lg px-4 py-3 space-y-1.5 text-sm">
+                <div className="flex justify-between text-gray-500">
+                  <span>Subtotal</span>
+                  <span className="text-gray-700">₹ {totals.sub.toFixed(2)}</span>
+                </div>
+                {shop.gst_enabled && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>GST {shop.gst_percent}%</span>
+                    <span className="text-gray-700">₹ {totals.tax.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-gray-500">
+                  <span>Discount</span>
+                  <span className="text-gray-700">₹ {Number(activeBill.discounted_amt || 0).toFixed(2)}</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between font-bold text-base">
+                  <span>Total</span>
+                  <span className="text-emerald-600">₹ {totals.total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Delete reason textarea */}
+              {!isViewOnly && confirmDelete && (
+                <textarea
+                  className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
+                  rows={2}
+                  placeholder="Reason for delete (required)"
+                  value={deleteReason}
+                  onChange={e => setDeleteReason(e.target.value)}
+                />
               )}
-              <div className="flex justify-between">
-                <span className="text-gray-600">Discount</span>
-                <span>
-                  ₹ {Number(activeBill.discounted_amt || 0).toFixed(2)}
-                </span>
-              </div>
-              <div className="border-t pt-2 mt-2 flex justify-between font-bold">
-                <span>Payable</span>
-                <span className="text-emerald-700">
-                  ₹ {totals.total.toFixed(2)}
-                </span>
-              </div>
+
+              {isViewOnly && (
+                <p className="text-center text-xs text-gray-400">View & Print mode only</p>
+              )}
             </div>
 
-            {/* ACTIONS - Print always visible, others only for editors */}
-            <div className="mt-6 flex justify-end gap-4 flex-wrap">
+            {/* Modal footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-gray-50 rounded-b-xl">
               <button
                 onClick={printInvoice}
-                className="px-4 py-2 bg-emerald-600 text-white rounded"
+                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
               >
                 Print
               </button>
@@ -578,7 +652,7 @@ export default function SalesHistory() {
                 <>
                   <button
                     onClick={saveEdit}
-                    className="px-4 py-2 bg-blue-600 text-white rounded"
+                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
                   >
                     Save
                   </button>
@@ -586,7 +660,7 @@ export default function SalesHistory() {
                   {!confirmDelete ? (
                     <button
                       onClick={() => setConfirmDelete(true)}
-                      className="px-4 py-2 bg-red-600 text-white rounded"
+                      className="px-4 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-medium"
                     >
                       Delete
                     </button>
@@ -594,36 +668,28 @@ export default function SalesHistory() {
                     <>
                       <button
                         onClick={deleteBill}
-                        className="px-4 py-2 bg-red-700 text-white rounded"
+                        className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
                       >
                         Confirm Delete
                       </button>
                       <button
                         onClick={() => setConfirmDelete(false)}
-                        className="px-4 py-2 bg-gray-300 rounded"
+                        className="px-4 py-1.5 rounded-lg border bg-white text-sm text-gray-600 hover:bg-gray-50"
                       >
                         Cancel
                       </button>
                     </>
                   )}
-
-                  {confirmDelete && (
-                    <textarea
-                      className="w-full border rounded mt-4 p-2"
-                      placeholder="Reason for delete (required)"
-                      value={deleteReason}
-                      onChange={e => setDeleteReason(e.target.value)}
-                    />
-                  )}
                 </>
               )}
-            </div>
 
-            {isViewOnly && (
-              <p className="text-center text-sm text-gray-500 mt-4">
-                View & Print mode only
-              </p>
-            )}
+              <button
+                onClick={() => setActiveBill(null)}
+                className="px-4 py-1.5 rounded-lg border bg-white text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

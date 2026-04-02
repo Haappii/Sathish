@@ -49,7 +49,6 @@ export default function OnlineOrders() {
 
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState(session?.branch_id || "");
-  const [shop, setShop] = useState({});
 
   const [provider, setProvider] = useState("");
   const [status, setStatus] = useState("");
@@ -91,6 +90,12 @@ export default function OnlineOrders() {
     () => `${String(API_BASE || "").replace(/\/api\/?$/, "")}/api/online-orders/webhook`,
     []
   );
+  const webhookEndpoint = `${webhookBase}/{"{PROVIDER}"}/${session?.shop_id || "{SHOP_ID}"}`;
+  const selectedBranch = useMemo(() => {
+    if (!branches.length) return null;
+    if (!isAdmin) return branches[0] || null;
+    return branches.find((branch) => Number(branch.branch_id) === Number(branchId)) || null;
+  }, [branches, branchId, isAdmin]);
 
   const applySearch = () => {
     setPage(1);
@@ -98,21 +103,15 @@ export default function OnlineOrders() {
   };
 
   const loadBranches = async () => {
-    if (!isAdmin) return;
     try {
-      const res = await api.get("/branch/active");
-      setBranches(res?.data || []);
+      const res = await api.get("/branch/scoped");
+      const rows = res?.data || [];
+      setBranches(rows);
+      if (!isAdmin && !branchId && rows[0]?.branch_id) {
+        setBranchId(String(rows[0].branch_id));
+      }
     } catch {
       setBranches([]);
-    }
-  };
-
-  const loadShop = async () => {
-    try {
-      const res = await api.get("/shop/details");
-      setShop(res?.data || {});
-    } catch {
-      setShop({});
     }
   };
 
@@ -186,7 +185,6 @@ export default function OnlineOrders() {
 
   useEffect(() => {
     loadBranches();
-    loadShop();
   }, []);
 
   useEffect(() => {
@@ -257,13 +255,18 @@ export default function OnlineOrders() {
       showToast("Quantity must be > 0", "error");
       return;
     }
+    const targetBranchId = isAdmin ? Number(branchId || session?.branch_id || 0) : undefined;
+    if (isAdmin && !targetBranchId) {
+      showToast("Select a branch before creating a test order", "error");
+      return;
+    }
     setCreating(true);
     try {
       const lineTotal = Number((qty * unitPrice).toFixed(2));
       await api.post("/online-orders", {
         provider: testForm.provider,
         provider_order_id: testForm.provider_order_id.trim(),
-        branch_id: isAdmin ? Number(branchId || session?.branch_id || 0) : undefined,
+        branch_id: targetBranchId,
         customer_name: testForm.customer_name?.trim() || null,
         customer_mobile: testForm.customer_mobile?.trim() || null,
         customer_address: testForm.customer_address?.trim() || null,
@@ -304,6 +307,12 @@ export default function OnlineOrders() {
           <h2 className="text-lg font-semibold text-slate-800">Online Orders</h2>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/setup/branches")}
+            className="px-3 py-1.5 rounded-lg border bg-white shadow-sm text-[12px] text-slate-700"
+          >
+            Branch Setup
+          </button>
           <button
             onClick={openCreateForm}
             className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[12px]"
@@ -371,6 +380,7 @@ export default function OnlineOrders() {
                 setPage(1);
               }}
             >
+              <option value="">All Branches</option>
               {branches.map((b) => (
                 <option key={b.branch_id} value={b.branch_id}>
                   {b.branch_name}
@@ -396,20 +406,35 @@ export default function OnlineOrders() {
           </button>
         </div>
 
-        <div className="text-[11px] text-slate-500">
-          Webhooks:{" "}
-          <span className="font-semibold">Swiggy: {shop?.swiggy_enabled ? "Enabled" : "Disabled"}</span>{" "}
-          ({shop?.swiggy_partner_id || "-"}) |{" "}
-          <span className="font-semibold">Zomato: {shop?.zomato_enabled ? "Enabled" : "Disabled"}</span>{" "}
-          ({shop?.zomato_partner_id || "-"})
-        </div>
-        <div className="text-[11px] text-slate-500">
-          Signature required: {shop?.online_orders_signature_required ? "Yes" : "No"} | Status sync:{" "}
-          {shop?.online_orders_status_sync_enabled ? "Enabled" : "Disabled"}{" "}
-          {shop?.online_orders_status_sync_strict ? "(Strict)" : "(Best effort)"}
-        </div>
+        {selectedBranch ? (
+          <>
+            <div className="text-[11px] text-slate-500">
+              Branch: <span className="font-semibold">{selectedBranch.branch_name}</span>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Webhooks:{" "}
+              <span className="font-semibold">
+                Swiggy: {selectedBranch.swiggy_enabled ? "Enabled" : "Disabled"}
+              </span>{" "}
+              ({selectedBranch.swiggy_partner_id || "-"}) |{" "}
+              <span className="font-semibold">
+                Zomato: {selectedBranch.zomato_enabled ? "Enabled" : "Disabled"}
+              </span>{" "}
+              ({selectedBranch.zomato_partner_id || "-"})
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Signature required: {selectedBranch.online_orders_signature_required ? "Yes" : "No"} | Status sync:{" "}
+              {selectedBranch.online_orders_status_sync_enabled ? "Enabled" : "Disabled"}{" "}
+              {selectedBranch.online_orders_status_sync_strict ? "(Strict)" : "(Best effort)"}
+            </div>
+          </>
+        ) : (
+          <div className="text-[11px] text-slate-500">
+            Select a branch to view branchwise online order configuration.
+          </div>
+        )}
         <div className="text-[11px] text-slate-500 break-all">
-          Endpoint format: {webhookBase}/{"{PROVIDER}"}/{"{SHOP_ID}"}
+          Endpoint format: {webhookEndpoint}
         </div>
       </div>
 

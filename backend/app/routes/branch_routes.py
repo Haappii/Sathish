@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 
 from app.db import SessionLocal
 from app.models.branch import Branch
@@ -16,6 +15,13 @@ from app.services.branch_service import (
 from app.utils.auth_user import get_current_user, AdminOnly
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+from app.utils.branch_online_orders import (
+    BRANCH_ONLINE_ORDER_FIELDS,
+    branch_online_order_param_keys,
+    load_branch_online_order_param_map,
+    read_branch_online_order_settings_from_map,
+    serialize_branch_online_order_value,
+)
 
 
 router = APIRouter(prefix="/branch", tags=["Branch"])
@@ -127,32 +133,54 @@ def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, pa
     db.commit()
 
 
-def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> dict[str, str]:
-    if not branch_ids:
-        return {}
+def _save_branch_online_order_settings(
+    db: Session,
+    *,
+    shop_id: int,
+    branch_id: int,
+    payload: BranchCreate | BranchUpdate,
+):
+    has_any = any(getattr(payload, field, None) is not None for field in BRANCH_ONLINE_ORDER_FIELDS)
+    if not has_any:
+        return
 
-    # Fetch only relevant discount keys for the given branches.
-    ors = []
+    keys = branch_online_order_param_keys(branch_id)
+    for field in BRANCH_ONLINE_ORDER_FIELDS:
+        if getattr(payload, field, None) is None:
+            continue
+        _upsert_param(
+            db,
+            shop_id=shop_id,
+            key=keys[field],
+            value=serialize_branch_online_order_value(field, getattr(payload, field)),
+        )
+    db.commit()
+
+
+def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> dict[str, str]:
+    pmap = load_branch_online_order_param_map(
+        db,
+        shop_id=shop_id,
+        branch_ids=branch_ids,
+        include_legacy_shop=True,
+    )
+    raw_param_keys = set(pmap.keys())
     for bid in branch_ids:
-        keys = _discount_param_keys(bid)
-        ors.extend([
-            SystemParameter.param_key == keys["enabled"],
-            SystemParameter.param_key == keys["type"],
-            SystemParameter.param_key == keys["value"],
-        ])
-        pkeys = _print_param_keys(bid)
-        ors.extend([
-            SystemParameter.param_key == pkeys["kot_required"],
-            SystemParameter.param_key == pkeys["receipt_required"],
-        ])
+        raw_param_keys.update(_discount_param_keys(bid).values())
+        raw_param_keys.update(_print_param_keys(bid).values())
+
+    if not raw_param_keys:
+        return pmap
 
     rows = (
         db.query(SystemParameter.param_key, SystemParameter.param_value)
         .filter(SystemParameter.shop_id == shop_id)
-        .filter(or_(*ors))
+        .filter(SystemParameter.param_key.in_(sorted(raw_param_keys)))
         .all()
     )
-    return {str(k): (str(v) if v is not None else "") for k, v in rows}
+    merged = {str(k): (str(v) if v is not None else "") for k, v in rows}
+    merged.update(pmap)
+    return merged
 
 
 def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
@@ -179,6 +207,13 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
 
     out.update(_read_branch_discount_from_params(pmap, bid))
     out.update(_read_branch_print_from_params(pmap, bid))
+    out.update(
+        read_branch_online_order_settings_from_map(
+            pmap,
+            bid,
+            include_legacy_shop_fallback=True,
+        )
+    )
     return out
 
 
@@ -302,6 +337,7 @@ def create(
     branch = create_branch(db, data, user.user_id, user.shop_id)
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_online_order_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
         db,
@@ -357,6 +393,7 @@ def update(branch_id: int, data: BranchUpdate,
 
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_online_order_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
         db,

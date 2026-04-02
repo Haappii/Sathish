@@ -2,23 +2,24 @@ import { ActivityIndicator, View } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { useAuth } from "../context/AuthContext";
-import LoginScreen from "../screens/LoginScreen";
-import HomeScreen from "../screens/HomeScreen";
-import CreateBillScreen from "../screens/CreateBillScreen";
+
+// Screens
+import LoginScreen        from "../screens/LoginScreen";
+import HomeScreen         from "../screens/HomeScreen";
+import CreateBillScreen   from "../screens/CreateBillScreen";
 import SalesHistoryScreen from "../screens/SalesHistoryScreen";
+import DashboardScreen    from "../screens/DashboardScreen";
+import CustomersScreen    from "../screens/CustomersScreen";
+import ExpensesScreen     from "../screens/ExpensesScreen";
+import CashDrawerScreen   from "../screens/CashDrawerScreen";
+import TableGridScreen    from "../screens/TableGridScreen";
+import TableOrderScreen   from "../screens/TableOrderScreen";
 
 const Stack = createNativeStackNavigator();
 
 function Loader() {
   return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#f8fafc",
-      }}
-    >
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc" }}>
       <ActivityIndicator size="large" />
     </View>
   );
@@ -33,21 +34,27 @@ export default function AppNavigator() {
     <Stack.Navigator
       screenOptions={{
         headerTitleStyle: { fontWeight: "700" },
-        contentStyle: { backgroundColor: "#f1f5f9" },
+        contentStyle:     { backgroundColor: "#f1f5f9" },
+        headerStyle:      { backgroundColor: "#fff" },
       }}
     >
       {!isLoggedIn ? (
         <Stack.Screen
           name="Login"
           component={LoginScreen}
-          options={{ title: "Login", headerShown: false }}
+          options={{ headerShown: false }}
         />
       ) : (
         <>
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: "Home" }}
+            options={{ title: "Haappii Billing", headerBackVisible: false }}
+          />
+          <Stack.Screen
+            name="Dashboard"
+            component={DashboardScreen}
+            options={{ title: "Dashboard" }}
           />
           <Stack.Screen
             name="CreateBill"
@@ -58,6 +65,32 @@ export default function AppNavigator() {
             name="SalesHistory"
             component={SalesHistoryScreen}
             options={{ title: "Sales History" }}
+          />
+          <Stack.Screen
+            name="Customers"
+            component={CustomersScreen}
+            options={{ title: "Customers" }}
+          />
+          <Stack.Screen
+            name="Expenses"
+            component={ExpensesScreen}
+            options={{ title: "Expenses" }}
+          />
+          <Stack.Screen
+            name="CashDrawer"
+            component={CashDrawerScreen}
+            options={{ title: "Cash Drawer" }}
+          />
+          {/* Hotel-only screens */}
+          <Stack.Screen
+            name="TableGrid"
+            component={TableGridScreen}
+            options={{ title: "Table Billing" }}
+          />
+          <Stack.Screen
+            name="TableOrder"
+            component={TableOrderScreen}
+            options={{ title: "Table Order" }}
           />
         </>
       )}

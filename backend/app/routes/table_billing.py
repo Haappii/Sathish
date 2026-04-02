@@ -29,6 +29,8 @@ router = APIRouter(
     tags=["Table Billing"]
 )
 
+TAKEAWAY_TABLE_NAME = "__TAKEAWAY__"
+
 def _end_active_qr_session(*, db: Session, shop_id: int, table_id: int) -> None:
     s = (
         db.query(TableQrSession)
@@ -51,6 +53,58 @@ def get_business_datetime(db: Session, shop_id: int) -> datetime:
     )
     return datetime.combine(business_date, datetime.now().time())
 
+
+def _running_total_for_order(db: Session, order_id: int) -> Decimal:
+    total = (
+        db.query(
+            func.coalesce(
+                func.sum(OrderItem.price * OrderItem.quantity),
+                0
+            )
+        )
+        .filter(OrderItem.order_id == order_id)
+        .scalar()
+    )
+    return Decimal(total or 0)
+
+
+def _serialize_order_items(order: Order) -> list[dict]:
+    return [
+        {
+            "order_item_id": it.order_item_id,
+            "item_id": it.item_id,
+            "item_name": it.item.item_name if it.item else None,
+            "price": float(it.price),
+            "quantity": it.quantity,
+        }
+        for it in order.items
+    ]
+
+
+def _get_or_create_takeaway_table(*, db: Session, shop_id: int, branch_id: int) -> TableMaster:
+    table = (
+        db.query(TableMaster)
+        .filter(
+            TableMaster.shop_id == shop_id,
+            TableMaster.branch_id == branch_id,
+            TableMaster.table_name == TAKEAWAY_TABLE_NAME,
+        )
+        .first()
+    )
+    if table:
+        return table
+
+    table = TableMaster(
+        shop_id=shop_id,
+        table_name=TAKEAWAY_TABLE_NAME,
+        capacity=0,
+        branch_id=branch_id,
+        status="FREE",
+    )
+    db.add(table)
+    db.flush()
+    return table
+
 # ======================================================
 # REQUEST MODEL (✅ ADDED – DOES NOT BREAK ANYTHING)
 # ======================================================
@@ -60,6 +114,21 @@ class CheckoutRequest(BaseModel):
     payment_mode: Optional[str] = "cash"
     payment_split: Optional[dict] = None
     service_charge: Optional[float] = 0
+
+
+class TakeawayItemRequest(BaseModel):
+    item_id: int
+    quantity: int
+    price: Optional[float] = None
+
+
+class TakeawayCreateRequest(BaseModel):
+    customer_name: Optional[str] = None
+    mobile: Optional[str] = None
+    notes: Optional[str] = None
+    token_number: Optional[str] = None
+    branch_id: Optional[int] = None
+    items: list[TakeawayItemRequest]
 
 
 # ======================================================
@@ -75,7 +144,8 @@ def list_tables(
         db.query(TableMaster)
         .filter(
             TableMaster.shop_id == user.shop_id,
-            TableMaster.branch_id == user.branch_id
+            TableMaster.branch_id == user.branch_id,
+            TableMaster.table_name != TAKEAWAY_TABLE_NAME,
         )
         .order_by(TableMaster.table_name)
         .all()
@@ -98,17 +168,7 @@ def list_tables(
         running_total = Decimal("0.00")
 
         if order:
-            total = (
-                db.query(
-                    func.coalesce(
-                        func.sum(OrderItem.price * OrderItem.quantity),
-                        0
-                    )
-                )
-                .filter(OrderItem.order_id == order.order_id)
-                .scalar()
-            )
-            running_total = Decimal(total)
+            running_total = _running_total_for_order(db, order.order_id)
 
         result.append({
             "table_id": t.table_id,
@@ -117,10 +177,137 @@ def list_tables(
             "status": t.status,
             "opened_at": t.table_start_time,
             "running_total": float(running_total),
-            "order_id": order.order_id if order else None
+            "order_id": order.order_id if order else None,
+            "order_type": order.order_type if order else None,
+            "customer_name": order.customer_name if order else None,
+            "mobile": order.mobile if order else None,
+            "notes": order.notes if order else None,
+            "token_number": order.token_number if order else None,
         })
 
     return result
+
+
+@router.get("/takeaway/orders")
+def list_takeaway_orders(
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("billing", "read"))
+):
+    ensure_hotel_billing_type(db, user.shop_id)
+    orders = (
+        db.query(Order)
+        .options(joinedload(Order.items).joinedload(OrderItem.item))
+        .filter(
+            Order.shop_id == user.shop_id,
+            Order.branch_id == user.branch_id,
+            Order.status == "OPEN",
+            Order.order_type == "TAKEAWAY"
+        )
+        .order_by(desc(Order.opened_at), desc(Order.order_id))
+        .all()
+    )
+
+    return [
+        {
+            "order_id": order.order_id,
+            "table_id": order.table_id,
+            "order_type": order.order_type,
+            "customer_name": order.customer_name,
+            "mobile": order.mobile,
+            "notes": order.notes,
+            "token_number": order.token_number,
+            "status": order.status,
+            "opened_at": order.opened_at,
+            "running_total": float(_running_total_for_order(db, order.order_id)),
+            "items": _serialize_order_items(order),
+        }
+        for order in orders
+    ]
+
+
+@router.post("/takeaway")
+def create_takeaway_order(
+    payload: TakeawayCreateRequest,
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("billing", "write"))
+):
+    ensure_hotel_billing_type(db, user.shop_id)
+    if not payload.items:
+        raise HTTPException(400, "Add at least one item")
+
+    takeaway_table = _get_or_create_takeaway_table(
+        db=db,
+        shop_id=int(user.shop_id),
+        branch_id=int(user.branch_id),
+    )
+
+    item_ids = [int(it.item_id) for it in payload.items]
+    item_map = {
+        int(item.item_id): item
+        for item in db.query(Item)
+        .filter(
+            Item.shop_id == user.shop_id,
+            Item.item_id.in_(item_ids),
+        )
+        .all()
+    }
+    overrides = {
+        int(row.item_id): row
+        for row in db.query(BranchItemPrice)
+        .filter(
+            BranchItemPrice.shop_id == user.shop_id,
+            BranchItemPrice.branch_id == user.branch_id,
+            BranchItemPrice.item_id.in_(item_ids),
+        )
+        .all()
+    }
+
+    order = Order(
+        shop_id=user.shop_id,
+        table_id=takeaway_table.table_id,
+        branch_id=user.branch_id,
+        order_type="TAKEAWAY",
+        customer_name=(payload.customer_name or "").strip() or "Walk-in",
+        mobile=(payload.mobile or "").strip() or None,
+        notes=(payload.notes or "").strip() or None,
+        token_number=(payload.token_number or "").strip() or None,
+        opened_by=user.user_id
+    )
+    db.add(order)
+    db.flush()
+
+    if not order.token_number:
+        order.token_number = f"T-{order.order_id:03d}"
+
+    for row in payload.items:
+        if int(row.quantity) <= 0:
+            raise HTTPException(400, "Item quantity must be greater than zero")
+
+        item = item_map.get(int(row.item_id))
+        if not item:
+            raise HTTPException(404, f"Item not found: {row.item_id}")
+
+        override = overrides.get(int(row.item_id))
+        if override and not override.item_status:
+            raise HTTPException(400, f"{item.item_name} is unavailable in this branch")
+
+        price_to_use = float(override.price) if override else float(item.price or 0)
+        db.add(OrderItem(
+            shop_id=user.shop_id,
+            order_id=order.order_id,
+            item_id=item.item_id,
+            quantity=int(row.quantity),
+            price=price_to_use
+        ))
+
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "success": True,
+        "order_id": order.order_id,
+        "token_number": order.token_number
+    }
 
 
 # ======================================================
@@ -176,17 +363,9 @@ def get_or_create_order(
     return {
         "order_id": order.order_id,
         "table_id": order.table_id,
+        "table_name": table.table_name,
         "status": order.status,
-        "items": [
-            {
-                "order_item_id": it.order_item_id,
-                "item_id": it.item_id,
-                "item_name": it.item.item_name,
-                "price": float(it.price),
-                "quantity": it.quantity
-            }
-            for it in order.items
-        ]
+        "items": _serialize_order_items(order)
     }
 
 

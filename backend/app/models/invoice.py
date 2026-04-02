@@ -1,10 +1,15 @@
-from sqlalchemy import Column, Integer, String, Numeric, TIMESTAMP, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, TIMESTAMP, ForeignKey, JSON, Boolean, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db import Base
 
 class Invoice(Base):
     __tablename__ = "invoice"
+    __table_args__ = (
+        Index("ix_invoice_shop_branch", "shop_id", "branch_id"),
+        Index("ix_invoice_shop_created", "shop_id", "created_time"),
+        Index("ix_invoice_shop_mobile", "shop_id", "mobile"),
+    )
 
     invoice_id = Column(Integer, primary_key=True, index=True)
     shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)

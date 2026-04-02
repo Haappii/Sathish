@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, date
@@ -28,8 +28,11 @@ def get_dashboard_stats(
 
     # Admin may supply a different branch_id via query param
     q_branch = request.query_params.get("branch_id")
-    if str(user.role_name).lower() == "admin" and q_branch:
-        branch_id = int(q_branch)
+    if (user.role_name or "").lower() == "admin" and q_branch:
+        try:
+            branch_id = int(q_branch)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
 
     today = get_business_date(db, user.shop_id)
 
@@ -76,8 +79,11 @@ def get_trends(
 ):
     branch_id = user.branch_id
     q_branch = request.query_params.get("branch_id")
-    if str(user.role_name).lower() == "admin" and q_branch:
-        branch_id = int(q_branch)
+    if (user.role_name or "").lower() == "admin" and q_branch:
+        try:
+            branch_id = int(q_branch)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
 
     biz_date = get_business_date(db, user.shop_id)
     period = (period or "day").lower()
@@ -202,8 +208,11 @@ def get_trend_metric(
 ):
     branch_id = user.branch_id
     q_branch = request.query_params.get("branch_id")
-    if str(user.role_name).lower() == "admin" and q_branch:
-        branch_id = int(q_branch)
+    if (user.role_name or "").lower() == "admin" and q_branch:
+        try:
+            branch_id = int(q_branch)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Invalid branch_id")
 
     biz_date = get_business_date(db, user.shop_id)
     period = (period or "day").lower()

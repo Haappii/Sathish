@@ -114,6 +114,12 @@ def debit_wallet(
     if amt <= 0:
         raise ValueError("Amount must be > 0")
 
+    # Lock the customer row to prevent concurrent wallet overdrafts
+    db.query(Customer).filter(
+        Customer.shop_id == shop_id,
+        Customer.customer_id == customer.customer_id,
+    ).with_for_update().first()
+
     bal = get_wallet_balance(db, shop_id=shop_id, customer_id=customer.customer_id)
     if bal < amt:
         raise ValueError("Insufficient wallet balance")

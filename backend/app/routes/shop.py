@@ -11,28 +11,9 @@ router = APIRouter(prefix="/shop", tags=["Shop"])
 
 BOOL_PARAM_KEYS = {
     "inventory_enabled",
-    "swiggy_enabled",
-    "zomato_enabled",
-    "online_orders_auto_accept",
-    "online_orders_signature_required",
-    "online_orders_status_sync_enabled",
-    "online_orders_status_sync_strict",
 }
-INT_PARAM_KEYS = {
-    "online_orders_status_sync_timeout_sec",
-}
+INT_PARAM_KEYS: set = set()
 TEXT_PARAM_KEYS = {
-    "swiggy_partner_id",
-    "zomato_partner_id",
-    "online_orders_webhook_token",
-    "swiggy_webhook_secret",
-    "zomato_webhook_secret",
-    "swiggy_status_sync_url",
-    "zomato_status_sync_url",
-    "swiggy_status_sync_token",
-    "zomato_status_sync_token",
-    "swiggy_status_sync_secret",
-    "zomato_status_sync_secret",
     "inventory_cost_method",
 }
 SHOP_PARAM_KEYS = BOOL_PARAM_KEYS | INT_PARAM_KEYS | TEXT_PARAM_KEYS
@@ -60,13 +41,6 @@ def _set_param(db: Session, shop_id: int, key: str, value: str):
     db.add(row)
 
 
-def _as_int(value, default: int) -> int:
-    try:
-        return int(value)
-    except Exception:
-        return default
-
-
 @router.get("/details")
 def get_shop_details(
     db: Session = Depends(get_db),
@@ -88,24 +62,6 @@ def get_shop_details(
     return {
         **(shop.__dict__ if shop else {}),
         "inventory_enabled": str(pmap.get("inventory_enabled", "NO")).upper() == "YES",
-        "swiggy_partner_id": pmap.get("swiggy_partner_id") or None,
-        "zomato_partner_id": pmap.get("zomato_partner_id") or None,
-        "swiggy_enabled": str(pmap.get("swiggy_enabled", "NO")).upper() == "YES",
-        "zomato_enabled": str(pmap.get("zomato_enabled", "NO")).upper() == "YES",
-        "online_orders_auto_accept": str(pmap.get("online_orders_auto_accept", "NO")).upper() == "YES",
-        "online_orders_webhook_token": pmap.get("online_orders_webhook_token") or None,
-        "online_orders_signature_required": str(pmap.get("online_orders_signature_required", "NO")).upper() == "YES",
-        "swiggy_webhook_secret": pmap.get("swiggy_webhook_secret") or None,
-        "zomato_webhook_secret": pmap.get("zomato_webhook_secret") or None,
-        "online_orders_status_sync_enabled": str(pmap.get("online_orders_status_sync_enabled", "YES")).upper() == "YES",
-        "online_orders_status_sync_strict": str(pmap.get("online_orders_status_sync_strict", "NO")).upper() == "YES",
-        "online_orders_status_sync_timeout_sec": _as_int(pmap.get("online_orders_status_sync_timeout_sec"), 8),
-        "swiggy_status_sync_url": pmap.get("swiggy_status_sync_url") or None,
-        "zomato_status_sync_url": pmap.get("zomato_status_sync_url") or None,
-        "swiggy_status_sync_token": pmap.get("swiggy_status_sync_token") or None,
-        "zomato_status_sync_token": pmap.get("zomato_status_sync_token") or None,
-        "swiggy_status_sync_secret": pmap.get("swiggy_status_sync_secret") or None,
-        "zomato_status_sync_secret": pmap.get("zomato_status_sync_secret") or None,
         "inventory_cost_method": (pmap.get("inventory_cost_method") or "LAST").strip().upper(),
     }
 
@@ -169,7 +125,7 @@ def save_shop_details(
         except Exception:
             pass
 
-    # 🔹 handle inventory flag separately
+    # handle shop-level param flags (inventory_enabled, inventory_cost_method)
     if any(k in payload for k in SHOP_PARAM_KEYS):
         require_super_admin(x_user_role)
         for key in SHOP_PARAM_KEYS:
@@ -178,11 +134,6 @@ def save_shop_details(
             value = payload.get(key)
             if key in BOOL_PARAM_KEYS:
                 _set_param(db, user.shop_id, key, "YES" if bool(value) else "NO")
-            elif key in INT_PARAM_KEYS:
-                iv = _as_int(value, 8)
-                if key == "online_orders_status_sync_timeout_sec":
-                    iv = max(3, min(iv, 30))
-                _set_param(db, user.shop_id, key, str(iv))
             else:
                 _set_param(db, user.shop_id, key, str(value or "").strip())
 

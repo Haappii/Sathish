@@ -98,10 +98,6 @@ const SHORTCUT_PATHS = [
   "/setup",
 ];
 
-// Keep menu and shortcut tiles compact but equal height
-// Keep shortcut and menu tiles aligned; fixed height when collapsed
-const MENU_TILE_HEIGHT = "h-[74px]";
-
 export default function Home() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -458,562 +454,316 @@ export default function Home() {
 
   /* ================== UI ================== */
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 items-start">
+    <div className="min-h-screen bg-slate-50">
 
-        {/* MENUS */}
-        <div className="lg:col-span-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 self-start mt-8">
+      {/* ── Today stats bar ── */}
+      <div className="px-5 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Today Bills",   value: Number(stats?.today_bills  || 0),                     fmt: v => v,             color: "bg-indigo-600" },
+          { label: "Today Sales",   value: Number(stats?.today_sales  || 0),                     fmt: v => `₹${v.toFixed(2)}`, color: "bg-emerald-600" },
+          { label: "Today Returns", value: Number(stats?.today_returns|| 0),                     fmt: v => v,             color: "bg-rose-500" },
+          { label: "Pending Dues",  value: Number(stats?.pending_dues || stats?.total_dues || 0),fmt: v => `₹${v.toFixed(2)}`, color: "bg-amber-500" },
+        ].map(s => (
+          <div key={s.label} className={`${s.color} text-white rounded-2xl px-4 py-3 shadow-sm`}>
+            <div className="text-[11px] opacity-75 font-medium">{s.label}</div>
+            <div className="text-xl font-bold mt-0.5 leading-tight">{s.fmt(s.value)}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-5 pb-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
+
+        {/* ── LEFT: shortcuts + menus ── */}
+        <div className="space-y-5">
+
+          {/* Quick shortcuts */}
           {quickShortcuts.length > 0 && (
-            <div className="sm:col-span-2 xl:col-span-3 bg-[#f5f7ff] rounded-2xl shadow-sm border border-indigo-100 p-2.5 pb-2 self-start">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Quick Shortcuts
-                </h2>
-              </div>
-
-              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Quick Access</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {quickShortcuts.map((m, idx) => (
                   <Link
                     key={`shortcut-${m.path}`}
                     to={m.path}
-                    className={`group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-2 transition-all flex items-center justify-between gap-3 ${MENU_TILE_HEIGHT}`}
+                    className="group flex items-center gap-3 bg-white border border-gray-100 hover:border-indigo-200 hover:shadow-md rounded-2xl px-3 py-3 transition-all"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
-                        {m.icon}
-                      </div>
-                      <div className="text-base font-medium text-gray-800 group-hover:text-indigo-700 truncate">
-                        {m.name}
-                      </div>
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-base shadow-sm shrink-0">
+                      {m.icon}
                     </div>
-                    <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
-                      Alt+{idx + 1}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold text-gray-800 group-hover:text-indigo-700 truncate">{m.name}</div>
+                      <div className="text-[10px] text-gray-400">Alt+{idx + 1}</div>
+                    </div>
                   </Link>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Spacer between shortcuts and main menus */}
-          {quickShortcuts.length > 0 && (
-            <div className="sm:col-span-2 xl:col-span-3 h-6" />
-          )}
+          {/* Module groups */}
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">All Modules</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+              {groupedMenus.map((g) => {
+                const hasTabs = g.items.length > 1;
+                const expanded = expandedGroup === g.key;
+                const primary = g.items[0];
+                const Icon = GROUP_EMOJI[g.key] || GROUP_EMOJI.other;
 
-          {groupedMenus.map((g) => {
-            const hasTabs = g.items.length > 1;
-            const expanded = expandedGroup === g.key;
-            const primary = g.items[0];
-            const Icon = GROUP_EMOJI[g.key] || GROUP_EMOJI.other;
+                const handleCardClick = () => {
+                  if (!hasTabs && primary) navigate(primary.path);
+                  else setExpandedGroup(expanded ? null : g.key);
+                };
 
-            const handleCardClick = () => {
-              if (!hasTabs && primary) {
-                navigate(primary.path);
-              } else {
-                setExpandedGroup(expanded ? null : g.key);
-              }
-            };
-
-            const collapsed = !hasTabs || !expanded;
-            return (
-              <div
-                key={g.key}
-                className={
-                  `group rounded-2xl bg-white border border-indigo-100 hover:border-indigo-200 hover:shadow-md p-2 cursor-pointer transition `
-                  + (collapsed
-                    ? `flex items-center justify-between ${MENU_TILE_HEIGHT}`
-                    : `flex flex-col gap-2 min-h-[90px] pb-2`)
-                }
-                onClick={handleCardClick}
-              >
-                <div className={`flex items-center justify-between gap-3 w-full ${collapsed ? "" : "pb-1"}`}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
-                      <Icon />
-                    </div>
-                    <div className="text-base font-medium text-gray-800 group-hover:text-indigo-700 truncate">
-                      {g.title}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      hasTabs
-                        ? setExpandedGroup(expanded ? null : g.key)
-                        : handleCardClick();
-                    }}
-                    className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100"
+                return (
+                  <div
+                    key={g.key}
+                    className={`bg-white border rounded-2xl cursor-pointer transition-all ${
+                      expanded ? "border-indigo-200 shadow-md" : "border-gray-100 hover:border-indigo-200 hover:shadow-sm"
+                    }`}
+                    onClick={handleCardClick}
                   >
-                    {hasTabs ? (expanded ? "Close" : "Open") : "Open"}
-                  </button>
-                </div>
+                    <div className="flex items-center gap-3 px-3 py-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base shadow-sm shrink-0 ${
+                        expanded ? "bg-indigo-700" : "bg-indigo-600"
+                      } text-white`}>
+                        <Icon />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-semibold text-gray-800 truncate">{g.title}</div>
+                        {hasTabs && (
+                          <div className="text-[10px] text-gray-400">{g.items.length} options</div>
+                        )}
+                      </div>
+                      {hasTabs && (
+                        <FaChevronDown className={`text-gray-400 text-xs transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
+                      )}
+                    </div>
 
-                {hasTabs && expanded && (
-                  <div className="mt-2 grid w/full grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
-                    {g.items.map((m) => (
-                      <button
-                        key={m.path}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(m.path);
-                        }}
-                        className="px-3 py-2 min-h-[36px] rounded-full border border-indigo-100 text-sm font-medium text-indigo-800 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition-shadow shadow-[0_6px_16px_rgba(79,70,229,0.12)] text-center"
-                      >
-                        {m.name}
-                      </button>
-                    ))}
+                    {hasTabs && expanded && (
+                      <div className="px-3 pb-3 pt-0 border-t border-gray-50">
+                        <div className="grid grid-cols-2 gap-1.5 mt-2">
+                          {g.items.map((m) => (
+                            <button
+                              key={m.path}
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); navigate(m.path); }}
+                              className="text-left px-3 py-2 rounded-xl border border-indigo-100 text-[12px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition"
+                            >
+                              {m.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* SIDEBAR DASHBOARD */}
-        <aside className="lg:col-span-1 space-y-6">
-
-          {/* Today Summary */}
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Today Summary
-              </h3>
-              <button
-                onClick={() => {
-                  loadStats();
-                  if (!hasValidCustomRange) return;
-                  loadCategorySales(selectedCategoryBranchId);
-                  loadBranchSales();
-                }}
-                className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Refresh
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="bg-emerald-600 text-white rounded-xl p-4">
-                <div className="text-xs opacity-80">Total Bills</div>
-                <div className="text-lg font-bold">
-                  {Number(stats?.today_bills || 0)}
-                </div>
-              </div>
-
-              <div className="bg-indigo-600 text-white rounded-xl p-4">
-                <div className="text-xs opacity-80">Total Amount</div>
-                <div className="text-lg font-bold">
-                  Rs. {Number(stats?.today_sales || 0).toFixed(2)}
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
+        </div>
 
-          {/* Sales Filter */}
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              Sales Filter
-            </h3>
+        {/* ── RIGHT: sidebar ── */}
+        <aside className="space-y-4">
 
-            <div className="flex flex-wrap gap-2">
+          {/* Sales filter */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Sales Filter</p>
+            <div className="flex gap-1.5">
               {["today", "month", "custom"].map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setReportMode(mode)}
-                  className={`px-3 py-1 text-xs rounded-lg border transition ${
+                  className={`flex-1 py-1.5 rounded-xl text-[11px] font-bold border transition ${
                     reportMode === mode
-                      ? "bg-indigo-600 border-indigo-600 text-white"
-                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                      ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
                   }`}
                 >
-                  {mode.toUpperCase()}
+                  {mode === "today" ? "Today" : mode === "month" ? "Month" : "Custom"}
                 </button>
               ))}
             </div>
-
             {reportMode === "custom" && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-400" />
+                <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-400" />
               </div>
             )}
             {!hasValidCustomRange && (
-              <p className="mt-2 text-[11px] text-amber-700">
-                Select both From and To dates for custom range.
-              </p>
+              <p className="mt-2 text-[10px] text-amber-600 font-medium">Select both From and To dates.</p>
             )}
           </div>
 
           {/* Branch Sales */}
           {isAdmin && (
-            <div className="bg-white rounded-2xl shadow-sm border p-5">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <button
-                  type="button"
-                  onClick={() => setBranchSalesOpen((v) => !v)}
-                  className="flex items-center gap-2 text-left"
-                  aria-expanded={branchSalesOpen}
-                >
-                  <h3 className="text-sm font-semibold text-gray-700">
-                    Branch Sales
-                  </h3>
-                  <FaChevronDown
-                    className={`text-gray-500 transition-transform ${
-                      branchSalesOpen ? "rotate-180" : ""
-                    }`}
-                  />
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-2">
+                <button type="button" onClick={() => setBranchSalesOpen(v => !v)}
+                  className="flex items-center gap-1.5">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Branch Sales</p>
+                  <FaChevronDown className={`text-gray-400 text-[10px] transition-transform ${branchSalesOpen ? "rotate-180" : ""}`} />
                 </button>
-                <button
-                  onClick={handleAllBranchesClick}
-                  className={`px-2 py-1 text-[11px] rounded border transition ${
+                <button onClick={handleAllBranchesClick}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition ${
                     selectedCategoryBranchId == null
                       ? "bg-indigo-600 border-indigo-600 text-white"
-                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  All Branches
+                      : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
+                  }`}>
+                  All
                 </button>
               </div>
+
               {branchSalesOpen && (
-                <>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Category filter: {selectedCategoryBranchName}
-                  </p>
-
-                  {branchSales.length === 0 ? (
-                    <p className="text-xs text-gray-500">
-                      No branch sales for selected range.
-                    </p>
-                  ) : (
-                    <>
-                      <div className="h-56">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={branchSales}
-                              dataKey="total_sales"
-                              nameKey="branch_name"
-                              innerRadius={40}
-                              outerRadius={80}
-                            >
-                              {branchSales.map((row, i) => (
-                                <Cell
-                                  key={i}
-                                  fill={COLORS[i % COLORS.length]}
-                                  style={{ cursor: "pointer" }}
-                                  onClick={() => handleBranchSalesClick(row, i)}
-                                  stroke={
-                                    String(row?.branch_id ?? "") ===
-                                    String(selectedCategoryBranchId ?? "")
-                                      ? "#111827"
-                                      : "#ffffff"
-                                  }
-                                  strokeWidth={
-                                    String(row?.branch_id ?? "") ===
-                                    String(selectedCategoryBranchId ?? "")
-                                      ? 2
-                                      : 1
-                                  }
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(v) => `Rs. ${v}`} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="mt-3 border-t pt-2">
-                        <div className="text-xs font-semibold text-gray-600 mb-2">
-                          Branch Names
-                        </div>
-                        <div className="max-h-32 overflow-auto space-y-1">
-                          {branchSales.map((row, i) => {
-                            const isSelected =
-                              String(row?.branch_id ?? "") ===
-                              String(selectedCategoryBranchId ?? "");
-
-                            return (
-                              <button
-                                key={`branch-name-${row?.branch_id ?? i}`}
+                branchSales.length === 0
+                  ? <p className="text-xs text-gray-400 py-2 text-center">No data for selected range.</p>
+                  : <>
+                    <div className="h-44">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={branchSales} dataKey="total_sales" nameKey="branch_name" innerRadius={35} outerRadius={65}>
+                            {branchSales.map((row, i) => (
+                              <Cell key={i} fill={COLORS[i % COLORS.length]} style={{ cursor: "pointer" }}
                                 onClick={() => handleBranchSalesClick(row, i)}
-                                className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
-                                  isSelected
-                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                                }`}
-                              >
-                                <span className="flex items-center gap-2 min-w-0">
-                                  <span
-                                    className="w-2.5 h-2.5 rounded-full flex-none"
-                                    style={{
-                                      backgroundColor: COLORS[i % COLORS.length],
-                                    }}
-                                  />
-                                  <span className="truncate">
-                                    {row?.branch_name ||
-                                      (row?.branch_id != null
-                                        ? `Branch ${row.branch_id}`
-                                        : "-")}
-                                  </span>
-                                </span>
-                                <span className="font-medium flex-none">
-                                  Rs. {Number(row?.total_sales || 0).toFixed(2)}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
+                                stroke={String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "") ? "#1e1b4b" : "#fff"}
+                                strokeWidth={String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "") ? 2 : 1}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v) => `Rs. ${v}`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 space-y-1 max-h-28 overflow-auto">
+                      {branchSales.map((row, i) => {
+                        const sel = String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "");
+                        return (
+                          <button key={`b-${row?.branch_id ?? i}`} onClick={() => handleBranchSalesClick(row, i)}
+                            className={`w-full flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-xl border transition ${
+                              sel ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-gray-100 hover:border-gray-200 text-gray-700"
+                            }`}>
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                              <span className="truncate">{row?.branch_name || `Branch ${row?.branch_id}`}</span>
+                            </span>
+                            <span className="font-semibold shrink-0">₹{Number(row?.total_sales || 0).toFixed(0)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
               )}
             </div>
           )}
 
           {/* Category Sales */}
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center justify-between mb-2">
-              <button
-                type="button"
-                onClick={() => setCategorySalesOpen((v) => !v)}
-                className="flex items-center gap-2 text-left"
-                aria-expanded={categorySalesOpen}
-              >
-                <h3 className="text-sm font-semibold text-gray-700">
-                  Category Sales
-                </h3>
-                <FaChevronDown
-                  className={`text-gray-500 transition-transform ${
-                    categorySalesOpen ? "rotate-180" : ""
-                  }`}
-                />
+              <button type="button" onClick={() => setCategorySalesOpen(v => !v)} className="flex items-center gap-1.5">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Category Sales</p>
+                <FaChevronDown className={`text-gray-400 text-[10px] transition-transform ${categorySalesOpen ? "rotate-180" : ""}`} />
               </button>
+              {isAdmin && (
+                <span className="text-[10px] text-gray-400 truncate max-w-[100px]">{selectedCategoryBranchName}</span>
+              )}
             </div>
 
             {categorySalesOpen && (
-              <>
-                {isAdmin && (
-                  <p className="text-xs text-gray-500 -mt-2 mb-3">
-                    Filtered by: {selectedCategoryBranchName}
-                  </p>
-                )}
-
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categorySales}
-                        dataKey="total_sales"
-                        nameKey="category_name"
-                        innerRadius={40}
-                        outerRadius={80}
-                      >
-                        {categorySales.map((row, i) => (
-                          <Cell
-                            key={i}
-                            fill={COLORS[i % COLORS.length]}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => handleCategorySalesClick(row, i)}
-                            stroke={
-                              String(row?.category_id ?? "") ===
-                              String(selectedCategory?.category_id ?? "")
-                                ? "#111827"
-                                : "#ffffff"
-                            }
-                            strokeWidth={
-                              String(row?.category_id ?? "") ===
-                              String(selectedCategory?.category_id ?? "")
-                                ? 2
-                                : 1
-                            }
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => `Rs. ${v}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="mt-3 border-t pt-2">
-                  <div className="text-xs font-semibold text-gray-600 mb-2">
-                    Category Names
+              categorySales.length === 0
+                ? <p className="text-xs text-gray-400 py-2 text-center">No data for selected range.</p>
+                : <>
+                  <div className="h-44">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={categorySales} dataKey="total_sales" nameKey="category_name" innerRadius={35} outerRadius={65}>
+                          {categorySales.map((row, i) => (
+                            <Cell key={i} fill={COLORS[i % COLORS.length]} style={{ cursor: "pointer" }}
+                              onClick={() => handleCategorySalesClick(row, i)}
+                              stroke={String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "") ? "#1e1b4b" : "#fff"}
+                              strokeWidth={String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "") ? 2 : 1}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v) => `Rs. ${v}`} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                  {categorySales.length === 0 ? (
-                    <p className="text-xs text-gray-500">
-                      No category sales for selected range.
-                    </p>
-                  ) : (
-                    <div className="max-h-32 overflow-auto space-y-1">
-                      {categorySales.map((row, i) => {
-                        const isSelected =
-                          String(row?.category_id ?? "") ===
-                          String(selectedCategory?.category_id ?? "");
+                  <div className="mt-2 space-y-1 max-h-28 overflow-auto">
+                    {categorySales.map((row, i) => {
+                      const sel = String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "");
+                      return (
+                        <button key={`c-${row?.category_id ?? i}`} onClick={() => handleCategorySalesClick(row, i)}
+                          className={`w-full flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-xl border transition ${
+                            sel ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-gray-100 hover:border-gray-200 text-gray-700"
+                          }`}>
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                            <span className="truncate">{row?.category_name || "-"}</span>
+                          </span>
+                          <span className="font-semibold shrink-0">₹{Number(row?.total_sales || 0).toFixed(0)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                        return (
-                          <button
-                            key={`cat-name-${row?.category_id ?? i}`}
-                            onClick={() => handleCategorySalesClick(row, i)}
-                            className={`w-full text-left text-xs rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 ${
-                              isSelected
-                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2 min-w-0">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full flex-none"
-                                style={{
-                                  backgroundColor: COLORS[i % COLORS.length],
-                                }}
-                              />
-                              <span className="truncate">
-                                {row?.category_name || "-"}
-                              </span>
-                            </span>
-                            <span className="font-medium flex-none">
-                              Rs. {Number(row?.total_sales || 0).toFixed(2)}
-                            </span>
-                          </button>
-                        );
-                      })}
+                  {selectedCategory && (
+                    <div className="mt-3 border-t pt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-gray-700">{selectedCategory.category_name}</p>
+                          <p className="text-[11px] text-gray-400">₹{Number(selectedCategory?.total_sales || 0).toFixed(2)} · {selectedCategoryItemsSold} sold</p>
+                        </div>
+                        <button onClick={() => { setSelectedCategory(null); setCategoryItemDetails([]); }}
+                          className="text-[10px] text-red-500 hover:text-red-600 border border-red-100 px-2 py-0.5 rounded-lg">
+                          Clear
+                        </button>
+                      </div>
+                      {categoryItemsLoading
+                        ? <p className="text-xs text-gray-400">Loading…</p>
+                        : categoryItemDetails.length === 0
+                          ? <p className="text-xs text-gray-400">No items found.</p>
+                          : <div className="max-h-32 overflow-auto divide-y divide-gray-50">
+                            {categoryItemDetails.map((item, idx) => {
+                              const rawAmount = item?.total_sales ?? item?.total_amount ?? item?.total_amt ?? item?.amount ?? null;
+                              const amt = rawAmount == null || rawAmount === "" ? null : Number(rawAmount);
+                              return (
+                                <div key={`${item?.item_name || "item"}-${idx}`}
+                                  className="py-1.5 flex items-center justify-between gap-2 text-xs">
+                                  <span className="truncate text-gray-700">{item?.item_name || "-"}</span>
+                                  <span className="flex flex-col items-end shrink-0 text-[11px]">
+                                    <span className="font-bold text-gray-800">{Number(item?.total_qty || 0)}</span>
+                                    <span className="text-gray-400">{amt == null || Number.isNaN(amt) ? "-" : `₹${amt.toFixed(0)}`}</span>
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                      }
                     </div>
                   )}
-                </div>
-
-                {selectedCategory && (
-                  <div className="mt-4 rounded-xl border bg-gray-50 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-xs text-gray-500">
-                          Selected Category
-                        </div>
-                        <div className="text-sm font-semibold text-gray-800">
-                          {selectedCategory.category_name}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          Sales: Rs.{" "}
-                          {Number(selectedCategory?.total_sales || 0).toFixed(2)}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          Total Items Sold: {selectedCategoryItemsSold}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          setSelectedCategory(null);
-                          setCategoryItemDetails([]);
-                        }}
-                        className="text-[11px] text-red-600 hover:text-red-700"
-                      >
-                        Clear
-                      </button>
-                    </div>
-
-                    <div className="mt-3 border-t pt-2">
-                      <div className="text-xs font-semibold text-gray-600 mb-2">
-                        Item-wise Quantity
-                      </div>
-
-                      {categoryItemsLoading ? (
-                        <p className="text-xs text-gray-500">Loading...</p>
-                      ) : categoryItemDetails.length === 0 ? (
-                        <p className="text-xs text-gray-500">
-                          No item sales found for this category.
-                        </p>
-                      ) : (
-                        <div className="max-h-36 overflow-auto divide-y">
-                          {categoryItemDetails.map((item, idx) => {
-                            const rawAmount =
-                              item?.total_sales ??
-                              item?.total_amount ??
-                              item?.total_amt ??
-                              item?.amount ??
-                              item?.total_price ??
-                              item?.total_value ??
-                              null;
-
-                            const amountNumber =
-                              rawAmount == null || rawAmount === ""
-                                ? null
-                                : Number(rawAmount);
-
-                            return (
-                              <div
-                                key={`${item?.item_name || "item"}-${idx}`}
-                                className="py-1.5 flex items-start justify-between gap-2 text-xs"
-                              >
-                                <span className="truncate pr-2">
-                                  {item?.item_name || "-"}
-                                </span>
-
-                                <span className="flex flex-col items-end flex-none leading-tight">
-                                  <span className="font-semibold">
-                                    {Number(item?.total_qty || 0)}
-                                  </span>
-                                  <span className="text-[11px] text-gray-600">
-                                    {amountNumber == null || Number.isNaN(amountNumber)
-                                      ? "Rs. -"
-                                      : `Rs. ${amountNumber.toFixed(2)}`}
-                                  </span>
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
+                </>
             )}
           </div>
 
           {/* Quick Expense */}
           {canExpenseWrite && (
-            <div className="bg-white rounded-2xl shadow-sm border p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Quick Expense
-              </h3>
-
-              <input
-                type="number"
-                placeholder="Amount"
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Quick Expense</p>
+              <input type="number" placeholder="Amount"
                 value={expenseForm.amount}
-                onChange={(e) =>
-                  setExpenseForm({ ...expenseForm, amount: e.target.value })
-                }
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
               />
-
-              <input
-                placeholder="Category"
+              <input placeholder="Category"
                 value={expenseForm.category}
-                onChange={(e) =>
-                  setExpenseForm({ ...expenseForm, category: e.target.value })
-                }
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
               />
-
-              <button
-                onClick={saveQuickExpense}
-                disabled={expenseSaving}
-                className="w-full py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {expenseSaving ? "Saving..." : "Save Expense"}
+              <button onClick={saveQuickExpense} disabled={expenseSaving}
+                className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-semibold transition">
+                {expenseSaving ? "Saving…" : "Save Expense"}
               </button>
             </div>
           )}

@@ -23,6 +23,26 @@ class BranchBase(BaseModel):
     kot_required: Optional[bool] = True
     receipt_required: Optional[bool] = True
 
+    # Optional: online order settings (stored in system_parameters)
+    swiggy_enabled: Optional[bool] = False
+    zomato_enabled: Optional[bool] = False
+    swiggy_partner_id: Optional[str] = ""
+    zomato_partner_id: Optional[str] = ""
+    online_orders_auto_accept: Optional[bool] = False
+    online_orders_webhook_token: Optional[str] = ""
+    online_orders_signature_required: Optional[bool] = False
+    swiggy_webhook_secret: Optional[str] = ""
+    zomato_webhook_secret: Optional[str] = ""
+    online_orders_status_sync_enabled: Optional[bool] = True
+    online_orders_status_sync_strict: Optional[bool] = False
+    online_orders_status_sync_timeout_sec: Optional[int] = 8
+    swiggy_status_sync_url: Optional[str] = ""
+    zomato_status_sync_url: Optional[str] = ""
+    swiggy_status_sync_token: Optional[str] = ""
+    zomato_status_sync_token: Optional[str] = ""
+    swiggy_status_sync_secret: Optional[str] = ""
+    zomato_status_sync_secret: Optional[str] = ""
+
 class BranchCreate(BranchBase):
     pass
 

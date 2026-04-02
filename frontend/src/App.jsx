@@ -3,6 +3,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 
+/** Redirects to /home if the shop's billing_type doesn't match the required type. */
+function ShopTypeGuard({ requireHotel, children }) {
+  const billingType = (localStorage.getItem("billing_type") || "").toLowerCase();
+  const isHotel = billingType === "hotel";
+  if (requireHotel && !isHotel) return <Navigate to="/home" replace />;
+  if (!requireHotel && isHotel) return <Navigate to="/home" replace />;
+  return children;
+}
+
 import MainLayout from "./layouts/MainLayout";
 
 import Login from "./pages/Login";
@@ -41,6 +50,13 @@ import TableOrder from "./pages/TableOrder";
 import QrOrders from "./pages/QrOrders";
 import PublicQrMenu from "./pages/PublicQrMenu";
 
+// ⭐ HOTEL FEATURES
+import KitchenDisplay from "./pages/KitchenDisplay";
+import Takeaway from "./pages/Takeaway";
+import Reservations from "./pages/Reservations";
+import RecipeManagement from "./pages/RecipeManagement";
+import DeliveryManagement from "./pages/DeliveryManagement";
+
 import Setup from "./pages/Setup";
 import Categories from "./pages/setup/Categories";
 import Items from "./pages/setup/Items";
@@ -51,6 +67,7 @@ import ManageTables from "./pages/setup/ManageTables";
 import Suppliers from "./pages/setup/Suppliers";
 import PurchaseOrders from "./pages/setup/PurchaseOrders";
 import Permissions from "./pages/setup/Permissions";
+import OnlineOrderSetup from "./pages/setup/OnlineOrderSetup";
 import SetupOnboard from "./pages/SetupOnboard";
 import About from "./pages/About";
 
@@ -141,6 +158,7 @@ export default function App() {
             <Route path="/setup/suppliers" element={<Suppliers />} />
             <Route path="/setup/purchase-orders" element={<PurchaseOrders />} />
             <Route path="/setup/permissions" element={<Permissions />} />
+            <Route path="/setup/online-orders" element={<OnlineOrderSetup />} />
             <Route
               path="/setup/branches/:branchId/tables"
               element={<ManageTables />}
@@ -149,12 +167,19 @@ export default function App() {
             {/* TABLE BILLING */}
             <Route path="/table-billing" element={<TableGrid />} />
             <Route path="/qr-orders" element={<QrOrders />} />
+
+            {/* ⭐ HOTEL-ONLY FEATURES */}
+            <Route path="/takeaway" element={<ShopTypeGuard requireHotel><Takeaway /></ShopTypeGuard>} />
+            <Route path="/reservations" element={<ShopTypeGuard requireHotel><Reservations /></ShopTypeGuard>} />
+            <Route path="/recipes" element={<ShopTypeGuard requireHotel><RecipeManagement /></ShopTypeGuard>} />
+            <Route path="/delivery" element={<ShopTypeGuard requireHotel><DeliveryManagement /></ShopTypeGuard>} />
           </Route>
 
           {/* NO SIDEBAR LAYOUT */}
           <Route element={<MainLayout hideSidebar />}>
             <Route path="/setup/items" element={<Items />} />
-            <Route path="/table-order/:orderId" element={<TableOrder />} />
+            <Route path="/table-order/:orderId" element={<ShopTypeGuard requireHotel><TableOrder /></ShopTypeGuard>} />
+            <Route path="/kitchen-display" element={<ShopTypeGuard requireHotel><KitchenDisplay /></ShopTypeGuard>} />
           </Route>
 
         </Routes>

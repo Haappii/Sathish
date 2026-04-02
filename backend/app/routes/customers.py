@@ -13,6 +13,20 @@ from app.utils.permissions import require_permission
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
 
+@router.get("/", response_model=list[CustomerResponse])
+def list_customers(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    status: str | None = Query(default=None, description="Filter by status (ACTIVE/INACTIVE)"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("customers", "read")),
+):
+    q = db.query(Customer).filter(Customer.shop_id == user.shop_id)
+    if status:
+        q = q.filter(Customer.status == status.upper())
+    return q.order_by(Customer.customer_name).offset(skip).limit(limit).all()
+
+
 @router.get("/search", response_model=list[CustomerResponse])
 def search_customers(
     q: str | None = Query(None),

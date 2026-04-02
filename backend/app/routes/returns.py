@@ -498,7 +498,8 @@ def cancel_return(
     db: Session = Depends(get_db),
     user=Depends(require_permission("returns", "delete")),
 ):
-    _require_admin(user)
+    if not _is_admin(user):
+        raise HTTPException(403, "Admin access required to cancel a return")
 
     row = db.query(SalesReturn).filter(
         SalesReturn.shop_id == user.shop_id,

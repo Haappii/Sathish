@@ -187,7 +187,10 @@ def create_invoice(
     reverse_charge = False
 
     tax, total = calculate_gst(subtotal, shop)
-    payable = total - Decimal(str(payload.discounted_amt or 0))
+    discount = Decimal(str(payload.discounted_amt or 0))
+    if discount > total:
+        raise HTTPException(400, "Discount cannot exceed invoice total")
+    payable = total - discount
     if payable < 0:
         payable = Decimal("0.00")
 

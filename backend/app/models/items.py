@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, ForeignKey, Float, Numeric
+from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, ForeignKey, Float, Numeric, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db import Base
@@ -6,6 +6,11 @@ from app.db import Base
 
 class Item(Base):
     __tablename__ = "items"
+    __table_args__ = (
+        Index("ix_items_shop_category", "shop_id", "category_id"),
+        Index("ix_items_shop_status", "shop_id", "item_status"),
+        Index("ix_items_shop_branch", "shop_id", "branch_id"),
+    )
 
     item_id = Column(Integer, primary_key=True, index=True)
     shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)

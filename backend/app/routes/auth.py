@@ -2,7 +2,9 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -15,13 +17,16 @@ from app.models.shop_details import ShopDetails
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 @router.post("/login")
-def login(request: dict, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, body: dict, db: Session = Depends(get_db)):
 
-    shop_id = request.get("shop_id")
-    username = request.get("username")
-    password = request.get("password")
+    shop_id = body.get("shop_id")
+    username = body.get("username")
+    password = body.get("password")
 
     if not shop_id:
         raise HTTPException(400, "Shop ID is required")
