@@ -127,7 +127,7 @@ fi
 echo "==> Frontend build"
 cd "${FRONTEND_DIR}"
 npm install
-NODE_OPTIONS="--max-old-space-size=512" VITE_API_BASE=/api npm run build
+NODE_OPTIONS="--max-old-space-size=1024" VITE_API_BASE=/api npm run build
 
 echo "==> Installing backend systemd service"
 TMP_SERVICE="$(mktemp)"
