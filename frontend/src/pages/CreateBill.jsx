@@ -84,6 +84,8 @@ const [customer, setCustomer] = useState({
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [showCouponEditor, setShowCouponEditor] = useState(false);
   const [showBillDetails, setShowBillDetails] = useState(false);
+  const [heldDrafts, setHeldDrafts] = useState([]);
+  const [showHeldPanel, setShowHeldPanel] = useState(false);
 
 
   const printTextRef = useRef(null);
@@ -244,6 +246,20 @@ const [customer, setCustomer] = useState({
     defaultDiscountBranchRef.current = null;
     loadData({ forceDefaultDiscount: true });
   }, [branch_id, loadData]);
+
+  const loadHeldDrafts = useCallback(async () => {
+    if (!navigator.onLine) return;
+    try {
+      const res = await authAxios.get("/invoice/draft/list");
+      setHeldDrafts(res.data || []);
+    } catch {
+      // silently ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHeldDrafts();
+  }, [loadHeldDrafts]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -831,10 +847,60 @@ const [customer, setCustomer] = useState({
       setGiftCardCode("");
       defaultDiscountBranchRef.current = null;
       await loadData({ forceDefaultDiscount: true });
+      loadHeldDrafts();
     } catch (err) {
       const msg = err?.response?.data?.detail || "Draft save failed";
       showToast(msg, "error");
     }
+  };
+
+  const restoreFromDraft = (draft) => {
+    const restoredCart = [];
+    for (const draftItem of draft.items) {
+      const fullItem = itemsData.find(i => i.item_id === draftItem.item_id);
+      if (!fullItem) continue;
+      const price = draftItem.quantity > 0
+        ? draftItem.amount / draftItem.quantity
+        : Number(fullItem.price || 0);
+      restoredCart.push({
+        ...fullItem,
+        base_price: Number(fullItem.price || 0),
+        price_level: "BASE",
+        price,
+        qty: draftItem.quantity,
+      });
+    }
+    setCart(restoredCart);
+    setCustomer({
+      mobile: draft.mobile || DEFAULT_MOBILE,
+      name: draft.customer_name || "NA",
+      gst_number: draft.gst_number || "",
+    });
+    setDiscount(Number(draft.discounted_amt || 0));
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponMsg("");
+    const mode = draft.payment_mode || "cash";
+    if (mode === "split") {
+      setSplitEnabled(true);
+      const ps = draft.payment_split || {};
+      setSplit({
+        cash: ps.cash || "",
+        card: ps.card || "",
+        upi: ps.upi || "",
+        gift_card: ps.gift_card_amount || "",
+        wallet: ps.wallet_amount || "",
+      });
+      setGiftCardCode(ps.gift_card_code || "");
+    } else {
+      setSplitEnabled(false);
+      setPaymentMode(mode);
+      if (mode === "gift_card") setGiftCardCode(draft.payment_split?.gift_card_code || "");
+      else if (mode === "wallet") setGiftCardCode("");
+      else setGiftCardCode("");
+    }
+    setShowHeldPanel(false);
+    showToast(`Draft ${draft.draft_number} restored to cart`, "success");
   };
 
   return (
@@ -863,6 +929,17 @@ const [customer, setCustomer] = useState({
               {cart.length} item{cart.length > 1 ? "s" : ""} · ₹{payable.toFixed(0)}
             </span>
           )}
+          {heldDrafts.length > 0 && (
+            <button
+              onClick={() => setShowHeldPanel(true)}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-amber-50 border-amber-200 shadow-sm text-xs font-bold text-amber-700 hover:bg-amber-100 transition"
+            >
+              ⏸ Held
+              <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {heldDrafts.length}
+              </span>
+            </button>
+          )}
           <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
             offlineMode
               ? "bg-amber-50 text-amber-700 border-amber-200"
@@ -872,6 +949,42 @@ const [customer, setCustomer] = useState({
           </span>
         </div>
       </div>
+
+      {/* ── Held Bills Panel ── */}
+      {showHeldPanel && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowHeldPanel(false)} />
+          <div className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-700">⏸ Held Bills ({heldDrafts.length})</p>
+              <button onClick={() => setShowHeldPanel(false)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {heldDrafts.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center mt-8">No held bills</p>
+              ) : (
+                heldDrafts.map(draft => (
+                  <button
+                    key={draft.draft_id}
+                    onClick={() => restoreFromDraft(draft)}
+                    className="w-full text-left bg-white border border-amber-200 rounded-xl px-4 py-3 hover:bg-amber-50 hover:border-amber-400 transition shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-bold text-amber-700">{draft.draft_number}</span>
+                      <span className="text-[10px] text-gray-400">{draft.items?.length || 0} item{draft.items?.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <p className="text-xs font-semibold text-gray-700">{draft.customer_name || "—"}</p>
+                    {draft.mobile && draft.mobile !== "9999999999" && (
+                      <p className="text-[10px] text-gray-400">{draft.mobile}</p>
+                    )}
+                    <p className="text-[11px] font-bold text-blue-600 mt-1">₹{Number(draft.discounted_amt || 0).toFixed(0)}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Three-panel grid ── */}
       <div className="grid grid-cols-1 xl:grid-cols-[15%_50%_35%] gap-3 px-3 pb-4 h-auto xl:h-[calc(100vh-108px)]">
