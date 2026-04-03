@@ -110,10 +110,24 @@ fi
 "${VENV_PYTHON}" -m pip install --upgrade pip
 "${VENV_PYTHON}" -m pip install -r requirements.txt
 
+echo "==> Ensuring swap space (prevents Node.js heap OOM on low-RAM servers)"
+if ! swapon --show | grep -q '/swapfile'; then
+  if [[ ! -f /swapfile ]]; then
+    echo "Creating 1 GB swapfile..."
+    sudo fallocate -l 1G /swapfile
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+  fi
+  sudo swapon /swapfile
+  echo "Swap enabled."
+else
+  echo "Swap already active, skipping."
+fi
+
 echo "==> Frontend build"
 cd "${FRONTEND_DIR}"
 npm install
-VITE_API_BASE=/api npm run build
+NODE_OPTIONS="--max-old-space-size=512" VITE_API_BASE=/api npm run build
 
 echo "==> Installing backend systemd service"
 TMP_SERVICE="$(mktemp)"
