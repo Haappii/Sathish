@@ -42,9 +42,9 @@ UPDATE invoice_archive_details SET shop_id = 1 WHERE shop_id IS NULL;
 ALTER TABLE invoice_archive_details ALTER COLUMN shop_id SET NOT NULL;
 
 -- AUDIT LOG
-ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS shop_id INTEGER;
-UPDATE audit_log SET shop_id = 1 WHERE shop_id IS NULL;
-ALTER TABLE audit_log ALTER COLUMN shop_id SET NOT NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS shop_id INTEGER;
+UPDATE audit_logs SET shop_id = 1 WHERE shop_id IS NULL;
+ALTER TABLE audit_logs ALTER COLUMN shop_id SET NOT NULL;
 
 -- EXPENSES
 ALTER TABLE branch_expenses ADD COLUMN IF NOT EXISTS shop_id INTEGER;
@@ -82,9 +82,9 @@ UPDATE shop_month_close SET shop_id = 1 WHERE shop_id IS NULL;
 ALTER TABLE shop_month_close ALTER COLUMN shop_id SET NOT NULL;
 
 -- SUPPLIERS / PO
-ALTER TABLE supplier ADD COLUMN IF NOT EXISTS shop_id INTEGER;
-UPDATE supplier SET shop_id = 1 WHERE shop_id IS NULL;
-ALTER TABLE supplier ALTER COLUMN shop_id SET NOT NULL;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS shop_id INTEGER;
+UPDATE suppliers SET shop_id = 1 WHERE shop_id IS NULL;
+ALTER TABLE suppliers ALTER COLUMN shop_id SET NOT NULL;
 
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS shop_id INTEGER;
 UPDATE purchase_orders SET shop_id = 1 WHERE shop_id IS NULL;
