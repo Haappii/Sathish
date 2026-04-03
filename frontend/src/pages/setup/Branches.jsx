@@ -28,7 +28,9 @@ export default function Branches() {
 
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [hotelShop, setHotelShop] = useState(false);
+  const [hotelShop, setHotelShop] = useState(
+    () => localStorage.getItem("billing_type") === "hotel"
+  );
 
   const emptyForm = useMemo(
     () => ({
@@ -116,8 +118,19 @@ export default function Branches() {
     loadBranches();
     api
       .get("/shop/details")
-      .then((res) => setHotelShop(isHotelShop(res.data || {})))
-      .catch(() => setHotelShop(false));
+      .then((res) => {
+        const data = res.data || {};
+        // Also persist so other pages can read without re-fetching
+        if (data.billing_type) {
+          localStorage.setItem("billing_type", data.billing_type.toLowerCase());
+        }
+        setHotelShop(isHotelShop(data));
+      })
+      .catch(() => {
+        // Fall back to the value MainLayout already cached in localStorage
+        const cached = localStorage.getItem("billing_type");
+        setHotelShop(cached === "hotel");
+      });
   }, [loadBranches]);
 
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
