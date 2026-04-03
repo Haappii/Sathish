@@ -11,10 +11,10 @@ DATABASE_URL=postgresql://shopuser:postgres@localhost:5432/shop_billing
 JWT_SECRET=change-this-before-production
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
-ALLOWED_ORIGINS=http://13.61.181.139
+ALLOWED_ORIGINS=http://56.228.9.197
 
 # Local runner / deploy hosts and ports
-PUBLIC_HOST=13.61.181.139
+PUBLIC_HOST=56.228.9.197
 BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
 FRONTEND_HOST=0.0.0.0
@@ -28,8 +28,8 @@ VITE_ANDROID_APK_URL=/downloads/haappii-billing.apk
 VITE_IOS_APP_URL=
 
 # Desktop wrapper
-APP_URL=http://13.61.181.139/
-APP_URL_DEFAULT=http://13.61.181.139/
+APP_URL=http://56.228.9.197/
+APP_URL_DEFAULT=http://56.228.9.197/
 
 # Optional support email config
 SUPPORT_EMAIL_ENABLED=false
