@@ -35,6 +35,9 @@ fi
 
 PUBLIC_HOST="${PUBLIC_HOST:-_}"
 RUN_USER="${SUDO_USER:-$(id -un)}"
+SWAPFILE_PATH="${SWAPFILE_PATH:-/swapfile}"
+SWAPFILE_SIZE_GB="${SWAPFILE_SIZE_GB:-2}"
+FRONTEND_NODE_HEAP_MB="${FRONTEND_NODE_HEAP_MB:-768}"
 
 require_cmd() {
   local cmd="$1"
@@ -91,6 +94,16 @@ require_cmd sudo "sudo is required for systemd/nginx installation."
 require_cmd python3 "python3 is required. Install python3 and python3-venv first."
 require_node_runtime
 
+print_memory_snapshot() {
+  if command -v free >/dev/null 2>&1; then
+    free -h || true
+  fi
+
+  if command -v swapon >/dev/null 2>&1; then
+    swapon --show || true
+  fi
+}
+
 echo "==> Backend setup"
 cd "${BACKEND_DIR}"
 
@@ -111,23 +124,31 @@ fi
 "${VENV_PYTHON}" -m pip install -r requirements.txt
 
 echo "==> Ensuring swap space (prevents Node.js heap OOM on low-RAM servers)"
-if ! swapon --show | grep -q '/swapfile'; then
-  if [[ ! -f /swapfile ]]; then
-    echo "Creating 1 GB swapfile..."
-    sudo fallocate -l 1G /swapfile
-    sudo chmod 600 /swapfile
-    sudo mkswap /swapfile
+if ! swapon --show | grep -q "${SWAPFILE_PATH}"; then
+  if [[ ! -f "${SWAPFILE_PATH}" ]]; then
+    echo "Creating ${SWAPFILE_SIZE_GB} GB swapfile at ${SWAPFILE_PATH}..."
+    sudo fallocate -l "${SWAPFILE_SIZE_GB}G" "${SWAPFILE_PATH}"
+    sudo chmod 600 "${SWAPFILE_PATH}"
+    sudo mkswap "${SWAPFILE_PATH}"
   fi
-  sudo swapon /swapfile
+  sudo swapon "${SWAPFILE_PATH}"
   echo "Swap enabled."
 else
   echo "Swap already active, skipping."
 fi
 
+echo "==> Memory snapshot before frontend build"
+print_memory_snapshot
+
 echo "==> Frontend build"
 cd "${FRONTEND_DIR}"
 npm install
-NODE_OPTIONS="--max-old-space-size=1024" VITE_API_BASE=/api npm run build
+if ! NODE_OPTIONS="--max-old-space-size=${FRONTEND_NODE_HEAP_MB}" VITE_API_BASE=/api npm run build; then
+  echo "Frontend build failed. If you saw 'Killed', the Linux OOM killer likely stopped Vite." >&2
+  echo "Memory snapshot after failure:" >&2
+  print_memory_snapshot >&2
+  exit 1
+fi
 
 echo "==> Installing backend systemd service"
 TMP_SERVICE="$(mktemp)"
