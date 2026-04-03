@@ -6,7 +6,5 @@
 !macroend
 
 !macro customUnInstall
-  ; Electron's deleteAppDataOnUninstall handles %APPDATA% but we also clear LocalAppData and our drivers cache.
   RMDir /r "$LOCALAPPDATA\\Haappii Billing"
-  RMDir /r "$PROGRAMDATA\\HaappiiBillingDrivers"
 !macroend
