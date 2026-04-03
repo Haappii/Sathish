@@ -179,6 +179,34 @@ def seed_shop_defaults():
         db.close()
 
 
+def reset_sequences():
+    """
+    After seeding rows with explicit primary key values (branch_id=1, shop_id=1, etc.)
+    PostgreSQL sequences are not advanced automatically.
+    This resets them so the next INSERT gets the correct next ID.
+    """
+    from sqlalchemy import text
+    tables = [
+        ("branch",       "branch_id"),
+        ("shop_details", "shop_id"),
+        ("users",        "user_id"),
+        ("roles",        "role_id"),
+        ("platform_users", "platform_user_id"),
+    ]
+    print("==> Resetting PostgreSQL sequences...")
+    with engine.connect() as conn:
+        for table, col in tables:
+            try:
+                conn.execute(text(
+                    f"SELECT setval(pg_get_serial_sequence('{table}', '{col}'), "
+                    f"COALESCE((SELECT MAX({col}) FROM {table}), 1))"
+                ))
+                print(f"    Reset {table}.{col}")
+            except Exception as e:
+                print(f"    Skipped {table}.{col}: {e}")
+        conn.commit()
+
+
 if __name__ == "__main__":
     print()
     create_tables()
@@ -186,6 +214,8 @@ if __name__ == "__main__":
     seed_platform_admin()
     print()
     seed_shop_defaults()
+    print()
+    reset_sequences()
     print()
     print("==> All done.")
     print()
