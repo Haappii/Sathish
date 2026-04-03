@@ -15,6 +15,21 @@ const envBase =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_BACKEND_URL;
 
+// When running inside the Electron desktop app, main.js injects the actual
+// server URL via preload.js so the frontend can reach the real backend even
+// when the offline bundle is served from a local 127.0.0.1 server.
+const electronServerUrl = (() => {
+  try {
+    const raw = typeof window !== "undefined" && /** @type {any} */ (window).electronAPI?.serverUrl;
+    if (!raw) return null;
+    const u = new URL(String(raw));
+    // Derive the API base from the server origin (nginx proxies /api/ to backend)
+    return `${u.protocol}//${u.host}/api`;
+  } catch {
+    return null;
+  }
+})();
+
 // Fallback kept for local/legacy usage.
 // For production HTTPS (Amplify), set `VITE_API_BASE` to an HTTPS endpoint
 // like `https://api.example.com/api` (or `/api` only if you have a proxy).
@@ -41,9 +56,10 @@ const fallbackBase = (() => {
 // When running the frontend on http://localhost:5173, it's very common to want
 // the backend on http://localhost:8000 even if the build env has a remote base.
 const envLocalBase = import.meta.env.VITE_API_BASE_LOCAL;
-const runtimeBase = isLocalHost()
-  ? (envLocalBase || fallbackBase)
-  : (envBase || fallbackBase);
+
+// Priority: Electron-injected server URL > env var > fallback
+const runtimeBase = electronServerUrl
+  || (isLocalHost() ? (envLocalBase || fallbackBase) : (envBase || fallbackBase));
 
 export const API_BASE = normalizeBaseUrl(runtimeBase);
 

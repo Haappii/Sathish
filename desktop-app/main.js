@@ -322,7 +322,11 @@ function errorHtml({ baseUrl, code, description, validatedUrl }) {
 </html>`;
 }
 
-function createWindow(targetUrl, offlineUrl) {
+function createWindow(targetUrl, offlineUrl, serverUrl) {
+  const additionalArguments = serverUrl
+    ? [`--poss-server=${serverUrl}`]
+    : [];
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -331,7 +335,8 @@ function createWindow(targetUrl, offlineUrl) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, "preload.js")
+      preload: path.join(__dirname, "preload.js"),
+      additionalArguments,
     }
   });
 
@@ -549,7 +554,7 @@ app.whenReady().then(async () => {
     }
   }
 
-  mainWindow = createWindow(baseUrl, offlineUrl);
+  mainWindow = createWindow(baseUrl, offlineUrl, resolvedUrl);
 });
 
 app.on("open-url", (event, url) => {
