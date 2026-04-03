@@ -163,3 +163,7 @@
 .input-modern {
   @apply border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-400 outline-none transition;
 }
+
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
