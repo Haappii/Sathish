@@ -10,6 +10,9 @@ const CONFIG_FILE = "config.json";
 
 function loadSharedEnv() {
   const candidates = [
+    // Bundled production defaults (lowest priority — always present in packaged app)
+    path.resolve(__dirname, "app.config.txt"),
+    // Outer files override for dev / self-hosted deployments (not bundled in installer)
     path.resolve(__dirname, "..", ".env"),
     path.resolve(__dirname, "..", "config.example.txt"),
     path.resolve(__dirname, "..", "config.txt"),
