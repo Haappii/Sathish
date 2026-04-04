@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 // src/pages/setup/Items.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { API_BASE } from "../../config/api";
@@ -31,6 +32,39 @@ export default function Items() {
 
   const [editingId, setEditingId] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const xlsxRef = useRef(null);
+
+  const handleExcelImport = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const rows = raw.map(r => ({
+        item_name: String(r["item_name"] || r["Item Name"] || r["name"] || "").trim(),
+        category_name: String(r["category_name"] || r["Category"] || r["category"] || "").trim().toUpperCase(),
+        price: parseFloat(r["price"] || r["Price"] || r["selling_price"] || 0) || 0,
+        buy_price: parseFloat(r["buy_price"] || r["Buy Price"] || r["cost"] || 0) || 0,
+        mrp_price: parseFloat(r["mrp_price"] || r["MRP"] || r["mrp"] || 0) || 0,
+        min_stock: parseInt(r["min_stock"] || r["Min Stock"] || 0) || 0,
+      })).filter(r => r.item_name && r.category_name);
+      if (!rows.length) return showToast("No valid rows found in file", "error");
+      const res = await authAxios.post("/items/bulk-import", rows);
+      const errs = res.data.errors || [];
+      showToast(`Done — ${res.data.inserted} inserted, ${res.data.updated} updated${errs.length ? `, ${errs.length} errors` : ""}`, "success");
+      if (errs.length) console.warn("Import errors:", errs);
+      loadData();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Import failed", "error");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const [imageFile, setImageFile] = useState(null);
 
@@ -249,14 +283,24 @@ export default function Items() {
       {/* Back + Add Item (same pattern as billing page) */}
       <div className="px-4 pt-2 pb-1 flex items-center justify-between">
         <BackButton />
-
-        <button
-          type="button"
-          onClick={() => resetForm({ keepCategory: true })}
-          className="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-sm text-[12px]"
-        >
-          Add Item
-        </button>
+        <div className="flex items-center gap-2">
+          <input ref={xlsxRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelImport} />
+          <button
+            type="button"
+            onClick={() => xlsxRef.current?.click()}
+            disabled={importing}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm text-[12px] flex items-center gap-1.5 disabled:opacity-60"
+          >
+            📥 {importing ? "Importing…" : "Import Excel"}
+          </button>
+          <button
+            type="button"
+            onClick={() => resetForm({ keepCategory: true })}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-sm text-[12px]"
+          >
+            Add Item
+          </button>
+        </div>
       </div>
 
       {/* Main content */}

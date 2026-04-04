@@ -18,6 +18,7 @@ import {
   FaClipboardCheck,
   FaBarcode,
   FaCodeBranch,
+  FaFileExcel,
 } from "react-icons/fa";
 import api from "../utils/apiClient";
 import { getSession } from "../utils/auth";
@@ -178,6 +179,13 @@ export default function Setup() {
       desc: "Daily closing process",
       icon: FaCalendarAlt,
       color: "text-emerald-700",
+    },
+    {
+      title: "Excel Upload",
+      link: "/setup/excel-upload",
+      desc: "Bulk import categories, items, users & employees",
+      icon: FaFileExcel,
+      color: "text-green-600",
     },
   ];
 

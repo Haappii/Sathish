@@ -303,7 +303,7 @@ export default function TableOrder() {
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
-  const generateKOTText = kotItems => {
+  const generateKOTText = (kotItems, categoryLabel = null) => {
     const WIDTH = 32;
     const NAME_COL = 22;
     const COUNT_COL = 8;
@@ -321,6 +321,10 @@ export default function TableOrder() {
     t += center(new Date().toLocaleString()) + "\n";
     t += center(tableName ? `Table ${tableName}` : "Table Billing") + "\n";
     t += line + "\n";
+    if (categoryLabel) {
+      t += `Category: ${categoryLabel.slice(0, 22)}`.padEnd(WIDTH) + "\n";
+      t += line + "\n";
+    }
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
     t += line + "\n";
     const rows = Array.isArray(kotItems) ? kotItems : [];
@@ -344,8 +348,32 @@ export default function TableOrder() {
       showToast("Add items before printing KOT", "warning");
       return;
     }
-    const ok = await printDirectText(generateKOTText(rows));
-    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
+
+    // Build lookup: item_id → category_id from items list
+    const itemCatMap = {};
+    items.forEach(it => { itemCatMap[String(it.item_id)] = it.category_id; });
+    const catNameMap = {};
+    categories.forEach(c => { catNameMap[String(c.category_id)] = c.category_name; });
+
+    // Group rows by category — one KOT ticket per category
+    const grouped = {};
+    rows.forEach(it => {
+      const catId = String(itemCatMap[String(it.item_id)] || "other");
+      if (!grouped[catId]) grouped[catId] = [];
+      grouped[catId].push(it);
+    });
+
+    const catIds = Object.keys(grouped);
+    const multiCat = catIds.length > 1;
+
+    for (const catId of catIds) {
+      const label = multiCat ? (catNameMap[catId] || catId) : null;
+      const ok = await printDirectText(generateKOTText(grouped[catId], label));
+      if (!ok) {
+        showToast("Printing failed. Check printer/popup settings.", "error");
+        break;
+      }
+    }
   };
 
   const confirmOrderAndPrintKOT = async () => {

@@ -3,6 +3,8 @@ from pathlib import Path
 import shutil
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from pydantic import BaseModel
+from typing import Optional
 
 from app.db import get_db
 from app.models.items import Item
@@ -16,6 +18,15 @@ from app.utils.permissions import require_permission
 from app.utils.shop_type import get_shop_billing_type
 from app.services.branch_item_price_service import upsert_branch_item_price
 from app.routes.invoice import resolve_branch_optional
+
+
+class ItemBulkRow(BaseModel):
+    item_name: str
+    category_name: str
+    price: float = 0
+    buy_price: Optional[float] = 0
+    mrp_price: Optional[float] = 0
+    min_stock: Optional[int] = 0
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -531,3 +542,106 @@ def delete_item(
     )
 
     return {"message": "Item marked inactive"}
+
+
+# ---------- BULK IMPORT (upsert by name) ----------
+@router.post("/bulk-import")
+def bulk_import_items(
+    rows: list[ItemBulkRow],
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("items", "write")),
+):
+    branch_id = resolve_branch_for_user(user=user, request=request)
+    shop_type = get_shop_billing_type(db, int(user.shop_id))
+
+    # Build category name → id map
+    cat_map = {
+        c.category_name.upper(): c.category_id
+        for c in db.query(Category).filter(Category.shop_id == user.shop_id).all()
+    }
+
+    inserted = 0
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(rows):
+        name = (row.item_name or "").strip()
+        cat_name = (row.category_name or "").strip().upper()
+        if not name:
+            errors.append({"row": i + 1, "error": "item_name is required"})
+            continue
+        category_id = cat_map.get(cat_name)
+        if not category_id:
+            errors.append({"row": i + 1, "error": f"Category '{row.category_name}' not found"})
+            continue
+
+        price = float(row.price or 0)
+        buy_price = float(row.buy_price or 0)
+        mrp_price = float(row.mrp_price or 0)
+        min_stock = int(row.min_stock or 0)
+
+        if shop_type == "hotel":
+            buy_price = 0
+            mrp_price = 0
+        else:
+            if price <= 0:
+                errors.append({"row": i + 1, "error": f"Item '{name}': price is required"})
+                continue
+            if buy_price <= 0:
+                errors.append({"row": i + 1, "error": f"Item '{name}': buy_price is required"})
+                continue
+            if mrp_price <= 0:
+                errors.append({"row": i + 1, "error": f"Item '{name}': mrp_price is required"})
+                continue
+
+        try:
+            existing = db.query(Item).filter(
+                Item.item_name == name,
+                Item.shop_id == user.shop_id,
+            ).first()
+            if existing:
+                existing.category_id = category_id
+                existing.price = price
+                existing.buy_price = buy_price
+                existing.mrp_price = mrp_price
+                existing.min_stock = min_stock
+                existing.item_status = True
+                db.flush()
+                upsert_branch_item_price(
+                    db, shop_id=user.shop_id, branch_id=branch_id,
+                    item_id=existing.item_id, price=price,
+                    buy_price=buy_price, mrp_price=mrp_price, item_status=True,
+                )
+                updated += 1
+            else:
+                item = Item(
+                    shop_id=user.shop_id,
+                    branch_id=branch_id,
+                    item_name=name,
+                    category_id=category_id,
+                    price=price,
+                    buy_price=buy_price,
+                    mrp_price=mrp_price,
+                    min_stock=min_stock,
+                    item_status=True,
+                    is_raw_material=False,
+                )
+                db.add(item)
+                db.flush()
+                upsert_branch_item_price(
+                    db, shop_id=user.shop_id, branch_id=branch_id,
+                    item_id=item.item_id, price=price,
+                    buy_price=buy_price, mrp_price=mrp_price, item_status=True,
+                )
+                stock = Inventory(
+                    shop_id=user.shop_id, item_id=item.item_id,
+                    branch_id=branch_id, quantity=0, min_stock=0,
+                )
+                db.add(stock)
+                inserted += 1
+        except Exception as e:
+            errors.append({"row": i + 1, "error": str(e)})
+
+    db.commit()
+    return {"inserted": inserted, "updated": updated, "errors": errors}

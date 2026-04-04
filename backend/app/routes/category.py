@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 
 from app.db import get_db
 from app.models.category import Category
@@ -13,6 +15,11 @@ from app.utils.permissions import require_permission
 from app.routes.invoice import resolve_branch_optional
 
 router = APIRouter(prefix="/category", tags=["Category"])
+
+
+class CategoryBulkRow(BaseModel):
+    category_name: str
+    status: Optional[bool] = True
 
 
 # ---------- LIST ----------
@@ -185,3 +192,42 @@ def delete_category(
     )
 
     return {"message": "Category marked inactive"}
+
+
+# ---------- BULK IMPORT (upsert by name) ----------
+@router.post("/bulk-import")
+def bulk_import_categories(
+    rows: list[CategoryBulkRow],
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("categories", "write")),
+):
+    inserted = 0
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(rows):
+        name = (row.category_name or "").strip().upper()
+        if not name:
+            errors.append({"row": i + 1, "error": "category_name is required"})
+            continue
+        try:
+            existing = db.query(Category).filter(
+                Category.category_name == name,
+                Category.shop_id == user.shop_id,
+            ).first()
+            if existing:
+                existing.category_status = row.status if row.status is not None else True
+                updated += 1
+            else:
+                db.add(Category(
+                    shop_id=user.shop_id,
+                    category_name=name,
+                    category_status=row.status if row.status is not None else True,
+                    created_by=user.user_id,
+                ))
+                inserted += 1
+        except Exception as e:
+            errors.append({"row": i + 1, "error": str(e)})
+
+    db.commit()
+    return {"inserted": inserted, "updated": updated, "errors": errors}

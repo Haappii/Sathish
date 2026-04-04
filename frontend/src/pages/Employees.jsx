@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import * as XLSX from "xlsx";
 
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
@@ -65,6 +66,43 @@ export default function Employees() {
   });
   const [editingId, setEditingId] = useState(null);
   const [employeeSaving, setEmployeeSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const xlsxRef = useRef(null);
+
+  const handleExcelImport = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const rows = raw.map(r => ({
+        employee_name: String(r["employee_name"] || r["Employee Name"] || r["name"] || "").trim(),
+        employee_code: String(r["employee_code"] || r["Code"] || r["code"] || "").trim() || undefined,
+        mobile: String(r["mobile"] || r["Mobile"] || r["phone"] || "").trim() || undefined,
+        designation: String(r["designation"] || r["Designation"] || r["role"] || "").trim() || undefined,
+        wage_type: String(r["wage_type"] || r["Wage Type"] || "DAILY").trim().toUpperCase().replace(" ", "_") || "DAILY",
+        daily_wage: parseFloat(r["daily_wage"] || r["Daily Wage"] || 0) || 0,
+        monthly_wage: parseFloat(r["monthly_wage"] || r["Monthly Wage"] || 0) || 0,
+        join_date: String(r["join_date"] || r["Join Date"] || r["joining_date"] || "").trim() || undefined,
+        notes: String(r["notes"] || r["Notes"] || "").trim() || undefined,
+        branch_name: String(r["branch_name"] || r["Branch"] || r["branch"] || "").trim() || undefined,
+      })).filter(r => r.employee_name);
+      if (!rows.length) return showToast("No valid rows found in file", "error");
+      const res = await api.post("/employees/bulk-import", rows);
+      const errs = res.data.errors || [];
+      showToast(`Done — ${res.data.inserted} inserted, ${res.data.updated} updated${errs.length ? `, ${errs.length} errors` : ""}`, "success");
+      if (errs.length) console.warn("Import errors:", errs);
+      loadPage();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Import failed", "error");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const [paymentForm, setPaymentForm] = useState({
     payment_date: todayIso(),
@@ -428,6 +466,14 @@ export default function Employees() {
           <p className="text-[11px] text-gray-400">{wageSummary.employee_count} employee{wageSummary.employee_count !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
+          <input ref={xlsxRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelImport} />
+          <button
+            onClick={() => xlsxRef.current?.click()}
+            disabled={importing}
+            className="px-3 py-1.5 rounded-xl border text-[12px] font-medium text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 transition disabled:opacity-60"
+          >
+            {importing ? "Importing…" : "📥 Import Excel"}
+          </button>
           <button
             onClick={() => navigate("/employees/attendance")}
             className="px-3 py-1.5 rounded-xl border text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition"

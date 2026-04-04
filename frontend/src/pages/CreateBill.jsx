@@ -622,7 +622,7 @@ const [customer, setCustomer] = useState({
     return t;
   };
 
-  const generateKOTText = (invoiceNumber, customerName) => {
+  const generateKOTText = (kotItems, invoiceNumber, customerName, categoryLabel = null) => {
     const WIDTH = 32;
     const NAME_COL = 22;
     const COUNT_COL = 8;
@@ -639,30 +639,51 @@ const [customer, setCustomer] = useState({
     t += center(headerName) + "\n";
     t += center("Date & Time") + "\n";
     t += center(new Date().toLocaleString()) + "\n";
-    t += center("Take way") + "\n";
+    t += center("Take Away") + "\n";
     t += line + "\n";
     t += `Invoice : ${invoiceNumber || "N/A"}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";
     t += `Customer: ${(customerName || "N/A").slice(0, 22)}`.padEnd(WIDTH) + "\n";
+    if (categoryLabel) {
+      t += `Category: ${categoryLabel.slice(0, 22)}`.padEnd(WIDTH) + "\n";
+    }
     t += line + "\n";
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
     t += line + "\n";
-    cart.forEach(i => {
+    kotItems.forEach(i => {
       const name = String(i.item_name || "").slice(0, NAME_COL).padEnd(NAME_COL);
       const count = String(i.qty || 0);
       t += name + rightCol(count, COUNT_COL) + "\n";
     });
     t += line + "\n";
-    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
+    const totalItems = kotItems.reduce((s, i) => s + (i.qty || 0), 0);
     t += center(`Total Count - ${totalItems}`) + "\n";
     t += line + "\n";
     return t;
   };
 
   const printKOT = async (invoiceNumber, customerName) => {
-    const ok = await printDirectText(generateKOTText(invoiceNumber, customerName), {
-      fontSize: 9,
+    // Group cart items by category — one KOT ticket per category
+    const grouped = {};
+    cart.forEach(item => {
+      const catId = String(item.category_id || "other");
+      if (!grouped[catId]) grouped[catId] = [];
+      grouped[catId].push(item);
     });
-    if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
+
+    const catIds = Object.keys(grouped);
+    const multiCat = catIds.length > 1;
+
+    for (const catId of catIds) {
+      const label = multiCat ? (categoryNameById[catId] || catId) : null;
+      const ok = await printDirectText(
+        generateKOTText(grouped[catId], invoiceNumber, customerName, label),
+        { fontSize: 9 }
+      );
+      if (!ok) {
+        showToast("Printing failed. Check printer/popup settings.", "error");
+        break;
+      }
+    }
   };
 
   const saveInvoice = async (print = false) => {

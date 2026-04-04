@@ -1,13 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 
 from app.db import get_db
+from app.models.branch import Branch
 from app.models.roles import Role
 from app.models.users import User
 from app.schemas.users import UserCreate, UserUpdate, UserResponse
 from app.utils.passwords import encode_password
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+
+
+class UserBulkRow(BaseModel):
+    user_name: str
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+    role_name: str
+    branch_name: Optional[str] = None
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -235,3 +246,80 @@ def deactivate_user(
     )
 
     return {"message": "User marked inactive"}
+
+
+# ------------------------------------------------
+# BULK IMPORT (upsert by username)
+# ------------------------------------------------
+@router.post("/bulk-import")
+def bulk_import_users(
+    rows: list[UserBulkRow],
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("users", "write")),
+):
+    is_admin = _is_admin(current_user)
+
+    # Build lookup maps
+    role_map = {
+        str(r.role_name).strip().lower(): r.role_id
+        for r in db.query(Role).filter(Role.status == True).all()  # noqa: E712
+    }
+    branch_map = {
+        str(b.branch_name).strip().lower(): b.branch_id
+        for b in db.query(Branch).filter(Branch.shop_id == current_user.shop_id).all()
+    }
+
+    inserted = 0
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(rows):
+        uname = (row.user_name or "").strip()
+        if not uname:
+            errors.append({"row": i + 1, "error": "user_name is required"})
+            continue
+
+        role_id = role_map.get((row.role_name or "").strip().lower())
+        if not role_id:
+            errors.append({"row": i + 1, "error": f"Role '{row.role_name}' not found"})
+            continue
+
+        branch_id = branch_map.get((row.branch_name or "").strip().lower()) if row.branch_name else None
+        if not is_admin:
+            branch_id = getattr(current_user, "branch_id", None)
+
+        try:
+            existing = db.query(User).filter(
+                User.user_name == uname,
+                User.shop_id == current_user.shop_id,
+            ).first()
+            if existing:
+                existing.name = row.full_name or existing.name
+                existing.role = role_id
+                if branch_id is not None:
+                    existing.branch_id = branch_id
+                if row.password:
+                    existing.password = encode_password(row.password)
+                existing.status = True
+                updated += 1
+            else:
+                if not row.password:
+                    errors.append({"row": i + 1, "error": f"User '{uname}': password is required for new users"})
+                    continue
+                db.add(User(
+                    shop_id=current_user.shop_id,
+                    user_name=uname,
+                    password=encode_password(row.password),
+                    name=row.full_name,
+                    role=role_id,
+                    branch_id=branch_id,
+                    status=True,
+                    login_status=False,
+                    created_by=current_user.user_id,
+                ))
+                inserted += 1
+        except Exception as e:
+            errors.append({"row": i + 1, "error": str(e)})
+
+    db.commit()
+    return {"inserted": inserted, "updated": updated, "errors": errors}
