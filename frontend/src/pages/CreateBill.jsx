@@ -906,14 +906,15 @@ const [customer, setCustomer] = useState({
   return (
     <>
       <style>{`
-        html, body, #root { height: 100%; margin: 0; padding: 0; }
-        @media (min-width: 1280px) { html, body, #root { overflow: hidden; } }
+        html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
         .no-scroll::-webkit-scrollbar { display: none; }
         .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
+      <div className="h-full flex flex-col overflow-hidden">
+
       {/* ── Top bar ── */}
-      <div className="px-3 pt-2 pb-2 flex items-center justify-between gap-3">
+      <div className="px-3 pt-2 pb-2 flex items-center justify-between gap-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate("/home", { replace: true })}
@@ -987,10 +988,10 @@ const [customer, setCustomer] = useState({
       )}
 
       {/* ── Three-panel grid ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[15%_50%_35%] gap-3 px-3 pb-4 h-auto xl:h-[calc(100vh-108px)]">
+      <div className="grid grid-cols-1 xl:grid-cols-[15%_50%_35%] gap-3 px-3 pb-4 flex-1 min-h-0">
 
         {/* ── PANEL 1: Categories ── */}
-        <aside className="bg-white rounded-2xl border shadow-sm flex flex-col xl:overflow-hidden">
+        <aside className="bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden">
           <div className="px-3 pt-3 pb-2 border-b">
             <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Categories</p>
             <input
@@ -1028,7 +1029,7 @@ const [customer, setCustomer] = useState({
         </aside>
 
         {/* ── PANEL 2: Items ── */}
-        <div className="bg-white rounded-2xl border shadow-sm flex flex-col xl:overflow-hidden">
+        <div className="bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden">
           <div className="px-3 pt-3 pb-2 border-b flex items-center gap-2">
             <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Items</p>
             <span className="text-[10px] text-gray-400 bg-gray-100 rounded-full px-1.5">{filteredItems.length}</span>
@@ -1111,7 +1112,7 @@ const [customer, setCustomer] = useState({
         </div>
 
         {/* ── PANEL 3: Bill ── */}
-        <div className="bg-white rounded-2xl border shadow-sm flex flex-col xl:overflow-hidden min-h-0">
+        <div className="bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden min-h-0">
 
           {/* ── Customer ── */}
           <div className="px-3 pt-2 pb-1.5 border-b space-y-1.5">
@@ -1180,6 +1181,17 @@ const [customer, setCustomer] = useState({
           </div>
 
           {/* ── Cart ── */}
+          {cart.length > 0 && (
+            <div className="px-3 pt-1.5 pb-0 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cart</span>
+              <button
+                onClick={() => setCart([])}
+                className="text-[10px] font-semibold text-red-400 hover:text-red-600 transition"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto no-scroll px-2 py-1 min-h-0">
             {!cart.length ? (
               <div className="flex flex-col items-center justify-center h-full py-6 text-gray-300">
@@ -1402,6 +1414,8 @@ const [customer, setCustomer] = useState({
 
       <div id="bill-print-area"><pre ref={printTextRef} style={{ fontSize: "12px" }} /></div>
       <div style={{ display: "none" }}><pre ref={kotPrintRef} /></div>
+
+      </div>
     </>
   );
 }

@@ -632,7 +632,7 @@ export default function MainLayout({ hideSidebar = false }) {
         </header>
 
         {/* CONTENT */}
-        <main className="flex-1 overflow-auto" style={isCreateBill ? {} : { paddingLeft: "1cm", paddingRight: "1cm" }}>
+        <main className={`flex-1 min-h-0 ${isCreateBill ? "overflow-hidden flex flex-col" : "overflow-auto"}`} style={{ paddingLeft: "1cm", paddingRight: "1cm" }}>
           <Outlet />
         </main>
 

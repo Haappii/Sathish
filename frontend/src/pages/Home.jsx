@@ -453,57 +453,105 @@ export default function Home() {
   };
 
   /* ================== UI ================== */
-  return (
-    <div className="min-h-screen bg-slate-50">
+  const statCards = [
+    {
+      label: "Today's Bills",
+      value: Number(stats?.today_bills || 0),
+      fmt: v => v,
+      icon: "🧾",
+      bg: "from-indigo-500 to-indigo-700",
+      light: "bg-indigo-50 text-indigo-600",
+    },
+    {
+      label: "Today's Sales",
+      value: Number(stats?.today_sales || 0),
+      fmt: v => `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
+      icon: "💰",
+      bg: "from-emerald-500 to-emerald-700",
+      light: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "Today's Returns",
+      value: Number(stats?.today_returns || 0),
+      fmt: v => v,
+      icon: "↩️",
+      bg: "from-rose-500 to-rose-700",
+      light: "bg-rose-50 text-rose-600",
+    },
+    {
+      label: "Pending Dues",
+      value: Number(stats?.pending_dues || stats?.total_dues || 0),
+      fmt: v => `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
+      icon: "⏳",
+      bg: "from-amber-400 to-amber-600",
+      light: "bg-amber-50 text-amber-600",
+    },
+  ];
 
-      {/* ── Today stats bar ── */}
-      <div className="px-5 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Today Bills",   value: Number(stats?.today_bills  || 0),                     fmt: v => v,             color: "bg-indigo-600" },
-          { label: "Today Sales",   value: Number(stats?.today_sales  || 0),                     fmt: v => `₹${v.toFixed(2)}`, color: "bg-emerald-600" },
-          { label: "Today Returns", value: Number(stats?.today_returns|| 0),                     fmt: v => v,             color: "bg-rose-500" },
-          { label: "Pending Dues",  value: Number(stats?.pending_dues || stats?.total_dues || 0),fmt: v => `₹${v.toFixed(2)}`, color: "bg-amber-500" },
-        ].map(s => (
-          <div key={s.label} className={`${s.color} text-white rounded-2xl px-4 py-3 shadow-sm`}>
-            <div className="text-[11px] opacity-75 font-medium">{s.label}</div>
-            <div className="text-xl font-bold mt-0.5 leading-tight">{s.fmt(s.value)}</div>
+  return (
+    <div className="min-h-screen bg-gray-50/70">
+
+      {/* ── Stats bar ── */}
+      <div className="px-5 pt-4 pb-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {statCards.map(s => (
+          <div
+            key={s.label}
+            className={`relative overflow-hidden bg-gradient-to-br ${s.bg} text-white rounded-2xl px-4 py-4 shadow-md`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[11px] font-semibold opacity-80 uppercase tracking-wider">{s.label}</p>
+                <p className="text-2xl font-extrabold mt-1 leading-none">
+                  {stats === null ? "—" : s.fmt(s.value)}
+                </p>
+              </div>
+              <span className="text-2xl opacity-30 select-none">{s.icon}</span>
+            </div>
+            <div className="absolute -bottom-3 -right-3 w-16 h-16 rounded-full bg-white/10" />
           </div>
         ))}
       </div>
 
-      <div className="px-5 pb-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
+      <div className="px-5 pb-8 grid grid-cols-1 lg:grid-cols-[1fr_310px] gap-5">
 
-        {/* ── LEFT: shortcuts + menus ── */}
-        <div className="space-y-5">
+        {/* ── LEFT ── */}
+        <div className="space-y-6">
 
           {/* Quick shortcuts */}
           {quickShortcuts.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Quick Access</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Quick Access</p>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {quickShortcuts.map((m, idx) => (
                   <Link
                     key={`shortcut-${m.path}`}
                     to={m.path}
-                    className="group flex items-center gap-3 bg-white border border-gray-100 hover:border-indigo-200 hover:shadow-md rounded-2xl px-3 py-3 transition-all"
+                    className="group relative flex items-center gap-3 bg-white border border-gray-100 hover:border-indigo-300 hover:shadow-lg rounded-2xl px-4 py-3.5 transition-all duration-150"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-base shadow-sm shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center text-[15px] shadow shrink-0 group-hover:scale-105 transition-transform">
                       {m.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-gray-800 group-hover:text-indigo-700 truncate">{m.name}</div>
-                      <div className="text-[10px] text-gray-400">Alt+{idx + 1}</div>
+                      <p className="text-[13px] font-semibold text-gray-800 group-hover:text-indigo-700 truncate leading-tight">{m.name}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Alt + {idx + 1}</p>
                     </div>
+                    <span className="absolute top-2 right-2.5 text-[9px] font-bold text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Module groups */}
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">All Modules</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">All Modules</p>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
               {groupedMenus.map((g) => {
                 const hasTabs = g.items.length > 1;
                 const expanded = expandedGroup === g.key;
@@ -518,37 +566,41 @@ export default function Home() {
                 return (
                   <div
                     key={g.key}
-                    className={`bg-white border rounded-2xl cursor-pointer transition-all ${
-                      expanded ? "border-indigo-200 shadow-md" : "border-gray-100 hover:border-indigo-200 hover:shadow-sm"
-                    }`}
                     onClick={handleCardClick}
+                    className={`bg-white rounded-2xl border cursor-pointer transition-all duration-150 ${
+                      expanded
+                        ? "border-indigo-200 shadow-md"
+                        : "border-gray-100 hover:border-indigo-200 hover:shadow-md"
+                    }`}
                   >
-                    <div className="flex items-center gap-3 px-3 py-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base shadow-sm shrink-0 ${
-                        expanded ? "bg-indigo-700" : "bg-indigo-600"
+                    <div className="flex items-center gap-3 px-4 py-3.5">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-[15px] shadow-sm shrink-0 transition-colors ${
+                        expanded
+                          ? "bg-gradient-to-br from-indigo-600 to-indigo-800"
+                          : "bg-gradient-to-br from-indigo-500 to-indigo-700"
                       } text-white`}>
                         <Icon />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold text-gray-800 truncate">{g.title}</div>
+                        <p className="text-[13px] font-semibold text-gray-800 truncate">{g.title}</p>
                         {hasTabs && (
-                          <div className="text-[10px] text-gray-400">{g.items.length} options</div>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{g.items.length} options</p>
                         )}
                       </div>
                       {hasTabs && (
-                        <FaChevronDown className={`text-gray-400 text-xs transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
+                        <FaChevronDown className={`text-gray-300 text-xs transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
                       )}
                     </div>
 
                     {hasTabs && expanded && (
-                      <div className="px-3 pb-3 pt-0 border-t border-gray-50">
-                        <div className="grid grid-cols-2 gap-1.5 mt-2">
+                      <div className="px-4 pb-4 pt-0 border-t border-gray-50">
+                        <div className="grid grid-cols-2 gap-1.5 mt-3">
                           {g.items.map((m) => (
                             <button
                               key={m.path}
                               type="button"
                               onClick={(e) => { e.stopPropagation(); navigate(m.path); }}
-                              className="text-left px-3 py-2 rounded-xl border border-indigo-100 text-[12px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition"
+                              className="text-left px-3 py-2 rounded-xl border border-indigo-100 text-[12px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 transition"
                             >
                               {m.name}
                             </button>
@@ -560,24 +612,24 @@ export default function Home() {
                 );
               })}
             </div>
-          </div>
+          </section>
         </div>
 
-        {/* ── RIGHT: sidebar ── */}
+        {/* ── RIGHT sidebar ── */}
         <aside className="space-y-4">
 
           {/* Sales filter */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Sales Filter</p>
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
               {["today", "month", "custom"].map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setReportMode(mode)}
-                  className={`flex-1 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition ${
                     reportMode === mode
-                      ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                      : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
+                      ? "bg-white text-indigo-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   {mode === "today" ? "Today" : mode === "month" ? "Month" : "Custom"}
@@ -585,31 +637,36 @@ export default function Home() {
               ))}
             </div>
             {reportMode === "custom" && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-400" />
-                <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-400" />
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] text-gray-400 font-semibold uppercase">From</label>
+                  <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-400 mt-0.5" />
+                </div>
+                <div>
+                  <label className="text-[9px] text-gray-400 font-semibold uppercase">To</label>
+                  <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-400 mt-0.5" />
+                </div>
               </div>
             )}
             {!hasValidCustomRange && (
-              <p className="mt-2 text-[10px] text-amber-600 font-medium">Select both From and To dates.</p>
+              <p className="mt-2 text-[10px] text-amber-600 font-medium bg-amber-50 px-2.5 py-1.5 rounded-lg">Select both From and To dates.</p>
             )}
           </div>
 
           {/* Branch Sales */}
           {isAdmin && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-2">
-                <button type="button" onClick={() => setBranchSalesOpen(v => !v)}
-                  className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between mb-3">
+                <button type="button" onClick={() => setBranchSalesOpen(v => !v)} className="flex items-center gap-1.5">
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Branch Sales</p>
                   <FaChevronDown className={`text-gray-400 text-[10px] transition-transform ${branchSalesOpen ? "rotate-180" : ""}`} />
                 </button>
                 <button onClick={handleAllBranchesClick}
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition ${
                     selectedCategoryBranchId == null
-                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
                       : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
                   }`}>
                   All
@@ -618,21 +675,26 @@ export default function Home() {
 
               {branchSalesOpen && (
                 branchSales.length === 0
-                  ? <p className="text-xs text-gray-400 py-2 text-center">No data for selected range.</p>
+                  ? (
+                    <div className="flex flex-col items-center py-6 text-gray-300">
+                      <span className="text-2xl mb-1">📊</span>
+                      <p className="text-xs">No data for selected range</p>
+                    </div>
+                  )
                   : <>
                     <div className="h-44">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={branchSales} dataKey="total_sales" nameKey="branch_name" innerRadius={35} outerRadius={65}>
+                          <Pie data={branchSales} dataKey="total_sales" nameKey="branch_name" innerRadius={38} outerRadius={66}>
                             {branchSales.map((row, i) => (
                               <Cell key={i} fill={COLORS[i % COLORS.length]} style={{ cursor: "pointer" }}
                                 onClick={() => handleBranchSalesClick(row, i)}
                                 stroke={String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "") ? "#1e1b4b" : "#fff"}
-                                strokeWidth={String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "") ? 2 : 1}
+                                strokeWidth={String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "") ? 2.5 : 1}
                               />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(v) => `Rs. ${v}`} />
+                          <Tooltip formatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -641,14 +703,14 @@ export default function Home() {
                         const sel = String(row?.branch_id ?? "") === String(selectedCategoryBranchId ?? "");
                         return (
                           <button key={`b-${row?.branch_id ?? i}`} onClick={() => handleBranchSalesClick(row, i)}
-                            className={`w-full flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-xl border transition ${
-                              sel ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-gray-100 hover:border-gray-200 text-gray-700"
+                            className={`w-full flex items-center justify-between gap-2 text-xs px-2.5 py-1.5 rounded-xl border transition ${
+                              sel ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-gray-100 hover:bg-gray-50 text-gray-700"
                             }`}>
-                            <span className="flex items-center gap-1.5 min-w-0">
+                            <span className="flex items-center gap-2 min-w-0">
                               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                              <span className="truncate">{row?.branch_name || `Branch ${row?.branch_id}`}</span>
+                              <span className="truncate font-medium">{row?.branch_name || `Branch ${row?.branch_id}`}</span>
                             </span>
-                            <span className="font-semibold shrink-0">₹{Number(row?.total_sales || 0).toFixed(0)}</span>
+                            <span className="font-bold shrink-0">₹{Number(row?.total_sales || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
                           </button>
                         );
                       })}
@@ -660,33 +722,38 @@ export default function Home() {
 
           {/* Category Sales */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <button type="button" onClick={() => setCategorySalesOpen(v => !v)} className="flex items-center gap-1.5">
                 <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Category Sales</p>
                 <FaChevronDown className={`text-gray-400 text-[10px] transition-transform ${categorySalesOpen ? "rotate-180" : ""}`} />
               </button>
               {isAdmin && (
-                <span className="text-[10px] text-gray-400 truncate max-w-[100px]">{selectedCategoryBranchName}</span>
+                <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-lg truncate max-w-[110px]">{selectedCategoryBranchName}</span>
               )}
             </div>
 
             {categorySalesOpen && (
               categorySales.length === 0
-                ? <p className="text-xs text-gray-400 py-2 text-center">No data for selected range.</p>
+                ? (
+                  <div className="flex flex-col items-center py-6 text-gray-300">
+                    <span className="text-2xl mb-1">🗂️</span>
+                    <p className="text-xs">No data for selected range</p>
+                  </div>
+                )
                 : <>
                   <div className="h-44">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={categorySales} dataKey="total_sales" nameKey="category_name" innerRadius={35} outerRadius={65}>
+                        <Pie data={categorySales} dataKey="total_sales" nameKey="category_name" innerRadius={38} outerRadius={66}>
                           {categorySales.map((row, i) => (
                             <Cell key={i} fill={COLORS[i % COLORS.length]} style={{ cursor: "pointer" }}
                               onClick={() => handleCategorySalesClick(row, i)}
                               stroke={String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "") ? "#1e1b4b" : "#fff"}
-                              strokeWidth={String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "") ? 2 : 1}
+                              strokeWidth={String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "") ? 2.5 : 1}
                             />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v) => `Rs. ${v}`} />
+                        <Tooltip formatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -695,28 +762,30 @@ export default function Home() {
                       const sel = String(row?.category_id ?? "") === String(selectedCategory?.category_id ?? "");
                       return (
                         <button key={`c-${row?.category_id ?? i}`} onClick={() => handleCategorySalesClick(row, i)}
-                          className={`w-full flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-xl border transition ${
-                            sel ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-gray-100 hover:border-gray-200 text-gray-700"
+                          className={`w-full flex items-center justify-between gap-2 text-xs px-2.5 py-1.5 rounded-xl border transition ${
+                            sel ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-gray-100 hover:bg-gray-50 text-gray-700"
                           }`}>
-                          <span className="flex items-center gap-1.5 min-w-0">
+                          <span className="flex items-center gap-2 min-w-0">
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                            <span className="truncate">{row?.category_name || "-"}</span>
+                            <span className="truncate font-medium">{row?.category_name || "-"}</span>
                           </span>
-                          <span className="font-semibold shrink-0">₹{Number(row?.total_sales || 0).toFixed(0)}</span>
+                          <span className="font-bold shrink-0">₹{Number(row?.total_sales || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
                         </button>
                       );
                     })}
                   </div>
 
                   {selectedCategory && (
-                    <div className="mt-3 border-t pt-3 space-y-2">
-                      <div className="flex items-center justify-between">
+                    <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-xs font-bold text-gray-700">{selectedCategory.category_name}</p>
-                          <p className="text-[11px] text-gray-400">₹{Number(selectedCategory?.total_sales || 0).toFixed(2)} · {selectedCategoryItemsSold} sold</p>
+                          <p className="text-xs font-bold text-gray-800">{selectedCategory.category_name}</p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            ₹{Number(selectedCategory?.total_sales || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })} · {selectedCategoryItemsSold} sold
+                          </p>
                         </div>
                         <button onClick={() => { setSelectedCategory(null); setCategoryItemDetails([]); }}
-                          className="text-[10px] text-red-500 hover:text-red-600 border border-red-100 px-2 py-0.5 rounded-lg">
+                          className="text-[10px] text-rose-500 hover:text-rose-600 border border-rose-100 bg-rose-50 px-2 py-0.5 rounded-lg transition shrink-0">
                           Clear
                         </button>
                       </div>
@@ -724,22 +793,24 @@ export default function Home() {
                         ? <p className="text-xs text-gray-400">Loading…</p>
                         : categoryItemDetails.length === 0
                           ? <p className="text-xs text-gray-400">No items found.</p>
-                          : <div className="max-h-32 overflow-auto divide-y divide-gray-50">
-                            {categoryItemDetails.map((item, idx) => {
-                              const rawAmount = item?.total_sales ?? item?.total_amount ?? item?.total_amt ?? item?.amount ?? null;
-                              const amt = rawAmount == null || rawAmount === "" ? null : Number(rawAmount);
-                              return (
-                                <div key={`${item?.item_name || "item"}-${idx}`}
-                                  className="py-1.5 flex items-center justify-between gap-2 text-xs">
-                                  <span className="truncate text-gray-700">{item?.item_name || "-"}</span>
-                                  <span className="flex flex-col items-end shrink-0 text-[11px]">
-                                    <span className="font-bold text-gray-800">{Number(item?.total_qty || 0)}</span>
-                                    <span className="text-gray-400">{amt == null || Number.isNaN(amt) ? "-" : `₹${amt.toFixed(0)}`}</span>
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          : (
+                            <div className="max-h-32 overflow-auto divide-y divide-gray-50">
+                              {categoryItemDetails.map((item, idx) => {
+                                const rawAmount = item?.total_sales ?? item?.total_amount ?? item?.total_amt ?? item?.amount ?? null;
+                                const amt = rawAmount == null || rawAmount === "" ? null : Number(rawAmount);
+                                return (
+                                  <div key={`${item?.item_name || "item"}-${idx}`}
+                                    className="py-1.5 flex items-center justify-between gap-2 text-xs">
+                                    <span className="truncate text-gray-700 font-medium">{item?.item_name || "-"}</span>
+                                    <span className="flex flex-col items-end shrink-0 text-[11px]">
+                                      <span className="font-bold text-gray-800">{Number(item?.total_qty || 0)}</span>
+                                      <span className="text-gray-400">{amt == null || Number.isNaN(amt) ? "-" : `₹${amt.toFixed(0)}`}</span>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )
                       }
                     </div>
                   )}
@@ -749,21 +820,27 @@ export default function Home() {
 
           {/* Quick Expense */}
           {canExpenseWrite && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Quick Expense</p>
-              <input type="number" placeholder="Amount"
-                value={expenseForm.amount}
-                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-              />
-              <input placeholder="Category"
-                value={expenseForm.category}
-                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-              />
+              <div>
+                <label className="text-[9px] text-gray-400 font-semibold uppercase">Amount</label>
+                <input type="number" placeholder="0.00"
+                  value={expenseForm.amount}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 mt-0.5"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] text-gray-400 font-semibold uppercase">Category</label>
+                <input placeholder="e.g. Rent, Utilities"
+                  value={expenseForm.category}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 mt-0.5"
+                />
+              </div>
               <button onClick={saveQuickExpense} disabled={expenseSaving}
-                className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-semibold transition">
-                {expenseSaving ? "Saving…" : "Save Expense"}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 disabled:opacity-60 text-white text-sm font-bold shadow-sm transition">
+                {expenseSaving ? "Saving…" : "💾 Save Expense"}
               </button>
             </div>
           )}
