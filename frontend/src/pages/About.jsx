@@ -3,40 +3,6 @@ import { Link } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 
-import adminMenu from "../assets/marketing/admin menu.png";
-import billing from "../assets/marketing/billing.png";
-import branch from "../assets/marketing/branch.png";
-import category from "../assets/marketing/category.png";
-import dashboard from "../assets/marketing/dashboard.png";
-import deletedInvoice from "../assets/marketing/deleted_invoice.png";
-import inventory from "../assets/marketing/inventory.png";
-import item from "../assets/marketing/item.png";
-import login from "../assets/marketing/Login.png";
-import report from "../assets/marketing/report.png";
-import reports from "../assets/marketing/reports.png";
-import runningTable from "../assets/marketing/running table.png";
-import tableBilling from "../assets/marketing/table billing.png";
-import tablem from "../assets/marketing/tablem.png";
-import user from "../assets/marketing/user.png";
-
-const gallery = [
-  { title: "Login Experience", src: login },
-  { title: "Admin & Configuration", src: adminMenu },
-  { title: "Dashboard Overview", src: dashboard },
-  { title: "Sales Billing", src: billing },
-  { title: "Table Billing", src: tableBilling },
-  { title: "Running Tables", src: runningTable },
-  { title: "Branch Management", src: branch },
-  { title: "Item Management", src: item },
-  { title: "Category Management", src: category },
-  { title: "Inventory Operations", src: inventory },
-  { title: "User Management", src: user },
-  { title: "Reports Hub", src: reports },
-  { title: "Invoice Report", src: report },
-  { title: "Deleted Invoice", src: deletedInvoice },
-  { title: "Table Management", src: tablem },
-];
-
 const features = [
   {
     icon: "⚡",
@@ -64,7 +30,6 @@ export default function About() {
   const { showToast } = useToast();
   const [demoOpen, setDemoOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  const [installOpen, setInstallOpen] = useState(false);
 
   const [demoForm, setDemoForm] = useState({
     name: "",
@@ -101,35 +66,8 @@ export default function About() {
     }
   };
 
-  const androidApkUrl = import.meta.env.VITE_ANDROID_APK_URL || "/downloads/haappii-billing.apk";
-  const iosAppUrl = import.meta.env.VITE_IOS_APP_URL || "";
   const windowsAppUrl = import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
-  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
   const isWindows = typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
-
-  const startAndroidDownload = async () => {
-    if (!androidApkUrl) { showToast("Android app not configured", "error"); return; }
-    try {
-      const resolved = new URL(androidApkUrl, window.location.href);
-      if (resolved.origin === window.location.origin) {
-        const head = await fetch(resolved.href, { method: "HEAD" });
-        const ct = (head.headers.get("content-type") || "").toLowerCase();
-        if (!head.ok || ct.includes("text/html")) {
-          showToast("APK file is not yet available on the server.", "error"); return;
-        }
-      }
-      const a = document.createElement("a");
-      a.href = resolved.href;
-      a.rel = "noopener noreferrer";
-      if (resolved.origin === window.location.origin) a.download = "haappii-billing.apk";
-      else a.target = "_blank";
-      document.body.appendChild(a); a.click(); a.remove();
-      if (isAndroid) setInstallOpen(true);
-      else showToast("Download started. Copy the APK to an Android phone to install.", "success");
-    } catch {
-      showToast("Unable to start download", "error");
-    }
-  };
 
   const startWindowsDownload = async () => {
     if (!windowsAppUrl) { showToast("Windows app not configured", "error"); return; }
@@ -259,8 +197,41 @@ export default function About() {
           border: 1px solid rgba(255,255,255,0.1);
           box-shadow: 0 40px 90px rgba(0,0,0,0.5);
           background: rgba(255,255,255,0.04);
+          padding: 28px;
         }
-        .ab-img-wrap img { width: 100%; display: block; }
+
+        .ab-hero-card {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .ab-hero-title {
+          font-family: Fraunces, serif;
+          font-size: 24px;
+          margin: 0;
+        }
+
+        .ab-hero-copy {
+          color: #9aa7c7;
+          margin: 0;
+          line-height: 1.7;
+          font-size: 14px;
+        }
+
+        .ab-hero-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(52,216,176,0.35);
+          background: rgba(52,216,176,0.12);
+          color: #7ef1d1;
+          font-size: 12px;
+          font-weight: 600;
+          width: fit-content;
+        }
 
         /* ── BUTTONS ── */
         .btn {
@@ -592,7 +563,16 @@ export default function About() {
         </div>
 
         <div className="ab-img-wrap">
-          <img src={login} alt="Haappii Billing" />
+          <div className="ab-hero-card">
+            <div className="ab-hero-pill">Offline Ready</div>
+            <h3 className="ab-hero-title">Operate without slowdowns</h3>
+            <p className="ab-hero-copy">
+              Fast billing, multi-branch visibility, and strong reporting without juggling tools.
+            </p>
+            <p className="ab-hero-copy">
+              Desktop and web stay in sync, even across multiple counters.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -629,19 +609,12 @@ export default function About() {
             <div className="ab-dl-icon">📱</div>
             <p className="ab-dl-title">Android App</p>
             <p className="ab-dl-sub">
-              {isAndroid
-                ? "You're on Android — tap Download and follow the install steps."
-                : "Download the APK and install it on any Android device."}
+              Mobile APK is coming soon — under construction.
             </p>
             <div className="ab-dl-actions">
-              <button className="btn btn-primary" onClick={startAndroidDownload}>
-                Download APK
+              <button className="btn btn-ghost" disabled>
+                Coming Soon
               </button>
-              {iosAppUrl && (
-                <a className="btn btn-ghost" href={iosAppUrl} target="_blank" rel="noopener noreferrer">
-                  iOS Link
-                </a>
-              )}
             </div>
           </div>
 
@@ -662,25 +635,6 @@ export default function About() {
               </button>
             </div>
           </div>
-        </div>
-      </section>
-
-      <div className="ab-divider" />
-
-      {/* GALLERY */}
-      <section className="ab-section">
-        <div className="ab-sec-label">Product Tour</div>
-        <h2 className="ab-sec-title">See it in action</h2>
-        <p className="ab-sec-sub">
-          Clean, purpose-built screens designed to reduce friction and keep your team moving fast.
-        </p>
-        <div className="ab-gallery">
-          {gallery.map((g) => (
-            <div className="ab-shot" key={g.title}>
-              <img src={g.src} alt={g.title} />
-              <div className="ab-shot-label">{g.title}</div>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -730,24 +684,6 @@ export default function About() {
         </div>
       )}
 
-      {/* ANDROID INSTALL HELP */}
-      {installOpen && (
-        <div className="ab-modal-bg" onClick={() => setInstallOpen(false)}>
-          <div className="ab-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Install on Android</h3>
-            <p>Your download has started. Follow these steps to install:</p>
-            <ol className="ab-steps">
-              <li>Open the downloaded APK from your notifications or Downloads folder.</li>
-              <li>If prompted, allow "Install unknown apps" for your browser.</li>
-              <li>Tap Install, then Open.</li>
-            </ol>
-            <div className="ab-modal-foot">
-              <button className="btn btn-ghost" onClick={() => setInstallOpen(false)}>Close</button>
-              <button className="btn btn-primary" onClick={startAndroidDownload}>Download Again</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
