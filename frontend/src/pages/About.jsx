@@ -551,7 +551,7 @@ export default function About() {
               Book a Demo
             </button>
             <Link to="/setup/onboard">
-              <button className="btn btn-ghost">Get Started Free</button>
+              <button className="btn btn-ghost">Application Setup</button>
             </Link>
             <button
               className="btn btn-ghost"
