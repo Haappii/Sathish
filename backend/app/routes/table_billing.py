@@ -17,7 +17,7 @@ from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.shop_details import ShopDetails
 from app.models.table_qr import TableQrSession
-from app.models.system_parameters import SystemParameter
+from app.models.branch import Branch
 from app.services.gst_service import calculate_gst
 
 from app.services.inventory_service import adjust_stock, is_inventory_enabled
@@ -82,22 +82,15 @@ def _serialize_order_items(order: Order) -> list[dict]:
     ]
 
 def _branch_service_charge(db: Session, *, shop_id: int, branch_id: int) -> Decimal:
-    keys = {
-        "required": f"branch:{branch_id}:service_charge_required",
-        "amount": f"branch:{branch_id}:service_charge_amount",
-    }
-    rows = (
-        db.query(SystemParameter.param_key, SystemParameter.param_value)
-        .filter(SystemParameter.shop_id == shop_id)
-        .filter(SystemParameter.param_key.in_(list(keys.values())))
-        .all()
+    branch = (
+        db.query(Branch)
+        .filter(Branch.shop_id == shop_id, Branch.branch_id == branch_id)
+        .first()
     )
-    pmap = {str(k): (str(v) if v is not None else "") for k, v in rows}
-    required = str(pmap.get(keys["required"], "NO") or "NO").strip().upper() == "YES"
-    if not required:
+    if not branch or not getattr(branch, "service_charge_required", False):
         return Decimal("0.00")
     try:
-        amount = Decimal(str(pmap.get(keys["amount"], "0") or "0"))
+        amount = Decimal(str(getattr(branch, "service_charge_amount", 0) or 0))
     except Exception:
         amount = Decimal("0")
     if amount < 0:

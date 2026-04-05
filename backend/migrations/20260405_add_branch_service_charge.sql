@@ -1,0 +1,5 @@
+ALTER TABLE branch
+ADD COLUMN IF NOT EXISTS service_charge_required BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE branch
+ADD COLUMN IF NOT EXISTS service_charge_amount NUMERIC(10, 2) DEFAULT 0;

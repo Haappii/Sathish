@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey
+from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, Boolean, Numeric
 from sqlalchemy.sql import func
 from app.db import Base
 
@@ -25,5 +25,7 @@ class Branch(Base):
     type = Column(String(20))   # Branch / Head Office
     status = Column(String(20), default="ACTIVE")
     branch_close = Column(String(1), default="N")  # Y/N
+    service_charge_required = Column(Boolean, default=False)
+    service_charge_amount = Column(Numeric(10, 2), default=0)
     created_date = Column(TIMESTAMP(timezone=True), server_default=func.now())
     created_by = Column(Integer)
