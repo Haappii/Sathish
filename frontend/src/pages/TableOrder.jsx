@@ -47,7 +47,6 @@ export default function TableOrder() {
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
-  const [serviceCharge, setServiceCharge] = useState("");
   const [showTotals, setShowTotals] = useState(false);
 
   const errorDetail = (err, fallback) =>
@@ -298,7 +297,9 @@ export default function TableOrder() {
         invoiceCreatedAt: invoice.created_time,
         invoiceItems: invoice.items || orderItems,
         invoiceTax: invoice.tax_amt,
-        invoiceServiceCharge: invoice?.payment_split?.service_charge ?? toAmount(serviceCharge || 0),
+        invoiceServiceCharge:
+          invoice?.payment_split?.service_charge ??
+          (branch?.service_charge_required ? toAmount(branch?.service_charge_amount || 0) : 0),
         invoiceDiscount: invoice.discounted_amt,
         invoiceTotal: invoice.total_amount,
       }),
@@ -423,12 +424,8 @@ export default function TableOrder() {
         Number(split.cash || 0) +
         Number(split.card || 0) +
         Number(split.upi || 0);
-      const serviceChargeValue = toAmount(serviceCharge || 0);
-      if (serviceChargeValue < 0) {
-        showToast("Service charge cannot be negative", "error");
-        setCompleting(false);
-        return;
-      }
+      const serviceChargeValue =
+        branch?.service_charge_required ? toAmount(branch?.service_charge_amount || 0) : 0;
       const payableTotal = total + serviceChargeValue;
 
       if (splitEnabled) {
@@ -495,7 +492,8 @@ export default function TableOrder() {
     (t, i) => t + Number(i.price) * i.quantity,
     0
   );
-  const serviceChargeAmount = toAmount(serviceCharge || 0);
+  const serviceChargeAmount =
+    branch?.service_charge_required ? toAmount(branch?.service_charge_amount || 0) : 0;
   const payableTotal = total + serviceChargeAmount;
   const splitTotal =
     Number(split.cash || 0) +
@@ -711,16 +709,6 @@ export default function TableOrder() {
                   placeholder="Optional"
                 />
               </div>
-              <div className="flex-1">
-                <label className="text-[9px] text-gray-400 font-semibold uppercase">Service Charge</label>
-                <input
-                  inputMode="decimal"
-                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-gray-50 focus:outline-none focus:border-blue-400"
-                  value={serviceCharge}
-                  onChange={e => setServiceCharge(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
             </div>
           </div>
 
@@ -738,6 +726,7 @@ export default function TableOrder() {
                     <th className="text-left py-1 font-semibold">Item</th>
                     <th className="text-center py-1 font-semibold w-20">Qty</th>
                     <th className="text-right py-1 font-semibold w-16">Amount</th>
+                    <th className="text-right py-1 font-semibold w-12">Remove</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -758,6 +747,15 @@ export default function TableOrder() {
                       </td>
                       <td className="py-1 text-right font-bold text-gray-800">
                         ₹{(Number(it.price || 0) * it.quantity).toFixed(2)}
+                      </td>
+                      <td className="py-1 text-right">
+                        <button
+                          onClick={() => changeQty(it.item_id, -it.quantity)}
+                          className="w-6 h-6 rounded border bg-white text-gray-500 text-xs font-bold hover:bg-red-50 hover:text-red-600"
+                          title="Remove item"
+                        >
+                          Ã—
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -888,5 +886,3 @@ export default function TableOrder() {
     </>
   );
 }
-
-

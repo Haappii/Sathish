@@ -49,6 +49,7 @@ export default function TableGrid() {
   const [confirming, setConfirming] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [hotelAllowed, setHotelAllowed] = useState(null);
+  const [branchInfo, setBranchInfo] = useState({});
 
   // print ref & helpers
   const printTextRef = useRef(null);
@@ -78,6 +79,19 @@ export default function TableGrid() {
         if (!mounted) return;
         setHotelAllowed(false);
       });
+
+    if (branchId) {
+      api
+        .get(`/branch/${branchId}`)
+        .then((res) => {
+          if (!mounted) return;
+          setBranchInfo(res.data || {});
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setBranchInfo({});
+        });
+    }
 
     return () => {
       mounted = false;
@@ -485,7 +499,9 @@ export default function TableGrid() {
                               table: t,
                               customer_name: t.customer_name || "NA",
                               mobile: t.mobile || DEFAULT_MOBILE,
-                              service_charge: "",
+                              service_charge: branchInfo?.service_charge_required
+                                ? toAmount(branchInfo?.service_charge_amount || 0)
+                                : 0,
                               payment_mode: "cash",
                               split_enabled: false,
                               split: { cash: "", card: "", upi: "" }
@@ -564,17 +580,6 @@ export default function TableGrid() {
                   value={confirming.customer_name}
                   onChange={e => setConfirming(c => ({ ...c, customer_name: e.target.value }))}
                   placeholder="Customer name"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-wide">Service Charge</label>
-                <input
-                  inputMode="decimal"
-                  className="mt-0.5 w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  value={confirming.service_charge ?? ""}
-                  onChange={e => setConfirming(c => ({ ...c, service_charge: e.target.value }))}
-                  placeholder="0.00"
                 />
               </div>
 

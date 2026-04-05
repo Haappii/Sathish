@@ -45,6 +45,12 @@ def _print_param_keys(branch_id: int) -> dict[str, str]:
         "receipt_required": f"branch:{branch_id}:receipt_required",
     }
 
+def _service_charge_param_keys(branch_id: int) -> dict[str, str]:
+    return {
+        "required": f"branch:{branch_id}:service_charge_required",
+        "amount": f"branch:{branch_id}:service_charge_amount",
+    }
+
 
 def _normalize_discount_type(raw: str | None) -> str:
     t = str(raw or "").strip().lower()
@@ -79,6 +85,20 @@ def _read_branch_print_from_params(pmap: dict[str, str], branch_id: int) -> dict
     return {
         "kot_required": bool(kot),
         "receipt_required": bool(receipt),
+    }
+
+def _read_branch_service_charge_from_params(pmap: dict[str, str], branch_id: int) -> dict:
+    keys = _service_charge_param_keys(branch_id)
+    required = str(pmap.get(keys["required"], "NO") or "NO").strip().upper() == "YES"
+    try:
+        amount = float(pmap.get(keys["amount"], "0") or 0)
+    except Exception:
+        amount = 0.0
+    if amount < 0:
+        amount = 0.0
+    return {
+        "service_charge_required": bool(required),
+        "service_charge_amount": float(amount),
     }
 
 
@@ -132,6 +152,24 @@ def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, pa
     _upsert_param(db, shop_id=shop_id, key=keys["receipt_required"], value=("YES" if receipt_required else "NO"))
     db.commit()
 
+def _save_branch_service_charge(db: Session, *, shop_id: int, branch_id: int, payload: BranchCreate | BranchUpdate):
+    has_any = any(getattr(payload, k, None) is not None for k in ("service_charge_required", "service_charge_amount"))
+    if not has_any:
+        return
+
+    required = bool(getattr(payload, "service_charge_required", False))
+    try:
+        amount = float(getattr(payload, "service_charge_amount", 0) or 0)
+    except Exception:
+        amount = 0.0
+    if amount < 0:
+        amount = 0.0
+
+    keys = _service_charge_param_keys(branch_id)
+    _upsert_param(db, shop_id=shop_id, key=keys["required"], value=("YES" if required else "NO"))
+    _upsert_param(db, shop_id=shop_id, key=keys["amount"], value=str(amount))
+    db.commit()
+
 
 def _save_branch_online_order_settings(
     db: Session,
@@ -168,6 +206,7 @@ def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> 
     for bid in branch_ids:
         raw_param_keys.update(_discount_param_keys(bid).values())
         raw_param_keys.update(_print_param_keys(bid).values())
+        raw_param_keys.update(_service_charge_param_keys(bid).values())
 
     if not raw_param_keys:
         return pmap
@@ -207,6 +246,7 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
 
     out.update(_read_branch_discount_from_params(pmap, bid))
     out.update(_read_branch_print_from_params(pmap, bid))
+    out.update(_read_branch_service_charge_from_params(pmap, bid))
     out.update(
         read_branch_online_order_settings_from_map(
             pmap,
@@ -337,6 +377,7 @@ def create(
     branch = create_branch(db, data, user.user_id, user.shop_id)
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_service_charge(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_online_order_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
@@ -393,6 +434,7 @@ def update(branch_id: int, data: BranchUpdate,
 
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_service_charge(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_online_order_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(

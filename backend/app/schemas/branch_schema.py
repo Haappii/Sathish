@@ -23,6 +23,10 @@ class BranchBase(BaseModel):
     kot_required: Optional[bool] = True
     receipt_required: Optional[bool] = True
 
+    # Optional: service charge (stored in system_parameters)
+    service_charge_required: Optional[bool] = False
+    service_charge_amount: Optional[float] = 0
+
     # Optional: online order settings (stored in system_parameters)
     swiggy_enabled: Optional[bool] = False
     zomato_enabled: Optional[bool] = False

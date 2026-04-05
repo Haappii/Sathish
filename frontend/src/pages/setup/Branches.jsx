@@ -54,6 +54,8 @@ export default function Branches() {
       discount_value: 0,
       kot_required: true,
       receipt_required: true,
+      service_charge_required: false,
+      service_charge_amount: 0,
       swiggy_enabled: false,
       zomato_enabled: false,
       swiggy_partner_id: "",
@@ -90,6 +92,8 @@ export default function Branches() {
         discount_value: Number(branch?.discount_value || 0),
         kot_required: branch?.kot_required !== false,
         receipt_required: branch?.receipt_required !== false,
+        service_charge_required: Boolean(branch?.service_charge_required),
+        service_charge_amount: Number(branch?.service_charge_amount || 0),
         swiggy_enabled: Boolean(branch?.swiggy_enabled),
         zomato_enabled: Boolean(branch?.zomato_enabled),
         online_orders_auto_accept: Boolean(branch?.online_orders_auto_accept),
@@ -159,6 +163,14 @@ export default function Branches() {
       }
       if (discountType === "percent" && discountValue > 100) {
         showToast("Percent discount cannot exceed 100", "error");
+        return;
+      }
+    }
+
+    if (hotelShop && form.service_charge_required) {
+      const amount = Number(form.service_charge_amount || 0);
+      if (!amount || amount < 0) {
+        showToast("Enter a valid service charge amount", "error");
         return;
       }
     }
@@ -443,6 +455,40 @@ export default function Branches() {
                 />
               </div>
             </FormSection>
+
+            {hotelShop && (
+              <FormSection
+                icon={<span className="text-sm font-bold">₹</span>}
+                title="Service Charge"
+                subtitle="Apply a fixed service charge for this branch"
+              >
+                <ToggleRow
+                  label="Service charge required"
+                  hint="Adds the configured amount to every table bill."
+                  checked={Boolean(form.service_charge_required)}
+                  onChange={(checked) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      service_charge_required: checked,
+                      service_charge_amount: checked ? prev.service_charge_amount || 0 : 0,
+                    }))
+                  }
+                />
+                {form.service_charge_required && (
+                  <div className="grid md:grid-cols-2 gap-4 mt-2">
+                    <Field label="Service Charge Amount">
+                      <input
+                        type="number"
+                        className={inputClass}
+                        placeholder="0"
+                        value={form.service_charge_amount}
+                        onChange={(e) => setField("service_charge_amount", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                )}
+              </FormSection>
+            )}
 
             {/* Online Orders */}
             <FormSection

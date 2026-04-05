@@ -17,6 +17,7 @@ from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.shop_details import ShopDetails
 from app.models.table_qr import TableQrSession
+from app.models.system_parameters import SystemParameter
 from app.services.gst_service import calculate_gst
 
 from app.services.inventory_service import adjust_stock, is_inventory_enabled
@@ -79,6 +80,29 @@ def _serialize_order_items(order: Order) -> list[dict]:
         }
         for it in order.items
     ]
+
+def _branch_service_charge(db: Session, *, shop_id: int, branch_id: int) -> Decimal:
+    keys = {
+        "required": f"branch:{branch_id}:service_charge_required",
+        "amount": f"branch:{branch_id}:service_charge_amount",
+    }
+    rows = (
+        db.query(SystemParameter.param_key, SystemParameter.param_value)
+        .filter(SystemParameter.shop_id == shop_id)
+        .filter(SystemParameter.param_key.in_(list(keys.values())))
+        .all()
+    )
+    pmap = {str(k): (str(v) if v is not None else "") for k, v in rows}
+    required = str(pmap.get(keys["required"], "NO") or "NO").strip().upper() == "YES"
+    if not required:
+        return Decimal("0.00")
+    try:
+        amount = Decimal(str(pmap.get(keys["amount"], "0") or "0"))
+    except Exception:
+        amount = Decimal("0")
+    if amount < 0:
+        amount = Decimal("0")
+    return amount.quantize(Decimal("0.01"))
 
 
 def _get_or_create_takeaway_table(*, db: Session, shop_id: int, branch_id: int) -> TableMaster:
@@ -481,10 +505,7 @@ def checkout_order(
         for it in order.items
     )
 
-    service_charge = Decimal(str(payload.service_charge or 0))
-    if service_charge < 0:
-        raise HTTPException(400, "Service charge cannot be negative")
-    service_charge = service_charge.quantize(Decimal("0.01"))
+    service_charge = _branch_service_charge(db, shop_id=user.shop_id, branch_id=int(user.branch_id))
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax_amt, total = calculate_gst(subtotal, shop)
