@@ -33,6 +33,7 @@ export default function ShopDetails() {
     gst_number: "", logo_url: "", billing_type: "store",
     gst_enabled: false, gst_percent: 0, gst_mode: "inclusive",
     inventory_enabled: false, inventory_cost_method: "LAST",
+    items_branch_wise: false,
   });
 
   const [logoFile, setLogoFile] = useState(null);
@@ -288,19 +289,17 @@ export default function ShopDetails() {
               disabled={!isSuperAdmin}
             />
 
+            <Toggle
+              label="Branch-wise Items"
+              hint="Each branch manages its own items and prices independently. When OFF, all branches share head-office items."
+              checked={form.items_branch_wise}
+              onChange={v => setField("items_branch_wise", v)}
+              disabled={!isSuperAdmin}
+            />
+
             {form.inventory_enabled && (
               <div className="space-y-3 pt-1">
-                <Field label="Cost Method">
-                  <Select
-                    disabled={!isSuperAdmin}
-                    value={String(form.inventory_cost_method || "LAST").toUpperCase()}
-                    onChange={e => setField("inventory_cost_method", e.target.value)}
-                  >
-                    <option value="LAST">Last Purchase Cost</option>
-                    <option value="WAVG">Weighted Average Cost</option>
-                    <option value="FIFO">FIFO — Item Lots</option>
-                  </Select>
-                </Field>
+                <p className="text-xs font-semibold text-gray-600">Cost Method</p>
                 <div className="space-y-2">
                   {[
                     { k: "LAST", title: "Last Cost", desc: "Uses latest PO price. Simple & fast." },

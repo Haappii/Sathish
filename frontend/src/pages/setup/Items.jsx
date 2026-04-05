@@ -7,6 +7,7 @@ import { useToast } from "../../components/Toast";
 import { API_BASE } from "../../config/api";
 import BackButton from "../../components/BackButton";
 import { isHotelShop } from "../../utils/shopType";
+import { getSession } from "../../utils/auth";
 
 export default function Items() {
   const { showToast } = useToast();
@@ -14,6 +15,11 @@ export default function Items() {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [hotelShop, setHotelShop] = useState(false);
+  const [branchWise, setBranchWise] = useState(false);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const session = getSession();
+  const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
   const [activeCategoryId, setActiveCategoryId] = useState("all");
   const [categorySearch, setCategorySearch] = useState("");
@@ -35,6 +41,10 @@ export default function Items() {
   const [importing, setImporting] = useState(false);
   const xlsxRef = useRef(null);
 
+  const branchHeaders = (branchWise && selectedBranchId)
+    ? { "x-branch-id": selectedBranchId }
+    : {};
+
   const handleExcelImport = async (e) => {
     const file = e.target.files[0];
     e.target.value = "";
@@ -54,7 +64,7 @@ export default function Items() {
         min_stock: parseInt(r["min_stock"] || r["Min Stock"] || 0) || 0,
       })).filter(r => r.item_name && r.category_name);
       if (!rows.length) return showToast("No valid rows found in file", "error");
-      const res = await authAxios.post("/items/bulk-import", rows);
+      const res = await authAxios.post("/items/bulk-import", { filename: file.name, rows }, { headers: branchHeaders });
       const errs = res.data.errors || [];
       showToast(`Done — ${res.data.inserted} inserted, ${res.data.updated} updated${errs.length ? `, ${errs.length} errors` : ""}`, "success");
       if (errs.length) console.warn("Import errors:", errs);
@@ -68,20 +78,43 @@ export default function Items() {
 
   const [imageFile, setImageFile] = useState(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (branchIdOverride) => {
     try {
-      const [shopRes, i, c] = await Promise.all([
+      const [shopRes, branchRes, c] = await Promise.all([
         authAxios.get("/shop/details"),
-        authAxios.get("/items/"),
-        authAxios.get("/category/")
+        authAxios.get("/branch/active"),
+        authAxios.get("/category/"),
       ]);
-      setHotelShop(isHotelShop(shopRes?.data || {}));
+      const shopData = shopRes?.data || {};
+      setHotelShop(isHotelShop(shopData));
+      const isBW = !!shopData.items_branch_wise;
+      setBranchWise(isBW);
+      const branchList = branchRes?.data || [];
+      setBranches(branchList);
+
+      // Determine which branch to load items for
+      let bid = branchIdOverride;
+      if (bid === undefined) {
+        if (isBW) {
+          // admin: default to first branch; non-admin: their own branch from session
+          bid = isAdmin
+            ? (branchList[0]?.branch_id ? String(branchList[0].branch_id) : "")
+            : String(session?.branch_id || "");
+          setSelectedBranchId(bid);
+        } else {
+          bid = "";
+          setSelectedBranchId("");
+        }
+      }
+
+      const headers = (isBW && bid) ? { "x-branch-id": bid } : {};
+      const i = await authAxios.get("/items/", { headers });
       setItems(i.data || []);
       setCategories(c.data || []);
     } catch {
       showToast("Failed to load data", "error");
     }
-  }, [showToast]);
+  }, [showToast, isAdmin, session?.branch_id]);
 
   useEffect(() => {
     loadData();
@@ -185,7 +218,7 @@ export default function Items() {
 
     try {
       if (editingId) {
-        await authAxios.put(`/items/${editingId}`, payload);
+        await authAxios.put(`/items/${editingId}`, payload, { headers: branchHeaders });
 
         const imageRes = await uploadImage(editingId);
         if (!imageRes.ok) {
@@ -194,7 +227,7 @@ export default function Items() {
           showToast("Item updated", "success");
         }
       } else {
-        const res = await authAxios.post("/items/", payload);
+        const res = await authAxios.post("/items/", payload, { headers: branchHeaders });
         const newId = res?.data?.item_id;
 
         const imageRes = await uploadImage(newId);
@@ -206,7 +239,7 @@ export default function Items() {
       }
 
       resetForm({ keepCategory: true });
-      loadData();
+      loadData(selectedBranchId);
     } catch (err) {
       const msg =
         err?.response?.data?.detail ||
@@ -237,10 +270,8 @@ export default function Items() {
 
   const toggleStatus = async item => {
     try {
-      await authAxios.put(`/items/${item.item_id}`, {
-        item_status: !item.item_status
-      });
-      loadData();
+      await authAxios.put(`/items/${item.item_id}`, { item_status: !item.item_status }, { headers: branchHeaders });
+      loadData(selectedBranchId);
     } catch {
       showToast("Status update failed", "error");
     }
@@ -280,9 +311,37 @@ export default function Items() {
         }
       `}</style>
 
-      {/* Back + Add Item (same pattern as billing page) */}
-      <div className="px-4 pt-2 pb-1 flex items-center justify-between">
-        <BackButton />
+      {/* Back + Branch selector + Add Item */}
+      <div className="px-4 pt-2 pb-1 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <BackButton />
+          {branchWise && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-500 font-medium">Branch:</span>
+              {isAdmin ? (
+                <select
+                  value={selectedBranchId}
+                  onChange={e => {
+                    const bid = e.target.value;
+                    setSelectedBranchId(bid);
+                    loadData(bid);
+                  }}
+                  className="border rounded-lg px-2 py-1 text-[12px] bg-white shadow-sm focus:outline-none focus:border-blue-400"
+                >
+                  {branches.map(b => (
+                    <option key={b.branch_id} value={String(b.branch_id)}>
+                      {b.branch_name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[12px] font-semibold">
+                  {branches.find(b => String(b.branch_id) === String(session?.branch_id))?.branch_name || "My Branch"}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <input ref={xlsxRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelImport} />
           <button
@@ -383,6 +442,9 @@ export default function Items() {
                 const isSelected = editingId === item.item_id;
                 const catName =
                   categories.find(c => c.category_id === item.category_id)?.category_name || "";
+                const branchName = branchWise
+                  ? (branches.find(b => String(b.branch_id) === String(item.branch_id))?.branch_name || null)
+                  : null;
 
                 return (
                   <div
@@ -449,15 +511,22 @@ export default function Items() {
                     </div>
 
                     <div className="mt-2 flex items-center justify-between">
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                          item.item_status
-                            ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                            : "text-red-700 bg-red-50 border-red-200"
-                        }`}
-                      >
-                        {item.item_status ? "Active" : "Disabled"}
-                      </span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                            item.item_status
+                              ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                              : "text-red-700 bg-red-50 border-red-200"
+                          }`}
+                        >
+                          {item.item_status ? "Active" : "Disabled"}
+                        </span>
+                        {branchName && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700">
+                            {branchName}
+                          </span>
+                        )}
+                      </div>
 
                       <button
                         type="button"

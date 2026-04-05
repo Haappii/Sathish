@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../utils/apiClient";
+import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import BackButton from "../components/BackButton";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LEAVE"];
 
 export default function EmployeeAttendance() {
@@ -12,7 +12,7 @@ export default function EmployeeAttendance() {
   const session = getSession() || {};
   const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
-  const [attendanceDate, setAttendanceDate] = useState(todayIso());
+  const [attendanceDate, setAttendanceDate] = useState("");
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [attendanceData, setAttendanceData] = useState({});
@@ -43,6 +43,12 @@ export default function EmployeeAttendance() {
   };
 
   useEffect(() => {
+    authAxios.get("/shop/details")
+      .then(res => {
+        const bDate = res.data?.app_date;
+        setAttendanceDate(bDate || new Date().toISOString().slice(0, 10));
+      })
+      .catch(() => setAttendanceDate(new Date().toISOString().slice(0, 10)));
     loadEmployees();
   }, []);
 

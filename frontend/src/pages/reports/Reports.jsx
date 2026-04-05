@@ -114,6 +114,7 @@ const REPORTS = [
   // Audit & Table
   { key: "audit/logs", label: "Audit Logs", group: "Audit" },
   { key: "audit/deleted-invoices", label: "Deleted Invoices", group: "Audit" },
+  { key: "bulk-import/history", label: "Bulk Upload History", group: "Audit", requiresDateRange: true },
   { key: "table/usage", label: "Table Usage", group: "Table" },
 
   // Employees / HR
@@ -148,6 +149,7 @@ const NO_USER_FILTER_KEYS = new Set([
   "employees/due-list",
   "employees/attendance-summary",
   "reservations/list",
+  "bulk-import/history",
   "gst/gstr1",
   "gst/gstr3b",
   "gst/hsn-summary",
@@ -246,6 +248,8 @@ export default function Reports() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState(null);
+  const [bulkLogs, setBulkLogs] = useState([]);
+  const [selectedBulkLogId, setSelectedBulkLogId] = useState(null);
 
   const reportOptions = REPORTS.filter(
     r => hotelShop || r.key !== "table/usage"
@@ -311,6 +315,8 @@ export default function Reports() {
   useEffect(() => {
     setData([]);
     setLoading(false);
+    setBulkLogs([]);
+    setSelectedBulkLogId(null);
     if (NO_USER_FILTER_KEYS.has(activeReport?.key)) {
       setUserId("");
     }
@@ -464,7 +470,7 @@ export default function Reports() {
      LOAD REPORT
      ===================================================== */
   const loadReport = async () => {
-    if (requiresDateRange && (!fromDate || !toDate)) {
+    if (requiresDateRange && (!fromDate || !toDate) && activeReport?.key !== "bulk-import/history") {
       showToast("Select From & To dates", "warning");
       return;
     }
@@ -509,6 +515,29 @@ export default function Reports() {
         rows = reportKey === "employees/due-list"
           ? wageRows.filter(r => Number(r.due_till_as_of || 0) > 0)
           : wageRows;
+      } else if (reportKey === "bulk-import/history") {
+        const apiParams = {};
+        if (fromDate) apiParams.from_date = fromDate;
+        if (toDate)   apiParams.to_date   = toDate;
+        const r = await api.get("/bulk-import-logs/", { params: apiParams });
+        const rawLogs = r.data || [];
+        setBulkLogs(rawLogs);
+        const fmt = (iso) => {
+          if (!iso) return "";
+          const d = new Date(iso);
+          return d.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        };
+        // Summary rows used for PDF/Excel export (one per log entry)
+        rows = rawLogs.map(l => ({
+          upload_type:  l.upload_type,
+          filename:     l.filename || "",
+          uploaded_by:  l.uploaded_by_name || "",
+          total_rows:   l.total_rows,
+          inserted:     l.inserted,
+          updated:      l.updated,
+          errors:       l.error_count,
+          date_time:    fmt(l.created_at),
+        }));
       } else {
         const r = await api.get(`/reports/${reportKey}`, { params });
         const raw = r.data;
@@ -1050,7 +1079,132 @@ export default function Reports() {
             <div className="text-3xl">📊</div>
             <div className="text-sm text-gray-400">Set your filters and click View Report</div>
           </div>
-        ) : (() => {
+        ) : activeReport?.key === "bulk-import/history" ? (() => {
+          const TYPE_BADGE = {
+            categories: { bg: "#EEF2FF", text: "#4338CA" },
+            items:       { bg: "#F0FDF4", text: "#15803D" },
+            users:       { bg: "#F0F9FF", text: "#0369A1" },
+            employees:   { bg: "#FFF7ED", text: "#C2410C" },
+          };
+          const TYPE_ICON = { categories: "🏷️", items: "📦", users: "👤", employees: "🪪" };
+          const fmt = (iso) => {
+            if (!iso) return "";
+            const d = new Date(iso);
+            return d.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+          };
+          return (
+            <div className="space-y-2">
+              <div className="bg-white border rounded-2xl shadow-sm overflow-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      {["Type","Filename","Uploaded By","Total","Inserted","Updated","Errors","Date & Time"].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r last:border-r-0">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bulkLogs.map((log) => {
+                      const badge = TYPE_BADGE[log.upload_type] || { bg: "#F1F5F9", text: "#475569" };
+                      const isOpen = selectedBulkLogId === log.log_id;
+                      const hasRows = Array.isArray(log.rows_json) && log.rows_json.length > 0;
+                      const errorMap = {};
+                      (log.errors_json || []).forEach(e => { errorMap[e.row] = e.error; });
+                      const colKeys = hasRows ? Object.keys(log.rows_json[0]) : [];
+                      return (
+                        <>
+                          {/* Summary row */}
+                          <tr key={log.log_id} className="hover:bg-gray-50 transition">
+                            <td className="px-3 py-2.5 border-r">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold" style={{ background: badge.bg, color: badge.text }}>
+                                {TYPE_ICON[log.upload_type]} {log.upload_type}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 border-r">
+                              <button
+                                onClick={() => setSelectedBulkLogId(isOpen ? null : log.log_id)}
+                                className="text-blue-600 hover:underline font-medium text-[11px] text-left"
+                                title={hasRows ? "Click to view file content" : "No row data stored"}
+                              >
+                                {log.filename || "—"}
+                              </button>
+                              {hasRows && (
+                                <span className="ml-1.5 text-[9px] text-gray-400">{isOpen ? "▲ hide" : "▼ details"}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 border-r text-gray-700">{log.uploaded_by_name || "—"}</td>
+                            <td className="px-3 py-2.5 border-r text-center font-medium text-gray-700">{log.total_rows}</td>
+                            <td className="px-3 py-2.5 border-r text-center font-semibold text-emerald-600">{log.inserted}</td>
+                            <td className="px-3 py-2.5 border-r text-center font-semibold text-blue-600">{log.updated}</td>
+                            <td className="px-3 py-2.5 border-r text-center">
+                              {log.error_count > 0
+                                ? <span className="font-semibold text-red-500">{log.error_count}</span>
+                                : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{fmt(log.created_at)}</td>
+                          </tr>
+
+                          {/* Expanded file content */}
+                          {isOpen && (
+                            <tr key={`${log.log_id}-detail`}>
+                              <td colSpan={8} className="px-0 py-0 bg-slate-50 border-b">
+                                <div className="px-5 py-3">
+                                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                    File Content — {log.filename} ({log.rows_json.length} rows)
+                                  </p>
+                                  {hasRows ? (
+                                    <div className="overflow-auto rounded-xl border border-slate-200">
+                                      <table className="w-full text-[10px]">
+                                        <thead>
+                                          <tr className="bg-slate-100 border-b border-slate-200">
+                                            <th className="px-2.5 py-1.5 text-left font-semibold text-slate-500 uppercase border-r border-slate-200">#</th>
+                                            {colKeys.map(k => (
+                                              <th key={k} className="px-2.5 py-1.5 text-left font-semibold text-slate-500 uppercase border-r border-slate-200 whitespace-nowrap">
+                                                {k.replace(/_/g, " ")}
+                                              </th>
+                                            ))}
+                                            <th className="px-2.5 py-1.5 text-left font-semibold text-slate-500 uppercase">Status</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {log.rows_json.map((row, idx) => {
+                                            const rowNo = idx + 1;
+                                            const errMsg = errorMap[rowNo];
+                                            return (
+                                              <tr key={idx} className={errMsg ? "bg-red-50" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                                                <td className="px-2.5 py-1.5 text-slate-400 border-r border-slate-100">{rowNo}</td>
+                                                {colKeys.map(k => (
+                                                  <td key={k} className="px-2.5 py-1.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">
+                                                    {row[k] === null || row[k] === undefined || row[k] === "" ? <span className="text-slate-300">—</span> : String(row[k])}
+                                                  </td>
+                                                ))}
+                                                <td className="px-2.5 py-1.5">
+                                                  {errMsg
+                                                    ? <span className="text-red-500 font-medium">✗ {errMsg}</span>
+                                                    : <span className="text-emerald-600 font-medium">✓ OK</span>}
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <p className="text-[11px] text-gray-400 italic">No row data stored for this upload.</p>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })() : (() => {
           const displayRows = buildDisplayRows();
           return (
             <div className="bg-white border rounded-2xl shadow-sm overflow-auto">

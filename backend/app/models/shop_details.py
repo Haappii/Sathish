@@ -40,3 +40,7 @@ class ShopDetails(Base):
     paid_until = Column(Date, nullable=True)
     last_payment_on = Column(Date, nullable=True)
     total_paid = Column(Numeric(12, 2), default=0)
+
+    # UPI / Reservation payment
+    upi_id = Column(String(80), nullable=True)
+    reservation_advance = Column(Numeric(10, 2), default=0)

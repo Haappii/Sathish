@@ -11,6 +11,7 @@ router = APIRouter(prefix="/shop", tags=["Shop"])
 
 BOOL_PARAM_KEYS = {
     "inventory_enabled",
+    "items_branch_wise",
 }
 INT_PARAM_KEYS: set = set()
 TEXT_PARAM_KEYS = {
@@ -61,8 +62,9 @@ def get_shop_details(
 
     return {
         **(shop.__dict__ if shop else {}),
-        "inventory_enabled": str(pmap.get("inventory_enabled", "NO")).upper() == "YES",
+        "inventory_enabled":   str(pmap.get("inventory_enabled",   "NO")).upper() == "YES",
         "inventory_cost_method": (pmap.get("inventory_cost_method") or "LAST").strip().upper(),
+        "items_branch_wise":   str(pmap.get("items_branch_wise",   "NO")).upper() == "YES",
     }
 
 

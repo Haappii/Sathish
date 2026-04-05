@@ -11,6 +11,8 @@ from app.models.items import Item
 from app.models.branch_item_price import BranchItemPrice
 from app.models.category import Category
 from app.models.stock import Inventory
+from app.models.bulk_import_log import BulkImportLog
+from app.models.system_parameters import SystemParameter
 from app.schemas.items import ItemCreate, ItemUpdate, ItemResponse
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
@@ -27,6 +29,11 @@ class ItemBulkRow(BaseModel):
     buy_price: Optional[float] = 0
     mrp_price: Optional[float] = 0
     min_stock: Optional[int] = 0
+
+
+class ItemBulkImport(BaseModel):
+    filename: Optional[str] = ""
+    rows: list[ItemBulkRow]
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -52,6 +59,14 @@ def resolve_branch_for_user(*, user, request: Request) -> int:
         return int(branch_raw)
     except (TypeError, ValueError):
         raise HTTPException(400, "Branch required")
+
+
+def _items_branch_wise(db: Session, shop_id: int) -> bool:
+    row = db.query(SystemParameter).filter(
+        SystemParameter.shop_id == shop_id,
+        SystemParameter.param_key == "items_branch_wise",
+    ).first()
+    return bool(row and (row.param_value or "").strip().upper() == "YES")
 
 
 def _resolve_image_ext(upload: UploadFile) -> str:
@@ -83,17 +98,26 @@ def list_items(
     request: Request,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=500, ge=1, le=2000),
+    is_raw_material: Optional[bool] = Query(default=None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+    is_bw = _items_branch_wise(db, user.shop_id)
+
+    if is_bw:
+        # Branch-wise mode: respect the branch header / user's branch
+        branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+    else:
+        # Head-office mode: always show shared (branch_id IS NULL) items
+        branch_id = None
 
     q = db.query(Item).filter(Item.shop_id == user.shop_id)
+
+    if is_raw_material is not None:
+        q = q.filter(Item.is_raw_material == is_raw_material)
     if branch_id is not None:
-        # Branch view: show branch-specific + shared items
         q = q.filter(or_(Item.branch_id == branch_id, Item.branch_id.is_(None)))
     else:
-        # Admin "all branches" view: show shared items only (no branch override applied)
         q = q.filter(Item.branch_id.is_(None))
 
     items = q.order_by(Item.item_name).offset(skip).limit(limit).all()
@@ -117,7 +141,6 @@ def list_items(
                 it.mrp_price = o.mrp_price
                 it.item_status = o.item_status
     else:
-        # Admin all-branch: keep shared items only; branch-specific items excluded without a branch filter.
         items = [it for it in items if it.branch_id is None]
 
     return items
@@ -131,7 +154,10 @@ def list_items_by_category(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+    if _items_branch_wise(db, user.shop_id):
+        branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+    else:
+        branch_id = None
 
     q = db.query(Item).filter(
         Item.shop_id == user.shop_id,
@@ -178,7 +204,10 @@ def create_item(
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
 ):
-    branch_id = resolve_branch_for_user(user=user, request=request)
+    if _items_branch_wise(db, user.shop_id):
+        branch_id = resolve_branch_for_user(user=user, request=request)
+    else:
+        branch_id = None  # head-office mode: items are shared across all branches
 
     shop_type = get_shop_billing_type(db, int(user.shop_id))
     is_raw = bool(getattr(request_data, "is_raw_material", False))
@@ -288,7 +317,10 @@ def update_item(
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
 ):
-    branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+    if _items_branch_wise(db, user.shop_id):
+        branch_id = resolve_branch_optional(user, request.headers.get("x-branch-id"))
+    else:
+        branch_id = None  # head-office mode: items are shared
 
     q = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == user.shop_id)
     if branch_id is not None:
@@ -547,7 +579,7 @@ def delete_item(
 # ---------- BULK IMPORT (upsert by name) ----------
 @router.post("/bulk-import")
 def bulk_import_items(
-    rows: list[ItemBulkRow],
+    body: ItemBulkImport,
     request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_permission("items", "write")),
@@ -565,7 +597,7 @@ def bulk_import_items(
     updated = 0
     errors = []
 
-    for i, row in enumerate(rows):
+    for i, row in enumerate(body.rows):
         name = (row.item_name or "").strip()
         cat_name = (row.category_name or "").strip().upper()
         if not name:
@@ -643,5 +675,18 @@ def bulk_import_items(
         except Exception as e:
             errors.append({"row": i + 1, "error": str(e)})
 
+    db.add(BulkImportLog(
+        shop_id=user.shop_id,
+        upload_type="items",
+        filename=body.filename or "",
+        uploaded_by=user.user_id,
+        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
     db.commit()
     return {"inserted": inserted, "updated": updated, "errors": errors}

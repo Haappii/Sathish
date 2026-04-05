@@ -26,6 +26,7 @@ from app.schemas.employee import (
     WagePaymentCreate,
     WagePaymentResponse,
 )
+from app.models.bulk_import_log import BulkImportLog
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
 
@@ -43,6 +44,12 @@ class EmployeeBulkRow(BaseModel):
     join_date: Optional[str] = None
     notes: Optional[str] = None
     branch_name: Optional[str] = None
+
+
+class EmployeeBulkImport(BaseModel):
+    filename: Optional[str] = ""
+    rows: list[EmployeeBulkRow]
+
 
 WAGE_TYPES = {"DAILY", "MONTHLY", "ON_DEMAND"}
 ATT_STATUSES = {"PRESENT", "ABSENT", "HALF_DAY", "LEAVE"}
@@ -952,7 +959,7 @@ def employee_wage_summary(
 # ---------- BULK IMPORT (upsert by employee_name or code) ----------
 @router.post("/bulk-import")
 def bulk_import_employees(
-    rows: list[EmployeeBulkRow],
+    body: EmployeeBulkImport,
     db: Session = Depends(get_db),
     user=Depends(require_permission("employees", "write")),
 ):
@@ -966,7 +973,7 @@ def bulk_import_employees(
     updated = 0
     errors = []
 
-    for i, row in enumerate(rows):
+    for i, row in enumerate(body.rows):
         name = (row.employee_name or "").strip()
         if not name:
             errors.append({"row": i + 1, "error": "employee_name is required"})
@@ -1046,5 +1053,18 @@ def bulk_import_employees(
         except Exception as e:
             errors.append({"row": i + 1, "error": str(e)})
 
+    db.add(BulkImportLog(
+        shop_id=user.shop_id,
+        upload_type="employees",
+        filename=body.filename or "",
+        uploaded_by=user.user_id,
+        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
     db.commit()
     return {"inserted": inserted, "updated": updated, "errors": errors}

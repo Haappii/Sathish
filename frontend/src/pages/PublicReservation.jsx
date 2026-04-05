@@ -60,14 +60,17 @@ export default function PublicReservation() {
       .finally(() => setLoadingShop(false));
   }, [shopId]);
 
-  // Load tables when branch changes
+  // Load available tables when branch, date, or time changes
   useEffect(() => {
     if (!shopId || !form.branch_id) { setTables([]); return; }
+    const qs = new URLSearchParams({ shop_id: shopId, branch_id: form.branch_id });
+    if (form.reservation_date) qs.set("reservation_date", form.reservation_date);
+    if (form.reservation_time) qs.set("reservation_time", form.reservation_time);
     axios
-      .get(`${API}/api/public/reservations/tables?shop_id=${shopId}&branch_id=${form.branch_id}`)
+      .get(`${API}/api/public/reservations/tables?${qs.toString()}`)
       .then((r) => setTables(r.data || []))
       .catch(() => setTables([]));
-  }, [shopId, form.branch_id]);
+  }, [shopId, form.branch_id, form.reservation_date, form.reservation_time]);
 
   const validate = () => {
     const e = {};
@@ -151,7 +154,7 @@ export default function PublicReservation() {
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center space-y-5">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-3xl">✓</div>
           <div>
-            <h1 className="text-lg font-bold text-gray-800">Booking Confirmed!</h1>
+            <h1 className="text-lg font-bold text-gray-800">Booking Received!</h1>
             <p className="text-sm text-gray-500 mt-1">We've received your reservation request.</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 text-[13px]">
@@ -173,10 +176,26 @@ export default function PublicReservation() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Status</span>
-              <span className="font-semibold text-amber-600">Pending Confirmation</span>
+              <span className="font-semibold text-amber-600">Pending Payment</span>
             </div>
           </div>
-          <p className="text-[11px] text-gray-400">The restaurant will confirm your booking shortly. Please arrive on time.</p>
+
+          {/* Payment email notice */}
+          {confirmation.has_email && confirmation.email_sent ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-[12px] text-blue-700 text-left space-y-1">
+              <p className="font-semibold">Payment link sent!</p>
+              <p>Check your email for a payment link to complete your booking. Your reservation will be confirmed after payment verification.</p>
+            </div>
+          ) : confirmation.has_email && !confirmation.email_sent ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-[12px] text-amber-700 text-left">
+              Please contact the restaurant to complete your payment and confirm your booking.
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-[12px] text-amber-700 text-left">
+              Please contact the restaurant to make the payment and confirm your booking.
+            </div>
+          )}
+
           <button
             onClick={resetForm}
             className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 transition"
@@ -318,7 +337,7 @@ export default function PublicReservation() {
           {/* Table preference */}
           {tables.length > 0 && (
             <div className="flex flex-col gap-1">
-              <label className={labelCls}>Table Preference (optional)</label>
+              <label className={labelCls}>Table Preference — Available for selected date &amp; time (optional)</label>
               <select
                 className={inputCls}
                 value={form.table_id}

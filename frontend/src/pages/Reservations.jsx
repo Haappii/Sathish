@@ -14,6 +14,11 @@ const STATUS = {
   NO_SHOW:   { label: "No Show",   bg: "bg-gray-100",   text: "text-gray-600",    border: "border-gray-200"   },
 };
 
+const PAY_BADGE = {
+  PAID:   { label: "Paid",          bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  UNPAID: { label: "Awaiting Pay",  bg: "bg-amber-50",   text: "text-amber-600",   border: "border-amber-200"  },
+};
+
 const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition w-full";
 const labelCls = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";
 const BLUE = "#0B3C8C";
@@ -232,7 +237,7 @@ export default function Reservations() {
               <table className="min-w-[860px] w-full text-[12px]">
                 <thead>
                   <tr className="bg-gray-50 border-b">
-                    {["Time", "Customer", "Mobile", "Table", "Guests", "Notes", "Status", "Actions"].map((h, i) => (
+                    {["Time", "Customer", "Mobile", "Table", "Guests", "Notes", "Status", "Payment", "Actions"].map((h, i) => (
                       <th key={h} className={`px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] ${i >= 3 && i <= 4 ? "text-center" : "text-left"}`}>{h}</th>
                     ))}
                   </tr>
@@ -260,11 +265,30 @@ export default function Reservations() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
+                          {(() => {
+                            const pb = PAY_BADGE[r.payment_status] || PAY_BADGE.UNPAID;
+                            return (
+                              <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${pb.bg} ${pb.text} ${pb.border}`}>
+                                {pb.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex gap-1.5 flex-wrap items-center">
-                            {r.status === "PENDING" && (
+                            {r.status === "PENDING" && r.payment_status === "PAID" && (
                               <button
                                 onClick={() => updateStatus(r.reservation_id, "CONFIRMED")}
                                 className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition"
+                              >
+                                Approve
+                              </button>
+                            )}
+                            {r.status === "PENDING" && r.payment_status !== "PAID" && (
+                              <button
+                                onClick={() => updateStatus(r.reservation_id, "CONFIRMED")}
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition"
+                                title="Payment not yet confirmed"
                               >
                                 Confirm
                               </button>

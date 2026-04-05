@@ -26,7 +26,8 @@ authAxios.interceptors.request.use(config => {
     console.warn("No token found for request:", config.url);
   }
 
-  if (session?.branch_id) {
+  // Only set x-branch-id from session if the caller hasn't already set it explicitly
+  if (session?.branch_id && !config.headers["x-branch-id"]) {
     config.headers["x-branch-id"] = session.branch_id;
   }
 

@@ -64,6 +64,7 @@ import app.models.customer_wallet_txn
 import app.models.gift_card
 import app.models.gift_card_txn
 import app.models.subscription_plan
+import app.models.bulk_import_log
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
@@ -348,6 +349,23 @@ def _auto_migrate_table_billing() -> None:
         logger.exception("Auto-migration (table billing) failed: %s", e)
 
 
+def _auto_migrate_bulk_import_log() -> None:
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS bulk_import_logs
+                      ADD COLUMN IF NOT EXISTS rows_json JSONB;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (bulk_import_log) failed: %s", e)
+
+
 @app.on_event("startup")
 def _startup_db_init():
     """
@@ -364,6 +382,7 @@ def _startup_db_init():
 
     _auto_migrate_demo_expiry()
     _auto_migrate_table_billing()
+    _auto_migrate_bulk_import_log()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
@@ -421,6 +440,7 @@ from app.routes import suppliers
 from app.routes import purchase_orders
 from app.routes import gift_cards
 from app.routes import platform_owner
+from app.routes import bulk_import_logs
 
 # ---------- REPORT ROUTES ----------
 from app.routes import categorysales
@@ -491,6 +511,7 @@ app.include_router(suppliers.router,     prefix="/api")
 app.include_router(purchase_orders.router, prefix="/api")
 app.include_router(gift_cards.router, prefix="/api")
 app.include_router(platform_owner.router, prefix="/api")
+app.include_router(bulk_import_logs.router, prefix="/api")
 
 # ---------- REPORTS ----------
 app.include_router(categorysales.router,         prefix="/api")

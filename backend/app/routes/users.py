@@ -7,6 +7,7 @@ from app.db import get_db
 from app.models.branch import Branch
 from app.models.roles import Role
 from app.models.users import User
+from app.models.bulk_import_log import BulkImportLog
 from app.schemas.users import UserCreate, UserUpdate, UserResponse
 from app.utils.passwords import encode_password
 from app.services.audit_service import log_action
@@ -19,6 +20,11 @@ class UserBulkRow(BaseModel):
     password: Optional[str] = None
     role_name: str
     branch_name: Optional[str] = None
+
+
+class UserBulkImport(BaseModel):
+    filename: Optional[str] = ""
+    rows: list[UserBulkRow]
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -253,7 +259,7 @@ def deactivate_user(
 # ------------------------------------------------
 @router.post("/bulk-import")
 def bulk_import_users(
-    rows: list[UserBulkRow],
+    body: UserBulkImport,
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "write")),
 ):
@@ -273,7 +279,7 @@ def bulk_import_users(
     updated = 0
     errors = []
 
-    for i, row in enumerate(rows):
+    for i, row in enumerate(body.rows):
         uname = (row.user_name or "").strip()
         if not uname:
             errors.append({"row": i + 1, "error": "user_name is required"})
@@ -321,5 +327,18 @@ def bulk_import_users(
         except Exception as e:
             errors.append({"row": i + 1, "error": str(e)})
 
+    db.add(BulkImportLog(
+        shop_id=current_user.shop_id,
+        upload_type="users",
+        filename=body.filename or "",
+        uploaded_by=current_user.user_id,
+        uploaded_by_name=getattr(current_user, "name", None) or getattr(current_user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
     db.commit()
     return {"inserted": inserted, "updated": updated, "errors": errors}

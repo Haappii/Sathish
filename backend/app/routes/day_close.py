@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 
 from app.db import get_db
 from app.models.branch import Branch
-from app.models.table_billing import Order
+from app.models.table_billing import Order, TableMaster
 from app.models.day_close import BranchDayClose, ShopDayClose
 from app.models.month_close import BranchMonthClose, ShopMonthClose
 from app.models.stock import Inventory
@@ -13,6 +14,7 @@ from app.services.financials_service import calc_day_close_totals
 from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/day-close", tags=["Day Close"])
+TAKEAWAY_TABLE_NAME = "__TAKEAWAY__"
 
 def parse_date(d: str) -> date:
     try:
@@ -53,6 +55,28 @@ def snapshot_stock(db: Session, shop_id: int, branch_id: int, stock_date: date):
         ))
 
 
+def count_open_table_orders(db: Session, shop_id: int, branch_id: int) -> int:
+    # Ignore hidden takeaway rows so branch close only blocks on actual table orders.
+    return (
+        db.query(Order.order_id)
+        .outerjoin(
+            TableMaster,
+            and_(
+                TableMaster.table_id == Order.table_id,
+                TableMaster.shop_id == Order.shop_id,
+            ),
+        )
+        .filter(
+            Order.shop_id == shop_id,
+            Order.branch_id == branch_id,
+            Order.status == "OPEN",
+            func.coalesce(func.upper(Order.order_type), "DINE_IN") != "TAKEAWAY",
+            func.coalesce(TableMaster.table_name, "") != TAKEAWAY_TABLE_NAME,
+        )
+        .count()
+    )
+
+
 @router.get("/status")
 def day_close_status(
     date_str: str,
@@ -84,19 +108,15 @@ def close_branch_day(
 ):
     d = parse_date(date_str)
 
-    open_orders = (
-        db.query(Order)
-        .filter(
-            Order.branch_id == branch_id,
-            Order.status == "OPEN",
-            Order.shop_id == user.shop_id
-        )
-        .count()
+    open_table_orders = count_open_table_orders(
+        db,
+        int(user.shop_id),
+        int(branch_id),
     )
-    if open_orders > 0:
+    if open_table_orders > 0:
         raise HTTPException(
             400,
-            "Please close all running tables before closing the branch."
+            "Please complete or cancel all open table orders before closing the branch."
         )
 
     exists = db.query(BranchDayClose).filter(

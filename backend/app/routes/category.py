@@ -6,6 +6,7 @@ from typing import Optional
 from app.db import get_db
 from app.models.category import Category
 from app.models.items import Item
+from app.models.bulk_import_log import BulkImportLog
 from app.schemas.category import (
     CategoryCreate, CategoryUpdate, CategoryResponse
 )
@@ -20,6 +21,11 @@ router = APIRouter(prefix="/category", tags=["Category"])
 class CategoryBulkRow(BaseModel):
     category_name: str
     status: Optional[bool] = True
+
+
+class CategoryBulkImport(BaseModel):
+    filename: Optional[str] = ""
+    rows: list[CategoryBulkRow]
 
 
 # ---------- LIST ----------
@@ -197,7 +203,7 @@ def delete_category(
 # ---------- BULK IMPORT (upsert by name) ----------
 @router.post("/bulk-import")
 def bulk_import_categories(
-    rows: list[CategoryBulkRow],
+    body: CategoryBulkImport,
     db: Session = Depends(get_db),
     user=Depends(require_permission("categories", "write")),
 ):
@@ -205,7 +211,7 @@ def bulk_import_categories(
     updated = 0
     errors = []
 
-    for i, row in enumerate(rows):
+    for i, row in enumerate(body.rows):
         name = (row.category_name or "").strip().upper()
         if not name:
             errors.append({"row": i + 1, "error": "category_name is required"})
@@ -229,5 +235,18 @@ def bulk_import_categories(
         except Exception as e:
             errors.append({"row": i + 1, "error": str(e)})
 
+    db.add(BulkImportLog(
+        shop_id=user.shop_id,
+        upload_type="categories",
+        filename=body.filename or "",
+        uploaded_by=user.user_id,
+        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
     db.commit()
     return {"inserted": inserted, "updated": updated, "errors": errors}

@@ -1,3 +1,4 @@
+
 // src/components/SupportChat.jsx
 import { useEffect, useState, useRef, useCallback } from "react";
 import authAxios from "../api/authAxios";

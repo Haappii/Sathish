@@ -1,8 +1,11 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import api from "../../utils/apiClient";
 import BackButton from "../../components/BackButton";
-import { FaFileExcel, FaCheckCircle, FaExclamationTriangle, FaUpload, FaDownload } from "react-icons/fa";
+import {
+  FaFileExcel, FaCheckCircle, FaExclamationTriangle,
+  FaUpload, FaDownload, FaHistory, FaCloudUploadAlt,
+} from "react-icons/fa";
 import { MdOutlineUploadFile } from "react-icons/md";
 
 const BLUE = "#0B3C8C";
@@ -156,7 +159,7 @@ function ImportCard({ type }) {
         setState({ loading: false, result: { error: "No valid rows found. Check the column names match the format below." } });
         return;
       }
-      const res = await api.post(type.endpoint, rows);
+      const res = await api.post(type.endpoint, { filename: file.name, rows });
       setState({ loading: false, result: { ...res.data, total: rows.length } });
     } catch (err) {
       setState({ loading: false, result: { error: err?.response?.data?.detail || "Import failed" } });
@@ -257,8 +260,165 @@ function ImportCard({ type }) {
   );
 }
 
+// ── type badge colors ────────────────────────────────────────────────────────
+const TYPE_COLORS = {
+  categories: { bg: "#EEF2FF", text: "#4338CA" },
+  items:       { bg: "#F0FDF4", text: "#15803D" },
+  users:       { bg: "#F0F9FF", text: "#0369A1" },
+  employees:   { bg: "#FFF7ED", text: "#C2410C" },
+};
+const TYPE_ICONS = { categories: "🏷️", items: "📦", users: "👤", employees: "🪪" };
+
+// ── history tab ──────────────────────────────────────────────────────────────
+function HistoryTab() {
+  const [logs, setLogs]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/bulk-import-logs/");
+      setLogs(res.data || []);
+    } catch {
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = filter === "all" ? logs : logs.filter(l => l.upload_type === filter);
+
+  const fmt = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {["all", "categories", "items", "users", "employees"].map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+              filter === f
+                ? "text-white border-transparent"
+                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+            }`}
+            style={filter === f ? { background: BLUE, borderColor: BLUE } : {}}
+          >
+            {f === "all" ? "All Types" : TYPE_ICONS[f] + " " + f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+        <button
+          onClick={load}
+          className="ml-auto px-3 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition"
+        >
+          ↻ Refresh
+        </button>
+      </div>
+
+      {loading && (
+        <p className="text-sm text-slate-400 text-center py-8">Loading…</p>
+      )}
+      {!loading && filtered.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center">
+          <FaHistory size={28} className="mx-auto text-slate-300 mb-3" />
+          <p className="text-sm text-slate-400">No upload history yet</p>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="text-left text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Type</th>
+                <th className="text-left text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Filename</th>
+                <th className="text-left text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Uploaded By</th>
+                <th className="text-center text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Total</th>
+                <th className="text-center text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Inserted</th>
+                <th className="text-center text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Updated</th>
+                <th className="text-center text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Errors</th>
+                <th className="text-left text-[11px] font-semibold text-slate-500 px-4 py-3 uppercase tracking-wide">Date & Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map((log) => {
+                const col = TYPE_COLORS[log.upload_type] || { bg: "#F1F5F9", text: "#475569" };
+                const hasErrors = log.error_count > 0;
+                const isExpanded = expanded === log.log_id;
+                return (
+                  <>
+                    <tr
+                      key={log.log_id}
+                      className={`hover:bg-slate-50 transition ${hasErrors ? "cursor-pointer" : ""}`}
+                      onClick={() => hasErrors && setExpanded(isExpanded ? null : log.log_id)}
+                    >
+                      <td className="px-4 py-3">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                          style={{ background: col.bg, color: col.text }}
+                        >
+                          {TYPE_ICONS[log.upload_type]} {log.upload_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-slate-700 max-w-[160px] truncate" title={log.filename}>
+                        {log.filename || <span className="text-slate-400 italic">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-slate-700">
+                        {log.uploaded_by_name || <span className="text-slate-400 italic">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center text-[12px] font-medium text-slate-700">{log.total_rows}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-[12px] font-semibold text-emerald-600">{log.inserted}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-[12px] font-semibold text-blue-600">{log.updated}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {hasErrors
+                          ? <span className="text-[12px] font-semibold text-red-500">{log.error_count} ▾</span>
+                          : <span className="text-[12px] text-slate-300">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-[11px] text-slate-500 whitespace-nowrap">{fmt(log.created_at)}</td>
+                    </tr>
+                    {isExpanded && log.errors_json?.length > 0 && (
+                      <tr key={`${log.log_id}-err`} className="bg-red-50">
+                        <td colSpan={8} className="px-6 py-3">
+                          <p className="text-[11px] font-semibold text-red-600 mb-1">Skipped rows:</p>
+                          <div className="space-y-0.5">
+                            {log.errors_json.map((e, idx) => (
+                              <p key={idx} className="text-[11px] text-red-500">
+                                Row {e.row}: {e.error}
+                              </p>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── main page ────────────────────────────────────────────────────────────────
 export default function ExcelUpload() {
+  const [tab, setTab] = useState("upload");
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -274,26 +434,52 @@ export default function ExcelUpload() {
               <p className="text-xs text-slate-500">Import categories, items, users and employees from spreadsheet</p>
             </div>
           </div>
+
+          {/* Tab switcher */}
+          <div className="ml-auto flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+            <button
+              onClick={() => setTab("upload")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                tab === "upload" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <FaCloudUploadAlt size={13} /> Upload
+            </button>
+            <button
+              onClick={() => setTab("history")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                tab === "history" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <FaHistory size={12} /> History
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="p-6 space-y-5 max-w-7xl mx-auto">
-        {/* Info banner */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex items-start gap-3">
-          <FaFileExcel size={18} className="text-blue-500 shrink-0 mt-0.5" />
-          <p className="text-[12px] text-blue-700">
-            Download a sample template, fill it in, and upload it back.
-            If a record with the same name/code already exists it will be <strong>updated</strong>, otherwise it will be <strong>inserted</strong>.
-            Accepts <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> files.
-          </p>
-        </div>
+        {tab === "upload" && (
+          <>
+            {/* Info banner */}
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex items-start gap-3">
+              <FaFileExcel size={18} className="text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-blue-700">
+                Download a sample template, fill it in, and upload it back.
+                If a record with the same name/code already exists it will be <strong>updated</strong>, otherwise it will be <strong>inserted</strong>.
+                Accepts <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> files.
+              </p>
+            </div>
 
-        {/* Cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          {IMPORT_TYPES.map((type) => (
-            <ImportCard key={type.key} type={type} />
-          ))}
-        </div>
+            {/* Cards grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+              {IMPORT_TYPES.map((type) => (
+                <ImportCard key={type.key} type={type} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {tab === "history" && <HistoryTab />}
       </div>
     </div>
   );

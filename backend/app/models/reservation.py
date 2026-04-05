@@ -31,4 +31,9 @@ class TableReservation(Base):
     cancelled_at = Column(DateTime, nullable=True)
     cancel_reason = Column(String(200), nullable=True)
 
+    # Payment tracking
+    payment_token = Column(String(64), nullable=True, index=True, unique=True)
+    payment_status = Column(String(20), default="UNPAID", nullable=False)  # UNPAID / PAID
+    advance_amount = Column(Numeric(10, 2), default=0)
+
     table = relationship("TableMaster")

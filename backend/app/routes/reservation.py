@@ -23,6 +23,7 @@ def _to_out(r: TableReservation) -> dict:
         "guests": r.guests,
         "notes": r.notes,
         "status": r.status,
+        "payment_status": r.payment_status or "UNPAID",
         "created_at": r.created_at,
         "confirmed_at": r.confirmed_at,
         "seated_at": r.seated_at,

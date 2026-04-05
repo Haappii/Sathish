@@ -77,6 +77,7 @@ import SupportDesk from "./pages/platform/SupportDesk";
 
 import Reports from "./pages/reports/Reports";
 import PublicReservation from "./pages/PublicReservation";
+import PublicPayment from "./pages/PublicPayment";
 
 import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
 
@@ -102,6 +103,7 @@ export default function App() {
           <Route path="/platform/support" element={<SupportDesk />} />
           <Route path="/qr/:token" element={<PublicQrMenu />} />
           <Route path="/book" element={<PublicReservation />} />
+          <Route path="/pay" element={<PublicPayment />} />
 
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>

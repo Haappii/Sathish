@@ -47,6 +47,7 @@ export default function PurchaseOrders() {
   const [suppliers, setSuppliers] = useState([]);
   const [items, setItems] = useState([]);
   const [pos, setPos] = useState([]);
+  const [isHotel, setIsHotel] = useState(false);
 
   const [activePo, setActivePo] = useState(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -70,16 +71,26 @@ export default function PurchaseOrders() {
     try { const res = await authAxios.get("/suppliers/", { params: { branch_id: isAdmin ? branchId : undefined } }); setSuppliers(res.data || []); }
     catch { showToast("Failed to load suppliers", "error"); }
   };
-  const loadItems = async () => {
-    try { const res = await authAxios.get("/items/"); setItems(res.data || []); }
-    catch { showToast("Failed to load items", "error"); }
+  const loadItems = async (hotel) => {
+    try {
+      const params = hotel ? { is_raw_material: true } : {};
+      const res = await authAxios.get("/items/", { params });
+      setItems(res.data || []);
+    } catch { showToast("Failed to load items", "error"); }
   };
   const loadPOs = async () => {
     try { const res = await authAxios.get("/purchase-orders/", { params: { branch_id: isAdmin ? branchId : undefined } }); setPos(res.data || []); }
     catch { showToast("Failed to load POs", "error"); }
   };
 
-  useEffect(() => { loadBranches(); loadItems(); }, []);
+  useEffect(() => {
+    loadBranches();
+    authAxios.get("/shop/details").then(res => {
+      const hotel = String(res.data?.billing_type || "").toLowerCase() === "hotel";
+      setIsHotel(hotel);
+      loadItems(hotel);
+    }).catch(() => loadItems(false));
+  }, []);
   useEffect(() => { loadSuppliers(); loadPOs(); }, [branchId]);
 
   /* ── po items ── */

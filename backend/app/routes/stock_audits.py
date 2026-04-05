@@ -16,6 +16,7 @@ from app.services.audit_service import log_action
 from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import is_inventory_enabled
 from app.utils.permissions import require_permission
+from app.utils.shop_type import get_shop_billing_type
 
 router = APIRouter(prefix="/stock-audits", tags=["Stock Audit"])
 
@@ -114,6 +115,10 @@ def create_audit(
 
     if item_ids:
         q = q.filter(Item.item_id.in_(item_ids))
+
+    # For hotel billing type: include only raw materials; for store: all items
+    if get_shop_billing_type(db, user.shop_id) == "hotel":
+        q = q.filter(Item.is_raw_material == True)
 
     rows = q.order_by(Item.item_name).all()
     for r in rows:

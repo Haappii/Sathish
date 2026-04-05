@@ -3,14 +3,11 @@ import authAxios from "../api/authAxios";
 import { getSession } from "../utils/auth";
 import BackButton from "../components/BackButton";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend
+  LineChart, Line,
+  BarChart, Bar, Cell,
+  XAxis, YAxis,
+  CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -30,6 +27,151 @@ const METRICS = [
 ];
 
 const BLUE = "#0B3C8C";
+
+const BAR_COLORS = ["#0B3C8C","#1d6fd8","#3b82f6","#60a5fa","#93c5fd","#bfdbfe","#7c3aed","#a78bfa","#10b981","#34d399"];
+
+const PRESETS = [
+  { key: "today",   label: "Today" },
+  { key: "week",    label: "This Week" },
+  { key: "month",   label: "This Month" },
+  { key: "fy",      label: "Financial Year" },
+  { key: "alltime", label: "All Time" },
+  { key: "custom",  label: "Custom" },
+];
+
+function SalesBreakdown({ salesTab, setSalesTab, salesPreset, setSalesPreset, salesFrom, setSalesFrom, salesTo, setSalesTo, salesData, salesLoading, salesSort, setSalesSort, onRefresh }) {
+  const fmtAmt = v => `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+  const nameKey = salesTab === "category" ? "category" : "item";
+
+  const sorted = [...salesData].sort((a, b) => {
+    const dir = salesSort.dir === "asc" ? 1 : -1;
+    if (salesSort.key === "amount") return dir * (Number(a.amount) - Number(b.amount));
+    if (salesSort.key === "quantity") return dir * (Number(a.quantity) - Number(b.quantity));
+    return dir * String(a[nameKey] || "").localeCompare(String(b[nameKey] || ""));
+  });
+
+  const toggleSort = key => setSalesSort(prev => ({ key, dir: prev.key === key && prev.dir === "desc" ? "asc" : "desc" }));
+  const sortIcon = key => salesSort.key === key ? (salesSort.dir === "asc" ? " ▲" : " ▼") : "";
+
+  const totalAmt = salesData.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const totalQty = salesData.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  const chartData = sorted.slice(0, 15).map(r => ({ name: String(r[nameKey] || "").slice(0, 20), amount: Number(r.amount || 0), quantity: Number(r.quantity || 0) }));
+
+  return (
+    <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+          {[{ key: "category", label: "Category Sales" }, { key: "item", label: "Item Sales" }].map(t => (
+            <button key={t.key} onClick={() => setSalesTab(t.key)}
+              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition ${salesTab === t.key ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={onRefresh} className="text-[11px] px-3 py-1 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition">
+          Refresh
+        </button>
+      </div>
+
+      {/* Date presets */}
+      <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center gap-2 flex-wrap">
+        {PRESETS.map(p => (
+          <button key={p.key} onClick={() => setSalesPreset(p.key)}
+            className={`px-3 py-1 rounded-xl text-[11px] font-medium transition border ${salesPreset === p.key ? "text-white border-transparent" : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"}`}
+            style={salesPreset === p.key ? { backgroundColor: BLUE } : {}}>
+            {p.label}
+          </button>
+        ))}
+        {salesPreset === "custom" && (
+          <div className="flex items-center gap-2 ml-1">
+            <input type="date" value={salesFrom} onChange={e => setSalesFrom(e.target.value)}
+              className="border border-gray-200 rounded-xl px-2 py-1 text-[11px] bg-white focus:outline-none focus:border-blue-400" />
+            <span className="text-[11px] text-gray-400">to</span>
+            <input type="date" value={salesTo} onChange={e => setSalesTo(e.target.value)}
+              className="border border-gray-200 rounded-xl px-2 py-1 text-[11px] bg-white focus:outline-none focus:border-blue-400" />
+          </div>
+        )}
+      </div>
+
+      {salesLoading ? (
+        <div className="flex items-center justify-center h-40 text-sm text-gray-400">Loading…</div>
+      ) : salesData.length === 0 ? (
+        <div className="flex items-center justify-center h-40 text-sm text-gray-400">No sales data for this period</div>
+      ) : (
+        <>
+          {/* Summary strip */}
+          <div className="px-4 py-2.5 border-b bg-blue-50/40 flex items-center gap-6">
+            <span className="text-[11px] text-gray-500">{salesData.length} {salesTab === "category" ? "categories" : "items"}</span>
+            <span className="text-[11px] font-semibold text-gray-700">Total: <span className="text-blue-700">{fmtAmt(totalAmt)}</span></span>
+            <span className="text-[11px] font-semibold text-gray-700">Qty: <span className="text-gray-600">{totalQty.toLocaleString("en-IN")}</span></span>
+          </div>
+
+          {/* Bar chart — top 15 */}
+          <div className="px-4 pt-4 pb-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Top {Math.min(15, salesData.length)} by Amount</p>
+            <div style={{ height: Math.max(160, chartData.length * 28) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 60, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 9, fill: "#94a3b8" }} axisLine={false} tickLine={false}
+                    tickFormatter={v => `₹${Number(v).toLocaleString("en-IN")}`} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} axisLine={false} tickLine={false} width={110} />
+                  <Tooltip formatter={(v, n) => n === "amount" ? fmtAmt(v) : v} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
+                  <Bar dataKey="amount" radius={[0, 4, 4, 0]} maxBarSize={18}>
+                    {chartData.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto border-t">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-700" onClick={() => toggleSort("name")}>
+                    {salesTab === "category" ? "Category" : "Item"}{sortIcon("name")}
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-700" onClick={() => toggleSort("quantity")}>
+                    Qty{sortIcon("quantity")}
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-700" onClick={() => toggleSort("amount")}>
+                    Amount{sortIcon("amount")}
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Share</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {sorted.map((row, idx) => {
+                  const share = totalAmt > 0 ? ((Number(row.amount) / totalAmt) * 100).toFixed(1) : "0.0";
+                  return (
+                    <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
+                      <td className="px-4 py-2 text-gray-400 text-[11px]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-gray-800">{row[nameKey]}</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{Number(row.quantity || 0).toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmtAmt(row.amount)}</td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${share}%`, backgroundColor: BLUE }} />
+                          </div>
+                          <span className="text-[10px] text-gray-500 w-8 text-right">{share}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const CustomTooltip = ({ active, payload, label, metricMeta }) => {
   if (!active || !payload?.length) return null;
@@ -67,15 +209,54 @@ export default function Trends() {
   const [metric, setMetric] = useState("sales");
   const [period, setPeriod] = useState("day");
   const [data, setData] = useState([]);
-  const [compareData, setCompareData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState("");
+
+  // Sales breakdown
+  const [businessDate, setBusinessDate] = useState("");
+  const [salesTab, setSalesTab] = useState("category");
+  const [salesPreset, setSalesPreset] = useState("month");
+  const [salesFrom, setSalesFrom] = useState("");
+  const [salesTo, setSalesTo] = useState("");
+  const [salesData, setSalesData] = useState([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesSort, setSalesSort] = useState({ key: "amount", dir: "desc" });
 
   const loadBranches = async () => {
     if (!isAdmin) return;
     const r = await authAxios.get("/branch/active");
     setBranches(r.data || []);
+  };
+
+  /* ── date-range helpers ── */
+  const fmtD = d => d.toISOString().slice(0, 10);
+  const getDateRange = (preset, bDate) => {
+    const today = bDate ? new Date(bDate) : new Date();
+    const todayStr = fmtD(today);
+    if (preset === "today")  return { from: todayStr, to: todayStr };
+    if (preset === "week")   { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: fmtD(d), to: todayStr }; }
+    if (preset === "month")  { const d = new Date(today.getFullYear(), today.getMonth(), 1); return { from: fmtD(d), to: todayStr }; }
+    if (preset === "fy") {
+      const y = today.getFullYear(), m = today.getMonth();
+      const s = m >= 3 ? new Date(y, 3, 1) : new Date(y - 1, 3, 1);
+      const e = m >= 3 ? new Date(y + 1, 2, 31) : new Date(y, 2, 31);
+      return { from: fmtD(s), to: fmtD(e) };
+    }
+    if (preset === "alltime") return { from: "2000-01-01", to: todayStr };
+    return null;
+  };
+
+  const loadSalesData = async (tab = salesTab, preset = salesPreset, from = salesFrom, to = salesTo, b = branchId) => {
+    const range = preset === "custom" ? { from, to } : getDateRange(preset, businessDate);
+    if (!range?.from || !range?.to) return;
+    setSalesLoading(true);
+    try {
+      const endpoint = tab === "category" ? "/reports/sales/category" : "/reports/sales/items";
+      const res = await authAxios.get(endpoint, { params: { from_date: range.from, to_date: range.to, branch_id: b || undefined } });
+      setSalesData(res.data || []);
+    } catch { setSalesData([]); }
+    finally { setSalesLoading(false); }
   };
 
   const loadTrend = async (m = metric, p = period, b = branchId) => {
@@ -99,8 +280,23 @@ export default function Trends() {
     }
   };
 
-  useEffect(() => { loadBranches(); }, []);
+  useEffect(() => {
+    loadBranches();
+    authAxios.get("/shop/details").then(res => {
+      const bd = res.data?.app_date || "";
+      setBusinessDate(bd);
+      // init salesFrom/salesTo for "month" preset using business date
+      const range = getDateRange("month", bd);
+      if (range) { setSalesFrom(range.from); setSalesTo(range.to); }
+    }).catch(() => {});
+  }, []);
   useEffect(() => { loadTrend(metric, period, branchId); }, [metric, period, branchId]);
+  useEffect(() => {
+    if (salesPreset !== "custom") loadSalesData(salesTab, salesPreset, salesFrom, salesTo, branchId);
+  }, [salesTab, salesPreset, branchId]);
+  useEffect(() => {
+    if (salesPreset === "custom" && salesFrom && salesTo) loadSalesData(salesTab, salesPreset, salesFrom, salesTo, branchId);
+  }, [salesFrom, salesTo]);
 
   const metricMeta = METRICS.find(m => m.key === metric);
   const selectedBranch = branches.find(b => String(b.branch_id) === String(branchId));
@@ -359,6 +555,17 @@ export default function Trends() {
                 </div>
               </div>
             )}
+
+            {/* ── Sales Breakdown ── */}
+            <SalesBreakdown
+              salesTab={salesTab} setSalesTab={t => { setSalesTab(t); setSalesData([]); }}
+              salesPreset={salesPreset} setSalesPreset={p => { setSalesPreset(p); if (p !== "custom") { const r = getDateRange(p, businessDate); if (r) { setSalesFrom(r.from); setSalesTo(r.to); } } }}
+              salesFrom={salesFrom} setSalesFrom={setSalesFrom}
+              salesTo={salesTo} setSalesTo={setSalesTo}
+              salesData={salesData} salesLoading={salesLoading}
+              salesSort={salesSort} setSalesSort={setSalesSort}
+              onRefresh={() => loadSalesData()}
+            />
           </div>
         </div>
       </div>
