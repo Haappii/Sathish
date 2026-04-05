@@ -257,6 +257,10 @@ export default function TableGrid() {
 
     t += rightKV("Grand Total", (invoice.total_amount || 0).toFixed(2)) + "\n";
     t += line + "\n";
+    const isHotel = String(shop?.billing_type || "").toLowerCase() === "hotel";
+    if (isHotel && String(shop?.fssai_number || "").trim()) {
+      t += center(`FSSAI No: ${String(shop.fssai_number).trim()}`) + "\n";
+    }
     // Footer + 4 blank lines to keep the message with the same receipt
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
 

@@ -16,6 +16,7 @@ class ShopDetailsBase(BaseModel):
     pincode: Optional[str] = None
 
     gst_number: Optional[str] = None
+    fssai_number: Optional[str] = None
     logo_url: Optional[str] = None
 
     # Billing settings

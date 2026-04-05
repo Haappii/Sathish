@@ -1,0 +1,2 @@
+ALTER TABLE shop_details
+ADD COLUMN IF NOT EXISTS fssai_number VARCHAR(50);

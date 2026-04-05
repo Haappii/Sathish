@@ -278,6 +278,10 @@ export default function TableOrder() {
       Number(invoiceTotal != null ? invoiceTotal : subtotal).toFixed(2)
     ) + "\n";
     t += line + "\n";
+    const isHotel = String(shop?.billing_type || "").toLowerCase() === "hotel";
+    if (isHotel && String(shop?.fssai_number || "").trim()) {
+      t += center(`FSSAI No: ${String(shop.fssai_number).trim()}`) + "\n";
+    }
     // Footer + 4 blank lines so footer always prints with the bill
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
 
@@ -884,6 +888,5 @@ export default function TableOrder() {
     </>
   );
 }
-
 
 

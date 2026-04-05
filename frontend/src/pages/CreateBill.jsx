@@ -617,6 +617,10 @@ const [customer, setCustomer] = useState({
     if (discountValue) t += rightKV("Discount", discountValue.toFixed(2)) + "\n";
     t += rightKV("Grand Total", payable.toFixed(2)) + "\n";
     t += line + "\n";
+    const isHotel = String(shop?.billing_type || "").toLowerCase() === "hotel";
+    if (isHotel && String(shop?.fssai_number || "").trim()) {
+      t += center(`FSSAI No: ${String(shop.fssai_number).trim()}`) + "\n";
+    }
     // Footer + 4 blank lines to ensure the message prints on the same ticket
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
     return t;

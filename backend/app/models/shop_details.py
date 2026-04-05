@@ -16,6 +16,7 @@ class ShopDetails(Base):
     pincode = Column(String(20))
 
     gst_number = Column(String(50))
+    fssai_number = Column(String(50))
     owner_name = Column(String(120))
     mobile = Column(String(20))
     mailid = Column(String(120))

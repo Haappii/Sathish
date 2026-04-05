@@ -31,6 +31,7 @@ export default function ShopDetails() {
     address_line1: "", address_line2: "", address_line3: "",
     city: "", state: "", pincode: "",
     gst_number: "", logo_url: "", billing_type: "store",
+    fssai_number: "",
     gst_enabled: false, gst_percent: 0, gst_mode: "inclusive",
     inventory_enabled: false, inventory_cost_method: "LAST",
     items_branch_wise: false,
@@ -115,6 +116,7 @@ export default function ShopDetails() {
 
   const billingLabel = String(form.billing_type || "").toLowerCase() === "hotel"
     ? "Hotel / Restaurant" : "Store / Retail";
+  const isHotel = String(form.billing_type || "").toLowerCase() === "hotel";
 
   return (
     <div className="space-y-5 pb-10">
@@ -242,6 +244,15 @@ export default function ShopDetails() {
 
           {/* GST card */}
           <Card title="GST & Taxes" subtitle="Fiscal settings">
+            {isHotel && (
+              <Field label="FSSAI Number">
+                <Input
+                  value={form.fssai_number}
+                  onChange={e => setField("fssai_number", e.target.value)}
+                  placeholder="FSSAI registration number"
+                />
+              </Field>
+            )}
             <Toggle
               label="Enable GST"
               hint="Applies GST to all invoices"
