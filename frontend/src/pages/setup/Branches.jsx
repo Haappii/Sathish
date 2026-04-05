@@ -83,6 +83,12 @@ export default function Branches() {
 
   const editBranch = useCallback(
     (branch) => {
+      const rawServiceChargeRequired = branch?.service_charge_required;
+      const rawServiceChargeAmount = Number(branch?.service_charge_amount || 0);
+      const normalizedServiceChargeRequired =
+        typeof rawServiceChargeRequired === "boolean"
+          ? rawServiceChargeRequired
+          : rawServiceChargeAmount > 0;
       setEditingId(branch.branch_id);
       setForm({
         ...emptyForm,
@@ -92,8 +98,8 @@ export default function Branches() {
         discount_value: Number(branch?.discount_value || 0),
         kot_required: branch?.kot_required !== false,
         receipt_required: branch?.receipt_required !== false,
-        service_charge_required: Boolean(branch?.service_charge_required),
-        service_charge_amount: Number(branch?.service_charge_amount || 0),
+        service_charge_required: normalizedServiceChargeRequired,
+        service_charge_amount: rawServiceChargeAmount,
         swiggy_enabled: Boolean(branch?.swiggy_enabled),
         zomato_enabled: Boolean(branch?.zomato_enabled),
         online_orders_auto_accept: Boolean(branch?.online_orders_auto_accept),
