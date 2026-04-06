@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { addDaysToBusinessDate, getBusinessDate, syncBusinessDate } from "../utils/businessDate";
 import { modulesToPermMap } from "../utils/navigationMenu";
 import BackButton from "../components/BackButton";
 
@@ -73,16 +74,12 @@ export default function Analytics() {
   const loadDefaultDates = async () => {
     try {
       const r = await authAxios.get("/shop/details");
-      const to = r?.data?.app_date || new Date().toISOString().slice(0, 10);
-      const d = new Date(to);
-      d.setDate(d.getDate() - 6);
-      setFromDate(d.toISOString().slice(0, 10));
+      const to = syncBusinessDate(r?.data?.app_date) || getBusinessDate();
+      setFromDate(addDaysToBusinessDate(to, -6));
       setToDate(to);
     } catch {
-      const to = new Date().toISOString().slice(0, 10);
-      const d = new Date();
-      d.setDate(d.getDate() - 6);
-      setFromDate(d.toISOString().slice(0, 10));
+      const to = getBusinessDate();
+      setFromDate(addDaysToBusinessDate(to, -6));
       setToDate(to);
     }
   };

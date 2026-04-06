@@ -12,6 +12,7 @@ from app.schemas.users import UserCreate, UserUpdate, UserResponse
 from app.utils.passwords import encode_password
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+from app.utils.user_session import clear_user_session, has_active_user_session, release_stale_shop_sessions
 
 
 class UserBulkRow(BaseModel):
@@ -45,6 +46,8 @@ def list_users(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users", "read")),
 ):
+    release_stale_shop_sessions(db, shop_id=current_user.shop_id)
+
     q = (
         db.query(User)
         .filter(User.status == True, User.shop_id == current_user.shop_id)  # noqa: E712
@@ -130,6 +133,96 @@ def create_user(
 
 
 # ------------------------------------------------
+# BULK IMPORT (upsert by username)
+# ------------------------------------------------
+@router.post("/bulk-import")
+def bulk_import_users(
+    body: UserBulkImport,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("users", "write")),
+):
+    is_admin = _is_admin(current_user)
+
+    # Build lookup maps
+    role_map = {
+        str(r.role_name).strip().lower(): r.role_id
+        for r in db.query(Role).filter(Role.status == True).all()  # noqa: E712
+    }
+    branch_map = {
+        str(b.branch_name).strip().lower(): b.branch_id
+        for b in db.query(Branch).filter(Branch.shop_id == current_user.shop_id).all()
+    }
+
+    inserted = 0
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(body.rows):
+        uname = (row.user_name or "").strip()
+        if not uname:
+            errors.append({"row": i + 1, "error": "user_name is required"})
+            continue
+
+        role_id = role_map.get((row.role_name or "").strip().lower())
+        if not role_id:
+            errors.append({"row": i + 1, "error": f"Role '{row.role_name}' not found"})
+            continue
+
+        branch_id = branch_map.get((row.branch_name or "").strip().lower()) if row.branch_name else None
+        if not is_admin:
+            branch_id = getattr(current_user, "branch_id", None)
+
+        try:
+            existing = db.query(User).filter(
+                User.user_name == uname,
+                User.shop_id == current_user.shop_id,
+            ).first()
+            if existing:
+                existing.name = row.full_name or existing.name
+                existing.role = role_id
+                if branch_id is not None:
+                    existing.branch_id = branch_id
+                if row.password:
+                    existing.password = encode_password(row.password)
+                existing.status = True
+                updated += 1
+            else:
+                if not row.password:
+                    errors.append({"row": i + 1, "error": f"User '{uname}': password is required for new users"})
+                    continue
+                db.add(User(
+                    shop_id=current_user.shop_id,
+                    user_name=uname,
+                    password=encode_password(row.password),
+                    name=row.full_name,
+                    role=role_id,
+                    branch_id=branch_id,
+                    status=True,
+                    login_status=False,
+                    created_by=current_user.user_id,
+                ))
+                inserted += 1
+        except Exception as e:
+            errors.append({"row": i + 1, "error": str(e)})
+
+    db.add(BulkImportLog(
+        shop_id=current_user.shop_id,
+        upload_type="users",
+        filename=body.filename or "",
+        uploaded_by=current_user.user_id,
+        uploaded_by_name=getattr(current_user, "name", None) or getattr(current_user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
+    db.commit()
+    return {"inserted": inserted, "updated": updated, "errors": errors}
+
+
+# ------------------------------------------------
 # UPDATE USER
 # ------------------------------------------------
 @router.put("/{user_id}", response_model=UserResponse)
@@ -158,6 +251,15 @@ def update_user(
     }
 
     payload = request.dict(exclude_unset=True)
+
+    if "login_status" in payload:
+        requested = bool(payload.pop("login_status"))
+        if requested:
+            raise HTTPException(400, "login_status is managed automatically")
+        clear_user_session(user)
+
+    if payload.get("status") is False and has_active_user_session(user):
+        raise HTTPException(400, "Cannot disable a user who is currently logged in")
 
     if not is_admin:
         # Managers can only edit users in their own branch.
@@ -252,93 +354,3 @@ def deactivate_user(
     )
 
     return {"message": "User marked inactive"}
-
-
-# ------------------------------------------------
-# BULK IMPORT (upsert by username)
-# ------------------------------------------------
-@router.post("/bulk-import")
-def bulk_import_users(
-    body: UserBulkImport,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_permission("users", "write")),
-):
-    is_admin = _is_admin(current_user)
-
-    # Build lookup maps
-    role_map = {
-        str(r.role_name).strip().lower(): r.role_id
-        for r in db.query(Role).filter(Role.status == True).all()  # noqa: E712
-    }
-    branch_map = {
-        str(b.branch_name).strip().lower(): b.branch_id
-        for b in db.query(Branch).filter(Branch.shop_id == current_user.shop_id).all()
-    }
-
-    inserted = 0
-    updated = 0
-    errors = []
-
-    for i, row in enumerate(body.rows):
-        uname = (row.user_name or "").strip()
-        if not uname:
-            errors.append({"row": i + 1, "error": "user_name is required"})
-            continue
-
-        role_id = role_map.get((row.role_name or "").strip().lower())
-        if not role_id:
-            errors.append({"row": i + 1, "error": f"Role '{row.role_name}' not found"})
-            continue
-
-        branch_id = branch_map.get((row.branch_name or "").strip().lower()) if row.branch_name else None
-        if not is_admin:
-            branch_id = getattr(current_user, "branch_id", None)
-
-        try:
-            existing = db.query(User).filter(
-                User.user_name == uname,
-                User.shop_id == current_user.shop_id,
-            ).first()
-            if existing:
-                existing.name = row.full_name or existing.name
-                existing.role = role_id
-                if branch_id is not None:
-                    existing.branch_id = branch_id
-                if row.password:
-                    existing.password = encode_password(row.password)
-                existing.status = True
-                updated += 1
-            else:
-                if not row.password:
-                    errors.append({"row": i + 1, "error": f"User '{uname}': password is required for new users"})
-                    continue
-                db.add(User(
-                    shop_id=current_user.shop_id,
-                    user_name=uname,
-                    password=encode_password(row.password),
-                    name=row.full_name,
-                    role=role_id,
-                    branch_id=branch_id,
-                    status=True,
-                    login_status=False,
-                    created_by=current_user.user_id,
-                ))
-                inserted += 1
-        except Exception as e:
-            errors.append({"row": i + 1, "error": str(e)})
-
-    db.add(BulkImportLog(
-        shop_id=current_user.shop_id,
-        upload_type="users",
-        filename=body.filename or "",
-        uploaded_by=current_user.user_id,
-        uploaded_by_name=getattr(current_user, "name", None) or getattr(current_user, "user_name", ""),
-        total_rows=len(body.rows),
-        inserted=inserted,
-        updated=updated,
-        error_count=len(errors),
-        errors_json=errors if errors else None,
-        rows_json=[r.model_dump() for r in body.rows],
-    ))
-    db.commit()
-    return {"inserted": inserted, "updated": updated, "errors": errors}

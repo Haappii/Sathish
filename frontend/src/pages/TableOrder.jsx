@@ -4,6 +4,7 @@ import api from "../utils/apiClient";
 import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { buildBusinessDateTimeLabel, getBusinessDate } from "../utils/businessDate";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 import { isHotelShop } from "../utils/shopType";
@@ -48,6 +49,7 @@ export default function TableOrder() {
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
   const [showTotals, setShowTotals] = useState(false);
+  const [cartBusy, setCartBusy] = useState(false);
 
   const errorDetail = (err, fallback) =>
     err?.response?.data?.detail || fallback;
@@ -154,18 +156,68 @@ export default function TableOrder() {
   );
 
   /* ================= ACTIONS ================= */
+  const updateOrderItem = async ({
+    itemId,
+    qty,
+    fallbackMessage,
+    successMessage = "",
+  }) => {
+    setCartBusy(true);
+    try {
+      await api.post("/table-billing/order/item/add", null, {
+        params: { order_id: orderId, item_id: itemId, qty }
+      });
+      await loadOrder();
+      if (successMessage) showToast(successMessage, "success");
+    } catch (err) {
+      showToast(errorDetail(err, fallbackMessage), "error");
+    } finally {
+      setCartBusy(false);
+    }
+  };
+
   const addItem = async id => {
-    await api.post("/table-billing/order/item/add", null, {
-      params: { order_id: orderId, item_id: id, qty: 1 }
+    await updateOrderItem({
+      itemId: id,
+      qty: 1,
+      fallbackMessage: "Failed to add item",
     });
-    await loadOrder();
   };
 
   const changeQty = async (id, delta) => {
-    await api.post("/table-billing/order/item/add", null, {
-      params: { order_id: orderId, item_id: id, qty: delta }
+    await updateOrderItem({
+      itemId: id,
+      qty: delta,
+      fallbackMessage: "Failed to update item",
     });
-    await loadOrder();
+  };
+
+  const removeItem = async item => {
+    await updateOrderItem({
+      itemId: item.item_id,
+      qty: -Number(item.quantity || 0),
+      fallbackMessage: "Failed to remove item",
+      successMessage: `${item.item_name} removed`,
+    });
+  };
+
+  const clearOrder = async () => {
+    if (!orderId || !orderItems.length) return;
+    const confirmed = window.confirm(
+      `Clear all ${orderItems.length} item${orderItems.length > 1 ? "s" : ""} from ${tableName || "this table"}?`
+    );
+    if (!confirmed) return;
+
+    setCartBusy(true);
+    try {
+      await api.post(`/table-billing/order/clear/${orderId}`);
+      await loadOrder();
+      showToast("Order cleared", "success");
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to clear order"), "error");
+    } finally {
+      setCartBusy(false);
+    }
   };
 
   /* ================= PRINT ================= */
@@ -211,7 +263,13 @@ export default function TableOrder() {
 
     t += line + "\n";
     t += `Invoice No : ${invoiceNumber}\n`;
-    t += `Date       : ${formatDisplayDate(invoiceCreatedAt || new Date(), false)}\n`;
+    t += `Date       : ${
+      invoiceCreatedAt
+        ? formatDisplayDate(invoiceCreatedAt, false)
+        : buildBusinessDateTimeLabel(getBusinessDate(shop?.app_date), {
+            timeOptions: { hour: "2-digit", minute: "2-digit" },
+          })
+    }\n`;
     const isPlaceholder = /^9{9,}$/.test(String(customer.mobile || ""));
     if (!isPlaceholder) {
       t += `Customer   : ${customer.name || "Walk-in"}\n`;
@@ -323,7 +381,7 @@ export default function TableOrder() {
     let t = "";
     t += center(headerName) + "\n";
     t += center("Date & Time") + "\n";
-    t += center(new Date().toLocaleString()) + "\n";
+    t += center(buildBusinessDateTimeLabel(getBusinessDate(shop?.app_date))) + "\n";
     t += center(tableName ? `Table ${tableName}` : "Table Billing") + "\n";
     t += line + "\n";
     if (categoryLabel) {
@@ -494,7 +552,7 @@ export default function TableOrder() {
   );
   const serviceChargeAmount =
     branch?.service_charge_required ? toAmount(branch?.service_charge_amount || 0) : 0;
-  const payableTotal = total + serviceChargeAmount;
+  const payableTotal = Math.round(total + serviceChargeAmount);
   const splitTotal =
     Number(split.cash || 0) +
     Number(split.card || 0) +
@@ -713,6 +771,26 @@ export default function TableOrder() {
           </div>
 
           {/* ── Order items (cart) ── */}
+          <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Order Items</p>
+              <p className="text-[11px] text-gray-500">
+                {orderItems.length
+                  ? `${orderItems.length} line item${orderItems.length > 1 ? "s" : ""}`
+                  : "Add items to build the table order"}
+              </p>
+            </div>
+            {orderItems.length > 0 && (
+              <button
+                type="button"
+                onClick={clearOrder}
+                disabled={cartBusy}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+              >
+                {cartBusy ? "Working..." : "Clear All"}
+              </button>
+            )}
+          </div>
           <div className="flex-1 overflow-y-auto no-scroll px-2 py-1 min-h-0">
             {!orderItems.length ? (
               <div className="flex flex-col items-center justify-center h-full py-6 text-gray-300">
@@ -726,7 +804,7 @@ export default function TableOrder() {
                     <th className="text-left py-1 font-semibold">Item</th>
                     <th className="text-center py-1 font-semibold w-20">Qty</th>
                     <th className="text-right py-1 font-semibold w-16">Amount</th>
-                    <th className="text-right py-1 font-semibold w-12">Remove</th>
+                    <th className="text-right py-1 font-semibold w-20">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -738,10 +816,10 @@ export default function TableOrder() {
                       </td>
                       <td className="py-1">
                         <div className="flex items-center justify-center gap-0.5">
-                          <button onClick={() => changeQty(it.item_id, -1)}
+                          <button type="button" onClick={() => changeQty(it.item_id, -1)}
                             className="w-5 h-5 rounded border bg-white text-gray-500 text-xs font-bold flex items-center justify-center hover:bg-gray-100">−</button>
                           <span className="w-8 text-center text-[11px] font-semibold">{it.quantity}</span>
-                          <button onClick={() => changeQty(it.item_id, 1)}
+                          <button type="button" onClick={() => changeQty(it.item_id, 1)}
                             className="w-5 h-5 rounded border bg-white text-gray-500 text-xs font-bold flex items-center justify-center hover:bg-gray-100">+</button>
                         </div>
                       </td>
@@ -750,11 +828,13 @@ export default function TableOrder() {
                       </td>
                       <td className="py-1 text-right">
                         <button
-                          onClick={() => changeQty(it.item_id, -it.quantity)}
-                          className="w-6 h-6 rounded border bg-white text-gray-500 text-xs font-bold hover:bg-red-50 hover:text-red-600"
+                          type="button"
+                          onClick={() => removeItem(it)}
+                          disabled={cartBusy}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                           title="Remove item"
                         >
-                          Ã—
+                          X
                         </button>
                       </td>
                     </tr>

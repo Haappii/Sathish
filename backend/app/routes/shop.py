@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.utils.auth_user import get_current_user
+from app.models.branch import Branch
 from app.models.shop_details import ShopDetails
 from app.models.system_parameters import SystemParameter
 from app.schemas.shop import ShopDetailsBase, ShopDetailsResponse
+from app.utils.head_office import get_head_office_branch
 from app.utils.shop_logo import SHOP_LOGOS_DIR, build_logo_filename, save_shop_logo_file
 
 router = APIRouter(prefix="/shop", tags=["Shop"])
@@ -49,6 +51,10 @@ def get_shop_details(
 ):
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    shop_data = {}
+    if shop:
+        for column in ShopDetails.__table__.columns:
+            shop_data[column.name] = getattr(shop, column.name)
 
     params = (
         db.query(SystemParameter)
@@ -59,9 +65,12 @@ def get_shop_details(
         .all()
     )
     pmap = {str(r.param_key): (r.param_value or "") for r in params}
+    head_office_branch = get_head_office_branch(db, shop_id=user.shop_id, shop=shop)
 
     return {
-        **(shop.__dict__ if shop else {}),
+        **shop_data,
+        "head_office_branch_id": int(head_office_branch.branch_id) if head_office_branch else None,
+        "head_office_branch_name": head_office_branch.branch_name if head_office_branch else None,
         "inventory_enabled":   str(pmap.get("inventory_enabled",   "NO")).upper() == "YES",
         "inventory_cost_method": (pmap.get("inventory_cost_method") or "LAST").strip().upper(),
         "items_branch_wise":   str(pmap.get("items_branch_wise",   "NO")).upper() == "YES",
@@ -104,6 +113,31 @@ def save_shop_details(
         elif prev_billing_type and incoming == prev_billing_type:
             # Ignore no-op updates (frontend should not send billing_type on edit).
             shop_payload.pop("billing_type", None)
+
+    if "head_office_branch_id" in shop_payload:
+        require_super_admin(getattr(user, "role_name", None) or x_user_role)
+        raw_branch_id = shop_payload.get("head_office_branch_id")
+        if raw_branch_id in ("", None, 0, "0"):
+            shop_payload["head_office_branch_id"] = None
+        else:
+            try:
+                head_office_branch_id = int(raw_branch_id)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "Invalid head office branch")
+
+            branch = (
+                db.query(Branch)
+                .filter(
+                    Branch.shop_id == user.shop_id,
+                    Branch.branch_id == head_office_branch_id,
+                )
+                .first()
+            )
+            if not branch:
+                raise HTTPException(400, "Selected head office branch not found")
+            if str(branch.status or "ACTIVE").upper() != "ACTIVE":
+                raise HTTPException(400, "Head office branch must be active")
+            shop_payload["head_office_branch_id"] = head_office_branch_id
 
     for k, v in shop_payload.items():
         setattr(shop, k, v)

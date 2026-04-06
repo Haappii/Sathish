@@ -16,6 +16,9 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 24 * 60)
     )  # 1 Day
+    LOGIN_SESSION_IDLE_MINUTES: int = int(
+        os.getenv("LOGIN_SESSION_IDLE_MINUTES", 15)
+    )
 
     # CORS — comma-separated list of allowed origins.
     # Example: ALLOWED_ORIGINS=https://app.myshop.com,https://admin.myshop.com

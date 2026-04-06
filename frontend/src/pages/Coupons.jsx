@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
+import { getBusinessDate, normalizeBusinessDate } from "../utils/businessDate";
 import { modulesToPermMap } from "../utils/navigationMenu";
 import BackButton from "../components/BackButton";
 import {
@@ -418,8 +419,9 @@ function StatCard({ icon, label, value, color }) {
 /* ── Coupon Card ── */
 function CouponCard({ coupon: r, canWrite, onDisable }) {
   const isPercent = r.discount_type === "PERCENT";
-  const now = new Date();
-  const expired = r.end_date && new Date(r.end_date) < now;
+  const businessDate = getBusinessDate();
+  const endDate = normalizeBusinessDate(r.end_date);
+  const expired = Boolean(endDate && endDate < businessDate);
 
   return (
     <div className={`rounded-2xl border-2 overflow-hidden transition ${r.active && !expired ? "border-slate-100 hover:border-slate-200" : "border-slate-100 opacity-60"}`}>

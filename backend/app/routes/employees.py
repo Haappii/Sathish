@@ -355,6 +355,43 @@ def _employee_wage_summary(
     }
 
 
+def _employee_outstanding_balance(
+    db: Session,
+    *,
+    employee: Employee,
+    as_of_date: date,
+) -> float:
+    summary = _employee_wage_summary(
+        db,
+        employee=employee,
+        period_from=_first_day(as_of_date),
+        period_to=as_of_date,
+        as_of_date=as_of_date,
+    )
+    return _round2(summary["due_till_as_of"])
+
+
+def _ensure_employee_can_deactivate(
+    db: Session,
+    *,
+    employee: Employee,
+    as_of_date: date,
+) -> None:
+    balance = _employee_outstanding_balance(
+        db,
+        employee=employee,
+        as_of_date=as_of_date,
+    )
+    if abs(balance) <= 0.009:
+        return
+
+    balance_type = "payable" if balance > 0 else "receivable"
+    raise HTTPException(
+        400,
+        f"Settle the pending {balance_type} amount of Rs. {abs(balance):.2f} before deactivating this employee",
+    )
+
+
 @router.get("", response_model=list[EmployeeResponse])
 @router.get("/", response_model=list[EmployeeResponse])
 def list_employees(
@@ -434,6 +471,120 @@ def create_employee(
     return emp
 
 
+# ---------- BULK IMPORT (upsert by name or code) ----------
+@router.post("/bulk-import")
+def bulk_import_employees(
+    body: EmployeeBulkImport,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("employees", "write")),
+):
+    branch_map = {
+        str(b.branch_name).strip().lower(): b.branch_id
+        for b in db.query(Branch).filter(Branch.shop_id == user.shop_id).all()
+    }
+    default_branch_id = _resolve_branch(None, user)
+
+    inserted = 0
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(body.rows):
+        name = (row.employee_name or "").strip()
+        if not name:
+            errors.append({"row": i + 1, "error": "employee_name is required"})
+            continue
+
+        try:
+            wage_type = _normalize_wage_type(row.wage_type or "DAILY")
+        except HTTPException:
+            errors.append({"row": i + 1, "error": f"Invalid wage_type '{row.wage_type}'"})
+            continue
+
+        daily_wage = _safe_float(row.daily_wage, 0.0)
+        monthly_wage = _safe_float(row.monthly_wage, 0.0)
+        if wage_type == "DAILY" and daily_wage <= 0:
+            errors.append({"row": i + 1, "error": f"'{name}': daily_wage must be > 0 for DAILY wage type"})
+            continue
+        if wage_type == "MONTHLY" and monthly_wage <= 0:
+            errors.append({"row": i + 1, "error": f"'{name}': monthly_wage must be > 0 for MONTHLY wage type"})
+            continue
+
+        branch_id = branch_map.get((row.branch_name or "").strip().lower(), default_branch_id)
+
+        join_dt = None
+        if row.join_date:
+            try:
+                join_dt = date.fromisoformat(str(row.join_date)[:10])
+            except ValueError:
+                pass
+
+        code = (row.employee_code or "").strip() or None
+
+        try:
+            existing = None
+            if code:
+                existing = db.query(Employee).filter(
+                    Employee.shop_id == user.shop_id,
+                    Employee.employee_code == code,
+                ).first()
+            if not existing:
+                existing = db.query(Employee).filter(
+                    Employee.shop_id == user.shop_id,
+                    Employee.employee_name == name,
+                ).first()
+
+            if existing:
+                existing.employee_name = name
+                if code:
+                    existing.employee_code = code
+                existing.mobile = (row.mobile or "").strip() or existing.mobile
+                existing.designation = (row.designation or "").strip() or existing.designation
+                existing.wage_type = wage_type
+                existing.daily_wage = daily_wage
+                existing.monthly_wage = monthly_wage
+                if join_dt:
+                    existing.join_date = join_dt
+                existing.notes = (row.notes or "").strip() or existing.notes
+                existing.branch_id = branch_id
+                existing.active = True
+                updated += 1
+            else:
+                db.add(Employee(
+                    shop_id=user.shop_id,
+                    branch_id=branch_id,
+                    employee_code=code,
+                    employee_name=name,
+                    mobile=(row.mobile or "").strip() or None,
+                    designation=(row.designation or "").strip() or None,
+                    wage_type=wage_type,
+                    daily_wage=daily_wage,
+                    monthly_wage=monthly_wage,
+                    join_date=join_dt or _business_date(db, user.shop_id),
+                    notes=(row.notes or "").strip() or None,
+                    active=True,
+                    created_by=user.user_id,
+                ))
+                inserted += 1
+        except Exception as e:
+            errors.append({"row": i + 1, "error": str(e)})
+
+    db.add(BulkImportLog(
+        shop_id=user.shop_id,
+        upload_type="employees",
+        filename=body.filename or "",
+        uploaded_by=user.user_id,
+        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
+    db.commit()
+    return {"inserted": inserted, "updated": updated, "errors": errors}
+
+
 @router.put("/{employee_id}", response_model=EmployeeResponse)
 def update_employee(
     employee_id: int,
@@ -472,6 +623,13 @@ def update_employee(
         raise HTTPException(400, "daily_wage must be > 0 for DAILY wage type")
     if wage_type == "MONTHLY" and next_monthly <= 0:
         raise HTTPException(400, "monthly_wage must be > 0 for MONTHLY wage type")
+
+    if "active" in data and bool(emp.active) and not bool(data.get("active")):
+        _ensure_employee_can_deactivate(
+            db,
+            employee=emp,
+            as_of_date=_business_date(db, user.shop_id),
+        )
 
     if "employee_code" in data:
         code = (data.get("employee_code") or "").strip() or None
@@ -529,6 +687,15 @@ def deactivate_employee(
         raise HTTPException(404, "Employee not found")
     _ensure_employee_access(emp, user)
 
+    if not bool(emp.active):
+        return {"success": True, "message": "Employee already inactive"}
+
+    _ensure_employee_can_deactivate(
+        db,
+        employee=emp,
+        as_of_date=_business_date(db, user.shop_id),
+    )
+
     old = bool(emp.active)
     emp.active = False
     log_action(
@@ -544,6 +711,39 @@ def deactivate_employee(
     )
     db.commit()
     return {"success": True}
+
+
+@router.post("/{employee_id}/restore", response_model=EmployeeResponse)
+def restore_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("employees", "write")),
+):
+    emp = (
+        db.query(Employee)
+        .filter(Employee.shop_id == user.shop_id, Employee.employee_id == employee_id)
+        .first()
+    )
+    if not emp:
+        raise HTTPException(404, "Employee not found")
+    _ensure_employee_access(emp, user)
+
+    old = bool(emp.active)
+    emp.active = True
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Employees",
+        action="RESTORE",
+        record_id=emp.employee_id,
+        old={"active": old},
+        new={"active": bool(emp.active)},
+        user_id=user.user_id,
+        commit=False,
+    )
+    db.commit()
+    db.refresh(emp)
+    return emp
 
 
 @router.get("/wages/due", response_model=list[WageDueRow])
@@ -954,117 +1154,3 @@ def employee_wage_summary(
         period_to=end,
         as_of_date=as_of,
     )
-
-
-# ---------- BULK IMPORT (upsert by employee_name or code) ----------
-@router.post("/bulk-import")
-def bulk_import_employees(
-    body: EmployeeBulkImport,
-    db: Session = Depends(get_db),
-    user=Depends(require_permission("employees", "write")),
-):
-    branch_map = {
-        str(b.branch_name).strip().lower(): b.branch_id
-        for b in db.query(Branch).filter(Branch.shop_id == user.shop_id).all()
-    }
-    default_branch_id = _resolve_branch(None, user)
-
-    inserted = 0
-    updated = 0
-    errors = []
-
-    for i, row in enumerate(body.rows):
-        name = (row.employee_name or "").strip()
-        if not name:
-            errors.append({"row": i + 1, "error": "employee_name is required"})
-            continue
-
-        try:
-            wage_type = _normalize_wage_type(row.wage_type or "DAILY")
-        except HTTPException:
-            errors.append({"row": i + 1, "error": f"Invalid wage_type '{row.wage_type}'"})
-            continue
-
-        daily_wage = _safe_float(row.daily_wage, 0.0)
-        monthly_wage = _safe_float(row.monthly_wage, 0.0)
-        if wage_type == "DAILY" and daily_wage <= 0:
-            errors.append({"row": i + 1, "error": f"'{name}': daily_wage must be > 0 for DAILY wage type"})
-            continue
-        if wage_type == "MONTHLY" and monthly_wage <= 0:
-            errors.append({"row": i + 1, "error": f"'{name}': monthly_wage must be > 0 for MONTHLY wage type"})
-            continue
-
-        branch_id = branch_map.get((row.branch_name or "").strip().lower(), default_branch_id)
-
-        join_dt = None
-        if row.join_date:
-            try:
-                join_dt = date.fromisoformat(str(row.join_date)[:10])
-            except ValueError:
-                pass
-
-        code = (row.employee_code or "").strip() or None
-
-        try:
-            existing = None
-            if code:
-                existing = db.query(Employee).filter(
-                    Employee.shop_id == user.shop_id,
-                    Employee.employee_code == code,
-                ).first()
-            if not existing:
-                existing = db.query(Employee).filter(
-                    Employee.shop_id == user.shop_id,
-                    Employee.employee_name == name,
-                ).first()
-
-            if existing:
-                existing.employee_name = name
-                if code:
-                    existing.employee_code = code
-                existing.mobile = (row.mobile or "").strip() or existing.mobile
-                existing.designation = (row.designation or "").strip() or existing.designation
-                existing.wage_type = wage_type
-                existing.daily_wage = daily_wage
-                existing.monthly_wage = monthly_wage
-                if join_dt:
-                    existing.join_date = join_dt
-                existing.notes = (row.notes or "").strip() or existing.notes
-                existing.branch_id = branch_id
-                existing.active = True
-                updated += 1
-            else:
-                db.add(Employee(
-                    shop_id=user.shop_id,
-                    branch_id=branch_id,
-                    employee_code=code,
-                    employee_name=name,
-                    mobile=(row.mobile or "").strip() or None,
-                    designation=(row.designation or "").strip() or None,
-                    wage_type=wage_type,
-                    daily_wage=daily_wage,
-                    monthly_wage=monthly_wage,
-                    join_date=join_dt or _business_date(db, user.shop_id),
-                    notes=(row.notes or "").strip() or None,
-                    active=True,
-                    created_by=user.user_id,
-                ))
-                inserted += 1
-        except Exception as e:
-            errors.append({"row": i + 1, "error": str(e)})
-
-    db.add(BulkImportLog(
-        shop_id=user.shop_id,
-        upload_type="employees",
-        filename=body.filename or "",
-        uploaded_by=user.user_id,
-        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
-        total_rows=len(body.rows),
-        inserted=inserted,
-        updated=updated,
-        error_count=len(errors),
-        errors_json=errors if errors else None,
-        rows_json=[r.model_dump() for r in body.rows],
-    ))
-    db.commit()
-    return {"inserted": inserted, "updated": updated, "errors": errors}

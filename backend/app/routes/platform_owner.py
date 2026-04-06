@@ -339,6 +339,11 @@ def accept_onboard_request(
         db.commit()
         db.refresh(branch)
 
+        shop.head_office_branch_id = branch.branch_id
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
         exists = db.query(User).filter(User.shop_id == shop.shop_id, User.user_name == admin_username).first()
         if exists:
             raise HTTPException(400, "Admin username already exists")
@@ -894,6 +899,11 @@ def accept_demo_ticket(
         db.add(branch)
         db.commit()
         db.refresh(branch)
+
+        shop.head_office_branch_id = branch.branch_id
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
 
         user = User(
             shop_id=shop.shop_id,

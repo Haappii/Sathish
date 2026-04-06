@@ -20,8 +20,19 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
+
+class _WinSafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler that skips rollover when the file is locked (Windows)."""
+
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except PermissionError:
+            pass  # Another process holds the file; skip this rotation cycle
+
+
 sql_log_path = os.path.join(LOG_DIR, "sql.log")
-sql_handler = RotatingFileHandler(
+sql_handler = _WinSafeRotatingFileHandler(
     sql_log_path,
     maxBytes=5 * 1024 * 1024,  # 5MB
     backupCount=10,

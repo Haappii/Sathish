@@ -12,6 +12,7 @@ from app.models.invoice_archive import InvoiceArchive
 from app.models.shop_details import ShopDetails
 from app.models.customer import Customer
 from app.models.branch import Branch
+from app.models.loyalty import LoyaltyAccount, LoyaltyTransaction
 
 from app.schemas.invoice import (
     InvoiceCreate,
@@ -138,6 +139,82 @@ def _extract_wallet_payment(payload: InvoiceCreate) -> tuple[str | None, float]:
     return (str(mobile or "").strip() or None), float(amt)
 
 
+def _get_branch_loyalty_percentage(db: Session, shop_id: int, branch_id: int) -> float:
+    if branch_id is None:
+        return 0.0
+    row = (
+        db.query(SystemParameter)
+        .filter(
+            SystemParameter.shop_id == shop_id,
+            SystemParameter.param_key == f"branch:{branch_id}:loyalty_points_percentage",
+        )
+        .first()
+    )
+    try:
+        percentage = float(getattr(row, "param_value", "0") or 0)
+    except Exception:
+        percentage = 0.0
+    return percentage if percentage > 0 else 0.0
+
+
+def _get_or_create_loyalty_account(db: Session, shop_id: int, customer_id: int) -> LoyaltyAccount:
+    account = (
+        db.query(LoyaltyAccount)
+        .filter(LoyaltyAccount.shop_id == shop_id, LoyaltyAccount.customer_id == customer_id)
+        .first()
+    )
+    if account:
+        return account
+
+    account = LoyaltyAccount(shop_id=shop_id, customer_id=customer_id, points_balance=0)
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return account
+
+
+def _award_branch_loyalty_points(db: Session, invoice, customer, branch_id: int, shop_id: int, user_id: int):
+    if not customer or not getattr(customer, "customer_id", None):
+        return
+
+    percentage = _get_branch_loyalty_percentage(db, shop_id=shop_id, branch_id=branch_id)
+    if percentage <= 0:
+        return
+
+    invoice_total = getattr(invoice, "total_amount", 0) or 0
+    invoice_discount = getattr(invoice, "discounted_amt", 0) or 0
+    try:
+        total_amount = Decimal(str(invoice_total))
+        discount_amount = Decimal(str(invoice_discount))
+    except Exception:
+        return
+
+    payable = (total_amount - discount_amount).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    if payable <= 0:
+        return
+
+    points = int((payable * Decimal(str(percentage)) / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    if points <= 0:
+        return
+
+    account = _get_or_create_loyalty_account(db, shop_id=shop_id, customer_id=customer.customer_id)
+    account.points_balance = int((account.points_balance or 0) + points)
+    db.add(
+        LoyaltyTransaction(
+            shop_id=shop_id,
+            account_id=account.account_id,
+            customer_id=customer.customer_id,
+            txn_type="EARN",
+            points=points,
+            amount_value=Decimal(str(payable)),
+            invoice_id=invoice.invoice_id,
+            notes="Invoice loyalty points",
+            created_by=user_id,
+        )
+    )
+    db.commit()
+
+
 # =====================================================
 # CREATE INVOICE
 # =====================================================
@@ -190,7 +267,7 @@ def create_invoice(
     discount = Decimal(str(payload.discounted_amt or 0))
     if discount > total:
         raise HTTPException(400, "Discount cannot exceed invoice total")
-    payable = total - discount
+    payable = (total - discount).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     if payable < 0:
         payable = Decimal("0.00")
 
@@ -476,6 +553,14 @@ def create_invoice(
         customer=customer,
         created_by=user.user_id,
     )
+    _award_branch_loyalty_points(
+        db=db,
+        invoice=invoice,
+        customer=customer,
+        branch_id=branch_id,
+        shop_id=user.shop_id,
+        user_id=user.user_id,
+    )
     return invoice
 
 
@@ -703,6 +788,64 @@ def modify_invoice(
         created_by=user.user_id,
     )
     return {"message": "Invoice modified successfully"}
+
+
+# =====================================================
+# REMOVE SERVICE CHARGE FROM INVOICE (Billing History)
+# =====================================================
+@router.patch("/{invoice_id}/remove-service-charge")
+def remove_service_charge(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("billing", "write")),
+):
+    if str(getattr(user, "role_name", "") or "").lower() == "cashier":
+        raise HTTPException(403, "Manager/Admin access required")
+
+    invoice = db.query(Invoice).filter(
+        Invoice.invoice_id == invoice_id,
+        Invoice.shop_id == user.shop_id,
+    ).first()
+    if not invoice:
+        raise HTTPException(404, "Invoice not found")
+    if is_branch_day_closed(db, user.shop_id, invoice.branch_id, invoice.created_time):
+        raise HTTPException(403, "Day closed for this branch")
+
+    split = dict(invoice.payment_split or {})
+    try:
+        sc = Decimal(str(split.pop("service_charge", 0) or 0))
+        sc_gst = Decimal(str(split.pop("service_charge_gst", 0) or 0))
+    except Exception:
+        sc = Decimal("0")
+        sc_gst = Decimal("0")
+
+    total_removal = sc + sc_gst
+    if total_removal <= 0:
+        raise HTTPException(400, "No service charge found on this invoice")
+
+    old_total = Decimal(str(invoice.total_amount or 0))
+    invoice.total_amount = (old_total - total_removal).quantize(Decimal("0.01"))
+    invoice.payment_split = split if split else None
+
+    db.commit()
+
+    log_action(
+        db,
+        shop_id=user.shop_id,
+        module="Invoice",
+        action="REMOVE_SERVICE_CHARGE",
+        record_id=invoice.invoice_number,
+        old={"total_amount": float(old_total), "service_charge": float(sc), "service_charge_gst": float(sc_gst)},
+        new={"total_amount": float(invoice.total_amount)},
+        user_id=user.user_id,
+    )
+
+    return {
+        "success": True,
+        "removed_service_charge": float(sc),
+        "removed_service_charge_gst": float(sc_gst),
+        "new_total": float(invoice.total_amount),
+    }
 
 
 # =====================================================

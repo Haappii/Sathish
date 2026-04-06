@@ -15,6 +15,9 @@ class User(Base):
     role = Column(Integer, ForeignKey("roles.role_id"))
     status = Column(Boolean, default=True)
     login_status = Column(Boolean, default=False)
+    active_session_id = Column(String(120), nullable=True)
+    last_login_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    last_activity_at = Column(TIMESTAMP(timezone=True), nullable=True)
     created_on = Column(TIMESTAMP(timezone=True), server_default=func.now())
     created_by = Column(Integer)
 

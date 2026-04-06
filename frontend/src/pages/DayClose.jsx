@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
-import { getSession, clearSession } from "../utils/auth";
+import { getSession, clearSession, isHeadOfficeBranch } from "../utils/auth";
+import { getBusinessDate, syncBusinessDate } from "../utils/businessDate";
 import { useToast } from "../components/Toast";
 import BackButton from "../components/BackButton";
 import { FaMoon, FaCheckCircle, FaCircle } from "react-icons/fa";
@@ -14,11 +15,9 @@ export default function DayClose() {
   const { showToast } = useToast();
   const session = getSession() || {};
   const role = (session.role || session.role_name || "").toLowerCase();
-  const isHeadOffice =
-    Number(session.branch_id) === 1 ||
-    (session.branch_name || "").toLowerCase().includes("head");
+  const isHeadOffice = isHeadOfficeBranch(session);
 
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => getBusinessDate());
   const [branches, setBranches] = useState([]);
   const [status, setStatus] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState("");
@@ -47,7 +46,10 @@ export default function DayClose() {
     if (role !== "admin" && role !== "manager") { navigate("/"); return; }
     loadBranches();
     authAxios.get("/shop/details")
-      .then(res => { const appDate = res?.data?.app_date; if (appDate) setDate(appDate); })
+      .then(res => {
+        const appDate = syncBusinessDate(res?.data?.app_date);
+        if (appDate) setDate(appDate);
+      })
       .catch(() => {});
   }, []);
 

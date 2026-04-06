@@ -99,7 +99,11 @@ def _denoms_total(denoms: dict | None) -> float | None:
         try:
             denom = Decimal(str(k).strip())
             count = Decimal(str(v).strip())
-        except Exception:
+            if count < 0:
+                raise ValueError(f"Denomination count for {k} cannot be negative")
+        except Exception as e:
+            if "cannot be negative" in str(e):
+                raise HTTPException(400, f"Denomination count for {k} cannot be negative")
             continue
         total += denom * count
     return float(total)
@@ -259,6 +263,12 @@ def open_shift(
     if is_branch_day_closed(db, user.shop_id, bid, business_dt):
         raise HTTPException(403, "Day closed for this branch")
 
+    opening_amt = float(payload.opening_cash or 0)
+    if opening_amt < 0:
+        raise HTTPException(400, "opening_cash must be >= 0")
+    if opening_amt > 9999999.99:
+        raise HTTPException(400, "opening_cash exceeds maximum limit")
+
     existing = (
         db.query(CashShift)
         .filter(
@@ -277,7 +287,7 @@ def open_shift(
         status="OPEN",
         opened_by=user.user_id,
         opened_at=business_dt,
-        opening_cash=float(payload.opening_cash or 0),
+        opening_cash=opening_amt,
         opening_notes=payload.opening_notes,
     )
     db.add(shift)
@@ -391,11 +401,24 @@ def close_shift(
     )
     expected_cash = float(expected_info.get("expected_cash") or 0)
 
+    # Validate denomination counts if provided
+    if payload.denomination_counts:
+        for k, v in payload.denomination_counts.items():
+            try:
+                count = Decimal(str(v))
+                if count < 0:
+                    raise HTTPException(400, f"Denomination count for {k} cannot be negative")
+            except (ValueError, TypeError):
+                raise HTTPException(400, f"Invalid count for denomination {k}")
+
     actual = payload.actual_cash
     if actual is None:
         actual = _denoms_total(payload.denomination_counts)
     if actual is None:
         raise HTTPException(400, "Provide actual_cash or denomination_counts")
+    
+    if actual < 0:
+        raise HTTPException(400, "actual_cash cannot be negative")
 
     diff = float(Decimal(str(actual - expected_cash)).quantize(Decimal("0.01")))
 

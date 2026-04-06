@@ -8,12 +8,9 @@ from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.shop_details import ShopDetails
 from app.utils.auth_user import get_current_user
+from app.utils.business_date import get_business_date
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
-
-def get_business_date(db: Session, shop_id: int) -> date:
-    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
-    return shop.app_date if shop and shop.app_date else datetime.now().date()
 
 
 @router.get("/stats")

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
-import { getSession } from "../../utils/auth";
+import { getSession, setSession } from "../../utils/auth";
 import defaultLogo from "../../assets/logo.png";
 import { getShopLogoUrl } from "../../utils/shopLogo";
 import BackButton from "../../components/BackButton";
@@ -25,12 +25,14 @@ export default function ShopDetails() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [branches, setBranches] = useState([]);
 
   const [form, setForm] = useState({
     shop_id: "", shop_name: "", owner_name: "", mobile: "", mailid: "",
     address_line1: "", address_line2: "", address_line3: "",
     city: "", state: "", pincode: "",
     gst_number: "", logo_url: "", billing_type: "store",
+    head_office_branch_id: null,
     fssai_number: "",
     gst_enabled: false, gst_percent: 0, gst_mode: "inclusive",
     inventory_enabled: false, inventory_cost_method: "LAST",
@@ -49,12 +51,19 @@ export default function ShopDetails() {
 
   useEffect(() => {
     let mounted = true;
-    authAxios.get("/shop/details")
-      .then(res => { if (mounted && res?.data) setForm(f => ({ ...f, ...res.data })); })
+    Promise.all([
+      authAxios.get("/shop/details"),
+      authAxios.get("/branch/scoped").catch(() => ({ data: [] })),
+    ])
+      .then(([shopRes, branchRes]) => {
+        if (!mounted) return;
+        if (shopRes?.data) setForm(f => ({ ...f, ...shopRes.data }));
+        setBranches(Array.isArray(branchRes?.data) ? branchRes.data : []);
+      })
       .catch(() => showToast("Failed to load shop details", "error"))
-      .finally(() => setLoading(false));
+      .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, []);
+  }, [showToast]);
 
   const setField = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -69,6 +78,10 @@ export default function ShopDetails() {
   const saveShop = async () => {
     setSaving(true);
     const wantsLogo = !!logoFile;
+    const normalizedHeadOfficeBranchId =
+      form.head_office_branch_id === "" || form.head_office_branch_id == null
+        ? null
+        : Number(form.head_office_branch_id);
     const uploadLogo = async () => {
       if (!logoFile) return { ok: true };
       const fd = new FormData();
@@ -84,13 +97,45 @@ export default function ShopDetails() {
       }
     };
     try {
-      const payload = { ...form };
+      const payload = {
+        ...form,
+        head_office_branch_id: Number.isFinite(normalizedHeadOfficeBranchId)
+          ? normalizedHeadOfficeBranchId
+          : null,
+      };
       delete payload.billing_type;
       ONLINE_ORDER_FIELDS.forEach(k => delete payload[k]);
-      await authAxios.post("/shop/", payload, { headers: { "x-user-role": userRole } });
+      const res = await authAxios.post("/shop/", payload, { headers: { "x-user-role": userRole } });
       const logoRes = await uploadLogo();
+      const savedHeadOfficeBranchId =
+        res?.data?.head_office_branch_id ?? payload.head_office_branch_id ?? null;
+      const currentSession = getSession() || {};
+      const currentHeadOfficeBranchId = currentSession?.head_office_branch_id ?? null;
+      const headOfficeChanged =
+        Number(currentHeadOfficeBranchId || 0) !== Number(savedHeadOfficeBranchId || 0);
+
+      setForm(prev => ({ ...prev, head_office_branch_id: savedHeadOfficeBranchId }));
+
+      if (headOfficeChanged) {
+        setSession({
+          ...currentSession,
+          head_office_branch_id: savedHeadOfficeBranchId,
+          app_date: res?.data?.app_date || currentSession?.app_date,
+        });
+      } else if (res?.data?.app_date && res.data.app_date !== currentSession?.app_date) {
+        setSession({
+          ...currentSession,
+          app_date: res.data.app_date,
+        });
+      }
+
       if (!logoRes.ok) showToast(`Saved, but logo failed: ${logoRes.msg}`, "warning");
       else showToast(wantsLogo ? "Shop updated (logo uploaded)" : "Shop updated", "success");
+
+      if (headOfficeChanged) {
+        window.location.reload();
+        return;
+      }
     } catch (err) {
       showToast(err?.response?.status === 403 ? "Only Admin can change these settings" : "Save failed", "error");
     } finally {
@@ -117,6 +162,13 @@ export default function ShopDetails() {
   const billingLabel = String(form.billing_type || "").toLowerCase() === "hotel"
     ? "Hotel / Restaurant" : "Store / Retail";
   const isHotel = String(form.billing_type || "").toLowerCase() === "hotel";
+  const availableBranches = branches
+    .filter(branch => branch?.branch_id)
+    .slice()
+    .sort((a, b) => String(a?.branch_name || "").localeCompare(String(b?.branch_name || "")));
+  const selectedHeadOfficeBranch = availableBranches.find(
+    branch => Number(branch.branch_id) === Number(form.head_office_branch_id || 0)
+  );
 
   return (
     <div className="space-y-5 pb-10">
@@ -241,6 +293,46 @@ export default function ShopDetails() {
 
         {/* Right column */}
         <div className="space-y-5">
+
+          <Card title="Business Day" subtitle="Choose which branch behaves as head office">
+            {!isSuperAdmin && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                <span>⚠️</span> Only Admin can change the head office branch.
+              </div>
+            )}
+
+            <Field label="Preferred Head Office Branch">
+              <Select
+                value={form.head_office_branch_id ?? ""}
+                onChange={e => setField("head_office_branch_id", e.target.value ? Number(e.target.value) : null)}
+                disabled={!isSuperAdmin || availableBranches.length === 0}
+              >
+                <option value="">Select branch</option>
+                {availableBranches.map(branch => {
+                  const active = String(branch?.status || "ACTIVE").toUpperCase() === "ACTIVE";
+                  return (
+                    <option
+                      key={branch.branch_id}
+                      value={branch.branch_id}
+                      disabled={!active}
+                    >
+                      {branch.branch_name}{active ? "" : " (Inactive)"}
+                    </option>
+                  );
+                })}
+              </Select>
+            </Field>
+
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              This branch will be treated as head office for shop close access and branch-close restrictions.
+            </p>
+
+            {selectedHeadOfficeBranch && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[12px] text-blue-700">
+                Preferred head office: <strong>{selectedHeadOfficeBranch.branch_name}</strong>
+              </div>
+            )}
+          </Card>
 
           {/* GST card */}
           <Card title="GST & Taxes" subtitle="Fiscal settings">

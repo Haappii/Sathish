@@ -2,11 +2,7 @@
 
 import axios from "axios";
 import { API_BASE, getApiBaseIssue } from "../config/api";
-import {
-  getSession,
-  clearSession,
-  refreshSessionActivity,
-} from "./auth";
+import { getSession, clearSession } from "./auth";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -28,7 +24,7 @@ api.interceptors.request.use(
     const roleLower = (session?.role || "").toString().toLowerCase();
     const isAdmin = roleLower === "admin";
 
-    // 🔑 SUPPORT BOTH session + localStorage token names
+    // Support both session and localStorage token names.
     const token =
       session?.access_token ||
       session?.token ||
@@ -38,13 +34,9 @@ api.interceptors.request.use(
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-
-      // user is active → refresh timer
-      refreshSessionActivity();
     }
 
-    // ❗ DO NOT redirect from request interceptor
-    // Let backend decide auth validity
+    // Let backend decide auth validity.
     if (session?.branch_id) {
       config.headers["x-branch-id"] = session.branch_id;
     }

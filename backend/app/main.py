@@ -217,6 +217,11 @@ def seed_defaults():
         db.add(ho_branch)
         db.commit()
 
+    if getattr(shop, "head_office_branch_id", None) != ho_branch.branch_id:
+        shop.head_office_branch_id = ho_branch.branch_id
+        db.add(shop)
+        db.commit()
+
     # ---- ADMIN USER ----
     admin = db.query(User).filter(
         User.user_name == "admin",
@@ -366,6 +371,201 @@ def _auto_migrate_bulk_import_log() -> None:
         logger.exception("Auto-migration (bulk_import_log) failed: %s", e)
 
 
+def _auto_migrate_branch_service_charge() -> None:
+    """
+    Backfill branch-level service charge fields on existing Postgres databases.
+
+    Fresh databases get these columns from create_all(), but older databases need
+    an explicit ALTER TABLE because SQLAlchemy won't mutate existing tables.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS branch
+                      ADD COLUMN IF NOT EXISTS service_charge_required BOOLEAN DEFAULT FALSE,
+                      ADD COLUMN IF NOT EXISTS service_charge_amount NUMERIC(10, 2) DEFAULT 0;
+
+                    UPDATE branch
+                    SET service_charge_required = FALSE
+                    WHERE service_charge_required IS NULL;
+
+                    UPDATE branch
+                    SET service_charge_amount = 0
+                    WHERE service_charge_amount IS NULL;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (branch service charge) failed: %s", e)
+
+
+def _auto_migrate_head_office_branch() -> None:
+    """
+    Add the preferred head-office branch pointer for existing Postgres databases.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS shop_details
+                      ADD COLUMN IF NOT EXISTS head_office_branch_id INTEGER;
+
+                    DO $$
+                    BEGIN
+                      IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_shop_details_head_office_branch'
+                      ) THEN
+                        ALTER TABLE shop_details
+                          ADD CONSTRAINT fk_shop_details_head_office_branch
+                          FOREIGN KEY (head_office_branch_id)
+                          REFERENCES branch(branch_id)
+                          ON DELETE SET NULL;
+                      END IF;
+                    END $$;
+
+                    WITH resolved AS (
+                      SELECT
+                        s.shop_id,
+                        COALESCE(
+                          (
+                            SELECT b.branch_id
+                            FROM branch b
+                            WHERE b.shop_id = s.shop_id
+                              AND (
+                                LOWER(COALESCE(b.type, '')) LIKE '%head%'
+                                OR LOWER(COALESCE(b.branch_name, '')) LIKE '%head%'
+                              )
+                            ORDER BY b.branch_id
+                            LIMIT 1
+                          ),
+                          (
+                            SELECT b.branch_id
+                            FROM branch b
+                            WHERE b.shop_id = s.shop_id
+                              AND UPPER(COALESCE(b.status, 'ACTIVE')) = 'ACTIVE'
+                            ORDER BY b.branch_id
+                            LIMIT 1
+                          )
+                        ) AS branch_id
+                      FROM shop_details s
+                    )
+                    UPDATE shop_details s
+                    SET head_office_branch_id = resolved.branch_id
+                    FROM resolved
+                    WHERE s.shop_id = resolved.shop_id
+                      AND s.head_office_branch_id IS NULL
+                      AND resolved.branch_id IS NOT NULL;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (head office branch) failed: %s", e)
+
+
+def _auto_migrate_user_session_tracking() -> None:
+    """
+    Add server-tracked user session columns for single-login enforcement.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS users
+                      ADD COLUMN IF NOT EXISTS active_session_id VARCHAR(120),
+                      ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
+                      ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;
+
+                    UPDATE users
+                    SET login_status = FALSE,
+                        active_session_id = NULL
+                    WHERE COALESCE(login_status, FALSE) = TRUE
+                      AND COALESCE(active_session_id, '') = '';
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (user session tracking) failed: %s", e)
+
+
+def _auto_migrate_branch_service_charge_gst() -> None:
+    """
+    Add GST-on-service-charge columns to the branch table for existing databases.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS branch
+                      ADD COLUMN IF NOT EXISTS service_charge_gst_required BOOLEAN DEFAULT FALSE,
+                      ADD COLUMN IF NOT EXISTS service_charge_gst_percent NUMERIC(5, 2) DEFAULT 0;
+
+                    UPDATE branch SET service_charge_gst_required = FALSE WHERE service_charge_gst_required IS NULL;
+                    UPDATE branch SET service_charge_gst_percent = 0 WHERE service_charge_gst_percent IS NULL;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (branch service charge GST) failed: %s", e)
+
+
+def _auto_migrate_table_name_unique_constraint() -> None:
+    """
+    Replace the old unique constraint on (shop_id, branch_id, table_name) with
+    one that includes category_id, so the same table name is allowed in different
+    categories (e.g. "Table 1" in both "1st Floor" and "2nd Floor").
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    DO $$
+                    DECLARE
+                        r RECORD;
+                    BEGIN
+                        FOR r IN
+                            SELECT DISTINCT c.conname
+                            FROM pg_constraint c
+                            JOIN pg_class t ON t.oid = c.conrelid
+                            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
+                            WHERE t.relname = 'tables_master'
+                              AND c.contype = 'u'
+                              AND a.attname = 'table_name'
+                              AND c.conname != 'uq_tables_master_shop_branch_category_name'
+                        LOOP
+                            EXECUTE 'ALTER TABLE tables_master DROP CONSTRAINT IF EXISTS '
+                                    || quote_ident(r.conname);
+                        END LOOP;
+                    END $$;
+
+                    ALTER TABLE tables_master
+                        ADD CONSTRAINT uq_tables_master_shop_branch_category_name
+                        UNIQUE (shop_id, branch_id, category_id, table_name)
+                        DEFERRABLE INITIALLY DEFERRED;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (table name unique constraint) failed: %s", e)
+
+
 @app.on_event("startup")
 def _startup_db_init():
     """
@@ -383,6 +583,11 @@ def _startup_db_init():
     _auto_migrate_demo_expiry()
     _auto_migrate_table_billing()
     _auto_migrate_bulk_import_log()
+    _auto_migrate_branch_service_charge()
+    _auto_migrate_branch_service_charge_gst()
+    _auto_migrate_head_office_branch()
+    _auto_migrate_user_session_tracking()
+    _auto_migrate_table_name_unique_constraint()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
@@ -451,6 +656,7 @@ from app.routes.branch_sales import router as branch_sales_router
 # ⭐ TABLE BILLING ROUTER
 from app.routes.table_billing import router as table_billing_router
 from app.routes.table_management import router as table_management_router
+from app.routes.table_category import router as table_category_router
 from app.routes.table_qr import router as table_qr_router
 from app.routes.public_qr import router as public_qr_router
 from app.routes.public_reservation import router as public_reservation_router
@@ -522,6 +728,7 @@ app.include_router(branch_sales_router,           prefix="/api")
 # ⭐ TABLE BILLING ----------
 app.include_router(table_billing_router, prefix="/api")
 app.include_router(table_management_router, prefix="/api")
+app.include_router(table_category_router, prefix="/api")
 app.include_router(table_qr_router, prefix="/api")
 app.include_router(public_qr_router, prefix="/api")
 app.include_router(public_reservation_router, prefix="/api")

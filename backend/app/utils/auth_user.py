@@ -8,6 +8,10 @@ from app.db import get_db
 from app.models.users import User
 from app.models.roles import Role
 from app.config import settings
+from app.utils.user_session import (
+    release_stale_user_session,
+    utcnow,
+)
 
 
 # Token source
@@ -29,6 +33,7 @@ def get_current_user(
 
         user_id: int = payload.get("user_id")
         shop_id = payload.get("shop_id")
+        session_id = payload.get("sid")
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -44,6 +49,29 @@ def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User disabled or not found"
             )
+
+        now = utcnow()
+        changed = release_stale_user_session(user, now=now)
+        active_session_id = str(getattr(user, "active_session_id", "") or "").strip()
+
+        if active_session_id:
+            if not session_id or session_id != active_session_id:
+                if changed:
+                    db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session ended. Please login again."
+                )
+        elif session_id:
+            if changed:
+                db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session ended. Please login again."
+            )
+
+        if changed:
+            db.commit()
 
         # ---------- attach role name ----------
         role = db.query(Role).filter(Role.role_id == user.role).first()

@@ -1,23 +1,23 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Any
 from datetime import datetime
 
 
 class CashShiftOpen(BaseModel):
-    opening_cash: float = 0
-    opening_notes: Optional[str] = None
+    opening_cash: float = Field(default=0, ge=0, le=9999999.99, description="Opening cash amount")
+    opening_notes: Optional[str] = Field(None, max_length=255, description="Optional opening notes")
 
 
 class CashShiftClose(BaseModel):
-    actual_cash: Optional[float] = None
-    denomination_counts: Optional[dict[str, Any]] = None
-    closing_notes: Optional[str] = None
+    actual_cash: Optional[float] = Field(None, ge=0, le=9999999.99, description="Actual cash counted")
+    denomination_counts: Optional[dict[str, Any]] = Field(None, description="Count of each denomination")
+    closing_notes: Optional[str] = Field(None, max_length=255, description="Optional closing notes")
 
 
 class CashMovementCreate(BaseModel):
     movement_type: str  # IN/OUT
-    amount: float
-    reason: Optional[str] = None
+    amount: float = Field(gt=0, le=9999999.99, description="Amount to add or remove")
+    reason: Optional[str] = Field(None, max_length=255, description="Reason for movement")
 
 
 class CashMovementOut(BaseModel):

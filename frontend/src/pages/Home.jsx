@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
-import { getSession } from "../utils/auth";
+import { getSession, isHeadOfficeBranchClosed } from "../utils/auth";
+import { getBusinessDate, syncBusinessDate } from "../utils/businessDate";
 
 import {
   canAccess,
@@ -48,7 +49,7 @@ const COLORS = [
   "#0ea5e9",
 ];
 
-const isoToday = () => new Date().toISOString().slice(0, 10);
+const isoToday = () => getBusinessDate();
 
 const MENU_GROUPS = [
   { key: "billing", title: "Billing", paths: ["/sales/create", "/sales/history", "/table-billing", "/online-orders", "/drafts", "/deleted-invoices"] },
@@ -92,9 +93,16 @@ const SHORTCUT_PATHS = [
   "/sales/history",
   "/customers",
   "/inventory",
-  "/expenses",
+  "/reservations",
   "/reports",
   "/cash-drawer",
+  "/setup",
+];
+
+const HEAD_OFFICE_CLOSED_SHORTCUT_PATHS = [
+  "/trends",
+  "/analytics",
+  "/reports",
   "/setup",
 ];
 
@@ -159,6 +167,7 @@ export default function Home() {
     api.get("/shop/details")
       .then((r) => {
         const s = r?.data || {};
+        if (s?.app_date) syncBusinessDate(s.app_date);
         setShop(s);
         setShopType((s.shop_type || s.billing_type || "").toLowerCase());
       })
@@ -321,9 +330,7 @@ export default function Home() {
 
   /* ------------------ MENU BUILD ------------------ */
   const showTableBilling = shopType === "hotel";
-  const isHeadOfficeClosed =
-    Number(branchId) === 1 &&
-    String(session?.branch_close || "N").toUpperCase() === "Y";
+  const isHeadOfficeClosed = isHeadOfficeBranchClosed(session);
 
   const menus = useMemo(() => {
     const fallback = buildRoleMenu({
@@ -355,12 +362,15 @@ export default function Home() {
   );
 
   const quickShortcuts = useMemo(() => {
+    const shortcutPaths = isHeadOfficeClosed
+      ? HEAD_OFFICE_CLOSED_SHORTCUT_PATHS
+      : SHORTCUT_PATHS;
     const byPath = new Map(menuCards.map((m) => [m.path, m]));
-    return SHORTCUT_PATHS
+    return shortcutPaths
       .map((path) => byPath.get(path))
       .filter(Boolean)
       .slice(0, 6);
-  }, [menuCards]);
+  }, [isHeadOfficeClosed, menuCards]);
 
   useEffect(() => {
     if (!quickShortcuts.length) return;
@@ -431,7 +441,7 @@ export default function Home() {
 
     try {
       await api.post("/expenses/", {
-        expense_date: (shop?.app_date || isoToday()).slice(0, 10),
+        expense_date: getBusinessDate(shop?.app_date),
         amount: Number(expenseForm.amount),
         category: expenseForm.category.trim(),
         payment_mode: expenseForm.payment_mode,
@@ -819,7 +829,7 @@ export default function Home() {
           </div>
 
           {/* Quick Expense */}
-          {canExpenseWrite && (
+          {canExpenseWrite && !isHeadOfficeClosed && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Quick Expense</p>
               <div>

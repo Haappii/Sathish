@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
+import { getBusinessDate } from "../utils/businessDate";
 import { modulesToPermMap } from "../utils/navigationMenu";
 import {
   getOfflineBills,
@@ -118,7 +119,7 @@ export default function OfflineSync() {
       });
       const csv = [headers.join(","), ...lines].join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      saveAs(blob, `offline-bills-${new Date().toISOString().slice(0, 10)}.csv`);
+      saveAs(blob, `offline-bills-${getBusinessDate()}.csv`);
     } finally {
       setExporting(false);
     }

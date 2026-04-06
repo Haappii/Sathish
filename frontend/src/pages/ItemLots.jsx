@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { getBusinessDate, normalizeBusinessDate } from "../utils/businessDate";
 import { modulesToPermMap } from "../utils/navigationMenu";
 import BackButton from "../components/BackButton";
 import { FaBoxes } from "react-icons/fa";
@@ -12,6 +13,7 @@ export default function ItemLots() {
   const { showToast } = useToast();
   const session = getSession() || {};
   const isAdmin = String(session?.role || "").toLowerCase() === "admin";
+  const businessDate = getBusinessDate();
 
   const [allowed, setAllowed] = useState(null);
   const [branches, setBranches] = useState([]);
@@ -159,7 +161,7 @@ export default function ItemLots() {
                       <td className="px-4 py-3 text-slate-600">{r.batch_no || <span className="text-slate-300">—</span>}</td>
                       <td className="px-4 py-3">
                         {r.expiry_date ? (
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${new Date(r.expiry_date) < new Date() ? "bg-red-50 text-red-600 border border-red-100" : "bg-emerald-50 text-emerald-700 border border-emerald-100"}`}>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${normalizeBusinessDate(r.expiry_date) < businessDate ? "bg-red-50 text-red-600 border border-red-100" : "bg-emerald-50 text-emerald-700 border border-emerald-100"}`}>
                             {r.expiry_date}
                           </span>
                         ) : <span className="text-slate-300">—</span>}

@@ -8,12 +8,18 @@ from app.utils.auth_user import get_current_user
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
 from app.models.items import Item
+from app.utils.business_date import get_business_date
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
-def resolve_range(mode: str, from_date: str | None, to_date: str | None):
-    today = datetime.today()
+def resolve_range(
+    mode: str,
+    from_date: str | None,
+    to_date: str | None,
+    current_date,
+):
+    today = datetime.combine(current_date, datetime.min.time())
 
     if mode == "today":
         start = today.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -50,7 +56,7 @@ def category_item_details(
     Returns item-wise quantity + total sales inside a category
     """
 
-    start, end = resolve_range(mode, from_date, to_date)
+    start, end = resolve_range(mode, from_date, to_date, get_business_date(db, user.shop_id))
 
     rows = (
         db.query(

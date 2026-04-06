@@ -289,7 +289,7 @@ const MENU_CATALOG = [
 ];
 
 const HEAD_OFFICE_CLOSED_KEYS = new Set([
-  "home",
+  "trends",
   "reports",
   "analytics",
   "admin",
@@ -484,9 +484,9 @@ export const buildRoleMenu = ({
 
   if (isHeadOfficeClosed) {
     menuItems = [
-      { name: "Home", path: "/home", icon: <FaHome /> },
-      { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
+      { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
+      { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> },
     ];
   }

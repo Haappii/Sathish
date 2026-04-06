@@ -1,7 +1,38 @@
 // src/utils/auth.js
 
+import { API_BASE } from "../config/api";
+
 const KEY = "hb_session";
+const BUSINESS_DATE_KEY = "hb_business_date";
 const EXPIRY_MINUTES = 15; // increase in production
+const SERVER_ACTIVITY_SYNC_MS = 60 * 1000;
+const AUTH_BASE = `${API_BASE}/auth`;
+
+let lastServerActivitySync = 0;
+let activitySyncPromise = null;
+let logoutPromise = null;
+
+function getSessionToken(session = getSession()) {
+  return (
+    session?.access_token ||
+    session?.token ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
+    ""
+  );
+}
+
+async function postAuth(path, { token, keepalive = false } = {}) {
+  if (!token) return null;
+
+  return fetch(`${AUTH_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    keepalive,
+  });
+}
 
 /* =========================
    SESSION HELPERS
@@ -20,6 +51,7 @@ export function setSession(data) {
     ...data,
     last_activity: Date.now()
   };
+  lastServerActivitySync = 0;
 
   localStorage.setItem(KEY, JSON.stringify(session));
 
@@ -30,12 +62,42 @@ export function setSession(data) {
   if (session?.access_token) {
     localStorage.setItem("access_token", session.access_token);
   }
+
+  const appDate =
+    typeof session?.app_date === "string" && session.app_date.trim()
+      ? session.app_date.trim().slice(0, 10)
+      : "";
+  if (appDate) {
+    localStorage.setItem(BUSINESS_DATE_KEY, appDate);
+  } else {
+    localStorage.removeItem(BUSINESS_DATE_KEY);
+  }
 }
 
 export function clearSession() {
   localStorage.removeItem(KEY);
   localStorage.removeItem("token");
   localStorage.removeItem("access_token");
+  localStorage.removeItem(BUSINESS_DATE_KEY);
+  lastServerActivitySync = 0;
+}
+
+export async function logoutSession({ redirect = true } = {}) {
+  if (logoutPromise) return logoutPromise;
+
+  const token = getSessionToken();
+
+  logoutPromise = postAuth("/logout", { token, keepalive: true })
+    .catch(() => {})
+    .finally(() => {
+      clearSession();
+      logoutPromise = null;
+      if (redirect && typeof window !== "undefined") {
+        window.location.replace("/");
+      }
+    });
+
+  return logoutPromise;
 }
 
 /* =========================
@@ -68,6 +130,44 @@ export function refreshSessionActivity() {
   }
 }
 
+export async function syncSessionActivity(force = false) {
+  const session = getSession();
+  const token = getSessionToken(session);
+  if (!session || !token) return;
+
+  const now = Date.now();
+  if (!force && now - lastServerActivitySync < SERVER_ACTIVITY_SYNC_MS) return;
+  if (activitySyncPromise) return activitySyncPromise;
+
+  lastServerActivitySync = now;
+  activitySyncPromise = postAuth("/ping", { token, keepalive: true })
+    .catch(() => {})
+    .finally(() => {
+      activitySyncPromise = null;
+    });
+
+  return activitySyncPromise;
+}
+
+export function isHeadOfficeBranch(session) {
+  const headOfficeBranchId = Number(session?.head_office_branch_id || 0);
+  const branchType = (session?.branch_type || "").toString().toLowerCase();
+  const branchName = (session?.branch_name || "").toString().toLowerCase();
+
+  return (
+    (headOfficeBranchId > 0 && Number(session?.branch_id || 0) === headOfficeBranchId) ||
+    branchType.includes("head") ||
+    branchName.includes("head")
+  );
+}
+
+export function isHeadOfficeBranchClosed(session) {
+  return (
+    isHeadOfficeBranch(session) &&
+    String(session?.branch_close || "N").toUpperCase() === "Y"
+  );
+}
+
 /* =========================
    USER ACTIVITY TRACKING
 ========================= */
@@ -91,8 +191,7 @@ export function startActivityTracking() {
 
     expiryTimer = setTimeout(() => {
       if (isSessionExpired()) {
-        clearSession();
-        window.location.replace("/");
+        logoutSession();
       } else {
         // Activity refreshed just before timeout, reschedule
         scheduleExpiry();
@@ -103,6 +202,7 @@ export function startActivityTracking() {
   activityHandler = () => {
     if (!getSession()) return;
     refreshSessionActivity();
+    syncSessionActivity();
     scheduleExpiry();
   };
 

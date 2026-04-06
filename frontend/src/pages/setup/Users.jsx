@@ -116,12 +116,13 @@ export default function Users() {
       await authAxios.put(`/users/${u.user_id}`, { status: !u.status });
       loadData();
       showToast("User status updated", "success");
-    } catch {
-      showToast("Failed to update status", "error");
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to update status", "error");
     }
   };
 
   const activeCount = users.filter(u => u.status).length;
+  const loggedInCount = users.filter(u => u.login_status).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -135,7 +136,7 @@ export default function Users() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-slate-800">User Management</h1>
-              <p className="text-xs text-slate-500">{users.length} total · {activeCount} active</p>
+              <p className="text-xs text-slate-500">{users.length} total · {activeCount} active · {loggedInCount} logged in</p>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -198,6 +199,9 @@ export default function Users() {
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-center truncate">{roleName}</span>
                     <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-center truncate">{branchName}</span>
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border text-center ${u.login_status ? "bg-violet-50 text-violet-700 border-violet-100" : "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                      {u.login_status ? "Logged In" : "Logged Out"}
+                    </span>
                     <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border text-center ${u.status ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"}`}>
                       {u.status ? "Active" : "Inactive"}
                     </span>

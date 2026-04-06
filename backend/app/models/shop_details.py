@@ -31,6 +31,7 @@ class ShopDetails(Base):
 
     # Business day tracking
     app_date = Column(Date, server_default=func.current_date())
+    head_office_branch_id = Column(Integer, nullable=True)
 
     # Demo / expiry (optional)
     is_demo = Column(Boolean, default=False)

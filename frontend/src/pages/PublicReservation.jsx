@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
+import { normalizeBusinessDate, systemDateIso } from "../utils/businessDate";
 
 const API = import.meta.env.VITE_API_URL || "";
-const today = () => new Date().toISOString().split("T")[0];
+const today = () => systemDateIso();
 
 const inputCls =
   "border border-gray-200 rounded-xl px-3 py-2.5 text-[13px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition w-full";
@@ -48,12 +49,19 @@ export default function PublicReservation() {
       .get(`${API}/api/public/reservations/shop-info?shop_id=${shopId}`)
       .then((r) => {
         setShopInfo(r.data);
+        const businessDate = normalizeBusinessDate(r.data?.app_date) || today();
         // Auto-select branch if only one or defaultBranch set
         const branches = r.data?.branches || [];
         if (defaultBranch) {
-          setForm((f) => ({ ...f, branch_id: defaultBranch }));
+          setForm((f) => ({ ...f, branch_id: defaultBranch, reservation_date: businessDate }));
         } else if (branches.length === 1) {
-          setForm((f) => ({ ...f, branch_id: String(branches[0].branch_id) }));
+          setForm((f) => ({
+            ...f,
+            branch_id: String(branches[0].branch_id),
+            reservation_date: businessDate,
+          }));
+        } else {
+          setForm((f) => ({ ...f, reservation_date: businessDate }));
         }
       })
       .catch(() => setStep(STEPS.NOT_FOUND))
@@ -74,11 +82,12 @@ export default function PublicReservation() {
 
   const validate = () => {
     const e = {};
+    const businessDate = normalizeBusinessDate(shopInfo?.app_date) || today();
     if (!form.customer_name.trim()) e.customer_name = "Name is required";
     if (!form.mobile.trim()) e.mobile = "Mobile is required";
     else if (!/^\d{7,15}$/.test(form.mobile.trim())) e.mobile = "Enter a valid mobile number";
     if (!form.reservation_date) e.reservation_date = "Date is required";
-    else if (form.reservation_date < today()) e.reservation_date = "Date cannot be in the past";
+    else if (form.reservation_date < businessDate) e.reservation_date = "Date cannot be before business date";
     if (!form.reservation_time) e.reservation_time = "Time is required";
     if (!form.branch_id) e.branch_id = "Please select a branch";
     setErrors(e);
@@ -115,7 +124,11 @@ export default function PublicReservation() {
     setForm({
       customer_name: "", mobile: "", email: "",
       branch_id: defaultBranch || (shopInfo?.branches?.length === 1 ? String(shopInfo.branches[0].branch_id) : ""),
-      table_id: "", reservation_date: today(), reservation_time: "19:00", guests: 2, notes: "",
+      table_id: "",
+      reservation_date: normalizeBusinessDate(shopInfo?.app_date) || today(),
+      reservation_time: "19:00",
+      guests: 2,
+      notes: "",
     });
     setErrors({});
     setConfirmation(null);

@@ -40,6 +40,7 @@ from app.models.employee import Employee, EmployeeAttendance
 from app.models.reservation import TableReservation
 from app.models.shop_details import ShopDetails
 from app.services.financials_service import calc_period_financials
+from app.utils.business_date import get_business_date
 from app.utils.shop_type import ensure_hotel_billing_type
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -721,6 +722,7 @@ def profit_item_wise(
         q = q.filter(Invoice.branch_id == branch_id)
 
     rows = q.all()
+    is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
     exp_q = db.query(func.coalesce(func.sum(BranchExpense.amount), 0)).filter(
         BranchExpense.shop_id == user.shop_id,
         BranchExpense.expense_date.between(f.date(), t.date()),
@@ -733,7 +735,7 @@ def profit_item_wise(
     result = []
     for r in rows:
         sales = float(r.sales_amount or 0)
-        cost = float(r.cost_amount or 0)
+        cost = 0.0 if is_hotel else float(r.cost_amount or 0)
         gross_profit = sales - cost
         allocated_expense = (total_expense * sales / total_sales) if total_sales > 0 else 0.0
         net_profit = gross_profit - allocated_expense
@@ -743,7 +745,6 @@ def profit_item_wise(
                 "category": r.category,
                 "quantity": int(r.quantity or 0),
                 "sales_amount": float(sales),
-                "cost_amount": float(cost),
                 "gross_profit": float(gross_profit),
                 "allocated_expense": float(allocated_expense),
                 "profit": float(net_profit),
@@ -790,6 +791,7 @@ def profit_category_wise(
         q = q.filter(Invoice.branch_id == branch_id)
 
     rows = q.all()
+    is_hotel = get_shop_billing_type(db, user.shop_id) == "hotel"
     exp_q = db.query(func.coalesce(func.sum(BranchExpense.amount), 0)).filter(
         BranchExpense.shop_id == user.shop_id,
         BranchExpense.expense_date.between(f.date(), t.date()),
@@ -802,7 +804,7 @@ def profit_category_wise(
     result = []
     for r in rows:
         sales = float(r.sales_amount or 0)
-        cost = float(r.cost_amount or 0)
+        cost = 0.0 if is_hotel else float(r.cost_amount or 0)
         gross_profit = sales - cost
         allocated_expense = (total_expense * sales / total_sales) if total_sales > 0 else 0.0
         net_profit = gross_profit - allocated_expense
@@ -811,7 +813,6 @@ def profit_category_wise(
                 "category": r.category,
                 "quantity": int(r.quantity or 0),
                 "sales_amount": float(sales),
-                "cost_amount": float(cost),
                 "gross_profit": float(gross_profit),
                 "allocated_expense": float(allocated_expense),
                 "profit": float(net_profit),
@@ -833,6 +834,9 @@ def profit_date_wise(
 ):
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
+
+    if (t.date() - f.date()).days > 366:
+        raise HTTPException(400, "Date range too large. Please select a range of 366 days or less.")
 
     qty_q = (
         db.query(
@@ -1644,7 +1648,7 @@ def dues_open(
         q = q.filter(InvoiceDue.created_on.between(f, t + timedelta(days=1)))
 
     rows = q.all()
-    today = datetime.utcnow().date()
+    today = get_business_date(db, user.shop_id)
     out = []
     for r in rows:
         age_days = ""
@@ -3295,7 +3299,7 @@ def accounting_trial_balance(
     user=Depends(require_permission("reports", "read")),
 ):
     if not as_of:
-        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+        as_of = get_business_date(db, user.shop_id).isoformat()
     try:
         dt = datetime.strptime(as_of, "%Y-%m-%d")
     except ValueError:
@@ -3446,7 +3450,7 @@ def accounting_balance_sheet(
     user=Depends(require_permission("reports", "read")),
 ):
     if not as_of:
-        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+        as_of = get_business_date(db, user.shop_id).isoformat()
     try:
         dt = datetime.strptime(as_of, "%Y-%m-%d")
     except ValueError:
@@ -3611,7 +3615,7 @@ def recon_stock_valuation(
     user=Depends(require_permission("reports", "read")),
 ):
     if not as_of:
-        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+        as_of = get_business_date(db, user.shop_id).isoformat()
     try:
         _ = datetime.strptime(as_of, "%Y-%m-%d")
     except ValueError:
@@ -3663,7 +3667,7 @@ def compliance_e_invoice_status(
     if from_date and to_date:
         f, t_end = parse_dt_range(from_date, to_date)
     else:
-        today = datetime.utcnow().date()
+        today = get_business_date(db, user.shop_id)
         f = datetime.combine(today - timedelta(days=29), datetime.min.time())
         t_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
 
@@ -3719,7 +3723,7 @@ def compliance_e_waybill_status(
     if from_date and to_date:
         f, t_end = parse_dt_range(from_date, to_date)
     else:
-        today = datetime.utcnow().date()
+        today = get_business_date(db, user.shop_id)
         f = datetime.combine(today - timedelta(days=29), datetime.min.time())
         t_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
 

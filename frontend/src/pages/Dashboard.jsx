@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { getSession } from "../utils/auth";
+import { getSession, isHeadOfficeBranchClosed } from "../utils/auth";
+import { getBusinessDate } from "../utils/businessDate";
 import authAxios from "../api/authAxios";
 
 import {
@@ -24,9 +25,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const session = getSession();
   const userRole = session?.role || "User";
-  const isHeadOfficeClosed =
-    Number(session?.branch_id) === 1 &&
-    String(session?.branch_close || "N").toUpperCase() === "Y";
+  const isHeadOfficeClosed = isHeadOfficeBranchClosed(session);
 
   const [stats, setStats] = useState({});
   const [inventoryEnabled, setInventoryEnabled] = useState(false);
@@ -121,9 +120,8 @@ export default function Dashboard() {
   };
 
   const openExpense = () => {
-    const today = new Date().toISOString().slice(0, 10);
     setExpense({
-      expense_date: today,
+      expense_date: getBusinessDate(),
       amount: "",
       category: "",
       payment_mode: "cash",

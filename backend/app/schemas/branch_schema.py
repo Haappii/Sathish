@@ -23,9 +23,14 @@ class BranchBase(BaseModel):
     kot_required: Optional[bool] = True
     receipt_required: Optional[bool] = True
 
-    # Optional: service charge (stored in system_parameters)
+    # Optional: service charge (stored directly on branch row)
     service_charge_required: Optional[bool] = False
     service_charge_amount: Optional[float] = 0
+    service_charge_gst_required: Optional[bool] = False
+    service_charge_gst_percent: Optional[float] = 0
+
+    # Optional: loyalty points percentage for this branch (stored in system_parameters)
+    loyalty_points_percentage: Optional[float] = 0
 
     # Optional: online order settings (stored in system_parameters)
     swiggy_enabled: Optional[bool] = False

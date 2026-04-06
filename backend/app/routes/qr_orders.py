@@ -91,7 +91,7 @@ def _get_or_create_open_table_order(
         opened_by=opened_by,
     )
     table.status = "OCCUPIED"
-    table.table_start_time = datetime.utcnow()
+    table.table_start_time = datetime.now()
     db.add(order)
     db.commit()
     db.refresh(order)

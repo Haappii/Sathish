@@ -14,6 +14,17 @@ from app.models.branch import Branch
 from app.utils.jwt_token import create_access_token
 from app.utils.passwords import encode_password, verify_password, password_needs_upgrade
 from app.models.shop_details import ShopDetails
+from app.utils.head_office import is_head_office_branch, get_head_office_branch_id
+from app.utils.auth_user import get_current_user
+from app.utils.business_date import get_business_date
+from app.utils.user_session import (
+    clear_user_session,
+    has_active_user_session,
+    release_stale_user_session,
+    start_user_session,
+    touch_user_session,
+    utcnow,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -62,18 +73,23 @@ def login(request: Request, body: dict, db: Session = Depends(get_db)):
     # Upgrade legacy password to bcrypt on successful login
     if password_needs_upgrade(user.password):
         user.password = encode_password(password)
-        db.commit()
 
     # Fetch branch safely
+    head_office_branch_id = get_head_office_branch_id(db, shop_id=user.shop_id, shop=shop)
     branch_name = None
+    branch = None
     if user.branch_id:
         branch = db.query(Branch).filter(
             Branch.branch_id == user.branch_id,
             Branch.shop_id == user.shop_id
         ).first()
         branch_name = branch.branch_name if branch else None
-        if branch and branch.branch_close == "Y" and (branch.type or "").lower() != "head office":
-            shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+        if branch and branch.branch_close == "Y" and not is_head_office_branch(
+            db,
+            shop_id=user.shop_id,
+            branch_id=branch.branch_id,
+            shop=shop,
+        ):
             app_date = shop.app_date if shop else None
             raise HTTPException(
                 403,
@@ -81,12 +97,23 @@ def login(request: Request, body: dict, db: Session = Depends(get_db)):
                 + (f" (Business Date: {app_date})" if app_date else "")
             )
 
+    release_stale_user_session(user)
+    if has_active_user_session(user):
+        raise HTTPException(
+            409,
+            "User is already logged in. Please logout from the active session and try again.",
+        )
+
+    session_id = start_user_session(user)
+    db.commit()
+
     # Payload stored in token
     token = create_access_token({
         "user_id": user.user_id,
         "role": user.role,
         "branch_id": user.branch_id,
-        "shop_id": user.shop_id
+        "shop_id": user.shop_id,
+        "sid": session_id,
     })
 
     return {
@@ -104,5 +131,32 @@ def login(request: Request, body: dict, db: Session = Depends(get_db)):
         "branch_id": user.branch_id,
         "branch_name": branch_name,
         "branch_close": branch.branch_close if branch else "N",
-        "branch_type": branch.type if branch else ""
+        "branch_type": branch.type if branch else "",
+        "head_office_branch_id": head_office_branch_id,
+        "login_status": user.login_status,
+        "app_date": get_business_date(db, user.shop_id),
+    }
+
+
+@router.post("/logout")
+def logout(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    clear_user_session(current_user)
+    db.commit()
+    return {"message": "Logged out"}
+
+
+@router.post("/ping")
+def ping(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if touch_user_session(current_user, now=utcnow()):
+        db.commit()
+    return {
+        "status": "ok",
+        "user_id": current_user.user_id,
+        "login_status": current_user.login_status,
     }

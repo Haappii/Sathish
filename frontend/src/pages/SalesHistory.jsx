@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { getBusinessDate, syncBusinessDate } from "../utils/businessDate";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 
@@ -12,9 +13,8 @@ export default function SalesHistory() {
   const printTextRef = useRef(null);
 
   /* ================= DATE ================= */
-  const today = new Date();
   const pad = n => String(n).padStart(2, "0");
-  const initialYMD = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const initialYMD = getBusinessDate();
 
   const parseToDate = v => {
     if (!v) return null;
@@ -105,7 +105,7 @@ export default function SalesHistory() {
     const loadAppDate = async () => {
       try {
         const res = await authAxios.get("/shop/details");
-        const ymd = formatAPI(res?.data?.app_date) || initialYMD;
+        const ymd = syncBusinessDate(res?.data?.app_date) || initialYMD;
         setAppDateYMD(ymd);
         setFromDate(ymd);
         setToDate(ymd);
@@ -120,8 +120,9 @@ export default function SalesHistory() {
   const loadBills = async () => {
     try {
       setLoading(true);
-      const from = formatAPI(fromDate) || formatAPI(new Date());
-      const to = formatAPI(toDate) || formatAPI(new Date());
+      const fallbackDate = getBusinessDate();
+      const from = formatAPI(fromDate) || fallbackDate;
+      const to = formatAPI(toDate) || fallbackDate;
       const res = await authAxios.get("/invoice/list", {
         params: { from_date: from, to_date: to }
       });

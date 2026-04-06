@@ -366,6 +366,28 @@ function createWindow(targetUrl, offlineUrl, serverUrl) {
   return win;
 }
 
+function getProtocolArg(argv = process.argv) {
+  return (argv || []).find((a) => String(a || "").startsWith(`${PROTOCOL}://`)) || null;
+}
+
+function registerProtocolClient() {
+  try {
+    if (app.isPackaged) {
+      app.setAsDefaultProtocolClient(PROTOCOL);
+      return;
+    }
+
+    const entry = process.argv[1] ? path.resolve(process.argv[1]) : null;
+    if (entry) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [entry]);
+    } else {
+      app.setAsDefaultProtocolClient(PROTOCOL);
+    }
+  } catch {
+    // ignore protocol registration failures
+  }
+}
+
 function escapeHtml(text) {
   return String(text || "")
     .replaceAll("&", "&amp;")
@@ -497,6 +519,7 @@ let mainWindow = null;
 let baseUrl = null;
 let offlineServer = null;
 let offlineUrl = null;
+let pendingProtocolUrl = getProtocolArg(process.argv);
 
 function toAbsoluteUrl(openUrl) {
   const raw = String(openUrl || "");
@@ -524,7 +547,8 @@ if (!gotTheLock) {
       mainWindow.focus();
     }
 
-    const openArg = (argv || []).find((a) => String(a || "").startsWith(`${PROTOCOL}://`));
+    const openArg = getProtocolArg(argv);
+    pendingProtocolUrl = openArg || pendingProtocolUrl;
     const target = toAbsoluteUrl(openArg);
     if (target && mainWindow) mainWindow.loadURL(target);
   });
@@ -550,18 +574,17 @@ app.whenReady().then(async () => {
   baseUrl = reachable ? resolvedUrl : (offlineUrl || resolvedUrl);
 
   if (!app.isDefaultProtocolClient(PROTOCOL)) {
-    try {
-      app.setAsDefaultProtocolClient(PROTOCOL);
-    } catch {
-      // ignore
-    }
+    registerProtocolClient();
   }
 
-  mainWindow = createWindow(baseUrl, offlineUrl, resolvedUrl);
+  const initialTarget = toAbsoluteUrl(pendingProtocolUrl) || baseUrl;
+  pendingProtocolUrl = null;
+  mainWindow = createWindow(initialTarget, offlineUrl, resolvedUrl);
 });
 
 app.on("open-url", (event, url) => {
   event.preventDefault();
+  pendingProtocolUrl = url || pendingProtocolUrl;
   const target = toAbsoluteUrl(url);
   if (target && mainWindow) mainWindow.loadURL(target);
 });
@@ -586,7 +609,9 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     baseUrl = baseUrl || resolveAppUrl();
-    mainWindow = createWindow(baseUrl, offlineUrl);
+    const target = toAbsoluteUrl(pendingProtocolUrl) || baseUrl;
+    pendingProtocolUrl = null;
+    mainWindow = createWindow(target, offlineUrl);
   }
 });
 

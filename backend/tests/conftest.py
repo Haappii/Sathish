@@ -17,6 +17,10 @@ from sqlalchemy import event
 # Import app.db AFTER setting DATABASE_URL so it picks up SQLite
 from app.db import Base, get_db, engine as app_engine, SessionLocal as AppSessionLocal
 from app.main import app
+from app.routes.auth import limiter as auth_route_limiter
+
+app.state.limiter.enabled = False
+auth_route_limiter.enabled = False
 
 # Enable foreign key enforcement on the shared engine
 @event.listens_for(app_engine, "connect")
@@ -77,12 +81,31 @@ def seeded_db(db_session):
     if existing:
         role = db_session.query(Role).filter_by(role_name="admin").first()
         user = db_session.query(User).filter_by(user_name="testadmin").first()
+        api_user = db_session.query(User).filter_by(user_name="fixtureadmin").first()
         branch = db_session.query(Branch).filter_by(branch_id=1).first()
+        if existing.head_office_branch_id != branch.branch_id:
+            existing.head_office_branch_id = branch.branch_id
+            db_session.add(existing)
+            db_session.commit()
+        if not api_user:
+            api_user = User(
+                shop_id=1,
+                user_name="fixtureadmin",
+                password="testpass123",
+                name="Fixture Admin",
+                role=role.role_id,
+                branch_id=branch.branch_id,
+                status=True,
+            )
+            db_session.add(api_user)
+            db_session.commit()
+            db_session.refresh(api_user)
         return {
             "shop_id": 1,
             "branch_id": branch.branch_id,
             "role_id": role.role_id,
             "user_id": user.user_id,
+            "api_user_id": api_user.user_id,
         }
 
     shop = ShopDetails(
@@ -105,6 +128,10 @@ def seeded_db(db_session):
     db_session.add(branch)
     db_session.flush()
 
+    shop.head_office_branch_id = branch.branch_id
+    db_session.add(shop)
+    db_session.flush()
+
     role = Role(role_name="admin")
     db_session.add(role)
     db_session.flush()
@@ -119,6 +146,17 @@ def seeded_db(db_session):
         status=True,
     )
     db_session.add(user)
+
+    api_user = User(
+        shop_id=1,
+        user_name="fixtureadmin",
+        password="testpass123",
+        name="Fixture Admin",
+        role=role.role_id,
+        branch_id=1,
+        status=True,
+    )
+    db_session.add(api_user)
     db_session.commit()
 
     return {
@@ -126,6 +164,7 @@ def seeded_db(db_session):
         "branch_id": branch.branch_id,
         "role_id": role.role_id,
         "user_id": user.user_id,
+        "api_user_id": api_user.user_id,
     }
 
 
@@ -136,6 +175,33 @@ def seeded_db(db_session):
 def client(seeded_db):
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def reset_user_sessions(db_session):
+    from app.models.users import User
+
+    db_session.query(User).filter(User.user_name == "fixtureadmin").update(
+        {
+            User.login_status: False,
+            User.active_session_id: None,
+            User.last_login_at: None,
+            User.last_activity_at: None,
+        },
+        synchronize_session=False,
+    )
+    db_session.commit()
+    yield
+    db_session.query(User).filter(User.user_name == "fixtureadmin").update(
+        {
+            User.login_status: False,
+            User.active_session_id: None,
+            User.last_login_at: None,
+            User.last_activity_at: None,
+        },
+        synchronize_session=False,
+    )
+    db_session.commit()
 
 
 @pytest.fixture(scope="session")
@@ -151,4 +217,6 @@ def auth_headers(client, seeded_db):
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    yield headers
+    client.post("/api/auth/logout", headers=headers)

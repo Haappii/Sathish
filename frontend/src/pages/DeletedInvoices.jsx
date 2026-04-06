@@ -13,6 +13,7 @@ export default function DeletedInvoices() {
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirmingRestore, setConfirmingRestore] = useState(null);
 
   /* ================= LOAD ================= */
   const loadDeletedInvoices = async () => {
@@ -54,16 +55,16 @@ export default function DeletedInvoices() {
   }, [search, list]);
 
   /* ================= RESTORE ================= */
-  const restoreInvoice = async (archiveId) => {
-    if (!window.confirm("Restore this deleted invoice?")) return;
-
+  const restoreInvoice = async () => {
+    if (!confirmingRestore?.archive_id) return;
     setLoading(true);
     try {
-      await api.post(`/invoice/archive/restore/${archiveId}`);
-      showToast("Invoice restored successfully");
-      loadDeletedInvoices();
-    } catch {
-      showToast("Restore failed", "error");
+      await api.post(`/invoice/archive/restore/${confirmingRestore.archive_id}`);
+      showToast("Invoice restored successfully", "success");
+      setConfirmingRestore(null);
+      await loadDeletedInvoices();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Restore failed", "error");
     } finally {
       setLoading(false);
     }
@@ -135,7 +136,7 @@ export default function DeletedInvoices() {
                       <td className="px-4 py-2.5 text-center">
                         <button
                           disabled={loading}
-                          onClick={() => restoreInvoice(inv.archive_id)}
+                          onClick={() => setConfirmingRestore(inv)}
                           className="px-3 py-1 rounded-xl text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
                         >
                           Restore
@@ -149,6 +150,58 @@ export default function DeletedInvoices() {
           </div>
         </div>
       </div>
+
+      {confirmingRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl border">
+            <div className="border-b px-5 py-4">
+              <h2 className="text-sm font-semibold text-gray-800">Restore Deleted Invoice</h2>
+              <p className="mt-1 text-[12px] text-gray-500">
+                {confirmingRestore.invoice_number
+                  ? `Restore invoice ${confirmingRestore.invoice_number}?`
+                  : "Restore this deleted invoice?"}
+              </p>
+            </div>
+
+            <div className="px-5 py-4 text-[12px] text-gray-600 space-y-1">
+              <div>
+                <span className="font-medium text-gray-700">Customer:</span>{" "}
+                {confirmingRestore.customer_name || "NA"}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Mobile:</span>{" "}
+                {confirmingRestore.mobile || "NA"}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Total:</span>{" "}
+                ₹{Number(confirmingRestore.total_amount || 0).toFixed(2)}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 rounded-b-2xl border-t bg-gray-50 px-5 py-3">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setConfirmingRestore(null);
+                  showToast("Restore cancelled", "warning");
+                }}
+                className="rounded-lg border bg-white px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={restoreInvoice}
+                className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {loading ? "Restoring..." : "Confirm Restore"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

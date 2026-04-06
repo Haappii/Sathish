@@ -82,6 +82,25 @@ def _read_branch_print_from_params(pmap: dict[str, str], branch_id: int) -> dict
     }
 
 
+def _loyalty_param_keys(branch_id: int) -> dict[str, str]:
+    return {
+        "points_percentage": f"branch:{branch_id}:loyalty_points_percentage",
+    }
+
+
+def _read_branch_loyalty_from_params(pmap: dict[str, str], branch_id: int) -> dict:
+    keys = _loyalty_param_keys(branch_id)
+    try:
+        percentage = float(pmap.get(keys["points_percentage"], "0") or 0)
+    except Exception:
+        percentage = 0.0
+    if percentage < 0:
+        percentage = 0.0
+    return {
+        "loyalty_points_percentage": float(percentage),
+    }
+
+
 def _upsert_param(db: Session, *, shop_id: int, key: str, value: str):
     row = (
         db.query(SystemParameter)
@@ -133,6 +152,22 @@ def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, pa
     db.commit()
 
 
+def _save_branch_loyalty_settings(db: Session, *, shop_id: int, branch_id: int, payload: BranchCreate | BranchUpdate):
+    if getattr(payload, "loyalty_points_percentage", None) is None:
+        return
+
+    try:
+        percentage = float(getattr(payload, "loyalty_points_percentage", 0) or 0)
+    except Exception:
+        percentage = 0.0
+    if percentage < 0:
+        percentage = 0.0
+
+    keys = _loyalty_param_keys(branch_id)
+    _upsert_param(db, shop_id=shop_id, key=keys["points_percentage"], value=str(percentage))
+    db.commit()
+
+
 def _save_branch_online_order_settings(
     db: Session,
     *,
@@ -168,6 +203,7 @@ def _load_branch_params(db: Session, *, shop_id: int, branch_ids: list[int]) -> 
     for bid in branch_ids:
         raw_param_keys.update(_discount_param_keys(bid).values())
         raw_param_keys.update(_print_param_keys(bid).values())
+        raw_param_keys.update(_loyalty_param_keys(bid).values())
 
     if not raw_param_keys:
         return pmap
@@ -205,10 +241,13 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
         "status": getattr(branch, "status", None) or "ACTIVE",
         "service_charge_required": bool(getattr(branch, "service_charge_required", False)),
         "service_charge_amount": float(getattr(branch, "service_charge_amount", 0) or 0),
+        "service_charge_gst_required": bool(getattr(branch, "service_charge_gst_required", False)),
+        "service_charge_gst_percent": float(getattr(branch, "service_charge_gst_percent", 0) or 0),
     }
 
     out.update(_read_branch_discount_from_params(pmap, bid))
     out.update(_read_branch_print_from_params(pmap, bid))
+    out.update(_read_branch_loyalty_from_params(pmap, bid))
     out.update(
         read_branch_online_order_settings_from_map(
             pmap,
@@ -339,6 +378,7 @@ def create(
     branch = create_branch(db, data, user.user_id, user.shop_id)
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_loyalty_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_online_order_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(
@@ -395,6 +435,7 @@ def update(branch_id: int, data: BranchUpdate,
 
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
+    _save_branch_loyalty_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_online_order_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
 
     log_action(

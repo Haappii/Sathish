@@ -5,6 +5,7 @@ import authAxios from "../api/authAxios";
 import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { buildBusinessDateTimeLabel, formatBusinessDate, getBusinessDate } from "../utils/businessDate";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 import {
@@ -513,7 +514,7 @@ const [customer, setCustomer] = useState({
     Math.max(0, manualDiscountValue + Number(couponDiscount || 0))
   );
 
-  const payable = grossTotal - discountValue;
+  const payable = Math.round(grossTotal - discountValue);
   const hasRealCustomerMobile =
     String(customer.mobile || "").trim() &&
     String(customer.mobile || "").trim() !== DEFAULT_MOBILE &&
@@ -558,7 +559,11 @@ const [customer, setCustomer] = useState({
     if (shop.gst_number) t += center(`GSTIN: ${shop.gst_number}`) + "\n";
     t += line + "\n";
     t += `Invoice No : ${invoiceNo}\n`;
-    t += `Date : ${new Date().toLocaleDateString("en-IN")}\n`;
+    t += `Date : ${formatBusinessDate(getBusinessDate(shop?.app_date), "en-IN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })}\n`;
     const isPlaceholder = customer.mobile === DEFAULT_MOBILE || /^9{9,}$/.test(customer.mobile);
     if (!isPlaceholder) {
       t += `Customer : ${customer.name}\n`;
@@ -642,7 +647,7 @@ const [customer, setCustomer] = useState({
       : shop.shop_name || "Shop Name";
     t += center(headerName) + "\n";
     t += center("Date & Time") + "\n";
-    t += center(new Date().toLocaleString()) + "\n";
+    t += center(buildBusinessDateTimeLabel(getBusinessDate(shop?.app_date))) + "\n";
     t += center("Take Away") + "\n";
     t += line + "\n";
     t += `Invoice : ${invoiceNumber || "N/A"}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";

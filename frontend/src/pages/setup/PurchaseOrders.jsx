@@ -35,6 +35,7 @@ export default function PurchaseOrders() {
   const session = getSession();
   const isAdmin = (session?.role || "").toLowerCase() === "admin";
   const apiOrigin = String(API_BASE || "").replace(/\/api\/?$/, "");
+  const cachedHotel = String(localStorage.getItem("billing_type") || "").toLowerCase() === "hotel";
 
   const parseSerialNumbers = (text) => {
     const raw = String(text || "");
@@ -47,7 +48,7 @@ export default function PurchaseOrders() {
   const [suppliers, setSuppliers] = useState([]);
   const [items, setItems] = useState([]);
   const [pos, setPos] = useState([]);
-  const [isHotel, setIsHotel] = useState(false);
+  const [isHotel, setIsHotel] = useState(cachedHotel);
 
   const [activePo, setActivePo] = useState(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -75,7 +76,8 @@ export default function PurchaseOrders() {
     try {
       const params = hotel ? { is_raw_material: true } : {};
       const res = await authAxios.get("/items/", { params });
-      setItems(res.data || []);
+      const allItems = res.data || [];
+      setItems(hotel ? allItems.filter(i => Boolean(i?.is_raw_material)) : allItems);
     } catch { showToast("Failed to load items", "error"); }
   };
   const loadPOs = async () => {
@@ -85,13 +87,17 @@ export default function PurchaseOrders() {
 
   useEffect(() => {
     loadBranches();
+    loadItems(cachedHotel);
     authAxios.get("/shop/details").then(res => {
       const hotel = String(res.data?.billing_type || "").toLowerCase() === "hotel";
       setIsHotel(hotel);
+      localStorage.setItem("billing_type", hotel ? "hotel" : "store");
       loadItems(hotel);
-    }).catch(() => loadItems(false));
+    }).catch(() => {});
   }, []);
   useEffect(() => { loadSuppliers(); loadPOs(); }, [branchId]);
+
+  const purchaseItems = isHotel ? items.filter(i => Boolean(i?.is_raw_material)) : items;
 
   /* ── po items ── */
   const addRow = () => setPoItems(prev => [...prev, { item_id: "", qty: 1, unit_cost: "" }]);
@@ -169,19 +175,21 @@ export default function PurchaseOrders() {
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
       if (!rows?.length) { showToast("Excel is empty", "error"); return; }
       const norm = obj => { const o = {}; for (const [k, v] of Object.entries(obj || {})) o[k.trim().toLowerCase()] = v; return o; };
-      const byName = name => { const n = String(name || "").trim().toLowerCase(); return n ? items.find(i => i.item_name.trim().toLowerCase() === n) || null : null; };
+      const byName = name => { const n = String(name || "").trim().toLowerCase(); return n ? purchaseItems.find(i => i.item_name.trim().toLowerCase() === n) || null : null; };
       const imported = [];
       for (const raw of rows) {
         const r = norm(raw);
-        let itemId = r.item_id ?? r.itemid ?? r["item id"] ? Number(r.item_id ?? r.itemid ?? r["item id"]) : null;
-        if (!itemId) { const m = byName(r.item_name ?? r.itemname ?? r["item name"]); itemId = m ? Number(m.item_id) : null; }
+        const itemName = r.item_name ?? r.itemname ?? r["item name"];
+        const matchedItem = byName(itemName);
+        if (!matchedItem) continue;
+        const itemId = Number(matchedItem.item_id);
         const qty = Number(r.qty ?? r.quantity ?? r["qty ordered"] ?? 0);
         const costRaw = r.unit_cost ?? r.unitcost ?? r.cost ?? r["unit cost"];
         const unitCost = costRaw === "" ? "" : Number(costRaw || 0);
-        if (!itemId || !qty || qty <= 0) continue;
+        if (!qty || qty <= 0) continue;
         imported.push({ item_id: String(itemId), qty, unit_cost: unitCost && unitCost > 0 ? String(unitCost) : "" });
       }
-      if (!imported.length) { showToast("No valid rows. Columns: item_id or item_name, qty, unit_cost", "error"); return; }
+      if (!imported.length) { showToast("No valid rows. Columns: item_name, qty, unit_cost", "error"); return; }
       setPoItems(imported);
       showToast(`Imported ${imported.length} rows`, "success");
     } catch { showToast("Excel import failed", "error"); }
@@ -332,7 +340,7 @@ export default function PurchaseOrders() {
                       onChange={e => updateRow(idx, "item_id", e.target.value)}
                     >
                       <option value="">Item…</option>
-                      {items.map(i => <option key={i.item_id} value={i.item_id}>{i.item_name}</option>)}
+                      {purchaseItems.map(i => <option key={i.item_id} value={i.item_id}>{i.item_name}</option>)}
                     </select>
                     <input
                       type="number"
@@ -368,7 +376,7 @@ export default function PurchaseOrders() {
                 <FaDownload size={11} className="text-slate-400" />
                 <span className="text-xs font-semibold text-slate-600">Import from Excel</span>
               </div>
-              <p className="text-[10px] text-slate-400">Columns: item_id or item_name, qty, unit_cost</p>
+              <p className="text-[10px] text-slate-400">Columns: item_name, qty, unit_cost</p>
               <input
                 type="file"
                 accept=".xlsx,.xls"

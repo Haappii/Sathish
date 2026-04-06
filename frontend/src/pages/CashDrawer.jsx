@@ -71,9 +71,12 @@ export default function CashDrawer() {
 
   const openShift = async () => {
     if (!canWrite) return showToast("Not allowed", "error");
+    const amt = Number(openForm.opening_cash || 0);
+    if (amt < 0) return showToast("Opening cash must be >= 0", "error");
+    if (amt > 9999999.99) return showToast("Amount exceeds maximum limit", "error");
     try {
       await authAxios.post("/cash-drawer/open", {
-        opening_cash: Number(openForm.opening_cash || 0),
+        opening_cash: amt,
         opening_notes: openForm.opening_notes || undefined,
       });
       setOpenForm({ opening_cash: "", opening_notes: "" });
@@ -88,10 +91,12 @@ export default function CashDrawer() {
     if (!canWrite) return showToast("Not allowed", "error");
     const amt = Number(moveForm.amount || 0);
     if (!amt || amt <= 0) return showToast("Enter amount", "error");
+    if (amt > 9999999.99) return showToast("Amount exceeds maximum limit", "error");
+    const cleanAmt = Math.round(amt * 100) / 100; // Fix float precision
     try {
       await authAxios.post("/cash-drawer/movement", {
         movement_type: moveForm.movement_type,
-        amount: amt,
+        amount: cleanAmt,
         reason: moveForm.reason || undefined,
       });
       setMoveForm({ movement_type: "IN", amount: "", reason: "" });
@@ -104,17 +109,38 @@ export default function CashDrawer() {
 
   const closeShift = async () => {
     if (!canWrite) return showToast("Not allowed", "error");
+    
+    // Validate that at least one denomination is provided
+    const denomTotal2 = calcDenomTotal(denoms);
+    if (denomTotal2 <= 0) {
+      return showToast("Please enter denomination counts", "error");
+    }
+    
+    // Validate variance is acceptable
+    const variance = denomTotal2 - Number(summary?.expected_cash || 0);
+    if (Math.abs(variance) > 1000) {
+      const confirmed = window.confirm(
+        `Large variance detected: ₹${variance.toFixed(2)}\nDo you want to close the shift anyway?`
+      );
+      if (!confirmed) return;
+    }
+    
     try {
       const denomCounts = Object.fromEntries(
         DENOMS.map((d) => [d, Number(denoms?.[d] || 0)])
       );
-      await authAxios.post("/cash-drawer/close", {
+      const response = await authAxios.post("/cash-drawer/close", {
         denomination_counts: denomCounts,
         closing_notes: closeForm.closing_notes || undefined,
       });
+      
+      const closedShift = response.data;
+      const finalVariance = Number(closedShift.diff_cash || 0);
+      const varianceMsg = `Shift closed. Variance: ₹${finalVariance.toFixed(2)} ${finalVariance >= 0 ? "(+)" : "(-)" }`;
+      
       setCloseForm({ closing_notes: "" });
       setDenoms(Object.fromEntries(DENOMS.map((d) => [d, ""])));
-      showToast("Shift closed", "success");
+      showToast(varianceMsg, finalVariance >= -10 ? "success" : "warning");
       load();
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to close shift", "error");
@@ -181,6 +207,8 @@ export default function CashDrawer() {
                 <label className={labelCls}>Opening Cash</label>
                 <input
                   type="number"
+                  min="0"
+                  max="9999999.99"
                   className={inputCls}
                   placeholder="0.00"
                   value={openForm.opening_cash}
@@ -277,6 +305,9 @@ export default function CashDrawer() {
                     <label className={labelCls}>Amount</label>
                     <input
                       type="number"
+                      step="0.01"
+                      min="0.01"
+                      max="9999999.99"
                       className={inputCls}
                       placeholder="0.00"
                       value={moveForm.amount}
@@ -312,6 +343,8 @@ export default function CashDrawer() {
                       <span className="w-10 text-[11px] font-semibold text-gray-600 flex-shrink-0">₹{d}</span>
                       <input
                         type="number"
+                        min="0"
+                        max="999999"
                         className="border border-gray-200 rounded-xl px-2 py-1 text-[12px] bg-gray-50 focus:outline-none w-full"
                         placeholder="0"
                         value={denoms?.[d] ?? ""}

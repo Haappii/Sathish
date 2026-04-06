@@ -52,6 +52,7 @@ export default function Branches() {
       discount_enabled: false,
       discount_type: "flat",
       discount_value: 0,
+      loyalty_points_percentage: 0,
       kot_required: true,
       receipt_required: true,
       service_charge_required: false,
@@ -100,6 +101,7 @@ export default function Branches() {
         receipt_required: branch?.receipt_required !== false,
         service_charge_required: normalizedServiceChargeRequired,
         service_charge_amount: rawServiceChargeAmount,
+        loyalty_points_percentage: Number(branch?.loyalty_points_percentage || 0),
         swiggy_enabled: Boolean(branch?.swiggy_enabled),
         zomato_enabled: Boolean(branch?.zomato_enabled),
         online_orders_auto_accept: Boolean(branch?.online_orders_auto_accept),
@@ -181,6 +183,12 @@ export default function Branches() {
       }
     }
 
+    const loyaltyPointsPercentage = Number(form.loyalty_points_percentage || 0);
+    if (Number.isNaN(loyaltyPointsPercentage) || loyaltyPointsPercentage < 0 || loyaltyPointsPercentage > 100) {
+      showToast("Enter loyalty points percentage between 0 and 100", "error");
+      return;
+    }
+
     const timeout = Number(form.online_orders_status_sync_timeout_sec || 8);
     if (Number.isNaN(timeout) || timeout < 3 || timeout > 30) {
       showToast("Status sync timeout must be between 3 and 30 seconds", "error");
@@ -192,6 +200,7 @@ export default function Branches() {
       const payload = {
         ...form,
         discount_value: Number(form.discount_value || 0),
+        loyalty_points_percentage: Number(form.loyalty_points_percentage || 0),
         online_orders_status_sync_timeout_sec: timeout,
       };
 
@@ -438,6 +447,31 @@ export default function Branches() {
                   </Field>
                 </div>
               )}
+            </FormSection>
+
+            {/* Loyalty Points */}
+            <FormSection
+              icon={<span className="text-sm font-bold">★</span>}
+              title="Loyalty Points"
+              subtitle="Award customer points as a percent of invoice total"
+            >
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Points percentage">
+                  <input
+                    type="number"
+                    className={inputClass}
+                    placeholder="0"
+                    value={form.loyalty_points_percentage}
+                    onChange={(e) => setField("loyalty_points_percentage", e.target.value)}
+                  />
+                </Field>
+                <div className="space-y-1.5">
+                  <div className="text-xs font-semibold text-slate-600">Hint</div>
+                  <div className="text-[11px] text-slate-500">
+                    Enter a number from 0 to 100. Points are calculated on invoice total after discount.
+                  </div>
+                </div>
+              </div>
             </FormSection>
 
             {/* Printing */}

@@ -21,7 +21,7 @@ import {
   FaFileExcel,
 } from "react-icons/fa";
 import api from "../utils/apiClient";
-import { getSession } from "../utils/auth";
+import { getSession, isHeadOfficeBranch } from "../utils/auth";
 import { modulesToPermMap } from "../utils/navigationMenu";
 
 export default function Setup() {
@@ -30,10 +30,7 @@ export default function Setup() {
   const [allowed, setAllowed] = useState(null);
   const roleLower = (session?.role || "").toString().toLowerCase();
   const isPrivileged = ["admin", "manager"].includes(roleLower);
-  const isHeadOffice =
-    (session?.branch_type || "").toLowerCase().includes("head") ||
-    (session?.branch_name || "").toLowerCase().includes("head") ||
-    Number(session?.branch_id) === 1;
+  const isHeadOffice = isHeadOfficeBranch(session);
 
   useEffect(() => {
     api.get("/permissions/my")

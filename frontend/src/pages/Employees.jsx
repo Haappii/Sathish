@@ -5,14 +5,11 @@ import * as XLSX from "xlsx";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { getBusinessDate, startOfBusinessMonth } from "../utils/businessDate";
 import { addEmployeeDoc, listEmployeeDocs, removeEmployeeDoc } from "../utils/hrmsLocalStore";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
-const firstDay = (isoDate) => {
-  const d = new Date(`${isoDate}T00:00:00`);
-  d.setDate(1);
-  return d.toISOString().slice(0, 10);
-};
+const todayIso = () => getBusinessDate();
+const firstDay = (isoDate) => startOfBusinessMonth(isoDate);
 
 const WAGE_TYPES = ["DAILY", "MONTHLY", "ON_DEMAND"];
 const PAYMENT_MODES = ["CASH", "UPI", "BANK", "CARD", "OTHER"];
@@ -31,6 +28,7 @@ export default function Employees() {
   const [asOfDate, setAsOfDate] = useState(todayIso());
 
   const [employees, setEmployees] = useState([]);
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState("ACTIVE");
   const [wageSummary, setWageSummary] = useState({
     employee_count: 0,
     earned_till_as_of: 0,
@@ -111,6 +109,8 @@ export default function Employees() {
     notes: "",
   });
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [employeeActionLoading, setEmployeeActionLoading] = useState(false);
+  const [confirmingEmployeeAction, setConfirmingEmployeeAction] = useState(null);
   const [docAddForm, setDocAddForm] = useState({
     doc_type: "ID_PROOF",
     doc_number: "",
@@ -126,6 +126,26 @@ export default function Employees() {
     }
     return map;
   }, [wageSummary]);
+
+  const activeEmployeeCount = useMemo(
+    () => employees.filter((emp) => Boolean(emp.active)).length,
+    [employees]
+  );
+
+  const inactiveEmployeeCount = useMemo(
+    () => employees.filter((emp) => !Boolean(emp.active)).length,
+    [employees]
+  );
+
+  const filteredEmployees = useMemo(() => {
+    if (employeeStatusFilter === "INACTIVE") {
+      return employees.filter((emp) => !Boolean(emp.active));
+    }
+    if (employeeStatusFilter === "ALL") {
+      return employees;
+    }
+    return employees.filter((emp) => Boolean(emp.active));
+  }, [employees, employeeStatusFilter]);
 
   const selectedEmployee = useMemo(
     () => employees.find((e) => Number(e.employee_id) === Number(selectedEmployeeId)) || null,
@@ -149,7 +169,7 @@ export default function Employees() {
 
   const loadEmployees = async () => {
     const res = await api.get("/employees", {
-      params: { branch_id: resolveBranchParam() },
+      params: { branch_id: resolveBranchParam(), include_inactive: true },
     });
     const rows = res?.data || [];
     setEmployees(rows);
@@ -343,15 +363,51 @@ export default function Employees() {
     });
   };
 
-  const deactivateEmployee = async (emp) => {
-    const ok = window.confirm(`Deactivate ${emp.employee_name}?`);
-    if (!ok) return;
+  const openEmployeeActionConfirm = (emp, action) => {
+    setConfirmingEmployeeAction({
+      action,
+      employee_id: emp.employee_id,
+      employee_name: emp.employee_name,
+      designation: emp.designation || "",
+      wage_type: emp.wage_type || "",
+      due_till_as_of: Number(dueMap?.[emp.employee_id]?.due_till_as_of || 0),
+    });
+  };
+
+  const closeEmployeeActionConfirm = () => {
+    const actionLabel =
+      confirmingEmployeeAction?.action === "restore" ? "Restore" : "Deactivate";
+    setConfirmingEmployeeAction(null);
+    showToast(`${actionLabel} cancelled`, "warning");
+  };
+
+  const confirmEmployeeAction = async () => {
+    if (!confirmingEmployeeAction?.employee_id || employeeActionLoading) return;
+
+    const { action, employee_id: employeeId } = confirmingEmployeeAction;
+    setEmployeeActionLoading(true);
     try {
-      await api.delete(`/employees/${emp.employee_id}`);
-      showToast("Employee deactivated", "success");
+      if (action === "restore") {
+        await api.post(`/employees/${employeeId}/restore`);
+        showToast("Employee restored", "success");
+        setSelectedEmployeeId(employeeId);
+      } else {
+        await api.delete(`/employees/${employeeId}`);
+        showToast("Employee deactivated", "success");
+      }
+
+      setConfirmingEmployeeAction(null);
       await loadPage();
     } catch (err) {
-      showToast(err?.response?.data?.detail || "Failed to deactivate employee", "error");
+      showToast(
+        err?.response?.data?.detail ||
+          (action === "restore"
+            ? "Failed to restore employee"
+            : "Failed to deactivate employee"),
+        "error"
+      );
+    } finally {
+      setEmployeeActionLoading(false);
     }
   };
 
@@ -463,7 +519,9 @@ export default function Employees() {
         </button>
         <div className="flex-1">
           <h1 className="text-base font-bold text-gray-800">Employee Management</h1>
-          <p className="text-[11px] text-gray-400">{wageSummary.employee_count} employee{wageSummary.employee_count !== 1 ? "s" : ""}</p>
+          <p className="text-[11px] text-gray-400">
+            {activeEmployeeCount} active • {inactiveEmployeeCount} inactive
+          </p>
         </div>
         <div className="flex gap-2">
           <input ref={xlsxRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelImport} />
@@ -507,7 +565,7 @@ export default function Employees() {
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard title="Employees" value={wageSummary.employee_count} />
+        <KpiCard title="Active Employees" value={activeEmployeeCount} />
         <KpiCard title="Total Due" value={money(wageSummary.due_till_as_of)} danger />
         <KpiCard title="Total Earned" value={money(wageSummary.earned_till_as_of)} />
         <KpiCard title="Total Paid" value={money(wageSummary.paid_till_as_of)} />
@@ -563,26 +621,75 @@ export default function Employees() {
         {/* Employee List */}
         <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b bg-gradient-to-r from-gray-50 to-white">
-            <div className="text-sm font-bold text-gray-800">Employee List</div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-gray-800">Employee List</div>
+                <div className="text-[11px] text-gray-500">
+                  {filteredEmployees.length} shown
+                </div>
+              </div>
+              <div className="flex items-center gap-1 rounded-xl border bg-white p-1">
+                {[
+                  { key: "ACTIVE", label: `Active (${activeEmployeeCount})` },
+                  { key: "INACTIVE", label: `Inactive (${inactiveEmployeeCount})` },
+                  { key: "ALL", label: `All (${employees.length})` },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setEmployeeStatusFilter(option.key)}
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${
+                      employeeStatusFilter === option.key
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="p-3 max-h-[480px] overflow-auto space-y-1.5">
             {loading ? (
               <div className="text-[12px] text-gray-400 text-center py-8">Loading...</div>
-            ) : employees.length === 0 ? (
+            ) : filteredEmployees.length === 0 ? (
               <div className="text-[12px] text-gray-400 text-center py-8">No employees found</div>
             ) : (
-              employees.map((emp) => {
+              filteredEmployees.map((emp) => {
                 const isSelected = Number(selectedEmployeeId) === Number(emp.employee_id);
                 const due = dueMap?.[emp.employee_id]?.due_till_as_of || 0;
                 return (
                   <div
                     key={emp.employee_id}
-                    className={`border rounded-xl p-3 text-[12px] cursor-pointer transition ${isSelected ? "bg-blue-50 border-blue-200" : "bg-white hover:bg-gray-50"}`}
+                    className={`border rounded-xl p-3 text-[12px] cursor-pointer transition ${
+                      isSelected
+                        ? "bg-blue-50 border-blue-200"
+                        : emp.active
+                          ? "bg-white hover:bg-gray-50"
+                          : "bg-slate-50/80 border-slate-200 hover:bg-slate-100/70"
+                    }`}
                     onClick={() => setSelectedEmployeeId(emp.employee_id)}
                   >
                     <div className="flex justify-between gap-2">
-                      <div className="font-semibold text-gray-800">{emp.employee_name}</div>
-                      <div className={`font-semibold ${Number(due) > 0 ? "text-rose-600" : "text-emerald-600"}`}>{money(due)}</div>
+                      <div className="space-y-1">
+                        <div className="font-semibold text-gray-800">{emp.employee_name}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            emp.active
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-slate-100 text-slate-600"
+                          }`}>
+                            {emp.active ? "Active" : "Inactive"}
+                          </span>
+                          {!emp.active && (
+                            <span className="text-[10px] text-slate-500">Restore available</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className={`font-semibold ${Number(due) > 0 ? "text-rose-600" : Number(due) < 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                        {money(due)}
+                      </div>
                     </div>
                     <div className="text-[11px] text-gray-500 mt-0.5">
                       {emp.wage_type} | {emp.designation || "No role"} | {emp.mobile || "-"}
@@ -590,7 +697,10 @@ export default function Employees() {
                     <div className="mt-1.5 flex gap-1.5">
                       <button onClick={(e) => { e.stopPropagation(); editEmployee(emp); }} className="px-2.5 py-0.5 border rounded-lg text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition">Edit</button>
                       {emp.active && (
-                        <button onClick={(e) => { e.stopPropagation(); deactivateEmployee(emp); }} className="px-2.5 py-0.5 border rounded-lg text-[11px] font-medium text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 transition">Deactivate</button>
+                        <button onClick={(e) => { e.stopPropagation(); openEmployeeActionConfirm(emp, "deactivate"); }} className="px-2.5 py-0.5 border rounded-lg text-[11px] font-medium text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 transition">Deactivate</button>
+                      )}
+                      {!emp.active && (
+                        <button onClick={(e) => { e.stopPropagation(); openEmployeeActionConfirm(emp, "restore"); }} className="px-2.5 py-0.5 border rounded-lg text-[11px] font-medium text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition">Restore</button>
                       )}
                     </div>
                   </div>
@@ -641,6 +751,11 @@ export default function Employees() {
               <SummaryTag label="Total Due" value={money(employeeSummary.due_till_as_of)} danger />
             </div>
           )}
+          {selectedEmployee && !selectedEmployee.active && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              This employee is inactive. Restore the employee from the list before adding new settlement payments.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <input type="date" className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400" value={paymentForm.payment_date} onChange={(e) => setPaymentForm((p) => ({ ...p, payment_date: e.target.value }))} />
             <input type="number" className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400" placeholder="Amount" value={paymentForm.amount} onChange={(e) => setPaymentForm((p) => ({ ...p, amount: e.target.value }))} />
@@ -649,7 +764,7 @@ export default function Employees() {
             </select>
             <input className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400" placeholder="Notes" value={paymentForm.notes} onChange={(e) => setPaymentForm((p) => ({ ...p, notes: e.target.value }))} />
           </div>
-          <button onClick={savePayment} disabled={!selectedEmployee || paymentSaving} className="px-5 py-1.5 rounded-xl text-[12px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-60">
+          <button onClick={savePayment} disabled={!selectedEmployee || !selectedEmployee.active || paymentSaving} className="px-5 py-1.5 rounded-xl text-[12px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-60">
             {paymentSaving ? "Saving..." : "Save Payment"}
           </button>
           <div className="bg-white border rounded-xl overflow-auto max-h-[220px]">
@@ -731,6 +846,78 @@ export default function Employees() {
           )}
         </div>
       </div>
+
+      {confirmingEmployeeAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl border bg-white shadow-xl">
+            <div className="border-b px-5 py-4">
+              <h2 className="text-sm font-semibold text-gray-800">
+                {confirmingEmployeeAction.action === "restore"
+                  ? "Restore Employee"
+                  : "Deactivate Employee"}
+              </h2>
+              <p className="mt-1 text-[12px] text-gray-500">
+                {confirmingEmployeeAction.action === "restore"
+                  ? `Restore ${confirmingEmployeeAction.employee_name}?`
+                  : `Deactivate ${confirmingEmployeeAction.employee_name}?`}
+              </p>
+            </div>
+
+            <div className="space-y-1 px-5 py-4 text-[12px] text-gray-600">
+              <div>
+                <span className="font-medium text-gray-700">Wage Type:</span>{" "}
+                {confirmingEmployeeAction.wage_type || "NA"}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Role:</span>{" "}
+                {confirmingEmployeeAction.designation || "NA"}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Settlement:</span>{" "}
+                {confirmingEmployeeAction.due_till_as_of > 0
+                  ? `Payable ${money(confirmingEmployeeAction.due_till_as_of)}`
+                  : confirmingEmployeeAction.due_till_as_of < 0
+                    ? `Receivable ${money(Math.abs(confirmingEmployeeAction.due_till_as_of))}`
+                    : "Settled"}
+              </div>
+              {confirmingEmployeeAction.action === "deactivate" && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                  Deactivation is allowed only after all payable or receivable amounts are settled.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 rounded-b-2xl border-t bg-gray-50 px-5 py-3">
+              <button
+                type="button"
+                disabled={employeeActionLoading}
+                onClick={closeEmployeeActionConfirm}
+                className="rounded-lg border bg-white px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={employeeActionLoading}
+                onClick={confirmEmployeeAction}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium text-white disabled:opacity-60 ${
+                  confirmingEmployeeAction.action === "restore"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-rose-600 hover:bg-rose-700"
+                }`}
+              >
+                {employeeActionLoading
+                  ? confirmingEmployeeAction.action === "restore"
+                    ? "Restoring..."
+                    : "Deactivating..."
+                  : confirmingEmployeeAction.action === "restore"
+                    ? "Confirm Restore"
+                    : "Confirm Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </div>
   );

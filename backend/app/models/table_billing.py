@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     DateTime,
     Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -14,10 +15,34 @@ from app.db import Base
 
 
 # ================================
+# TABLE CATEGORY
+# ================================
+class TableCategory(Base):
+    __tablename__ = "table_categories"
+
+    category_id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)
+    category_name = Column(String(100), nullable=False)
+    branch_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tables = relationship(
+        "TableMaster",
+        back_populates="category",
+        cascade="all, delete-orphan"
+    )
+
+
+# ================================
 # TABLE MASTER
 # ================================
 class TableMaster(Base):
     __tablename__ = "tables_master"
+
+    __table_args__ = (
+        UniqueConstraint("shop_id", "branch_id", "category_id", "table_name",
+                         name="uq_tables_master_shop_branch_category_name"),
+    )
 
     table_id = Column(Integer, primary_key=True, index=True)
     shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)
@@ -25,13 +50,15 @@ class TableMaster(Base):
     capacity = Column(Integer, default=0)
 
     branch_id = Column(Integer, nullable=False)
-    status = Column(String(20), default="FREE")  # FREE / OCCUPIED
+    category_id = Column(Integer, ForeignKey("table_categories.category_id"), nullable=True)
+    status = Column(String(20), default="FREE")  # FREE / OCCUPIED / PAID
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # 🔥 NEW COLUMN (USED FOR RUNNING TIME)
     table_start_time = Column(DateTime, nullable=True)
 
+    category = relationship("TableCategory", back_populates="tables")
     orders = relationship(
         "Order",
         back_populates="table",

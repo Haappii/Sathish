@@ -139,6 +139,11 @@ async def setup_onboard(request: Request, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(branch)
 
+        shop.head_office_branch_id = branch.branch_id
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
         # Ensure username unique within shop
         exists = db.query(User).filter(
             User.shop_id == shop.shop_id,

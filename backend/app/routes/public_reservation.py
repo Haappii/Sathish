@@ -92,6 +92,7 @@ def get_shop_info(
         "address": shop.address_line1 or "",
         "mobile": shop.mobile or "",
         "upi_id": shop.upi_id or "",
+        "app_date": str(shop.app_date) if getattr(shop, "app_date", None) else None,
         "reservation_advance": float(shop.reservation_advance or 0),
         "branches": [
             {"branch_id": b.branch_id, "branch_name": b.branch_name}

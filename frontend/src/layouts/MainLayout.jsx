@@ -7,11 +7,13 @@ import api from "../utils/apiClient";
 import {
   getSession,
   setSession as persistSession,
-  clearSession,
   isSessionExpired,
-  refreshSessionActivity
+  logoutSession,
+  refreshSessionActivity,
+  isHeadOfficeBranchClosed,
 } from "../utils/auth";
 import { useToast } from "../components/Toast";
+import { formatBusinessDate } from "../utils/businessDate";
 
 import defaultLogo from "../assets/logo.png";
 import SupportChat from "../components/SupportChat";
@@ -86,18 +88,17 @@ export default function MainLayout({ hideSidebar = false }) {
   const branchName = session?.branch_name ?? null;
 
   const appDateDisplay = shop?.app_date
-    ? new Date(shop.app_date).toLocaleDateString("en-GB", {
+    ? formatBusinessDate(shop.app_date, "en-GB", {
         day: "2-digit",
         month: "short",
-        year: "numeric"
+        year: "numeric",
       })
     : "Business Date not set";
 
   /* ================= SESSION CHECK ================= */
   useEffect(() => {
     if (!session?.token || isSessionExpired()) {
-      clearSession();
-      navigate("/");
+      logoutSession();
       return;
     }
     refreshSessionActivity();
@@ -139,6 +140,15 @@ export default function MainLayout({ hideSidebar = false }) {
         if (data.shop_name) setShopName(data.shop_name);
         localStorage.setItem("billing_type", (data.billing_type || "shop").toLowerCase());
         setShop(data);
+        if (data.app_date) {
+          setSessionAndRerender((cur) => {
+            if ((cur?.app_date || "") === data.app_date) return cur;
+            return {
+              ...cur,
+              app_date: data.app_date,
+            };
+          });
+        }
       })
       .catch(() => {});
   }, []);
@@ -312,8 +322,7 @@ export default function MainLayout({ hideSidebar = false }) {
     .toLowerCase();
 
   const showTableBilling = shopType === "hotel";
-  const isHeadOfficeClosed =
-    Number(branchId) === 1 && String(session?.branch_close || "N").toUpperCase() === "Y";
+  const isHeadOfficeClosed = isHeadOfficeBranchClosed(session);
 
   const canQrOrders = useMemo(() => {
     if (!showTableBilling) return false;
@@ -622,7 +631,7 @@ export default function MainLayout({ hideSidebar = false }) {
 
             {/* Logout */}
             <button
-              onClick={() => { clearSession(); navigate("/"); }}
+              onClick={() => { logoutSession(); }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-white transition hover:opacity-90"
               style={{ backgroundColor: BLUE }}
             >

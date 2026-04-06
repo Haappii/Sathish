@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from pydantic import BaseModel
@@ -31,6 +31,10 @@ router = APIRouter(
 )
 
 TAKEAWAY_TABLE_NAME = "__TAKEAWAY__"
+
+
+def _table_started_now() -> datetime:
+    return datetime.now()
 
 def _end_active_qr_session(*, db: Session, shop_id: int, table_id: int) -> None:
     s = (
@@ -81,21 +85,34 @@ def _serialize_order_items(order: Order) -> list[dict]:
         for it in order.items
     ]
 
-def _branch_service_charge(db: Session, *, shop_id: int, branch_id: int) -> Decimal:
+def _branch_service_charge_info(db: Session, *, shop_id: int, branch_id: int) -> dict:
+    """Return service_charge and service_charge_gst as Decimals from branch settings."""
     branch = (
         db.query(Branch)
         .filter(Branch.shop_id == shop_id, Branch.branch_id == branch_id)
         .first()
     )
+    zero = {"service_charge": Decimal("0.00"), "service_charge_gst": Decimal("0.00")}
     if not branch or not getattr(branch, "service_charge_required", False):
-        return Decimal("0.00")
+        return zero
     try:
         amount = Decimal(str(getattr(branch, "service_charge_amount", 0) or 0))
     except Exception:
         amount = Decimal("0")
     if amount < 0:
         amount = Decimal("0")
-    return amount.quantize(Decimal("0.01"))
+    amount = amount.quantize(Decimal("0.01"))
+
+    gst_amt = Decimal("0.00")
+    if getattr(branch, "service_charge_gst_required", False):
+        try:
+            gst_pct = Decimal(str(getattr(branch, "service_charge_gst_percent", 0) or 0))
+        except Exception:
+            gst_pct = Decimal("0")
+        if gst_pct > 0:
+            gst_amt = (amount * gst_pct / 100).quantize(Decimal("0.01"))
+
+    return {"service_charge": amount, "service_charge_gst": gst_amt}
 
 
 def _get_or_create_takeaway_table(*, db: Session, shop_id: int, branch_id: int) -> TableMaster:
@@ -159,6 +176,7 @@ def list_tables(
     ensure_hotel_billing_type(db, user.shop_id)
     tables = (
         db.query(TableMaster)
+        .options(joinedload(TableMaster.category))
         .filter(
             TableMaster.shop_id == user.shop_id,
             TableMaster.branch_id == user.branch_id,
@@ -191,7 +209,10 @@ def list_tables(
             "table_id": t.table_id,
             "table_name": t.table_name,
             "capacity": t.capacity,
+            "category_id": t.category_id,
+            "category_name": t.category.category_name if t.category else None,
             "status": t.status,
+            "table_start_time": t.table_start_time,
             "opened_at": t.table_start_time,
             "running_total": float(running_total),
             "order_id": order.order_id if order else None,
@@ -363,6 +384,7 @@ def get_or_create_order(
     )
 
     if not order:
+        table_started_at = _table_started_now()
         order = Order(
             shop_id=user.shop_id,
             table_id=table_id,
@@ -371,18 +393,21 @@ def get_or_create_order(
         )
 
         table.status = "OCCUPIED"
-        table.table_start_time = datetime.now()
+        table.table_start_time = table_started_at
 
         db.add(order)
         db.commit()
         db.refresh(order)
 
+    sc_info = _branch_service_charge_info(db, shop_id=user.shop_id, branch_id=int(user.branch_id))
     return {
         "order_id": order.order_id,
         "table_id": order.table_id,
         "table_name": table.table_name,
         "status": order.status,
-        "items": _serialize_order_items(order)
+        "items": _serialize_order_items(order),
+        "service_charge": float(sc_info["service_charge"]),
+        "service_charge_gst": float(sc_info["service_charge_gst"]),
     }
 
 
@@ -464,6 +489,41 @@ def add_order_item(
     return {"success": True}
 
 
+@router.post("/order/clear/{order_id}")
+def clear_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("billing", "write"))
+):
+    ensure_hotel_billing_type(db, user.shop_id)
+    order = (
+        db.query(Order)
+        .options(joinedload(Order.items))
+        .filter(
+            Order.shop_id == user.shop_id,
+            Order.order_id == order_id,
+            Order.branch_id == user.branch_id,
+            Order.status == "OPEN"
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    removed_count = 0
+    for it in list(order.items):
+        db.delete(it)
+        removed_count += 1
+
+    db.commit()
+    return {
+        "success": True,
+        "removed_count": removed_count,
+        "message": "Order cleared"
+    }
+
+
 # ======================================================
 # CHECKOUT ORDER (✅ FIXED – CUSTOMER DETAILS SAVED)
 # ======================================================
@@ -498,16 +558,20 @@ def checkout_order(
         for it in order.items
     )
 
-    service_charge = _branch_service_charge(db, shop_id=user.shop_id, branch_id=int(user.branch_id))
+    sc_info = _branch_service_charge_info(db, shop_id=user.shop_id, branch_id=int(user.branch_id))
+    service_charge = sc_info["service_charge"]
+    service_charge_gst = sc_info["service_charge_gst"]
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax_amt, total = calculate_gst(subtotal, shop)
-    grand_total = (total + service_charge).quantize(Decimal("0.01"))
+    grand_total = (total + service_charge + service_charge_gst).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
     payment_split = payload.payment_split if isinstance(payload.payment_split, dict) else {}
     if service_charge > 0:
         payment_split = dict(payment_split or {})
         payment_split["service_charge"] = float(service_charge)
+        if service_charge_gst > 0:
+            payment_split["service_charge_gst"] = float(service_charge_gst)
 
     invoice = Invoice(
         shop_id=user.shop_id,
@@ -564,7 +628,7 @@ def checkout_order(
 
     order.status = "CLOSED"
     order.closed_at = datetime.now()
-    order.table.status = "FREE"
+    order.table.status = "PAID"
     order.table.table_start_time = None
     _end_active_qr_session(db=db, shop_id=int(user.shop_id), table_id=int(order.table_id))
 

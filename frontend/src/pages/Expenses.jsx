@@ -4,16 +4,11 @@ import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { getBusinessDate, startOfBusinessMonth } from "../utils/businessDate";
 import { modulesToPermMap } from "../utils/navigationMenu";
 
-const isoToday = () => new Date().toISOString().slice(0, 10);
-
-const monthStart = () => {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${yyyy}-${mm}-01`;
-};
+const isoToday = () => getBusinessDate();
+const monthStart = () => startOfBusinessMonth(getBusinessDate());
 
 const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition w-full";
 const labelCls = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";

@@ -25,7 +25,7 @@ function StatusBadge({ status }) {
 }
 
 /* ── table card ───────────────────────────────────────────────────────────── */
-function TableCard({ t, editingId, editForm, setEditForm, onStartEdit, onSaveEdit, onCancelEdit, onQr, onDelete, confirmDeleteId }) {
+function TableCard({ t, editingId, editForm, setEditForm, onStartEdit, onSaveEdit, onCancelEdit, onQr, onDelete, confirmDeleteId, categories }) {
   const isEditing = editingId === t.table_id;
   const isConfirmDelete = confirmDeleteId === t.table_id;
   const status = String(t.status || "AVAILABLE").toUpperCase();
@@ -61,6 +61,16 @@ function TableCard({ t, editingId, editForm, setEditForm, onStartEdit, onSaveEdi
               />
               <span className="text-xs text-slate-500">seats</span>
             </div>
+            <select
+              value={editForm.category_id}
+              onChange={(e) => setEditForm((f) => ({ ...f, category_id: e.target.value }))}
+              className={inputCls}
+            >
+              <option value="">No Category</option>
+              {categories.map(c => (
+                <option key={c.category_id} value={c.category_id}>{c.category_name}</option>
+              ))}
+            </select>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => onSaveEdit(t.table_id)}
@@ -92,6 +102,11 @@ function TableCard({ t, editingId, editForm, setEditForm, onStartEdit, onSaveEdi
                     <FaChair size={10} />
                     <span>{t.capacity} seats</span>
                   </div>
+                  {t.category_name && (
+                    <div className="text-xs text-blue-600 font-medium mt-0.5">
+                      {t.category_name}
+                    </div>
+                  )}
                 </div>
               </div>
               <StatusBadge status={t.status} />
@@ -241,12 +256,16 @@ export default function ManageTables() {
   const { showToast } = useToast();
 
   const [tables, setTables] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ table_name: "", capacity: 4 });
+  const [editForm, setEditForm] = useState({ table_name: "", capacity: 4, category_id: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [hotelAllowed, setHotelAllowed] = useState(null);
 
-  const [form, setForm] = useState({ table_name: "", capacity: 4 });
+  const [form, setForm] = useState({ table_name: "", capacity: 4, category_id: "" });
+  const [categoryForm, setCategoryForm] = useState({ category_name: "" });
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editCategoryForm, setEditCategoryForm] = useState({ category_name: "" });
 
   const [qrOpen, setQrOpen] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
@@ -276,9 +295,74 @@ export default function ManageTables() {
     }
   };
 
+  /* ── load categories ── */
+  const loadCategories = async () => {
+    try {
+      const res = await api.get("/table-categories/", { params: { branch_id: branchId } });
+      setCategories(res.data || []);
+    } catch {
+      showToast("Failed to load categories", "error");
+    }
+  };
+
+  /* ── add category ── */
+  const addCategory = async () => {
+    if (!categoryForm.category_name.trim()) { showToast("Category name required", "error"); return; }
+    try {
+      await api.post("/table-categories/", {
+        category_name: categoryForm.category_name.trim(),
+        branch_id: Number(branchId),
+      });
+      setCategoryForm({ category_name: "" });
+      loadCategories();
+      showToast("Category added", "success");
+    } catch {
+      showToast("Failed to add category", "error");
+    }
+  };
+
+  /* ── edit category ── */
+  const startEditCategory = (category) => {
+    setEditingCategoryId(category.category_id);
+    setEditCategoryForm({ category_name: category.category_name });
+  };
+
+  const saveEditCategory = async () => {
+    if (!editCategoryForm.category_name.trim()) { showToast("Category name required", "error"); return; }
+    try {
+      await api.put(`/table-categories/${editingCategoryId}/`, {
+        category_name: editCategoryForm.category_name.trim(),
+      });
+      setEditingCategoryId(null);
+      setEditCategoryForm({ category_name: "" });
+      loadCategories();
+      showToast("Category updated", "success");
+    } catch {
+      showToast("Failed to update category", "error");
+    }
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCategoryId(null);
+    setEditCategoryForm({ category_name: "" });
+  };
+
+  /* ── delete category ── */
+  const deleteCategory = async (categoryId) => {
+    try {
+      await api.delete(`/table-categories/${categoryId}/`);
+      loadCategories();
+      loadTables(); // reload tables to update category references
+      showToast("Category deleted", "success");
+    } catch {
+      showToast("Failed to delete category", "error");
+    }
+  };
+
   useEffect(() => {
     if (!hotelAllowed) return;
     loadTables();
+    loadCategories();
   }, [branchId, hotelAllowed]);
 
   /* ── add ── */
@@ -288,9 +372,10 @@ export default function ManageTables() {
       await api.post("/tables/create", {
         table_name: form.table_name.trim(),
         capacity: Number(form.capacity),
+        category_id: form.category_id ? Number(form.category_id) : null,
         branch_id: Number(branchId),
       });
-      setForm({ table_name: "", capacity: 4 });
+      setForm({ table_name: "", capacity: 4, category_id: "" });
       loadTables();
       showToast("Table added", "success");
     } catch {
@@ -301,7 +386,7 @@ export default function ManageTables() {
   /* ── edit ── */
   const startEdit = (t) => {
     setEditingId(t.table_id);
-    setEditForm({ table_name: t.table_name, capacity: t.capacity });
+    setEditForm({ table_name: t.table_name, capacity: t.capacity, category_id: t.category_id || "" });
   };
 
   const saveEdit = async (id) => {
@@ -310,6 +395,7 @@ export default function ManageTables() {
       await api.put(`/tables/${id}`, {
         table_name: editForm.table_name.trim(),
         capacity: Number(editForm.capacity),
+        category_id: editForm.category_id ? Number(editForm.category_id) : null,
       });
       setEditingId(null);
       loadTables();
@@ -450,6 +536,74 @@ export default function ManageTables() {
         </div>
       )}
 
+      {/* ── categories section ── */}
+      <div className="bg-white border rounded-2xl shadow-sm p-5">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">Table Categories</h3>
+        <div className="space-y-3">
+          {categories.map(c => (
+            <div key={c.category_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+              {editingCategoryId === c.category_id ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    value={editCategoryForm.category_name}
+                    onChange={(e) => setEditCategoryForm({ category_name: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && saveEditCategory()}
+                    className={`${inputCls} flex-1`}
+                    autoFocus
+                  />
+                  <button
+                    onClick={saveEditCategory}
+                    className="text-xs text-green-600 hover:text-green-800 font-semibold"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEditCategory}
+                    className="text-xs text-gray-600 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="text-sm font-medium text-slate-700">{c.category_name}</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => startEditCategory(c)}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteCategory(c.category_id)}
+                      className="text-xs text-rose-600 hover:text-rose-800"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          <div className="flex gap-2 pt-2">
+            <input
+              placeholder="New category name"
+              value={categoryForm.category_name}
+              onChange={(e) => setCategoryForm({ category_name: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && addCategory()}
+              className={`${inputCls} flex-1`}
+            />
+            <button
+              onClick={addCategory}
+              className="px-4 py-2 rounded-xl text-white text-sm font-semibold"
+              style={{ background: BLUE }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* ── add table card ── */}
       <div className="bg-white border rounded-2xl shadow-sm p-5">
         <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -477,6 +631,19 @@ export default function ManageTables() {
               onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
               className={inputCls}
             />
+          </div>
+          <div className="w-40">
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Category</label>
+            <select
+              value={form.category_id}
+              onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
+              className={inputCls}
+            >
+              <option value="">No Category</option>
+              {categories.map(c => (
+                <option key={c.category_id} value={c.category_id}>{c.category_name}</option>
+              ))}
+            </select>
           </div>
           <button
             onClick={addTable}
@@ -510,6 +677,7 @@ export default function ManageTables() {
               onQr={(table) => openQr(table, false)}
               onDelete={requestDelete}
               confirmDeleteId={confirmDeleteId}
+              categories={categories}
             />
           ))}
         </div>

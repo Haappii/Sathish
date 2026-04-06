@@ -13,6 +13,7 @@ import { saveAs } from "file-saver";
 import defaultLogo from "../../assets/logo.png";
 import { getShopLogoUrl } from "../../utils/shopLogo";
 import { isHotelShop } from "../../utils/shopType";
+import { getBusinessDate, syncBusinessDate } from "../../utils/businessDate";
 import {
   FaChartBar,
   FaMoneyBillWave,
@@ -290,9 +291,7 @@ export default function Reports() {
       const b = toDate.split("-").reverse().join("/");
       return `${a} to ${b}`;
     }
-    const now = new Date();
-    const pad = n => String(n).padStart(2, "0");
-    const d = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+    const d = getBusinessDate().split("-").reverse().join("/");
     return `As of ${d}`;
   };
 
@@ -302,6 +301,7 @@ export default function Reports() {
   useEffect(() => {
     api.get("/shop/details").then(r => {
       const shopData = r.data || {};
+      if (shopData?.app_date) syncBusinessDate(shopData.app_date);
       setShop(shopData);
       setHotelShop(isHotelShop(shopData));
     });
@@ -506,7 +506,7 @@ export default function Reports() {
       let rows = [];
 
       if (reportKey === "employees/wages-summary" || reportKey === "employees/due-list") {
-        const asOf = toDate || fromDate || new Date().toISOString().slice(0, 10);
+        const asOf = toDate || fromDate || getBusinessDate();
         const r = await api.get("/employees/wages/summary", {
           params: { branch_id: params.branch_id, as_of_date: asOf },
         });

@@ -4,6 +4,7 @@ import api from "../utils/apiClient";
 import { printDirectText } from "../utils/printDirect";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { buildBusinessDateTimeLabel, getBusinessDate } from "../utils/businessDate";
 import {
   MdTableRestaurant,
   MdOutlineOpenInNew,
@@ -42,7 +43,7 @@ function generateKOTText({ tableName, items }) {
 
   let t = "";
   t += center("KOT") + "\n";
-  t += center(new Date().toLocaleString()) + "\n";
+  t += center(buildBusinessDateTimeLabel(getBusinessDate())) + "\n";
   t += center(tableName ? `Table ${tableName}` : "Table Billing") + "\n";
   t += line + "\n";
   t += "Item Name".padEnd(NAME_COL) + rightCol("Count", COUNT_COL) + "\n";

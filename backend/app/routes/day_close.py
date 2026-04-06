@@ -12,6 +12,8 @@ from app.models.stock import Inventory
 from app.models.date_wise_stock import DateWiseStock
 from app.services.financials_service import calc_day_close_totals
 from app.utils.permissions import require_permission
+from app.utils.head_office import is_head_office_branch, get_head_office_branch_id
+from app.models.shop_details import ShopDetails
 
 router = APIRouter(prefix="/day-close", tags=["Day Close"])
 TAKEAWAY_TABLE_NAME = "__TAKEAWAY__"
@@ -250,30 +252,26 @@ def close_shop_day(
 ):
     # Permission already checked by dependency.
 
-    head_branch = db.query(Branch).filter(
-        Branch.branch_id == user.branch_id,
-        Branch.shop_id == user.shop_id
-    ).first()
-    if not head_branch or (
-        "head" not in (head_branch.type or "").lower()
-        and "head" not in (head_branch.branch_name or "").lower()
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    if not is_head_office_branch(
+        db,
+        shop_id=user.shop_id,
+        branch_id=getattr(user, "branch_id", None),
+        shop=shop,
     ):
         raise HTTPException(403, "Shop close allowed only from Head Office")
 
     d = parse_date(date_str)
 
     # ensure all branches closed (using branch_close flag)
+    head_office_branch_id = get_head_office_branch_id(db, shop_id=user.shop_id, shop=shop)
     branches = db.query(Branch).filter(
         Branch.status == "ACTIVE",
         Branch.shop_id == user.shop_id
     ).all()
     active_branches = [
         b for b in branches
-        if (
-            b.branch_id != 1
-            and "head" not in (b.type or "").lower()
-            and "head" not in (b.branch_name or "").lower()
-        )
+        if head_office_branch_id is None or int(b.branch_id) != int(head_office_branch_id)
     ]
     closed_ids = set(
         r[0] for r in db.query(BranchDayClose.branch_id)
@@ -371,8 +369,6 @@ def close_shop_day(
     ))
 
     # advance app date
-    from app.models.shop_details import ShopDetails
-    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     if shop:
         shop.app_date = d + timedelta(days=1)
     # reset branch close flags

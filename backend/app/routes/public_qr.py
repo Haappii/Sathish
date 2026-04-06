@@ -127,7 +127,7 @@ def _mark_table_running(*, db: Session, table: TableMaster) -> None:
     if table.status != "OCCUPIED":
         table.status = "OCCUPIED"
     if not getattr(table, "table_start_time", None):
-        table.table_start_time = datetime.utcnow()
+        table.table_start_time = datetime.now()
     db.commit()
 
 

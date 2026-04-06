@@ -26,6 +26,7 @@ class ShopDetailsBase(BaseModel):
     gst_mode: Optional[str] = "inclusive"
 
     app_date: Optional[date] = None
+    head_office_branch_id: Optional[int] = None
 
     # Stored in system_parameters (not in shop_details table)
     inventory_enabled: Optional[bool] = None

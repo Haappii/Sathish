@@ -9,6 +9,7 @@ from app.models.items import Item
 from app.models.category import Category
 from app.models.invoice import Invoice
 from app.utils.auth_user import get_current_user
+from app.utils.business_date import get_business_date
 
 
 router = APIRouter(
@@ -34,15 +35,14 @@ def get_category_item_count(
 
     # ---------- DATE FILTERS ----------
     date_filter = []
+    business_date = get_business_date(db, user.shop_id)
 
     if mode == "today":
-        today = date.today()
-        date_filter.append(func.date(Invoice.created_time) == today)
+        date_filter.append(func.date(Invoice.created_time) == business_date)
 
     elif mode == "month":
-        today = date.today()
-        date_filter.append(func.extract("year", Invoice.created_time) == today.year)
-        date_filter.append(func.extract("month", Invoice.created_time) == today.month)
+        date_filter.append(func.extract("year", Invoice.created_time) == business_date.year)
+        date_filter.append(func.extract("month", Invoice.created_time) == business_date.month)
 
     elif mode == "custom":
         if not from_date or not to_date:

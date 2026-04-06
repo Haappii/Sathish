@@ -68,6 +68,7 @@ export default function About() {
 
   const windowsAppUrl = import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
   const isWindows = typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
+  const desktopAppProtocolUrl = `poss://open?path=${encodeURIComponent("/home")}`;
 
   const startWindowsDownload = async () => {
     if (!windowsAppUrl) { showToast("Windows app not configured", "error"); return; }
@@ -93,7 +94,43 @@ export default function About() {
   };
 
   const openDesktopApp = () => {
-    window.location.href = `poss://open?path=${encodeURIComponent("/home")}`;
+    if (!isWindows) {
+      showToast("Desktop app launch is available on Windows only.", "error");
+      return;
+    }
+
+    let didLeavePage = false;
+    const markPageHidden = () => {
+      didLeavePage = true;
+      window.removeEventListener("blur", markPageHidden);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        markPageHidden();
+      }
+    };
+
+    window.addEventListener("blur", markPageHidden, { once: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const link = document.createElement("a");
+    link.href = desktopAppProtocolUrl;
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.setTimeout(() => {
+      window.removeEventListener("blur", markPageHidden);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (!didLeavePage) {
+        showToast("Desktop app did not respond. Install it first, or start it once manually and try again.", "error");
+      }
+    }, 1800);
+
+    showToast("Trying to open the desktop app...", "info");
+    return;
     showToast("Trying to open the desktop app…", "info");
   };
 

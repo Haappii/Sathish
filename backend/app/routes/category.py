@@ -86,6 +86,58 @@ def create_category(
     return category
 
 
+# ---------- BULK IMPORT (upsert by name) ----------
+@router.post("/bulk-import")
+def bulk_import_categories(
+    body: CategoryBulkImport,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("categories", "write")),
+):
+    inserted = 0
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(body.rows):
+        name = (row.category_name or "").strip().upper()
+        if not name:
+            errors.append({"row": i + 1, "error": "category_name is required"})
+            continue
+        try:
+            existing = db.query(Category).filter(
+                Category.category_name == name,
+                Category.shop_id == user.shop_id,
+            ).first()
+            if existing:
+                existing.category_status = row.status if row.status is not None else True
+                updated += 1
+            else:
+                db.add(Category(
+                    shop_id=user.shop_id,
+                    category_name=name,
+                    category_status=row.status if row.status is not None else True,
+                    created_by=user.user_id,
+                ))
+                inserted += 1
+        except Exception as e:
+            errors.append({"row": i + 1, "error": str(e)})
+
+    db.add(BulkImportLog(
+        shop_id=user.shop_id,
+        upload_type="categories",
+        filename=body.filename or "",
+        uploaded_by=user.user_id,
+        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
+        total_rows=len(body.rows),
+        inserted=inserted,
+        updated=updated,
+        error_count=len(errors),
+        errors_json=errors if errors else None,
+        rows_json=[r.model_dump() for r in body.rows],
+    ))
+    db.commit()
+    return {"inserted": inserted, "updated": updated, "errors": errors}
+
+
 # ---------- UPDATE ----------
 @router.put("/{category_id}", response_model=CategoryResponse)
 def update_category(category_id: int, request: CategoryUpdate,
@@ -198,55 +250,3 @@ def delete_category(
     )
 
     return {"message": "Category marked inactive"}
-
-
-# ---------- BULK IMPORT (upsert by name) ----------
-@router.post("/bulk-import")
-def bulk_import_categories(
-    body: CategoryBulkImport,
-    db: Session = Depends(get_db),
-    user=Depends(require_permission("categories", "write")),
-):
-    inserted = 0
-    updated = 0
-    errors = []
-
-    for i, row in enumerate(body.rows):
-        name = (row.category_name or "").strip().upper()
-        if not name:
-            errors.append({"row": i + 1, "error": "category_name is required"})
-            continue
-        try:
-            existing = db.query(Category).filter(
-                Category.category_name == name,
-                Category.shop_id == user.shop_id,
-            ).first()
-            if existing:
-                existing.category_status = row.status if row.status is not None else True
-                updated += 1
-            else:
-                db.add(Category(
-                    shop_id=user.shop_id,
-                    category_name=name,
-                    category_status=row.status if row.status is not None else True,
-                    created_by=user.user_id,
-                ))
-                inserted += 1
-        except Exception as e:
-            errors.append({"row": i + 1, "error": str(e)})
-
-    db.add(BulkImportLog(
-        shop_id=user.shop_id,
-        upload_type="categories",
-        filename=body.filename or "",
-        uploaded_by=user.user_id,
-        uploaded_by_name=getattr(user, "name", None) or getattr(user, "user_name", ""),
-        total_rows=len(body.rows),
-        inserted=inserted,
-        updated=updated,
-        error_count=len(errors),
-        errors_json=errors if errors else None,
-        rows_json=[r.model_dump() for r in body.rows],
-    ))
-    db.commit()
-    return {"inserted": inserted, "updated": updated, "errors": errors}

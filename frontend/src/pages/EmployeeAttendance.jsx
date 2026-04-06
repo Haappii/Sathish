@@ -3,6 +3,7 @@ import api from "../utils/apiClient";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { getBusinessDate, syncBusinessDate } from "../utils/businessDate";
 import BackButton from "../components/BackButton";
 
 const STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LEAVE"];
@@ -12,7 +13,7 @@ export default function EmployeeAttendance() {
   const session = getSession() || {};
   const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
-  const [attendanceDate, setAttendanceDate] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState(getBusinessDate());
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [attendanceData, setAttendanceData] = useState({});
@@ -45,10 +46,10 @@ export default function EmployeeAttendance() {
   useEffect(() => {
     authAxios.get("/shop/details")
       .then(res => {
-        const bDate = res.data?.app_date;
-        setAttendanceDate(bDate || new Date().toISOString().slice(0, 10));
+        const bDate = syncBusinessDate(res.data?.app_date);
+        setAttendanceDate(bDate || getBusinessDate());
       })
-      .catch(() => setAttendanceDate(new Date().toISOString().slice(0, 10)));
+      .catch(() => setAttendanceDate(getBusinessDate()));
     loadEmployees();
   }, []);
 

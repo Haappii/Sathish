@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
+import { getBusinessDate } from "../utils/businessDate";
 
-const today = () => new Date().toISOString().split("T")[0];
+const today = () => getBusinessDate();
 
 const STATUS = {
   PENDING:   { label: "Pending",   bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200"  },

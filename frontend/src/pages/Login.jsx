@@ -87,7 +87,9 @@ export default function Login() {
         branch_id: res.data.branch_id,
         branch_name: res.data.branch_name,
         branch_close: res.data.branch_close,
-        branch_type: res.data.branch_type
+        branch_type: res.data.branch_type,
+        head_office_branch_id: res.data.head_office_branch_id,
+        app_date: res.data.app_date,
       };
 
       setSession(sessionPayload);

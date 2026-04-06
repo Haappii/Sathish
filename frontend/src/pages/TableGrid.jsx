@@ -18,20 +18,35 @@ const toAmount = (v) => {
    TIME HELPERS — ONLY FROM table_start_time
    ===================================================== */
 
+const parseTableStartTime = (value) => {
+  if (!value) return null;
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+
+  if (typeof value === "string") {
+    const fallback = new Date(value.replace(" ", "T"));
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
+  return null;
+};
+
+const getTableStartTime = (table) =>
+  table?.table_start_time || table?.opened_at || null;
+
 // returns minutes since start
 const runningMinutes = (tableStartTime) => {
-  if (!tableStartTime) return null;
+  const start = parseTableStartTime(tableStartTime);
+  if (!start) return null;
 
-  const start = new Date(tableStartTime).getTime();
-  if (isNaN(start)) return null;
-
-  return Math.floor((Date.now() - start) / 60000);
+  return Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
 };
 
 // format start time as HH:MM
 const formatStartTime = (tableStartTime) => {
-  if (!tableStartTime) return "";
-  const d = new Date(tableStartTime);
+  const d = parseTableStartTime(tableStartTime);
+  if (!d) return "";
   return d.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit"
@@ -45,7 +60,6 @@ export default function TableGrid() {
   const branchId = session.branch_id;
 
   const [tables, setTables] = useState([]);
-  const [tab, setTab] = useState("IDLE");
   const [confirming, setConfirming] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [hotelAllowed, setHotelAllowed] = useState(null);
@@ -383,14 +397,11 @@ export default function TableGrid() {
 
 
   /* ================= FILTER ================= */
-  const list = tables.filter(t =>
-    tab === "IDLE"
-      ? t.status === "FREE"
-      : t.status === "OCCUPIED"
-  );
+  const list = tables;
 
   const freeCount = tables.filter(t => t.status === "FREE").length;
   const occupiedCount = tables.filter(t => t.status === "OCCUPIED").length;
+  const paidCount = tables.filter(t => t.status === "PAID").length;
 
   return (
     <div className="space-y-3">
@@ -414,34 +425,19 @@ export default function TableGrid() {
         </button>
         <h1 className="text-base font-semibold text-gray-700">Table Billing</h1>
 
-        {/* Tab toggle */}
-        <div className="ml-auto flex rounded-lg border overflow-hidden bg-white">
-          <button
-            onClick={() => setTab("IDLE")}
-            className={`px-4 py-1.5 text-xs font-semibold transition ${
-              tab === "IDLE"
-                ? "bg-indigo-600 text-white"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Free
-            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-              tab === "IDLE" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-            }`}>{freeCount}</span>
-          </button>
-          <button
-            onClick={() => setTab("RUNNING")}
-            className={`px-4 py-1.5 text-xs font-semibold transition border-l ${
-              tab === "RUNNING"
-                ? "bg-indigo-600 text-white"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Occupied
-            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-              tab === "RUNNING" ? "bg-white/20 text-white" : "bg-orange-100 text-orange-600"
-            }`}>{occupiedCount}</span>
-          </button>
+        <div className="ml-auto flex items-center gap-3 text-xs text-gray-600">
+          <div className="rounded-full border border-gray-200 bg-white px-3 py-1">
+            Free: <span className="font-semibold text-gray-900">{freeCount}</span>
+          </div>
+          <div className="rounded-full border border-gray-200 bg-white px-3 py-1">
+            Occupied: <span className="font-semibold text-gray-900">{occupiedCount}</span>
+          </div>
+          <div className="rounded-full border border-gray-200 bg-white px-3 py-1">
+            Paid: <span className="font-semibold text-gray-900">{paidCount}</span>
+          </div>
+          <div className="rounded-full border border-gray-200 bg-white px-3 py-1">
+            Total: <span className="font-semibold text-gray-900">{tables.length}</span>
+          </div>
         </div>
       </div>
 
@@ -449,86 +445,128 @@ export default function TableGrid() {
       {list.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400">No tables available</div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {list.map(t => {
-            const mins = runningMinutes(t.opened_at);
-            const isOccupied = t.status === "OCCUPIED";
+        (() => {
+          // Group tables by category
+          const grouped = {};
+          list.forEach(t => {
+            const cat = t.category_name || "Uncategorized";
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(t);
+          });
 
-            return (
-              <div
-                key={t.table_id}
-                onClick={() => navigate(`/table-order/${t.table_id}`)}
-                className={`rounded-xl border cursor-pointer transition active:scale-[0.97] overflow-hidden ${
-                  isOccupied
-                    ? "border-orange-200 bg-orange-50"
-                    : "border-gray-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30"
-                }`}
-              >
-                {/* Card header */}
-                <div className={`px-3 py-2 flex items-center justify-between ${
-                  isOccupied ? "bg-orange-100" : "bg-gray-50"
-                }`}>
-                  <span className={`text-sm font-bold truncate ${
-                    isOccupied ? "text-orange-700" : "text-indigo-700"
-                  }`}>
-                    {t.table_name}
-                  </span>
-                  <span className="text-[10px] text-gray-500 shrink-0 ml-1">
-                    {t.capacity} seats
-                  </span>
-                </div>
+          return Object.keys(grouped).map(catName => (
+            <div key={catName} className="space-y-2">
+              <h2 className="text-sm font-semibold text-gray-700 border-b pb-1">{catName}</h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {grouped[catName].map(t => {
+                  const tableStartTime = getTableStartTime(t);
+                  const mins = runningMinutes(tableStartTime);
+                  const isOccupied = t.status === "OCCUPIED";
+                  const isPaid = t.status === "PAID";
 
-                {/* Card body */}
-                <div className="px-3 py-2.5">
-                  {isOccupied ? (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-500">{formatStartTime(t.opened_at)}</span>
-                        <span className="text-[10px] text-orange-600 font-medium">{mins ?? 0}m</span>
+                  return (
+                    <div
+                      key={t.table_id}
+                      onClick={async () => {
+                        if (isPaid) {
+                          try {
+                            await api.patch(`/tables/${t.table_id}/status`, { status: "FREE" });
+                            await loadTables();
+                            showToast("Table cleared", "success");
+                          } catch (err) {
+                            showToast("Failed to clear table", "error");
+                          }
+                        } else {
+                          navigate(`/table-order/${t.table_id}`);
+                        }
+                      }}
+                      className={`rounded-xl border cursor-pointer transition active:scale-[0.97] overflow-hidden ${
+                        isOccupied
+                          ? "border-orange-200 bg-orange-50"
+                          : isPaid
+                          ? "border-green-200 bg-green-50"
+                          : "border-gray-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30"
+                      }`}
+                    >
+                      {/* Card header */}
+                      <div className={`px-3 py-2 flex items-start justify-between gap-3 ${
+                        isOccupied ? "bg-orange-100" : isPaid ? "bg-green-100" : "bg-gray-50"
+                      }`}>
+                        <div className="min-w-0">
+                          <div className={`text-sm font-bold truncate ${
+                            isOccupied ? "text-orange-700" : isPaid ? "text-green-700" : "text-indigo-700"
+                          }`}>
+                            {t.table_name}
+                          </div>
+                          <div className="text-[10px] text-gray-500">
+                            {t.capacity} seats
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${
+                          isOccupied ? "bg-orange-100 text-orange-700" : isPaid ? "bg-green-100 text-green-700" : "bg-indigo-100 text-indigo-700"
+                        }`}>
+                          {isOccupied ? "Occupied" : isPaid ? "Paid" : "Free"}
+                        </span>
                       </div>
-                      <div className="text-lg font-bold text-gray-800 leading-none">
-                        ₹{Number(t.running_total || 0).toFixed(0)}
-                      </div>
-                      <div className="flex gap-1.5 pt-1" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            if (!t.order_id) { showToast("No active order for this table", "error"); return; }
-                            setConfirming({
-                              order_id: t.order_id,
-                              table: t,
-                              customer_name: t.customer_name || "NA",
-                              mobile: t.mobile || DEFAULT_MOBILE,
-                              service_charge: branchInfo?.service_charge_required
-                                ? toAmount(branchInfo?.service_charge_amount || 0)
-                                : 0,
-                              payment_mode: "cash",
-                              split_enabled: false,
-                              split: { cash: "", card: "", upi: "" }
-                            });
-                          }}
-                          className="flex-1 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold"
-                        >
-                          Complete
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); navigate(`/table-order/${t.table_id}`); }}
-                          className="flex-1 py-1 rounded-lg border bg-white hover:bg-gray-50 text-[11px] text-gray-600"
-                        >
-                          Open
-                        </button>
+
+                      {/* Card body */}
+                      <div className="px-3 py-2.5">
+                        {isOccupied ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-gray-500">{formatStartTime(tableStartTime)}</span>
+                              <span className="text-[10px] text-orange-600 font-medium">{mins ?? 0}m</span>
+                            </div>
+                            <div className="text-lg font-bold text-gray-800 leading-none">
+                              ₹{Number(t.running_total || 0).toFixed(0)}
+                            </div>
+                            <div className="flex gap-1.5 pt-1" onClick={e => e.stopPropagation()}>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  if (!t.order_id) { showToast("No active order for this table", "error"); return; }
+                                  setConfirming({
+                                    order_id: t.order_id,
+                                    table: t,
+                                    customer_name: t.customer_name || "NA",
+                                    mobile: t.mobile || DEFAULT_MOBILE,
+                                    service_charge: branchInfo?.service_charge_required
+                                      ? toAmount(branchInfo?.service_charge_amount || 0)
+                                      : 0,
+                                    payment_mode: "cash",
+                                    split_enabled: false,
+                                    split: { cash: "", card: "", upi: "" }
+                                  });
+                                }}
+                                className="flex-1 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold"
+                              >
+                                Complete
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); navigate(`/table-order/${t.table_id}`); }}
+                                className="flex-1 py-1 rounded-lg border bg-white hover:bg-gray-50 text-[11px] text-gray-600"
+                              >
+                                Open
+                              </button>
+                            </div>
+                          </div>
+                        ) : isPaid ? (
+                          <div className="py-2 text-center text-[11px] text-green-600 font-medium">
+                            Tap to clear
+                          </div>
+                        ) : (
+                          <div className="py-2 text-center text-[11px] text-gray-400">
+                            Tap to start
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="py-2 text-center text-[11px] text-gray-400">
-                      Tap to start
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          ));
+        })()
       )}
 
       {/* ── Checkout modal ── */}

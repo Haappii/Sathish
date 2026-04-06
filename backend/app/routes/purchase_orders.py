@@ -25,6 +25,7 @@ from app.services.day_close_service import is_branch_day_closed
 from app.services.inventory_service import adjust_stock
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+from app.utils.shop_type import get_shop_billing_type
 from sqlalchemy import func
 
 router = APIRouter(prefix="/purchase-orders", tags=["Purchase Orders"])
@@ -110,6 +111,7 @@ def create_po(
 ):
     bid = resolve_branch(payload.branch_id, user)
     business_date = get_business_date(db, user.shop_id)
+    is_hotel = get_shop_billing_type(db, int(user.shop_id)) == "hotel"
     if is_branch_day_closed(db, user.shop_id, bid, business_date):
         raise HTTPException(403, "Day closed for this branch")
 
@@ -147,6 +149,11 @@ def create_po(
         ).first()
         if not item:
             raise HTTPException(400, f"Item not found: {it.item_id}")
+        if is_hotel and not bool(getattr(item, "is_raw_material", False)):
+            raise HTTPException(
+                400,
+                f"Hotel purchase orders allow raw materials only: {item.item_name}",
+            )
         qty = int(it.qty or 0)
         if qty <= 0:
             raise HTTPException(400, "Qty must be > 0")
