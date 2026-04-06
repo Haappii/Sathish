@@ -759,6 +759,25 @@ def api_health():
     return {"status": "ok"}
 
 
+@app.get("/api/status")
+def api_status():
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/info")
+def api_v1_info():
+    return {
+        "status": "ok",
+        "service": "Billing API",
+        "message": "Production backend is running",
+    }
+
+
+@app.get("/api", include_in_schema=False)
+def api_root():
+    return {"status": "ok", "message": "Billing API is running"}
+
+
 @app.get("/api/items", include_in_schema=False)
 def legacy_items_redirect():
     return RedirectResponse(url="/api/items/", status_code=307)

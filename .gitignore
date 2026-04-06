@@ -6,6 +6,7 @@ __pycache__/
 venv/
 .env
 config.txt
+config.example.txt
 
 # Backend
 backend/venv/

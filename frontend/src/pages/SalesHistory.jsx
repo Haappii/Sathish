@@ -213,6 +213,12 @@ export default function SalesHistory() {
   };
 
   const totals = calculateTotals();
+  const paymentSplit = activeBill?.payment_split || {};
+  const serviceChargeAmount = Number(paymentSplit.service_charge || 0);
+  const serviceChargeGstAmount = Number(paymentSplit.service_charge_gst || 0);
+  const discountedAmt = Number(activeBill?.discounted_amt || 0);
+  const billingTotal = totals.total - discountedAmt + serviceChargeAmount + serviceChargeGstAmount;
+  const hasServiceCharge = serviceChargeAmount > 0 || serviceChargeGstAmount > 0;
 
   /* ================= UPDATE QTY ================= */
   const updateQty = (idx, qty) => {
@@ -244,6 +250,25 @@ export default function SalesHistory() {
       loadBills();
     } catch {
       showToast("Update failed", "error");
+    }
+  };
+
+  const removeServiceCharge = async () => {
+    try {
+      const resp = await authAxios.patch(`/invoice/${activeBill.invoice_id}/remove-service-charge`);
+      const updatedSplit = { ...(activeBill.payment_split || {}) };
+      delete updatedSplit.service_charge;
+      delete updatedSplit.service_charge_gst;
+      setActiveBill(prev => ({
+        ...prev,
+        payment_split: Object.keys(updatedSplit).length ? updatedSplit : null,
+        total_amount: resp.data?.new_total ?? prev.total_amount
+      }));
+      showToast("Service charge removed successfully", "success");
+      loadBills();
+    } catch (e) {
+      const message = e?.response?.data?.detail || "Could not remove service charge";
+      showToast(message, "error");
     }
   };
 
@@ -338,9 +363,17 @@ export default function SalesHistory() {
     t += leftText + " ".repeat(gap) + rightText + "\n";
     if (shop.gst_enabled)
       t += rightKV(`GST ${shop.gst_percent}%`, totals.tax.toFixed(2)) + "\n";
+
+    const serviceCharge = Number(activeBill.payment_split?.service_charge || 0);
+    const serviceChargeGst = Number(activeBill.payment_split?.service_charge_gst || 0);
+    if (serviceCharge > 0)
+      t += rightKV("Service Charge", serviceCharge.toFixed(2)) + "\n";
+    if (serviceChargeGst > 0)
+      t += rightKV("Service Charge GST", serviceChargeGst.toFixed(2)) + "\n";
+
     if (activeBill.discounted_amt)
       t += rightKV("Discount", Number(activeBill.discounted_amt).toFixed(2)) + "\n";
-    t += rightKV("Grand Total", totals.total.toFixed(2)) + "\n";
+    t += rightKV("Grand Total", billingTotal.toFixed(2)) + "\n";
     t += line + "\n";
     // Footer + 4 blank lines so the final message is always on the same slip
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
@@ -614,13 +647,25 @@ export default function SalesHistory() {
                     <span className="text-gray-700">₹ {totals.tax.toFixed(2)}</span>
                   </div>
                 )}
+                {serviceChargeAmount > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Service Charge</span>
+                    <span className="text-gray-700">₹ {serviceChargeAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {serviceChargeGstAmount > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Service Charge GST</span>
+                    <span className="text-gray-700">₹ {serviceChargeGstAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-500">
                   <span>Discount</span>
                   <span className="text-gray-700">₹ {Number(activeBill.discounted_amt || 0).toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between font-bold text-base">
                   <span>Total</span>
-                  <span className="text-emerald-600">₹ {totals.total.toFixed(2)}</span>
+                  <span className="text-emerald-600">₹ {billingTotal.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -682,6 +727,14 @@ export default function SalesHistory() {
                     </>
                   )}
                 </>
+              )}
+              {hasServiceCharge && canEdit && isAppDateBill(activeBill?.created_time) && (
+                <button
+                  onClick={removeServiceCharge}
+                  className="px-4 py-1.5 rounded-lg bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-200 text-sm font-medium"
+                >
+                  Remove Service Charge
+                </button>
               )}
 
               <button
