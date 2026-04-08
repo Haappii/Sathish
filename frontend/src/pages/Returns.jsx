@@ -11,6 +11,8 @@ export default function Returns() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
+  const isHotel = (localStorage.getItem("billing_type") || "").toLowerCase() === "hotel";
+
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoice, setInvoice] = useState(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
@@ -46,12 +48,18 @@ export default function Returns() {
     if (!invoice?.invoice_number) return showToast("Load an invoice first", "error");
 
     const items = (invoice.items || [])
-      .map(i => ({
-        item_id: i.item_id,
-        quantity: Number(qty[i.item_id] || 0),
-        condition: condition[i.item_id] || "GOOD",
-        restock: (condition[i.item_id] || "GOOD") !== "DAMAGED",
-      }))
+      .map(i => {
+        const cond = condition[i.item_id] || "GOOD";
+        // Hotel: GOOD → restock (re-serve); BAD → trash (do not restock)
+        // Store: GOOD → restock; DAMAGED → do not restock
+        const restock = isHotel ? cond === "GOOD" : cond !== "DAMAGED";
+        return {
+          item_id: i.item_id,
+          quantity: Number(qty[i.item_id] || 0),
+          condition: isHotel ? (cond === "GOOD" ? "GOOD" : "DAMAGED") : cond,
+          restock,
+        };
+      })
       .filter(x => x.quantity > 0);
 
     if (items.length === 0) return showToast("Enter return qty", "error");
@@ -230,8 +238,17 @@ export default function Returns() {
                             onChange={e => setCondition(prev => ({ ...prev, [i.item_id]: e.target.value }))}
                             className="border border-gray-200 rounded-xl px-2 py-1 text-[11px] bg-gray-50 focus:outline-none"
                           >
-                            <option value="GOOD">Good (add to stock)</option>
-                            <option value="DAMAGED">Damaged (do not add)</option>
+                            {isHotel ? (
+                              <>
+                                <option value="GOOD">Good (add to future invoices)</option>
+                                <option value="BAD">Bad (trash)</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="GOOD">Good (add to stock)</option>
+                                <option value="DAMAGED">Damaged (do not add)</option>
+                              </>
+                            )}
                           </select>
                         </td>
                         <td className="px-4 py-2.5 text-right">
