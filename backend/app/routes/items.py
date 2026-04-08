@@ -514,17 +514,22 @@ def update_item(
         if request_data.min_stock is not None:
             item.min_stock = request_data.min_stock
 
-        # Post-validate prices only for normal items
-        if shop_type == "hotel":
-            if float(getattr(item, "price", 0) or 0) <= 0:
-                raise HTTPException(400, "Selling price is required for items")
-        else:
-            if float(getattr(item, "price", 0) or 0) <= 0:
-                raise HTTPException(400, "Selling price is required for items")
-            if float(getattr(item, "buy_price", 0) or 0) <= 0:
-                raise HTTPException(400, "Buy price is required for items")
-            if float(getattr(item, "mrp_price", 0) or 0) <= 0:
-                raise HTTPException(400, "MRP is required for items")
+        # Post-validate prices only when price fields were explicitly sent
+        price_fields_sent = any(
+            getattr(request_data, f, None) is not None
+            for f in ("price", "buy_price", "mrp_price")
+        )
+        if price_fields_sent:
+            if shop_type == "hotel":
+                if float(getattr(item, "price", 0) or 0) <= 0:
+                    raise HTTPException(400, "Selling price is required for items")
+            else:
+                if float(getattr(item, "price", 0) or 0) <= 0:
+                    raise HTTPException(400, "Selling price is required for items")
+                if float(getattr(item, "buy_price", 0) or 0) <= 0:
+                    raise HTTPException(400, "Buy price is required for items")
+                if float(getattr(item, "mrp_price", 0) or 0) <= 0:
+                    raise HTTPException(400, "MRP is required for items")
 
     db.commit()
     db.refresh(item)
