@@ -15,7 +15,8 @@ class Item(Base):
     item_id = Column(Integer, primary_key=True, index=True)
     shop_id = Column(Integer, ForeignKey("shop_details.shop_id"), nullable=False)
     branch_id = Column(Integer, ForeignKey("branch.branch_id"), nullable=True)
-    category_id = Column(Integer, ForeignKey("category.category_id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("category.category_id"), nullable=True)   # null for raw materials
+    supplier_id = Column(Integer, ForeignKey("suppliers.supplier_id"), nullable=True)  # set for raw materials
 
     item_name = Column(String(150), nullable=False)
     hsn_code = Column(String(30), nullable=True)

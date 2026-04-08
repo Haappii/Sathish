@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 
 from app.models.stock import Inventory
 from app.models.items import Item
@@ -135,7 +135,10 @@ def get_branch_stock_rows(
             Inventory.min_stock
         )
         .join(Item, Item.item_id == Inventory.item_id)
-        .filter(Inventory.shop_id == shop_id, Inventory.branch_id == branch_id)
+        .filter(
+            Inventory.shop_id == shop_id,
+            or_(Inventory.branch_id == branch_id, Inventory.branch_id.is_(None))
+        )
         .order_by(desc(Inventory.quantity))
     )
 

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models.invoice import Invoice
 
 _BASE36_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -32,6 +33,9 @@ def generate_invoice_number(db: Session, *, shop_id: int, branch_id: int) -> str
       INV-{BRCD}{SEQ}
     - BRCD: 4 chars derived from branch_id (base36)
     - SEQ : per-branch sequence, 5 digits (00001...)
+
+    Orders by invoice_number DESC (not invoice_id) so that out-of-order
+    inserts don't cause duplicate number generation.
     """
     brcd = _branch_code(branch_id)
     prefix = f"INV-{brcd}"
@@ -43,7 +47,7 @@ def generate_invoice_number(db: Session, *, shop_id: int, branch_id: int) -> str
             Invoice.branch_id == branch_id,
             Invoice.invoice_number.like(f"{prefix}%"),
         )
-        .order_by(Invoice.invoice_id.desc())
+        .order_by(Invoice.invoice_number.desc())
         .first()
     )
 

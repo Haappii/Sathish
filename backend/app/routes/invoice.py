@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, cast, Date as SQLDate
+from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 
@@ -570,16 +571,21 @@ def create_invoice(
 @router.get("/list")
 def list_invoices(
     request: Request,
+    from_date: Optional[str] = Query(default=None),
+    to_date: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     user=Depends(require_permission("billing", "read")),
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
-    return (
+    q = (
         db.query(Invoice)
         .filter(Invoice.branch_id == branch_id, Invoice.shop_id == user.shop_id)
-        .order_by(Invoice.invoice_id.desc())
-        .all()
     )
+    if from_date:
+        q = q.filter(cast(Invoice.created_time, SQLDate) >= from_date)
+    if to_date:
+        q = q.filter(cast(Invoice.created_time, SQLDate) <= to_date)
+    return q.order_by(Invoice.invoice_id.desc()).all()
 
 
 # =====================================================

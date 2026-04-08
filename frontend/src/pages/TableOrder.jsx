@@ -51,12 +51,16 @@ export default function TableOrder() {
   const [showTotals, setShowTotals] = useState(false);
   const [cartBusy, setCartBusy] = useState(false);
 
+  // Ref to always have the latest orderId without closure staleness
+  const orderIdRef = useRef(null);
+
   const errorDetail = (err, fallback) =>
     err?.response?.data?.detail || fallback;
 
   /* ================= LOAD ================= */
   const loadOrder = useCallback(async () => {
     const res = await api.get(`/table-billing/order/by-table/${tableId}`);
+    orderIdRef.current = res.data.order_id;
     setOrderId(res.data.order_id);
     setOrderItems(res.data.items || []);
     setTableName(res.data.table_name || res.data.table?.table_name || "");
@@ -107,6 +111,17 @@ export default function TableOrder() {
       mounted = false;
     };
   }, [loadOrder, loadData, showToast]);
+
+  /* Reload order when user switches back to this tab (stale session fix) */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && hotelAllowed) {
+        loadOrder().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadOrder, hotelAllowed]);
 
   /* ================= CUSTOMER AUTO FILL ================= */
   const fetchCustomerByMobile = async mobile => {
@@ -164,9 +179,23 @@ export default function TableOrder() {
   }) => {
     setCartBusy(true);
     try {
-      await api.post("/table-billing/order/item/add", null, {
-        params: { order_id: orderId, item_id: itemId, qty }
-      });
+      let currentOrderId = orderIdRef.current;
+      try {
+        await api.post("/table-billing/order/item/add", null, {
+          params: { order_id: currentOrderId, item_id: itemId, qty }
+        });
+      } catch (err) {
+        // If order is stale/invalid, reload and retry once
+        if (err?.response?.status === 400) {
+          await loadOrder();
+          currentOrderId = orderIdRef.current;
+          await api.post("/table-billing/order/item/add", null, {
+            params: { order_id: currentOrderId, item_id: itemId, qty }
+          });
+        } else {
+          throw err;
+        }
+      }
       await loadOrder();
       if (successMessage) showToast(successMessage, "success");
     } catch (err) {

@@ -14,6 +14,7 @@ export default function Items() {
 
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [hotelShop, setHotelShop] = useState(false);
   const [branchWise, setBranchWise] = useState(false);
   const [branches, setBranches] = useState([]);
@@ -22,12 +23,14 @@ export default function Items() {
   const isAdmin = String(session?.role || "").toLowerCase() === "admin";
 
   const [activeCategoryId, setActiveCategoryId] = useState("all");
+  const [activeSupplierId, setActiveSupplierId] = useState(null);
   const [categorySearch, setCategorySearch] = useState("");
   const [search, setSearch] = useState("");
 
   const [form, setForm] = useState({
     item_name: "",
     category_id: "",
+    supplier_id: "",
     price: "",
     buy_price: "",
     mrp_price: "",
@@ -80,10 +83,11 @@ export default function Items() {
 
   const loadData = useCallback(async (branchIdOverride) => {
     try {
-      const [shopRes, branchRes, c] = await Promise.all([
+      const [shopRes, branchRes, c, suppRes] = await Promise.all([
         authAxios.get("/shop/details"),
         authAxios.get("/branch/active"),
         authAxios.get("/category/"),
+        authAxios.get("/suppliers/"),
       ]);
       const shopData = shopRes?.data || {};
       setHotelShop(isHotelShop(shopData));
@@ -92,11 +96,9 @@ export default function Items() {
       const branchList = branchRes?.data || [];
       setBranches(branchList);
 
-      // Determine which branch to load items for
       let bid = branchIdOverride;
       if (bid === undefined) {
         if (isBW) {
-          // admin: default to first branch; non-admin: their own branch from session
           bid = isAdmin
             ? (branchList[0]?.branch_id ? String(branchList[0].branch_id) : "")
             : String(session?.branch_id || "");
@@ -111,6 +113,7 @@ export default function Items() {
       const i = await authAxios.get("/items/", { headers });
       setItems(i.data || []);
       setCategories(c.data || []);
+      setSuppliers(suppRes.data || []);
     } catch {
       showToast("Failed to load data", "error");
     }
@@ -154,12 +157,13 @@ export default function Items() {
     setForm({
       item_name: "",
       category_id: nextCategoryId,
+      supplier_id: activeSupplierId ? String(activeSupplierId) : "",
       price: "",
       buy_price: "",
       mrp_price: "",
       min_stock: "",
       item_status: true,
-      is_raw_material: false,
+      is_raw_material: !!activeSupplierId,
     });
     setEditingId(null);
     setEditingItem(null);
@@ -168,34 +172,56 @@ export default function Items() {
 
   const selectCategory = catId => {
     setActiveCategoryId(catId);
+    setActiveSupplierId(null);
     if (catId !== "all") {
       setForm(prev => ({ ...prev, category_id: String(catId) }));
     }
   };
 
+  const selectSupplier = suppId => {
+    setActiveSupplierId(suppId);
+    setActiveCategoryId("all");
+    setForm(prev => ({ ...prev, supplier_id: String(suppId), is_raw_material: true, category_id: "" }));
+  };
+
   const saveItem = async () => {
-    if (!form.item_name || !form.category_id) {
-      return showToast("Enter item name and select a category", "error");
+    if (!form.item_name.trim()) {
+      return showToast("Enter item name", "error");
+    }
+    if (form.is_raw_material) {
+      if (!form.supplier_id) return showToast("Select a supplier for raw material", "error");
+    } else {
+      if (!form.category_id) return showToast("Select a category", "error");
+      if (!hotelShop) {
+        if (!Number(form.buy_price)) return showToast("Buy price is required", "error");
+        if (!Number(form.mrp_price)) return showToast("MRP is required", "error");
+      }
+      if (!Number(form.price)) return showToast("Selling price is required", "error");
     }
 
-    if (!hotelShop && !form.is_raw_material) {
-      if (!Number(form.buy_price)) return showToast("Buy price is required", "error");
-      if (!Number(form.mrp_price)) return showToast("MRP is required", "error");
-    }
-    if (!form.is_raw_material && !Number(form.price)) {
-      return showToast("Selling price is required", "error");
-    }
-
-    const payload = {
-      item_name: form.item_name.toUpperCase(),
-      category_id: Number(form.category_id),
-      price: Number(form.price) || 0,
-      buy_price: hotelShop ? 0 : (Number(form.buy_price) || 0),
-      mrp_price: hotelShop ? 0 : (Number(form.mrp_price) || 0),
-      min_stock: Number(form.min_stock) || 0,
-      item_status: !!form.item_status,
-      is_raw_material: !!form.is_raw_material,
-    };
+    const payload = form.is_raw_material
+      ? {
+          item_name: form.item_name.toUpperCase(),
+          is_raw_material: true,
+          supplier_id: Number(form.supplier_id),
+          category_id: null,
+          price: 0,
+          buy_price: 0,
+          mrp_price: 0,
+          min_stock: Number(form.min_stock) || 0,
+          item_status: !!form.item_status,
+        }
+      : {
+          item_name: form.item_name.toUpperCase(),
+          category_id: Number(form.category_id),
+          is_raw_material: false,
+          supplier_id: null,
+          price: Number(form.price) || 0,
+          buy_price: hotelShop ? 0 : (Number(form.buy_price) || 0),
+          mrp_price: hotelShop ? 0 : (Number(form.mrp_price) || 0),
+          min_stock: Number(form.min_stock) || 0,
+          item_status: !!form.item_status,
+        };
 
     const uploadImage = async itemId => {
       if (!imageFile) return { ok: true };
@@ -250,20 +276,22 @@ export default function Items() {
   };
 
   const editItem = item => {
-    const catId = String(item?.category_id ?? "");
-    if (catId) setActiveCategoryId(catId);
+    const isRaw = !!item.is_raw_material;
+    const catId = isRaw ? "" : String(item?.category_id ?? "");
+    if (!isRaw && catId) setActiveCategoryId(catId);
 
     setEditingId(item.item_id);
     setEditingItem(item);
     setForm({
       item_name: item.item_name || "",
       category_id: catId,
+      supplier_id: isRaw ? String(item.supplier_id ?? "") : "",
       price: item.price ?? 0,
       buy_price: item.buy_price ?? 0,
       mrp_price: item.mrp_price ?? 0,
       min_stock: item.min_stock ?? 0,
       item_status: !!item.item_status,
-      is_raw_material: !!item.is_raw_material,
+      is_raw_material: isRaw,
     });
     setImageFile(null);
   };
@@ -280,13 +308,16 @@ export default function Items() {
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (items || []).filter(i => {
+      const searchOk = (i.item_name || "").toLowerCase().includes(q);
+      if (activeSupplierId) {
+        return i.is_raw_material && String(i.supplier_id) === String(activeSupplierId) && searchOk;
+      }
       const catOk =
         activeCategoryId === "all" ||
         String(i.category_id) === String(activeCategoryId);
-      const searchOk = (i.item_name || "").toLowerCase().includes(q);
       return catOk && searchOk;
     });
-  }, [items, activeCategoryId, search]);
+  }, [items, activeCategoryId, activeSupplierId, search]);
 
   const formCategoryName =
     categories.find(c => String(c.category_id) === String(form.category_id))
@@ -294,24 +325,26 @@ export default function Items() {
 
   return (
     <>
-      <style jsx global>{`
-        html, body, #root {
-          height: 100%;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
+      <style>{`
+        html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        .no-scroll::-webkit-scrollbar { display: none; }
+        .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+          position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+          background-color: #d1d5db; border-radius: 20px; transition: .2s;
         }
-        /* Hide scrollbar but keep scroll functionality */
-        .no-scroll::-webkit-scrollbar {
-          display: none;
+        .toggle-slider:before {
+          position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+          background-color: white; border-radius: 50%; transition: .2s;
         }
-        .no-scroll {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;     /* Firefox */
-        }
+        input:checked + .toggle-slider { background-color: #10b981; }
+        input:checked + .toggle-slider:before { transform: translateX(16px); }
+        .toggle-switch-blue input:checked + .toggle-slider { background-color: #f59e0b; }
       `}</style>
 
-      {/* Back + Branch selector + Add Item */}
+      {/* Top bar */}
       <div className="px-4 pt-2 pb-1 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <BackButton />
@@ -357,84 +390,118 @@ export default function Items() {
             onClick={() => resetForm({ keepCategory: true })}
             className="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-sm text-[12px]"
           >
-            Add Item
+            + Add Item
           </button>
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main 3-column layout */}
       <div
-        className="grid grid-cols-[200px_3fr_2fr] gap-6 px-4 pb-4 no-scroll"
+        className="grid grid-cols-[190px_3fr_230px] gap-3 px-4 pb-4 no-scroll"
         style={{ height: "calc(100vh - 110px)" }}
       >
-        {/* CATEGORIES */}
-        <aside className="rounded-2xl border shadow-xl p-3 bg-white text-[11px] flex flex-col overflow-hidden">
-          <h2 className="text-sm font-bold text-center mb-2">CATEGORIES</h2>
-
+        {/* ── CATEGORIES + SUPPLIERS ── */}
+        <aside className="rounded-2xl border shadow-lg p-3 bg-white text-[11px] flex flex-col overflow-hidden">
           <input
-            className="border rounded-lg px-2 py-1 mb-2 text-[11px] w-full"
+            className="border rounded-lg px-2 py-1.5 mb-2 text-[11px] w-full focus:outline-none focus:border-blue-400"
             placeholder="Search category..."
             value={categorySearch}
             onChange={e => setCategorySearch(e.target.value)}
           />
 
-          <div className="flex-1 overflow-y-auto no-scroll">
+          <div className="flex-1 overflow-y-auto no-scroll space-y-0.5">
+            {/* All Items */}
             <button
               type="button"
               onClick={() => selectCategory("all")}
-              className={`w-full text-left px-3 py-2 rounded mb-1 ${
-                activeCategoryId === "all" ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                activeCategoryId === "all" && !activeSupplierId
+                  ? "bg-blue-600 text-white"
+                  : "hover:bg-gray-100 text-gray-700"
               }`}
             >
               <div className="flex justify-between items-center">
-                <span className="font-medium">All</span>
-                <span className={`text-[11px] ${activeCategoryId === "all" ? "text-white/80" : "text-gray-500"}`}>
-                  {items.length}
+                <span className="font-semibold text-[11px]">All Items</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  activeCategoryId === "all" && !activeSupplierId ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                }`}>
+                  {items.filter(i => !i.is_raw_material).length}
                 </span>
               </div>
             </button>
 
+            {/* Category list */}
             {filteredCategories.map(c => {
               const id = String(c.category_id);
-              const isActive = String(activeCategoryId) === id;
+              const isActive = !activeSupplierId && String(activeCategoryId) === id;
               const count = itemCountByCategory[id] || 0;
-
               return (
                 <button
                   key={c.category_id}
                   type="button"
                   onClick={() => selectCategory(id)}
-                  className={`w-full text-left px-3 py-2 rounded mb-1 ${
-                    isActive ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    isActive ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-700"
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-medium">{c.category_name}</span>
-                    <span className={`text-[11px] ${isActive ? "text-white/80" : "text-gray-500"}`}>
-                      {count}
-                    </span>
+                    <span className="font-medium text-[11px] truncate pr-1">{c.category_name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                      isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                    }`}>{count}</span>
                   </div>
                 </button>
               );
             })}
+
+            {/* Raw Materials by Supplier */}
+            {suppliers.length > 0 && (
+              <>
+                <div className="pt-2 pb-1 px-1">
+                  <div className="text-[9px] font-bold text-amber-600 uppercase tracking-widest border-t pt-2">
+                    Raw Materials
+                  </div>
+                </div>
+                {suppliers.map(s => {
+                  const sid = String(s.supplier_id);
+                  const isActive = String(activeSupplierId) === sid;
+                  const count = items.filter(i => i.is_raw_material && String(i.supplier_id) === sid).length;
+                  return (
+                    <button
+                      key={s.supplier_id}
+                      type="button"
+                      onClick={() => selectSupplier(sid)}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        isActive ? "bg-amber-500 text-white" : "hover:bg-amber-50 text-gray-700"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium text-[11px] truncate pr-1">{s.supplier_name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          isActive ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
+                        }`}>{count}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </>
+            )}
           </div>
         </aside>
 
-        {/* ITEM LIST */}
-        <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col overflow-hidden text-[11px]">
-          <h2 className="text-sm font-bold text-center mb-2">ITEM LIST</h2>
+        {/* ── ITEM LIST ── */}
+        <div className="rounded-2xl border shadow-lg p-3 bg-white flex flex-col overflow-hidden">
+          <h2 className="text-[11px] font-bold text-center text-gray-500 uppercase tracking-widest mb-2">Item List</h2>
 
-          <div className="flex gap-2 mb-2">
-            <input
-              className="flex-1 border rounded-lg px-2 py-1 shadow-sm text-[11px]"
-              placeholder="Search item..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
+          <input
+            className="border rounded-lg px-2 py-1.5 mb-3 text-[11px] w-full focus:outline-none focus:border-blue-400"
+            placeholder="Search items..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
 
           <div className="flex-1 overflow-y-auto no-scroll pr-1">
-            <div className="grid grid-cols-[repeat(auto-fill,_minmax(260px,_1fr))] gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,_minmax(240px,_1fr))] gap-2">
               {filteredItems.map(item => {
                 const imgUrl = item.image_filename
                   ? `${API_BASE}/item-images/${item.image_filename}`
@@ -442,6 +509,9 @@ export default function Items() {
                 const isSelected = editingId === item.item_id;
                 const catName =
                   categories.find(c => c.category_id === item.category_id)?.category_name || "";
+                const supplierName = item.is_raw_material
+                  ? (suppliers.find(s => String(s.supplier_id) === String(item.supplier_id))?.supplier_name || "")
+                  : "";
                 const branchName = branchWise
                   ? (branches.find(b => String(b.branch_id) === String(item.branch_id))?.branch_name || null)
                   : null;
@@ -449,21 +519,19 @@ export default function Items() {
                 return (
                   <div
                     key={item.item_id}
-                    className={`
-                      text-left rounded-lg border shadow-sm bg-white
-                      px-2 py-2 text-[12px] leading-tight
-                      hover:bg-blue-50 cursor-pointer
-                      ${isSelected ? "border-blue-400 bg-blue-50" : ""}
-                    `}
+                    className={`rounded-xl border cursor-pointer transition-all
+                      ${isSelected
+                        ? "border-blue-400 bg-blue-50 shadow-md"
+                        : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
+                      }`}
                     onClick={() => editItem(item)}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" || e.key === " ") editItem(item);
-                    }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") editItem(item); }}
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="w-10 h-10 rounded-md border bg-gray-50 overflow-hidden flex-shrink-0">
+                    <div className="flex items-start gap-2 p-2">
+                      {/* Image */}
+                      <div className="w-11 h-11 rounded-lg border bg-gray-50 overflow-hidden flex-shrink-0">
                         {imgUrl ? (
                           <img
                             src={imgUrl}
@@ -472,53 +540,56 @@ export default function Items() {
                             onError={e => { e.currentTarget.style.display = "none"; }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-400">
+                          <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-300 font-medium">
                             IMG
                           </div>
                         )}
                       </div>
 
-                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="font-semibold text-[13px] whitespace-normal break-words leading-snug min-w-0">
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="font-semibold text-[12px] text-gray-800 leading-tight break-words min-w-0">
                             {item.item_name}
                           </div>
-                          {item.is_raw_material ? (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-800 flex-shrink-0">
+                          {item.is_raw_material && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 flex-shrink-0 font-medium">
                               RAW
                             </span>
-                          ) : null}
+                          )}
                         </div>
-                        {!item.is_raw_material ? (
-                          <div className="text-[12px] mt-1 font-medium">
-                            RS.{Number(item.price || 0).toFixed(0)}
-                          </div>
+
+                        {item.is_raw_material ? (
+                          <div className="text-[11px] text-amber-600 font-medium mt-0.5">Raw Material</div>
                         ) : (
-                          <div className="text-[12px] mt-1 font-medium text-amber-800">
-                            Raw Material
+                          <div className="text-[12px] text-blue-700 font-bold mt-0.5">
+                            ₹{Number(item.price || 0).toFixed(0)}
                           </div>
                         )}
-                        <div className="text-[11px] text-gray-500 mt-1 whitespace-normal break-words">
-                          {activeCategoryId === "all" && catName ? `${catName} | ` : ""}
-                          {!hotelShop && (
-                            <>
-                              Buy RS.{Number(item.buy_price || 0).toFixed(0)} | MRP RS.{Number(item.mrp_price || 0).toFixed(0)} |{" "}
-                            </>
-                          )}
-                          Min {Number(item.min_stock || 0)}
+
+                        <div className="text-[10px] text-gray-400 mt-0.5 truncate">
+                          {item.is_raw_material
+                            ? supplierName && <span className="text-amber-600">{supplierName}</span>
+                            : <>
+                                {activeCategoryId === "all" && catName ? catName : ""}
+                                {!hotelShop && (
+                                  <span> · Buy ₹{Number(item.buy_price || 0).toFixed(0)} · MRP ₹{Number(item.mrp_price || 0).toFixed(0)}</span>
+                                )}
+                                {item.min_stock > 0 && <span> · Min {item.min_stock}</span>}
+                              </>
+                          }
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between">
+                    {/* Footer */}
+                    <div className="flex items-center justify-between px-2 pb-2">
                       <div className="flex items-center gap-1 flex-wrap">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                            item.item_status
-                              ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                              : "text-red-700 bg-red-50 border-red-200"
-                          }`}
-                        >
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          item.item_status
+                            ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
+                            : "text-red-600 bg-red-50 border border-red-200"
+                        }`}>
                           {item.item_status ? "Active" : "Disabled"}
                         </span>
                         {branchName && (
@@ -530,14 +601,11 @@ export default function Items() {
 
                       <button
                         type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          toggleStatus(item);
-                        }}
-                        className={`text-[11px] px-2 py-1 rounded-lg border ${
+                        onClick={e => { e.stopPropagation(); toggleStatus(item); }}
+                        className={`text-[10px] px-2 py-0.5 rounded-lg border transition-colors ${
                           item.item_status
-                            ? "text-red-600 hover:bg-red-50"
-                            : "text-emerald-700 hover:bg-emerald-50"
+                            ? "text-red-500 border-red-200 hover:bg-red-50"
+                            : "text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                         }`}
                       >
                         {item.item_status ? "Disable" : "Enable"}
@@ -549,161 +617,229 @@ export default function Items() {
             </div>
 
             {filteredItems.length === 0 && (
-              <div className="text-[12px] text-gray-500 text-center py-8">
+              <div className="text-[12px] text-gray-400 text-center py-10">
                 No items found
               </div>
             )}
           </div>
         </div>
 
-        {/* ADD / EDIT */}
-        <div className="rounded-2xl border shadow-xl p-3 bg-white flex flex-col overflow-hidden text-[11px]">
-          <h2 className="text-sm font-bold text-center mb-2">
-            {editingId ? "EDIT ITEM" : "ADD ITEM"}
-          </h2>
+        {/* ── ADD / EDIT PANEL ── */}
+        <div className="rounded-2xl border shadow-lg bg-white flex flex-col overflow-hidden">
+          {/* Panel header */}
+          <div className={`px-4 py-3 border-b ${editingId ? "bg-blue-600" : "bg-emerald-600"}`}>
+            <h2 className="text-[12px] font-bold text-white text-center tracking-wide">
+              {editingId ? "✏️ EDIT ITEM" : "＋ ADD ITEM"}
+            </h2>
+          </div>
 
-          <div className="flex-1 overflow-y-auto no-scroll pr-1">
-            <div className="mb-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-[9px] text-gray-600">Category</div>
-                {form.category_id ? (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full border bg-gray-50 text-gray-700">
-                    {formCategoryName}
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-gray-500">Select from left</span>
-                )}
+          <div className="flex-1 overflow-y-auto no-scroll px-3 py-3 space-y-3">
+
+            {/* Raw Material toggle — at top so user sees it first */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+              <div>
+                <div className="text-[11px] font-semibold text-amber-800">Raw Material</div>
+                <div className="text-[10px] text-amber-600">Supplier-linked, no price</div>
               </div>
+              <label className="toggle-switch toggle-switch-blue">
+                <input
+                  type="checkbox"
+                  checked={form.is_raw_material}
+                  onChange={e => {
+                    const raw = e.target.checked;
+                    setForm({ ...form, is_raw_material: raw, price: "", buy_price: "", mrp_price: "", category_id: raw ? "" : form.category_id, supplier_id: raw ? form.supplier_id : "" });
+                    if (!raw) setActiveSupplierId(null);
+                  }}
+                />
+                <span className="toggle-slider"></span>
+              </label>
             </div>
 
-            <div className="mb-2">
-              <label className="text-[9px] text-gray-600">Item Name *</label>
+            {/* Supplier (raw material) OR Category (normal item) */}
+            {form.is_raw_material ? (
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Supplier *</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full text-[12px] focus:outline-none focus:border-amber-400 bg-white"
+                  value={form.supplier_id}
+                  onChange={e => setForm({ ...form, supplier_id: e.target.value })}
+                >
+                  <option value="">— Select supplier —</option>
+                  {suppliers.map(s => (
+                    <option key={s.supplier_id} value={String(s.supplier_id)}>{s.supplier_name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Category *</div>
+                {form.category_id ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-[11px] text-blue-700 font-semibold truncate">{formCategoryName}</span>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, category_id: "" }))}
+                      className="ml-auto text-[10px] text-blue-400 hover:text-red-500 flex-shrink-0"
+                    >✕</button>
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-[11px] text-gray-400 italic">
+                    ← Select from left panel
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Item Name */}
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Item Name *</label>
               <input
-                className="border rounded-lg px-2 py-1 w-full text-[11px]"
+                className="border rounded-lg px-3 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                placeholder="Enter item name..."
                 value={form.item_name}
                 onChange={e => setForm({ ...form, item_name: e.target.value })}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label className="text-[9px] text-gray-600">Selling Price</label>
-                <input
-                  type="number"
-                  className="border rounded-lg px-2 py-1 w-full text-[11px]"
-                  value={form.price}
-                  onChange={e => setForm({ ...form, price: e.target.value })}
-                  disabled={form.is_raw_material}
-                />
-              </div>
-
-              {!hotelShop && (
-                <>
-                  <div>
-                    <label className="text-[9px] text-gray-600">Buy Price</label>
+            {/* Pricing — only for normal items */}
+            {!form.is_raw_material && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-2">
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pricing</div>
+                <div>
+                  <label className="text-[10px] text-gray-500 mb-0.5 block">Selling Price *</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
                     <input
                       type="number"
-                      className="border rounded-lg px-2 py-1 w-full text-[11px]"
-                      value={form.buy_price}
-                      onChange={e => setForm({ ...form, buy_price: e.target.value })}
+                      className="border rounded-lg pl-6 pr-2 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
+                      placeholder="0"
+                      value={form.price}
+                      onChange={e => setForm({ ...form, price: e.target.value })}
                     />
                   </div>
-
-                  <div>
-                    <label className="text-[9px] text-gray-600">MRP Price</label>
-                    <input
-                      type="number"
-                      className="border rounded-lg px-2 py-1 w-full text-[11px]"
-                      value={form.mrp_price}
-                      onChange={e => setForm({ ...form, mrp_price: e.target.value })}
-                      disabled={form.is_raw_material}
-                    />
+                </div>
+                {!hotelShop && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Buy Price *</label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
+                        <input
+                          type="number"
+                          className="border rounded-lg pl-6 pr-2 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
+                          placeholder="0"
+                          value={form.buy_price}
+                          onChange={e => setForm({ ...form, buy_price: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">MRP *</label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
+                        <input
+                          type="number"
+                          className="border rounded-lg pl-6 pr-2 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
+                          placeholder="0"
+                          value={form.mrp_price}
+                          onChange={e => setForm({ ...form, mrp_price: e.target.value })}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </>
-              )}
+                )}
+              </div>
+            )}
 
+            {/* Min Stock — for all items */}
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Min Stock</label>
+              <input
+                type="number"
+                className="border rounded-lg px-3 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400"
+                placeholder="0"
+                value={form.min_stock}
+                onChange={e => setForm({ ...form, min_stock: e.target.value })}
+              />
+              <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Alert when stock falls below this value</p>
+            </div>
+
+            {/* Image upload — only for normal items */}
+            {!form.is_raw_material && (
               <div>
-                <label className="text-[9px] text-gray-600">Min Stock</label>
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Item Image</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {imagePreviewUrl ? (
+                      <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : editingItem?.image_filename ? (
+                      <img
+                        src={`${API_BASE}/item-images/${editingItem.image_filename}`}
+                        alt={editingItem.item_name}
+                        className="w-full h-full object-cover"
+                        onError={e => { e.currentTarget.style.display = "none"; }}
+                      />
+                    ) : (
+                      <span className="text-[9px] text-gray-300">📷</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className="block w-full cursor-pointer">
+                      <div className="px-2 py-1.5 border border-dashed border-gray-300 rounded-lg text-center text-[10px] text-gray-500 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                        {imageFile ? imageFile.name : "Choose image"}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={e => setImageFile(e.target.files?.[0] || null)}
+                      />
+                    </label>
+                    <div className="text-[9px] text-gray-400 mt-0.5 pl-1">JPG, PNG, WEBP</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Active toggle */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+              <div>
+                <div className="text-[11px] font-semibold text-gray-700">Active</div>
+                <div className="text-[10px] text-gray-400">Show in billing</div>
+              </div>
+              <label className="toggle-switch">
                 <input
-                  type="number"
-                  className="border rounded-lg px-2 py-1 w-full text-[11px]"
-                  value={form.min_stock}
-                  onChange={e => setForm({ ...form, min_stock: e.target.value })}
+                  type="checkbox"
+                  checked={form.item_status}
+                  onChange={e => setForm({ ...form, item_status: e.target.checked })}
                 />
-              </div>
+                <span className="toggle-slider"></span>
+              </label>
             </div>
 
-            <div className="mb-2">
-              <div className="text-[9px] text-gray-600">Item Image</div>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="border rounded-lg px-2 py-1 text-[11px] w-full"
-                onChange={e => setImageFile(e.target.files?.[0] || null)}
-              />
-
-              <div className="mt-2 flex items-center gap-2">
-                <div className="w-16 h-16 rounded-lg border bg-gray-50 overflow-hidden flex items-center justify-center">
-                  {imagePreviewUrl ? (
-                    <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  ) : editingItem?.image_filename ? (
-                    <img
-                      src={`${API_BASE}/item-images/${editingItem.image_filename}`}
-                      alt={editingItem.item_name}
-                      className="w-full h-full object-cover"
-                      onError={e => { e.currentTarget.style.display = "none"; }}
-                    />
-                  ) : (
-                    <span className="text-[10px] text-gray-400">No Image</span>
-                  )}
-                </div>
-
-                <div className="text-[10px] text-gray-500 leading-tight">
-                  {imageFile
-                    ? imageFile.name
-                    : editingItem?.image_filename
-                      ? "Current image"
-                      : "Choose an image"}
-                </div>
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 text-[11px] mb-2">
-              <input
-                type="checkbox"
-                checked={form.item_status}
-                onChange={e => setForm({ ...form, item_status: e.target.checked })}
-              />
-              Active
-            </label>
-
-            <label className="flex items-center gap-2 text-[11px] mb-2">
-              <input
-                type="checkbox"
-                checked={form.is_raw_material}
-                onChange={e => setForm({ ...form, is_raw_material: e.target.checked })}
-              />
-              Raw Material
-            </label>
           </div>
 
-          <div className="flex gap-2 justify-end pt-2">
+          {/* Action buttons */}
+          <div className="px-3 py-3 border-t bg-gray-50 flex gap-2">
             {editingId && (
               <button
                 type="button"
                 onClick={() => resetForm({ keepCategory: true })}
-                className="px-3 py-1 border rounded-lg text-[12px]"
+                className="flex-1 py-2 border border-gray-300 rounded-xl text-[12px] text-gray-600 hover:bg-gray-100 transition-colors font-medium"
               >
                 Cancel
               </button>
             )}
-
             <button
               type="button"
               onClick={saveItem}
-              className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-[12px]"
+              className={`flex-1 py-2 rounded-xl text-[12px] text-white font-semibold transition-colors shadow-sm ${
+                editingId
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
             >
-              {editingId ? "Update" : "Save"}
+              {editingId ? "Update" : "Save Item"}
             </button>
           </div>
         </div>

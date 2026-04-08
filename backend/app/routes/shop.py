@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from sqlalchemy.orm import Session
 from app.db import get_db
@@ -197,7 +198,7 @@ def upload_shop_logo(
         file=file
     )
 
-    shop.logo_url = filename
+    shop.logo_url = f"{filename}?v={int(time.time())}"
     db.add(shop)
     db.commit()
     db.refresh(shop)

@@ -172,7 +172,7 @@ export default function Inventory() {
                 {filtered.map(item => {
                   const stock = getStock(item.item_id);
                   const catName = categories.find(c => c.category_id === item.category_id)?.category_name || "";
-                  const isLow = stock <= 5;
+                  const isLow = item.min_stock > 0 ? stock <= item.min_stock : false;
                   return (
                     <div key={item.item_id} className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col gap-3 hover:border-slate-200 transition shadow-sm">
                       <div>
@@ -181,9 +181,12 @@ export default function Inventory() {
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold ${isLow ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
-                          <span>Stock:</span>
-                          <span>{stock}</span>
+                        <div className={`flex flex-col px-2.5 py-1 rounded-xl text-xs font-bold ${isLow ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Stock:</span>
+                            <span>{stock}</span>
+                          </div>
+                          {isLow && <span className="text-[10px] font-medium">Min: {item.min_stock}</span>}
                         </div>
                         <button onClick={() => openHistory(item)} className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition" title="View history">
                           <IoTimeOutline size={14} />

@@ -16,6 +16,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
   serverUrl,
 
   /**
+   * File-based offline storage.
+   * read/write snapshot JSON files per entity key.
+   * queue/remove pending mutations for auto-sync on reconnect.
+   */
+  localData: {
+    read:        (key)       => ipcRenderer.invoke("local-data-read", key),
+    write:       (key, data) => ipcRenderer.invoke("local-data-write", key, data),
+    queuePush:   (item)      => ipcRenderer.invoke("offline-queue-push", item),
+    queueGet:    ()          => ipcRenderer.invoke("offline-queue-get"),
+    queueRemove: (ids)       => ipcRenderer.invoke("offline-queue-remove", ids),
+  },
+
+  /** Check live reachability of the server (resolves to true/false). */
+  checkOnline: () => ipcRenderer.invoke("is-server-reachable"),
+
+  /**
    * Silently print plain text (monospace) via main process.
    * Returns a promise that resolves true/false.
    */

@@ -3,6 +3,7 @@
 import axios from "axios";
 import { API_BASE, getApiBaseIssue } from "../config/api";
 import { getSession, clearSession } from "./auth";
+import { snapshotResponse, getSnapshotKey, readSnapshot, queueMutation } from "./offlineStore";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -60,12 +61,52 @@ api.interceptors.request.use(
    RESPONSE INTERCEPTOR
 ========================= */
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error?.response?.status === 401) {
+  (response) => {
+    // On every successful GET: snapshot the data to a local file (Electron only, fire-and-forget).
+    // This keeps the local file store fresh so it's ready if the server goes offline.
+    if (response.config?.method === "get") {
+      snapshotResponse(response.config.url, response.data);
+    }
+    return response;
+  },
+  async (error) => {
+    const status = error?.response?.status;
+
+    // 401 — session expired, force logout.
+    if (status === 401) {
       clearSession();
       window.location.replace("/");
+      return Promise.reject(error);
     }
+
+    // Network error (no response at all) — server is unreachable.
+    if (!error.response && error.config) {
+      const method = (error.config.method || "").toLowerCase();
+      const url = error.config.url || "";
+
+      // GET: return the last saved snapshot so the UI still renders offline.
+      if (method === "get") {
+        const key = getSnapshotKey(url);
+        if (key) {
+          const cached = await readSnapshot(key);
+          if (cached != null) {
+            return { data: cached, status: 200, _offline: true };
+          }
+        }
+      }
+
+      // Mutations: queue for replay when server comes back.
+      if (["post", "put", "delete"].includes(method)) {
+        let body = null;
+        try { body = error.config.data ? JSON.parse(error.config.data) : null; } catch { /* ignore */ }
+        await queueMutation(method.toUpperCase(), url, body);
+        // Reject with a typed error so the caller can show an "offline" message.
+        const offlineErr = new Error("You are offline. This action will sync when reconnected.");
+        offlineErr.offline = true;
+        return Promise.reject(offlineErr);
+      }
+    }
+
     return Promise.reject(error);
   }
 );

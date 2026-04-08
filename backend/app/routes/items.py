@@ -212,16 +212,30 @@ def create_item(
     shop_type = get_shop_billing_type(db, int(user.shop_id))
     is_raw = bool(getattr(request_data, "is_raw_material", False))
 
-    if shop_type == "hotel":
-        # Hotels: selling price is required only for sellable items.
-        if not is_raw and float(request_data.price or 0) <= 0:
-            raise HTTPException(400, "Selling price is required for items")
-        # Hotels: buy/MRP not needed.
+    if is_raw:
+        if not request_data.supplier_id:
+            raise HTTPException(400, "Supplier is required for raw material items")
+        # Raw materials have no pricing or category
+        request_data.category_id = None
+        request_data.price = 0
         request_data.buy_price = 0
         request_data.mrp_price = 0
     else:
-        # Shops: require buy + sell + MRP for sellable items.
-        if not is_raw:
+        if not request_data.category_id:
+            raise HTTPException(400, "Category is required for items")
+        category = db.query(Category).filter(
+            Category.category_id == request_data.category_id,
+            Category.shop_id == user.shop_id
+        ).first()
+        if not category:
+            raise HTTPException(400, "Category not found")
+
+        if shop_type == "hotel":
+            if float(request_data.price or 0) <= 0:
+                raise HTTPException(400, "Selling price is required for items")
+            request_data.buy_price = 0
+            request_data.mrp_price = 0
+        else:
             if float(request_data.price or 0) <= 0:
                 raise HTTPException(400, "Selling price is required for items")
             if float(request_data.buy_price or 0) <= 0:
@@ -229,61 +243,59 @@ def create_item(
             if float(request_data.mrp_price or 0) <= 0:
                 raise HTTPException(400, "MRP is required for items")
 
-    category = db.query(Category).filter(
-        Category.category_id == request_data.category_id,
-        Category.shop_id == user.shop_id
-    ).first()
-    if not category:
-        raise HTTPException(400, "Category not found")
-
     item = Item(
         shop_id=user.shop_id,
-        branch_id=branch_id if branch_id is not None else getattr(user, "branch_id", None),
+        branch_id=branch_id,  # NULL in head-office mode = shared across branches
         item_name=request_data.item_name,
         category_id=request_data.category_id,
+        supplier_id=request_data.supplier_id if is_raw else None,
         item_status=request_data.item_status,
         price=request_data.price,
         buy_price=request_data.buy_price or 0,
         mrp_price=request_data.mrp_price or 0,
-        min_stock=request_data.min_stock,
-        is_raw_material=bool(getattr(request_data, "is_raw_material", False)),
+        min_stock=request_data.min_stock if not is_raw else 0,
+        is_raw_material=is_raw,
         created_by=None
     )
 
     db.add(item)
     db.flush()  # assigns item.item_id before it's used below
-    upsert_branch_item_price(
-        db,
-        shop_id=user.shop_id,
-        branch_id=branch_id,
-        item_id=item.item_id,
-        price=float(item.price or 0),
-        buy_price=float(item.buy_price or 0),
-        mrp_price=float(item.mrp_price or 0),
-        item_status=bool(item.item_status),
-    )
+
+    if not is_raw and branch_id is not None:
+        upsert_branch_item_price(
+            db,
+            shop_id=user.shop_id,
+            branch_id=branch_id,
+            item_id=item.item_id,
+            price=float(item.price or 0),
+            buy_price=float(item.buy_price or 0),
+            mrp_price=float(item.mrp_price or 0),
+            item_status=bool(item.item_status),
+        )
     db.commit()
     db.refresh(item)
 
-    # dummy inventory row (min_stock ignored now)
+    # dummy inventory row — use user's actual branch so stock queries can find it
+    stock_branch_id = branch_id if branch_id is not None else getattr(user, "branch_id", None)
     stock = Inventory(
         shop_id=user.shop_id,
         item_id=item.item_id,
-        branch_id=branch_id,
+        branch_id=stock_branch_id,
         quantity=0,
-        min_stock=0   # 👈 kept as dummy
+        min_stock=0
     )
     db.add(stock)
-    upsert_branch_item_price(
-        db,
-        shop_id=user.shop_id,
-        branch_id=branch_id,
-        item_id=item.item_id,
-        price=request_data.price,
-        buy_price=request_data.buy_price or 0,
-        mrp_price=request_data.mrp_price or 0,
-        item_status=request_data.item_status,
-    )
+    if not is_raw and branch_id is not None:
+        upsert_branch_item_price(
+            db,
+            shop_id=user.shop_id,
+            branch_id=branch_id,
+            item_id=item.item_id,
+            price=request_data.price,
+            buy_price=request_data.buy_price or 0,
+            mrp_price=request_data.mrp_price or 0,
+            item_status=request_data.item_status,
+        )
     db.commit()
 
     log_action(
@@ -461,44 +473,58 @@ def update_item(
     if request_data.item_name is not None:
         item.item_name = request_data.item_name
 
-    if request_data.category_id is not None:
-        item.category_id = request_data.category_id
-
-    if request_data.item_status is not None:
-        item.item_status = request_data.item_status
-
-    if request_data.price is not None:
-        item.price = request_data.price
-
-    if shop_type == "hotel":
-        # Hotels: buy/MRP are not used.
-        item.buy_price = 0
-        item.mrp_price = 0
-    else:
-        if request_data.buy_price is not None:
-            item.buy_price = request_data.buy_price
-        if request_data.mrp_price is not None:
-            item.mrp_price = request_data.mrp_price
-
-    if request_data.min_stock is not None:
-        item.min_stock = request_data.min_stock   # 👈 now updates here
-
     if getattr(request_data, "is_raw_material", None) is not None:
         item.is_raw_material = bool(request_data.is_raw_material)
 
-    # Post-validate (after applying toggles).
     is_raw = bool(getattr(item, "is_raw_material", False))
-    if shop_type == "hotel":
-        if not is_raw and float(getattr(item, "price", 0) or 0) <= 0:
-            raise HTTPException(400, "Selling price is required for items")
+
+    if is_raw:
+        # Raw material: clear category/pricing, set supplier
+        if getattr(request_data, "supplier_id", None) is not None:
+            item.supplier_id = request_data.supplier_id
+        item.category_id = None
+        item.price = 0
+        item.buy_price = 0
+        item.mrp_price = 0
+        item.min_stock = 0
     else:
-        if not is_raw:
+        # Normal item: update category + pricing
+        if request_data.category_id is not None:
+            item.category_id = request_data.category_id
+        item.supplier_id = None
+
+        if request_data.item_status is not None:
+            item.item_status = request_data.item_status
+
+        if request_data.price is not None:
+            item.price = request_data.price
+
+        if shop_type == "hotel":
+            item.buy_price = 0
+            item.mrp_price = 0
+        else:
+            if request_data.buy_price is not None:
+                item.buy_price = request_data.buy_price
+            if request_data.mrp_price is not None:
+                item.mrp_price = request_data.mrp_price
+
+        if request_data.min_stock is not None:
+            item.min_stock = request_data.min_stock
+
+        # Post-validate prices only for normal items
+        if shop_type == "hotel":
+            if float(getattr(item, "price", 0) or 0) <= 0:
+                raise HTTPException(400, "Selling price is required for items")
+        else:
             if float(getattr(item, "price", 0) or 0) <= 0:
                 raise HTTPException(400, "Selling price is required for items")
             if float(getattr(item, "buy_price", 0) or 0) <= 0:
                 raise HTTPException(400, "Buy price is required for items")
             if float(getattr(item, "mrp_price", 0) or 0) <= 0:
                 raise HTTPException(400, "MRP is required for items")
+
+    if request_data.item_status is not None and not is_raw:
+        item.item_status = request_data.item_status
 
     db.commit()
     db.refresh(item)

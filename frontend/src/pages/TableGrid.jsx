@@ -62,7 +62,9 @@ export default function TableGrid() {
   const [tables, setTables] = useState([]);
   const [confirming, setConfirming] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [hotelAllowed, setHotelAllowed] = useState(null);
+  const [hotelAllowed, setHotelAllowed] = useState(
+    () => localStorage.getItem("billing_type") === "hotel"
+  );
   const [branchInfo, setBranchInfo] = useState({});
 
   // print ref & helpers

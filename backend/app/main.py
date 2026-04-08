@@ -566,6 +566,44 @@ def _auto_migrate_table_name_unique_constraint() -> None:
         logger.exception("Auto-migration (table name unique constraint) failed: %s", e)
 
 
+def _auto_migrate_items_supplier() -> None:
+    """
+    Add supplier_id to items and make category_id nullable (for raw material items).
+    Raw materials are supplier-linked and have no category or pricing.
+    Split into two separate transactions so each is idempotent independently.
+    """
+    if engine.dialect.name != "postgresql":
+        return
+    # Step 1: add supplier_id column (safe to repeat via IF NOT EXISTS)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS items
+                      ADD COLUMN IF NOT EXISTS supplier_id INTEGER
+                        REFERENCES suppliers(supplier_id);
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (items supplier - add column) failed: %s", e)
+    # Step 2: drop NOT NULL on category_id (no-op if already nullable — caught and ignored)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS items
+                      ALTER COLUMN category_id DROP NOT NULL;
+                    """
+                )
+            )
+    except Exception as e:
+        # "column is already nullable" is harmless — log at debug level only
+        logger.debug("Auto-migration (items supplier - drop not null) skipped: %s", e)
+
+
 @app.on_event("startup")
 def _startup_db_init():
     """
@@ -588,6 +626,7 @@ def _startup_db_init():
     _auto_migrate_head_office_branch()
     _auto_migrate_user_session_tracking()
     _auto_migrate_table_name_unique_constraint()
+    _auto_migrate_items_supplier()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.

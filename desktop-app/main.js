@@ -4,6 +4,7 @@ const fs = require("fs");
 const child_process = require("child_process");
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 
 const PROTOCOL = "poss";
 const CONFIG_FILE = "config.json";
@@ -395,6 +396,87 @@ function escapeHtml(text) {
     .replaceAll(">", "&gt;");
 }
 
+/* =============================================================
+   FILE-BASED OFFLINE STORAGE
+   Each snapshotted endpoint is saved as <userData>/local-data/<key>.json
+   Pending mutations are queued in <userData>/local-data/pending-queue.json
+   and replayed automatically when the server becomes reachable.
+============================================================= */
+
+function getLocalDataDir() {
+  return path.join(app.getPath("userData"), "local-data");
+}
+
+function ensureLocalDataDir() {
+  const dir = getLocalDataDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+ipcMain.handle("local-data-read", (_event, key) => {
+  try {
+    const file = path.join(ensureLocalDataDir(), `${String(key).replace(/[^a-z0-9_-]/gi, "_")}.json`);
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle("local-data-write", (_event, key, value) => {
+  try {
+    const file = path.join(ensureLocalDataDir(), `${String(key).replace(/[^a-z0-9_-]/gi, "_")}.json`);
+    fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle("offline-queue-push", (_event, item) => {
+  try {
+    const dir = ensureLocalDataDir();
+    const file = path.join(dir, "pending-queue.json");
+    let queue = [];
+    if (fs.existsSync(file)) {
+      try { queue = JSON.parse(fs.readFileSync(file, "utf-8")); } catch { queue = []; }
+    }
+    queue.push({
+      ...item,
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      timestamp: new Date().toISOString(),
+    });
+    fs.writeFileSync(file, JSON.stringify(queue, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle("offline-queue-get", () => {
+  try {
+    const file = path.join(ensureLocalDataDir(), "pending-queue.json");
+    if (!fs.existsSync(file)) return [];
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle("offline-queue-remove", (_event, ids) => {
+  try {
+    const file = path.join(ensureLocalDataDir(), "pending-queue.json");
+    if (!fs.existsSync(file)) return true;
+    let queue = JSON.parse(fs.readFileSync(file, "utf-8"));
+    const idSet = new Set(ids);
+    queue = queue.filter((item) => !idSet.has(item.id));
+    fs.writeFileSync(file, JSON.stringify(queue, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 ipcMain.handle("silent-print-text", async (_event, payload) => {
   const { text = "", options = {} } = payload || {};
   const fontSize = Number(options.fontSize || 12) || 12;
@@ -572,6 +654,9 @@ app.whenReady().then(async () => {
 
   const reachable = await probeUrlReachable(resolvedUrl);
   baseUrl = reachable ? resolvedUrl : (offlineUrl || resolvedUrl);
+
+  // Expose current online state so the renderer can check it on load.
+  ipcMain.handle("is-server-reachable", () => probeUrlReachable(resolvedUrl));
 
   if (!app.isDefaultProtocolClient(PROTOCOL)) {
     registerProtocolClient();

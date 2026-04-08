@@ -61,16 +61,14 @@ export default function SalesHistory() {
   const toYMD = dateValue => {
     const d = parseToDate(dateValue);
     if (!d) return "";
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    // Use UTC methods: backend stores created_time with UTC date == shop app_date
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   };
 
   const isAppDateBill = dateValue => {
     const billYmd = toYMD(dateValue);
     return !!billYmd && billYmd === appDateYMD;
   };
-
-  const isDefaultRange =
-    fromDate === appDateYMD && toDate === appDateYMD;
 
   /* ================= STATE ================= */
   const [bills, setBills] = useState([]);
@@ -145,7 +143,6 @@ export default function SalesHistory() {
 
   /* ================= FILTER ================= */
   const filtered = bills.filter(b =>
-    (!isDefaultRange || isAppDateBill(b.created_time)) &&
     `${b.invoice_number} ${b.customer_name || ""} ${b.mobile || ""}`
       .toLowerCase()
       .includes(search.toLowerCase())

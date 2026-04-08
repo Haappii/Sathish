@@ -441,7 +441,9 @@ export default function Reports() {
     const centerX = pageWidth / 2;
 
     if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", margin, 12, 28, 28);
+      const mimeMatch = logoDataUrl.match(/^data:(image\/[^;]+)/);
+      const imgFormat = mimeMatch ? mimeMatch[1].split("/")[1].toUpperCase() : "PNG";
+      doc.addImage(logoDataUrl, imgFormat, margin, 12, 28, 28);
     }
 
     let y = 18;
@@ -588,9 +590,15 @@ export default function Reports() {
       });
 
     const fetchAsDataUrl = async (url) => {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Failed to load image (${res.status})`);
-      return blobToDataUrl(await res.blob());
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Failed to load image (${res.status})`);
+        return blobToDataUrl(await res.blob());
+      } finally {
+        clearTimeout(timer);
+      }
     };
 
     const resolveLogoDataUrl = async () => {
@@ -608,57 +616,62 @@ export default function Reports() {
 
     const logoDataUrl = await resolveLogoDataUrl();
 
-    const isInvoiceDetail =
-      activeReport?.key === "sales/invoice-details" ||
-      activeReport?.key === "sales/customer-invoices";
-    const doc = new jsPDF(
-      isInvoiceDetail ? "l" : "p",
-      "mm",
-      "a4"
-    );
-    const startY = drawPdfHeader(doc, headerBranch, logoDataUrl);
+    try {
+      const isInvoiceDetail =
+        activeReport?.key === "sales/invoice-details" ||
+        activeReport?.key === "sales/customer-invoices";
+      const doc = new jsPDF(
+        isInvoiceDetail ? "l" : "p",
+        "mm",
+        "a4"
+      );
+      const startY = drawPdfHeader(doc, headerBranch, logoDataUrl);
 
-    let exportRows = data;
-        if (isInvoiceDetail) {
-          let lastInvoice = null;
-          exportRows = data.map(row => {
-            const same = row.invoice_number === lastInvoice;
-            lastInvoice = row.invoice_number;
-            const grand =
-              Number(row.sub_total || 0) +
-              Number(row.gst || 0) -
-              Number(row.discount || 0);
+      let exportRows = data;
+      if (isInvoiceDetail) {
+        let lastInvoice = null;
+        exportRows = data.map(row => {
+          const same = row.invoice_number === lastInvoice;
+          lastInvoice = row.invoice_number;
+          const grand =
+            Number(row.sub_total || 0) +
+            Number(row.gst || 0) -
+            Number(row.discount || 0);
 
-            if (!same) {
-              return { ...row, grand_total: grand };
-            }
+          if (!same) {
+            return { ...row, grand_total: grand };
+          }
 
-            return {
-              ...row,
-              invoice_date: "",
-              invoice_time: "",
-              invoice_number: "",
-              customer: "",
-              payment_mode: "",
-              total_items: "",
-              sub_total: "",
-              gst: "",
-              discount: "",
-              grand_total: "",
-              created_user: "",
-        };
+          return {
+            ...row,
+            invoice_date: "",
+            invoice_time: "",
+            invoice_number: "",
+            customer: "",
+            payment_mode: "",
+            total_items: "",
+            sub_total: "",
+            gst: "",
+            discount: "",
+            grand_total: "",
+            created_user: "",
+          };
+        });
+      }
+
+      autoTable(doc, {
+        startY,
+        head: [Object.keys(data[0]).map(h => h.replaceAll("_", " ").toUpperCase())],
+        body: exportRows.map(r => Object.values(r)),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [15, 23, 42] },
       });
+
+      doc.save(`${buildExportName()}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      showToast("PDF export failed. Please try again.", "error");
     }
-
-    autoTable(doc, {
-      startY,
-      head: [Object.keys(data[0]).map(h => h.replaceAll("_", " ").toUpperCase())],
-      body: exportRows.map(r => Object.values(r)),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 23, 42] },
-    });
-
-    doc.save(`${buildExportName()}.pdf`);
   };
 
   /* =====================================================

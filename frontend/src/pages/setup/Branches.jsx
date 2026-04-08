@@ -122,10 +122,9 @@ export default function Branches() {
       const rows = res.data || [];
       setBranches(rows);
 
-      if (!isAdmin) {
-        const first = rows?.[0] || null;
-        if (first?.branch_id) editBranch(first);
-      }
+      // Auto-select the first branch so settings are visible immediately.
+      const first = rows?.[0] || null;
+      if (first?.branch_id) editBranch(first);
     } catch (err) {
       setBranches([]);
       const msg = err?.response?.data?.detail || "Failed to load branches";
@@ -207,14 +206,17 @@ export default function Branches() {
       if (editingId) {
         await api.put(`/branch/${editingId}`, payload);
         showToast("Branch updated", "success");
+        // Keep form populated — just refresh the branch list silently
+        api.get("/branch/scoped").then((res) => {
+          setBranches(res.data || []);
+        }).catch(() => {});
       } else {
         await api.post("/branch/create", payload);
         showToast("Branch created", "success");
+        setForm(emptyForm);
+        setEditingId(null);
+        await loadBranches();
       }
-
-      setForm(emptyForm);
-      setEditingId(null);
-      await loadBranches();
     } catch (err) {
       showToast(err?.response?.data?.detail || "Save failed", "error");
     } finally {

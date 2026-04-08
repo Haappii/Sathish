@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Haappii Billing — Feature Poster</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #0a0a1a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .poster {
+      width: 900px;
+      background: linear-gradient(135deg, #0d0d2b 0%, #1a0533 40%, #0d1a33 100%);
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(130, 80, 255, 0.3);
+      box-shadow: 0 0 60px rgba(130, 80, 255, 0.2), 0 0 120px rgba(0, 180, 255, 0.1);
+      position: relative;
+    }
+
+    /* Background decorative circles */
+    .poster::before {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(130, 80, 255, 0.12) 0%, transparent 70%);
+      top: -100px; right: -100px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .poster::after {
+      content: '';
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(0, 180, 255, 0.1) 0%, transparent 70%);
+      bottom: -80px; left: -80px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: linear-gradient(90deg, #6c00ff, #00b4ff);
+      padding: 36px 48px 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 40px;
+      background: linear-gradient(135deg, #0d0d2b 50%, transparent 50%);
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 5px 16px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo-icon {
+      width: 64px; height: 64px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      border: 2px solid rgba(255,255,255,0.35);
+    }
+    .logo-text h1 {
+      font-size: 40px;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .logo-text h1 span { color: #ffe066; }
+    .logo-text p {
+      font-size: 14px;
+      color: rgba(255,255,255,0.8);
+      margin-top: 4px;
+      font-weight: 400;
+    }
+
+    /* ── TRIAL BANNER ── */
+    .trial-banner {
+      margin: 32px 40px 0;
+      background: linear-gradient(90deg, #ffe066, #ffb300);
+      border-radius: 14px;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .trial-icon { font-size: 32px; }
+    .trial-text h2 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1a0a00;
+    }
+    .trial-text p {
+      font-size: 13px;
+      color: #5a3a00;
+      margin-top: 2px;
+    }
+
+    /* ── TAGLINE ── */
+    .tagline {
+      text-align: center;
+      padding: 28px 40px 8px;
+    }
+    .tagline h3 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .tagline h3 span {
+      background: linear-gradient(90deg, #a855f7, #00b4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .tagline p {
+      font-size: 14px;
+      color: rgba(255,255,255,0.55);
+      margin-top: 6px;
+    }
+
+    /* ── FEATURES GRID ── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      padding: 20px 40px;
+    }
+    .feature-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 20px;
+      transition: transform 0.2s;
+    }
+    .feature-card:hover { transform: translateY(-3px); }
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    .feature-card h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .feature-card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .feature-card ul li {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      padding: 2px 0;
+      padding-left: 14px;
+      position: relative;
+    }
+    .feature-card ul li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #a855f7;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    /* card accent colors */
+    .card-purple { border-top: 3px solid #a855f7; }
+    .card-blue   { border-top: 3px solid #00b4ff; }
+    .card-green  { border-top: 3px solid #22c55e; }
+    .card-yellow { border-top: 3px solid #ffe066; }
+    .card-pink   { border-top: 3px solid #f472b6; }
+    .card-orange { border-top: 3px solid #fb923c; }
+
+    /* ── HIGHLIGHT STRIP ── */
+    .highlights {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      background: rgba(108, 0, 255, 0.12);
+      border-top: 1px solid rgba(130, 80, 255, 0.2);
+      border-bottom: 1px solid rgba(130, 80, 255, 0.2);
+      padding: 18px 40px;
+      margin: 8px 0;
+    }
+    .highlight-item {
+      text-align: center;
+    }
+    .highlight-item .num {
+      font-size: 26px;
+      font-weight: 900;
+      background: linear-gradient(90deg, #a855f7, #00b4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .highlight-item .lbl {
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      margin-top: 2px;
+      font-weight: 500;
+    }
+    .highlight-sep {
+      width: 1px;
+      height: 40px;
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      background: linear-gradient(90deg, rgba(108,0,255,0.15), rgba(0,180,255,0.1));
+      border-top: 1px solid rgba(130,80,255,0.2);
+      padding: 22px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .footer-contact {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .contact-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      font-weight: 500;
+    }
+    .contact-row span.icon { font-size: 16px; }
+    .contact-row a {
+      color: #00b4ff;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .cta-btn {
+      background: linear-gradient(90deg, #6c00ff, #00b4ff);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 14px 30px;
+      border-radius: 50px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 4px 24px rgba(108,0,255,0.4);
+      letter-spacing: 0.5px;
+    }
+    .footer-brand {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+<div class="poster">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="badge">🇮🇳 Made for Indian Businesses</div>
+    <div class="logo-row">
+      <div class="logo-icon">🛒</div>
+      <div class="logo-text">
+        <h1>Haappii <span>Billing</span></h1>
+        <p>Smart POS &amp; Billing Software for Retail, Restaurants &amp; More</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FREE TRIAL BANNER -->
+  <div class="trial-banner">
+    <div class="trial-icon">🎁</div>
+    <div class="trial-text">
+      <h2>2 Months FREE Trial — No Credit Card Required!</h2>
+      <p>Experience the full power of Haappii Billing absolutely free for 60 days. Get started today!</p>
+    </div>
+  </div>
+
+  <!-- TAGLINE -->
+  <div class="tagline">
+    <h3>Everything you need to <span>run your business smarter</span></h3>
+    <p>Fast billing · GST ready · Multi-branch · Offline capable · Works on any device</p>
+  </div>
+
+  <!-- FEATURES GRID -->
+  <div class="features">
+
+    <div class="feature-card card-purple">
+      <div class="feature-icon">🧾</div>
+      <h4>Billing &amp; Invoicing</h4>
+      <ul>
+        <li>Fast invoice generation</li>
+        <li>GST / Tax calculations</li>
+        <li>Discounts &amp; coupons</li>
+        <li>Print &amp; WhatsApp bills</li>
+        <li>Draft &amp; return management</li>
+      </ul>
+    </div>
+
+    <div class="feature-card card-blue">
+      <div class="feature-icon">📦</div>
+      <h4>Inventory Management</h4>
+      <ul>
+        <li>Real-time stock tracking</li>
+        <li>Item lots &amp; batch control</li>
+        <li>Reorder alerts</li>
+        <li>Stock audits &amp; transfers</li>
+        <li>Supplier ledger</li>
+      </ul>
+    </div>
+
+    <div class="feature-card card-green">
+      <div class="feature-icon">📊</div>
+      <h4>Reports &amp; Analytics</h4>
+      <ul>
+        <li>Sales &amp; revenue trends</li>
+        <li>Item / category reports</li>
+        <li>Branch performance</li>
+        <li>Export PDF &amp; Excel</li>
+        <li>Day-close summaries</li>
+      </ul>
+    </div>
+
+    <div class="feature-card card-yellow">
+      <div class="feature-icon">🍽️</div>
+      <h4>Restaurant / Table Billing</h4>
+      <ul>
+        <li>Table grid management</li>
+        <li>Kitchen display system</li>
+        <li>QR menu &amp; online orders</li>
+        <li>Reservations</li>
+        <li>Recipe management</li>
+      </ul>
+    </div>
+
+    <div class="feature-card card-pink">
+      <div class="feature-icon">👥</div>
+      <h4>Customers &amp; Loyalty</h4>
+      <ul>
+        <li>Customer database</li>
+        <li>Dues &amp; credit tracking</li>
+        <li>Loyalty points program</li>
+        <li>Gift cards</li>
+        <li>Delivery management</li>
+      </ul>
+    </div>
+
+    <div class="feature-card card-orange">
+      <div class="feature-icon">⚙️</div>
+      <h4>Operations &amp; Admin</h4>
+      <ul>
+        <li>Multi-branch support</li>
+        <li>Role-based access control</li>
+        <li>Employee &amp; attendance</li>
+        <li>Expense tracking</li>
+        <li>Offline sync capability</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- STATS STRIP -->
+  <div class="highlights">
+    <div class="highlight-item">
+      <div class="num">25+</div>
+      <div class="lbl">Powerful Modules</div>
+    </div>
+    <div class="highlight-sep"></div>
+    <div class="highlight-item">
+      <div class="num">GST</div>
+      <div class="lbl">Tax Ready</div>
+    </div>
+    <div class="highlight-sep"></div>
+    <div class="highlight-item">
+      <div class="num">Multi</div>
+      <div class="lbl">Branch Support</div>
+    </div>
+    <div class="highlight-sep"></div>
+    <div class="highlight-item">
+      <div class="num">📱</div>
+      <div class="lbl">Any Device</div>
+    </div>
+    <div class="highlight-sep"></div>
+    <div class="highlight-item">
+      <div class="num">60</div>
+      <div class="lbl">Days Free Trial</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-contact">
+      <div class="contact-row">
+        <span class="icon">🌐</span>
+        <a href="https://haappiibilling.in/" target="_blank">haappiibilling.in</a>
+      </div>
+      <div class="contact-row">
+        <span class="icon">📞</span>
+        <span><a href="tel:+917904263246">+91 79042 63246</a></span>
+      </div>
+    </div>
+    <a class="cta-btn" href="https://haappiibilling.in/" target="_blank">
+      🚀 Start Free Trial
+    </a>
+    <div class="footer-brand">
+      Haappii Billing<br/>
+      Smart Business Software
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

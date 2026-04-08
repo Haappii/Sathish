@@ -57,8 +57,8 @@ def list_stock(
         db,
         user.shop_id,
         branch,
-        raw_only=is_hotel,
-        exclude_raw=not is_hotel,
+        raw_only=is_hotel,   # hotel: only raw materials
+        exclude_raw=False,    # store: show both regular items and raw materials
     )
 
     return [
@@ -98,8 +98,6 @@ def add_stock(
         raise HTTPException(404, "Item not found")
     if is_hotel and not bool(getattr(it, "is_raw_material", False)):
         raise HTTPException(400, "Inventory is for raw materials only")
-    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
-        raise HTTPException(400, "Inventory is for sellable items only")
 
     ensure_stock_row(db, user.shop_id, item_id, branch)
     adjust_stock(db, user.shop_id, item_id, branch, qty, "ADD")
@@ -143,8 +141,6 @@ def remove_stock(
         raise HTTPException(404, "Item not found")
     if is_hotel and not bool(getattr(it, "is_raw_material", False)):
         raise HTTPException(400, "Inventory is for raw materials only")
-    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
-        raise HTTPException(400, "Inventory is for sellable items only")
 
     ensure_stock_row(db, user.shop_id, item_id, branch)
     ok = adjust_stock(db, user.shop_id, item_id, branch, qty, "REMOVE")
@@ -191,8 +187,6 @@ def set_min_stock(
         raise HTTPException(404, "Item not found")
     if is_hotel and not bool(getattr(it, "is_raw_material", False)):
         raise HTTPException(400, "Inventory is for raw materials only")
-    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
-        raise HTTPException(400, "Inventory is for sellable items only")
 
     update_min_stock(db, user.shop_id, item_id, branch, min_stock)
 
@@ -233,8 +227,6 @@ def stock_history(
     if not it:
         raise HTTPException(404, "Item not found")
     if is_hotel and not bool(getattr(it, "is_raw_material", False)):
-        return []
-    if (not is_hotel) and bool(getattr(it, "is_raw_material", False)):
         return []
 
     rows = (
