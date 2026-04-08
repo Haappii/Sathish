@@ -245,8 +245,8 @@ export default function Returns() {
                               </>
                             ) : (
                               <>
-                                <option value="GOOD">Good (add to stock)</option>
-                                <option value="DAMAGED">Damaged (do not add)</option>
+                                <option value="GOOD">Good</option>
+                                <option value="DAMAGED">Damaged</option>
                               </>
                             )}
                           </select>
