@@ -253,7 +253,7 @@ def create_item(
         price=request_data.price,
         buy_price=request_data.buy_price or 0,
         mrp_price=request_data.mrp_price or 0,
-        min_stock=request_data.min_stock if not is_raw else 0,
+        min_stock=request_data.min_stock or 0,
         is_raw_material=is_raw,
         created_by=None
     )
@@ -486,7 +486,10 @@ def update_item(
         item.price = 0
         item.buy_price = 0
         item.mrp_price = 0
-        item.min_stock = 0
+        if request_data.min_stock is not None:
+            item.min_stock = request_data.min_stock
+        if request_data.item_status is not None:
+            item.item_status = request_data.item_status
     else:
         # Normal item: update category + pricing
         if request_data.category_id is not None:
@@ -522,9 +525,6 @@ def update_item(
                 raise HTTPException(400, "Buy price is required for items")
             if float(getattr(item, "mrp_price", 0) or 0) <= 0:
                 raise HTTPException(400, "MRP is required for items")
-
-    if request_data.item_status is not None and not is_raw:
-        item.item_status = request_data.item_status
 
     db.commit()
     db.refresh(item)
