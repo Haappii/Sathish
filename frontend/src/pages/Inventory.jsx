@@ -186,7 +186,11 @@ export default function Inventory() {
                             <span>Stock:</span>
                             <span>{stock}</span>
                           </div>
-                          {isLow && <span className="text-[10px] font-medium">Min: {item.min_stock}</span>}
+                          {item.min_stock > 0 && (
+                            <span className={`text-[10px] font-medium ${isLow ? "text-red-500" : "text-emerald-600"}`}>
+                              Min: {item.min_stock}
+                            </span>
+                          )}
                         </div>
                         <button onClick={() => openHistory(item)} className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition" title="View history">
                           <IoTimeOutline size={14} />

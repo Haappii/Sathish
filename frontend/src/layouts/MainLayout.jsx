@@ -245,7 +245,7 @@ export default function MainLayout({ hideSidebar = false }) {
       });
       const rows = Array.isArray(res?.data) ? res.data : [];
       const lows = rows
-        .filter((r) => Number(r.quantity || 0) <= Number(r.min_stock || 0))
+        .filter((r) => Number(r.min_stock || 0) > 0 && Number(r.quantity || 0) < Number(r.min_stock || 0))
         .sort((a, b) => Number(a.quantity || 0) - Number(b.quantity || 0));
       setLowStockItems(lows);
     } catch {
