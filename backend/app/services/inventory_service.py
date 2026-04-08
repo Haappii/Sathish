@@ -133,7 +133,8 @@ def get_branch_stock_rows(
             Inventory.item_id,
             Item.item_name,
             Inventory.quantity,
-            Item.min_stock
+            Item.min_stock,
+            Inventory.branch_id
         )
         .join(Item, Item.item_id == Inventory.item_id)
         .filter(
@@ -148,4 +149,9 @@ def get_branch_stock_rows(
     if exclude_raw:
         q = q.filter(Item.is_raw_material == False)
 
-    return q
+    # Deduplicate by item_id: prefer the branch-specific row over the shop-level (null) row.
+    seen: dict = {}
+    for r in q.all():
+        if r.item_id not in seen or r.branch_id is not None:
+            seen[r.item_id] = r
+    return list(seen.values())
