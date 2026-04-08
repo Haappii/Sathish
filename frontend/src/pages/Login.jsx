@@ -105,17 +105,25 @@ export default function Login() {
       navigate("/home", { replace: true });
 
     } catch (err) {
-      const msg = err?.response?.data?.detail || err?.message;
-      if (msg) {
-        setError(msg);
-      } else if (!navigator.onLine) {
-        await attemptOfflineLogin();
+      // Network/CORS error from offline bundle — try saved credentials
+      if (err?.offline) {
+        const ok = await attemptOfflineLogin();
+        if (!ok) {
+          setError("Cannot reach server. Sign in online at least once to enable offline login.");
+        }
       } else {
-        const networkHint =
-          window?.location?.protocol === "https:" ? " (API must be HTTPS)" : "";
-        setError(
-          `Login failed: cannot reach server${networkHint}. Check API URL / network.`
-        );
+        const msg = err?.response?.data?.detail || err?.message;
+        if (msg) {
+          setError(msg);
+        } else if (!navigator.onLine) {
+          await attemptOfflineLogin();
+        } else {
+          const networkHint =
+            window?.location?.protocol === "https:" ? " (API must be HTTPS)" : "";
+          setError(
+            `Login failed: cannot reach server${networkHint}. Check API URL / network.`
+          );
+        }
       }
     }
 

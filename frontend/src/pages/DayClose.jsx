@@ -44,6 +44,7 @@ export default function DayClose() {
 
   useEffect(() => {
     if (role !== "admin" && role !== "manager") { navigate("/"); return; }
+    if (!navigator.onLine) return; // don't load if offline — UI blocks actions below
     loadBranches();
     authAxios.get("/shop/details")
       .then(res => {
@@ -57,6 +58,10 @@ export default function DayClose() {
 
   const closeBranch = async () => {
     if (!selectedBranch) return;
+    if (!navigator.onLine) {
+      showToast("Day-end requires an active server connection. Please connect and try again.", "error");
+      return;
+    }
     setClosing(true);
     try {
       await authAxios.post("/day-close/branch", null, { params: { date_str: date, branch_id: Number(selectedBranch) } });
@@ -69,6 +74,10 @@ export default function DayClose() {
   };
 
   const closeShop = async () => {
+    if (!navigator.onLine) {
+      showToast("Day-end requires an active server connection. Please connect and try again.", "error");
+      return;
+    }
     setClosing(true);
     try {
       await authAxios.post("/day-close/shop", null, { params: { date_str: date } });
@@ -84,6 +93,27 @@ export default function DayClose() {
   const totalCount = status.length || 1;
   const pct = Math.round((closedCount / totalCount) * 100);
   const allClosed = closedCount === status.length && status.length > 0;
+
+  if (!navigator.onLine) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-8 max-w-md text-center space-y-3">
+          <div className="text-3xl">📡</div>
+          <h2 className="text-lg font-bold text-slate-800">You are offline</h2>
+          <p className="text-sm text-slate-500">
+            Day-end requires a live connection to the server. Please reconnect to the network and try again.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="mt-2 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+            style={{ background: BLUE }}
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

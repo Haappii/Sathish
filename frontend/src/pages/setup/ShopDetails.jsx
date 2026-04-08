@@ -132,7 +132,7 @@ export default function ShopDetails() {
       if (!logoRes.ok) showToast(`Saved, but logo failed: ${logoRes.msg}`, "warning");
       else showToast(wantsLogo ? "Shop updated (logo uploaded)" : "Shop updated", "success");
 
-      if (headOfficeChanged) {
+      if (headOfficeChanged || (wantsLogo && logoRes.ok)) {
         window.location.reload();
         return;
       }

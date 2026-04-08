@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, session } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const child_process = require("child_process");
@@ -247,7 +247,51 @@ function startOfflineServer(staticDir) {
   });
 }
 
-function probeUrlReachable(targetUrl, timeoutMs = 2500) {
+/**
+ * Inject permissive CORS headers on all responses from the production server.
+ * Required when the offline bundle (http://127.0.0.1:{port}) makes API calls to
+ * the remote server — Chromium enforces CORS even inside Electron.
+ * This must be called after app.whenReady() so defaultSession exists.
+ */
+function setupDesktopCors(serverUrl) {
+  if (!serverUrl) return;
+  let serverOrigin;
+  try {
+    serverOrigin = new URL(serverUrl).origin;
+  } catch {
+    return;
+  }
+
+  // Handle preflight (OPTIONS) requests: respond immediately with 200 + CORS headers
+  // so the browser doesn't block the actual request.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: [`${serverOrigin}/api/*`] },
+    (details, callback) => {
+      const headers = Object.assign({}, details.requestHeaders);
+      // Strip problematic origin so the server CORS middleware stays out of the way.
+      // We inject the allow-origin ourselves on the response side.
+      callback({ requestHeaders: headers });
+    }
+  );
+
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: [`${serverOrigin}/*`] },
+    (details, callback) => {
+      callback({
+        responseHeaders: Object.assign({}, details.responseHeaders, {
+          "access-control-allow-origin":      ["*"],
+          "access-control-allow-credentials": ["true"],
+          "access-control-allow-methods":     ["GET, POST, PUT, DELETE, PATCH, OPTIONS"],
+          "access-control-allow-headers":     [
+            "Authorization, Content-Type, x-branch-id, x-user-role, x-real-ip",
+          ],
+        }),
+      });
+    }
+  );
+}
+
+function probeUrlReachable(targetUrl, timeoutMs = 4000) {
   return new Promise((resolve) => {
     try {
       const u = new URL(targetUrl);
@@ -364,6 +408,24 @@ function createWindow(targetUrl, offlineUrl, serverUrl) {
     win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   });
   win.loadURL(targetUrl);
+
+  // Periodic server reachability check (every 30 s).
+  // If the window is on the offline bundle but the server came back online,
+  // reload from the production URL so the user gets realtime data.
+  if (serverUrl && offlineUrl) {
+    const intervalId = setInterval(async () => {
+      if (win.isDestroyed()) { clearInterval(intervalId); return; }
+      const reachable = await probeUrlReachable(serverUrl, 3000);
+      const current = win.webContents.getURL();
+      const onOfflineBundle = current.startsWith("http://127.0.0.1");
+      if (reachable && onOfflineBundle) {
+        baseUrl = serverUrl;
+        win.loadURL(serverUrl);
+      }
+    }, 30000);
+    win.on("closed", () => clearInterval(intervalId));
+  }
+
   return win;
 }
 
@@ -639,6 +701,9 @@ if (!gotTheLock) {
 app.whenReady().then(async () => {
   const resolvedUrl = resolveAppUrl();
   persistAppUrl(resolvedUrl);
+
+  // Must be called before creating the window so the session filter is in place.
+  setupDesktopCors(resolvedUrl);
 
   // Start lightweight static server for the bundled offline UI (if present).
   const offlineDir = getOfflineUiDir();

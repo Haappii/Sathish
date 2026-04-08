@@ -18,13 +18,18 @@ const isElectron = () =>
  * Only these endpoints are snapshotted for offline use.
  */
 const SNAPSHOT_MAP = [
-  { pattern: /\/products(\/list)?/, key: "products" },
-  { pattern: /\/category(\/list)?/, key: "categories" },
+  { pattern: /\/items(\/list)?(\/)?(\?.*)?$/, key: "items" },
+  { pattern: /\/category(\/list)?(\/)?(\?.*)?$/, key: "categories" },
   { pattern: /\/tables(\/list)?/, key: "tables" },
   { pattern: /\/customers(\/list)?/, key: "customers" },
   { pattern: /\/branch\/scoped/, key: "branch" },
   { pattern: /\/shop\/details/, key: "shop_details" },
   { pattern: /\/order(\/list)?/, key: "orders" },
+  { pattern: /\/pricing\/levels/, key: "pricing_levels" },
+  { pattern: /\/pricing\/all/, key: "pricing_all" },
+  { pattern: /\/purchase-orders(\/list)?(\/)?(\?.*)?$/, key: "purchase_orders" },
+  { pattern: /\/inventory\/list/, key: "inventory" },
+  { pattern: /\/suppliers(\/list)?(\/)?(\?.*)?$/, key: "suppliers" },
 ];
 
 export function getSnapshotKey(url) {

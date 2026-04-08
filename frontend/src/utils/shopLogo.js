@@ -28,8 +28,9 @@ export const resolveApiUrl = (path) => {
     return new URL(v, base).toString();
   }
 
-  // When API_BASE is relative (eg: "/api"), let the browser resolve.
-  return v;
+  // When API_BASE is relative (eg: "/api"), prepend it to form an absolute path.
+  const base = API_BASE.endsWith("/") ? API_BASE : `${API_BASE}/`;
+  return `${base}${v}`;
 };
 
 export const getShopLogoUrl = (shop) => {

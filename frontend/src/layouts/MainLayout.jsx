@@ -332,6 +332,8 @@ export default function MainLayout({ hideSidebar = false }) {
     return Boolean(permMap?.qr_orders?.can_read);
   }, [showTableBilling, permsEnabled, permMap, roleLower]);
 
+  const ADMIN_PATHS = new Set(["/setup"]);
+
   const menuItems = useMemo(() => {
     const fallback = buildRoleMenu({
       roleLower,
@@ -339,15 +341,25 @@ export default function MainLayout({ hideSidebar = false }) {
       isHeadOfficeClosed,
     });
 
-    if (!permsEnabled || !permMap) return fallback;
+    let items;
+    if (!permsEnabled || !permMap) {
+      items = fallback;
+    } else {
+      const rbac = buildRbacMenu({
+        permMap,
+        showTableBilling,
+        isHeadOfficeClosed,
+      });
+      items = rbac && rbac.length ? rbac : fallback;
+    }
 
-    const rbac = buildRbacMenu({
-      permMap,
-      showTableBilling,
-      isHeadOfficeClosed,
-    });
-    return rbac && rbac.length ? rbac : fallback;
-  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed]);
+    // Hide Admin menu when offline — admin operations require server connectivity.
+    if (!online) {
+      items = items.filter((m) => !ADMIN_PATHS.has(m.path));
+    }
+
+    return items;
+  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed, online]);
 
   const loadQrPending = async () => {
     if (!canQrOrders) {
