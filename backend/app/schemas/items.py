@@ -6,12 +6,12 @@ class ItemBase(BaseModel):
     item_name: Optional[str] = None
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
-    price: Optional[float] = 0
-    buy_price: Optional[float] = 0
-    mrp_price: Optional[float] = 0
-    item_status: Optional[bool] = True
+    price: Optional[float] = None
+    buy_price: Optional[float] = None
+    mrp_price: Optional[float] = None
+    item_status: Optional[bool] = None
     is_raw_material: Optional[bool] = None
-    min_stock: Optional[int] = 0
+    min_stock: Optional[int] = None
 
 
 class ItemCreate(ItemBase):
