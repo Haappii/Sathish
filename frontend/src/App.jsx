@@ -28,7 +28,7 @@ import Returns from "./pages/Returns";
 import StockTransfers from "./pages/StockTransfers";
 import Drafts from "./pages/Drafts";
 import Customers from "./pages/Customers";
-import ReorderAlerts from "./pages/ReorderAlerts";
+
 import SupportTickets from "./pages/SupportTickets";
 import Alerts from "./pages/Alerts";
 import CashDrawer from "./pages/CashDrawer";
@@ -127,7 +127,7 @@ export default function App() {
             <Route path="/stock-transfers" element={<StockTransfers />} />
             <Route path="/drafts" element={<Drafts />} />
             <Route path="/customers" element={<Customers />} />
-            <Route path="/reorder-alerts" element={<ReorderAlerts />} />
+
             <Route path="/support-tickets" element={<SupportTickets />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/cash-drawer" element={<CashDrawer />} />

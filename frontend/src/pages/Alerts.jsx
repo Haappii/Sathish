@@ -88,7 +88,7 @@ export default function Alerts() {
             <div className="rounded-xl border bg-white p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">Low Stock</div>
-                <Link className="text-[11px] text-blue-600 underline" to="/reorder-alerts">
+                <Link className="text-[11px] text-blue-600 underline" to="/inventory">
                   Open
                 </Link>
               </div>

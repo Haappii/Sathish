@@ -259,13 +259,6 @@ const MENU_CATALOG = [
     perm: { module: "inventory", action: "read" },
   },
   {
-    key: "reorder_alerts",
-    name: "Reorder Alerts",
-    path: "/reorder-alerts",
-    icon: <FaBell />,
-    perm: { module: "inventory", action: "read" },
-  },
-  {
     key: "alerts",
     name: "Alerts",
     path: "/alerts",
@@ -336,7 +329,6 @@ export const buildRbacMenu = ({
   // Hotel: inventory means raw materials stock.
   return filtered.map((x) => {
     if (x.key === "inventory") return { ...x, name: "Raw Materials" };
-    if (x.key === "reorder_alerts") return { ...x, name: "Raw Material Alerts" };
     return x;
   });
 };
@@ -348,7 +340,6 @@ export const buildRoleMenu = ({
 }) => {
   let menuItems = [];
   const inventoryName = showTableBilling ? "Raw Materials" : "Inventory";
-  const reorderAlertsName = showTableBilling ? "Raw Material Alerts" : "Reorder Alerts";
 
   if (roleLower === "cashier") {
     menuItems = [
@@ -428,7 +419,6 @@ export const buildRoleMenu = ({
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
       { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
-      { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
       { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> },
@@ -472,7 +462,6 @@ export const buildRoleMenu = ({
           ]
         : []),
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
-      { name: reorderAlertsName, path: "/reorder-alerts", icon: <FaBell /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },

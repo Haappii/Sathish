@@ -610,7 +610,7 @@ export default function MainLayout({ hideSidebar = false }) {
                       )}
                     </div>
                     <div className="px-4 py-2.5 border-t flex items-center justify-between gap-2">
-                      <button type="button" onClick={() => { setLowStockOpen(false); navigate("/reorder-alerts"); }}
+                      <button type="button" onClick={() => { setLowStockOpen(false); navigate("/inventory"); }}
                         className="px-3 py-1.5 rounded-xl border text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition">
                         View All
                       </button>

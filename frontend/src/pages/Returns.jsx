@@ -50,9 +50,9 @@ export default function Returns() {
     const items = (invoice.items || [])
       .map(i => {
         const cond = condition[i.item_id] || "GOOD";
-        // Hotel: GOOD → restock (re-serve); BAD → trash (do not restock)
+        // Hotel: food items are never added back to stock regardless of condition
         // Store: GOOD → restock; DAMAGED → do not restock
-        const restock = isHotel ? cond === "GOOD" : cond !== "DAMAGED";
+        const restock = isHotel ? false : cond !== "DAMAGED";
         return {
           item_id: i.item_id,
           quantity: Number(qty[i.item_id] || 0),
@@ -240,7 +240,7 @@ export default function Returns() {
                           >
                             {isHotel ? (
                               <>
-                                <option value="GOOD">Good (add to future invoices)</option>
+                                <option value="GOOD">Good condition</option>
                                 <option value="BAD">Bad (trash)</option>
                               </>
                             ) : (

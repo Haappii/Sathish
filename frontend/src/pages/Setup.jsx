@@ -10,7 +10,6 @@ import {
   FaTruck,
   FaClipboardList,
   FaUsers,
-  FaBell,
   FaLifeRing,
   FaUserShield,
   FaTags,
@@ -155,13 +154,6 @@ export default function Setup() {
       desc: "Customer profiles & dues",
       icon: FaUsers,
       color: "text-slate-700",
-    },
-    {
-      title: "Reorder Alerts",
-      link: "/reorder-alerts",
-      desc: "Items below minimum stock",
-      icon: FaBell,
-      color: "text-rose-600",
     },
     {
       title: "Support Tickets",
