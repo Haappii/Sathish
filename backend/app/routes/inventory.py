@@ -272,14 +272,14 @@ def reorder_alerts(
             Inventory.item_id,
             Item.item_name,
             Inventory.quantity,
-            Inventory.min_stock
+            Item.min_stock
         )
         .join(Item, Item.item_id == Inventory.item_id)
         .filter(
             Inventory.shop_id == user.shop_id,
             Inventory.branch_id == branch,
-            Inventory.min_stock > 0,
-            Inventory.quantity < Inventory.min_stock
+            Item.min_stock > 0,
+            Inventory.quantity < Item.min_stock
         )
     )
     if is_hotel:
@@ -287,7 +287,7 @@ def reorder_alerts(
     else:
         q = q.filter(Item.is_raw_material == False)
 
-    rows = q.order_by((Inventory.min_stock - Inventory.quantity).desc()).all()
+    rows = q.order_by((Item.min_stock - Inventory.quantity).desc()).all()
 
     return [
         {

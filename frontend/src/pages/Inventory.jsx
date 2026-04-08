@@ -172,7 +172,7 @@ export default function Inventory() {
                 {filtered.map(item => {
                   const stock = getStock(item.item_id);
                   const catName = categories.find(c => c.category_id === item.category_id)?.category_name || "";
-                  const isLow = item.min_stock > 0 ? stock <= item.min_stock : false;
+                  const isLow = item.min_stock > 0 ? stock < item.min_stock : false;
                   return (
                     <div key={item.item_id} className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col gap-3 hover:border-slate-200 transition shadow-sm">
                       <div>

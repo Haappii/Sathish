@@ -111,7 +111,7 @@ export default function Dashboard() {
     const r = await authAxios.get("/inventory/list", {
       params: { branch_id: session.branch_id }
     });
-    setLowStockItems(r.data.filter(i => i.quantity <= i.min_stock));
+    setLowStockItems(r.data.filter(i => i.min_stock > 0 && i.quantity < i.min_stock));
   };
 
   const loadBranches = async () => {

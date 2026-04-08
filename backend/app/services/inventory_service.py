@@ -109,11 +109,12 @@ def adjust_stock(
 # UPDATE MINIMUM STOCK
 # =========================================================
 def update_min_stock(db: Session, shop_id: int, item_id: int, branch_id: int, min_stock: int):
-    row = ensure_stock_row(db, shop_id, item_id, branch_id)
-    row.min_stock = min_stock
-    db.commit()
-    db.refresh(row)
-    return row
+    item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == shop_id).first()
+    if item:
+        item.min_stock = min_stock
+        db.commit()
+        db.refresh(item)
+    return item
 
 
 # =========================================================
@@ -132,7 +133,7 @@ def get_branch_stock_rows(
             Inventory.item_id,
             Item.item_name,
             Inventory.quantity,
-            Inventory.min_stock
+            Item.min_stock
         )
         .join(Item, Item.item_id == Inventory.item_id)
         .filter(
