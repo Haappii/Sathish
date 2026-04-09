@@ -68,6 +68,7 @@ import PurchaseOrders from "./pages/setup/PurchaseOrders";
 import Permissions from "./pages/setup/Permissions";
 import OnlineOrderSetup from "./pages/setup/OnlineOrderSetup";
 import ExcelUpload from "./pages/setup/ExcelUpload";
+import MailScheduler from "./pages/setup/MailScheduler";
 import SetupOnboard from "./pages/SetupOnboard";
 import About from "./pages/About";
 
@@ -163,6 +164,7 @@ export default function App() {
             <Route path="/setup/purchase-orders" element={<PurchaseOrders />} />
             <Route path="/setup/permissions" element={<Permissions />} />
             <Route path="/setup/excel-upload" element={<ExcelUpload />} />
+            <Route path="/setup/mail-scheduler" element={<MailScheduler />} />
             <Route path="/setup/online-orders" element={<OnlineOrderSetup />} />
             <Route
               path="/setup/branches/:branchId/tables"

@@ -78,6 +78,7 @@ import app.models.modifier
 import app.models.reservation
 import app.models.recipe
 import app.models.delivery
+import app.models.mail_scheduler
 
 
 from app.models.users import User
@@ -639,6 +640,12 @@ def _startup_db_init():
     except Exception as e:
         logger.exception("DB seed_platform_owner_defaults failed: %s", e)
 
+    try:
+        from app.services.mail_scheduler_service import start_mail_scheduler
+        start_mail_scheduler()
+    except Exception as e:
+        logger.exception("Mail scheduler startup failed: %s", e)
+
 
 # ======================================================
 # ROUTERS
@@ -677,6 +684,7 @@ from app.routes import (
 from app.routes import inventory_bulk
 from app.routes import branch_routes, auth_branch
 from app.routes import support_chat
+from app.routes import mail_scheduler as mail_scheduler_routes
 from app.routes import setup_onboard
 from app.routes import day_close
 from app.routes import expenses
@@ -748,8 +756,9 @@ app.include_router(branch_routes.router, prefix="/api")
 app.include_router(auth_branch.router,   prefix="/api")
 
 # ---------- SUPPORT CHAT ----------
-app.include_router(support_chat.router,  prefix="/api")
-app.include_router(setup_onboard.router, prefix="/api")
+app.include_router(support_chat.router,        prefix="/api")
+app.include_router(mail_scheduler_routes.router, prefix="/api")
+app.include_router(setup_onboard.router,       prefix="/api")
 app.include_router(day_close.router,     prefix="/api")
 app.include_router(expenses.router,      prefix="/api")
 app.include_router(suppliers.router,     prefix="/api")

@@ -18,6 +18,7 @@ import {
   FaBarcode,
   FaCodeBranch,
   FaFileExcel,
+  FaEnvelope,
 } from "react-icons/fa";
 import api from "../utils/apiClient";
 import { getSession, isHeadOfficeBranch } from "../utils/auth";
@@ -175,6 +176,13 @@ export default function Setup() {
       desc: "Bulk import categories, items, users & employees",
       icon: FaFileExcel,
       color: "text-green-600",
+    },
+    {
+      title: "Mail Scheduler",
+      link: "/setup/mail-scheduler",
+      desc: "Schedule automated daily report emails",
+      icon: FaEnvelope,
+      color: "text-blue-700",
     },
   ];
 
