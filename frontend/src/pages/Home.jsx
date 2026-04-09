@@ -52,7 +52,21 @@ const COLORS = [
 const isoToday = () => getBusinessDate();
 
 const MENU_GROUPS = [
-  { key: "billing", title: "Billing", paths: ["/sales/create", "/sales/history", "/table-billing", "/online-orders", "/drafts", "/deleted-invoices"] },
+  {
+    key: "billing",
+    title: "Billing",
+    paths: [
+      "/sales/create",
+      "/sales/history",
+      "/table-billing",
+      "/qr-orders",
+      "/order-live",
+      "/kot",
+      "/online-orders",
+      "/drafts",
+      "/deleted-invoices",
+    ],
+  },
   { key: "customers", title: "Customers & Receivables", paths: ["/customers", "/dues"] },
   { key: "employees", title: "Employees", paths: ["/employees", "/employees/attendance"] },
   { key: "returns", title: "Returns", paths: ["/returns"] },
@@ -116,6 +130,7 @@ export default function Home() {
 
   const [shop, setShop] = useState(null);
   const [shopType, setShopType] = useState("");
+  const [orderLiveTrackingEnabled, setOrderLiveTrackingEnabled] = useState(true);
   const [permMap, setPermMap] = useState(null);
   const [permsEnabled, setPermsEnabled] = useState(false);
 
@@ -186,6 +201,30 @@ export default function Home() {
         setPermMap(null);
       });
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!branchId) {
+      setOrderLiveTrackingEnabled(true);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    api.get(`/branch/${branchId}`)
+      .then((res) => {
+        if (!mounted) return;
+        setOrderLiveTrackingEnabled(res?.data?.order_live_tracking_enabled !== false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setOrderLiveTrackingEnabled(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [branchId]);
 
   /* ------------------ ACCESS CONTROL ------------------ */
   const canExpenseWrite = useMemo(() => {
@@ -337,6 +376,7 @@ export default function Home() {
       roleLower,
       showTableBilling,
       isHeadOfficeClosed,
+      orderLiveTrackingEnabled,
     });
 
     if (!permsEnabled || !permMap) return fallback;
@@ -345,6 +385,7 @@ export default function Home() {
       permMap,
       showTableBilling,
       isHeadOfficeClosed,
+      orderLiveTrackingEnabled,
     });
 
     return rbac?.length ? rbac : fallback;
@@ -354,6 +395,7 @@ export default function Home() {
     roleLower,
     showTableBilling,
     isHeadOfficeClosed,
+    orderLiveTrackingEnabled,
   ]);
 
   const menuCards = useMemo(

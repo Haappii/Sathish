@@ -66,6 +66,7 @@ export default function TableGrid() {
     () => localStorage.getItem("billing_type") === "hotel"
   );
   const [branchInfo, setBranchInfo] = useState({});
+  const orderLiveTrackingEnabled = branchInfo?.order_live_tracking_enabled !== false;
 
   // print ref & helpers
   const printTextRef = useRef(null);
@@ -112,7 +113,7 @@ export default function TableGrid() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [branchId]);
 
   useEffect(() => {
     if (!hotelAllowed) return;
@@ -427,20 +428,24 @@ export default function TableGrid() {
         <h1 className="text-base font-semibold text-gray-700">Table Billing</h1>
 
         <div className="ml-auto flex items-center gap-3 text-xs text-gray-600">
-          <button
-            type="button"
-            onClick={() => navigate("/order-live")}
-            className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-semibold text-blue-700 hover:bg-blue-100 transition"
-          >
-            Order Live
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/kot")}
-            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700 hover:bg-amber-100 transition"
-          >
-            Manage Status
-          </button>
+          {orderLiveTrackingEnabled && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate("/order-live")}
+                className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-semibold text-blue-700 hover:bg-blue-100 transition"
+              >
+                Order Live
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/kot")}
+                className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700 hover:bg-amber-100 transition"
+              >
+                Manage Status
+              </button>
+            </>
+          )}
           <div className="rounded-full border border-gray-200 bg-white px-3 py-1">
             Free: <span className="font-semibold text-gray-900">{freeCount}</span>
           </div>

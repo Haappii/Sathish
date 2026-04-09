@@ -55,6 +55,7 @@ export default function Branches() {
       loyalty_points_percentage: 0,
       kot_required: true,
       receipt_required: true,
+      order_live_tracking_enabled: true,
       paper_size: "58mm",
       fssai_number: "",
       service_charge_required: false,
@@ -101,6 +102,7 @@ export default function Branches() {
         discount_value: Number(branch?.discount_value || 0),
         kot_required: branch?.kot_required !== false,
         receipt_required: branch?.receipt_required !== false,
+        order_live_tracking_enabled: branch?.order_live_tracking_enabled !== false,
         paper_size: branch?.paper_size || "58mm",
         fssai_number: branch?.fssai_number || "",
         service_charge_required: normalizedServiceChargeRequired,
@@ -479,6 +481,21 @@ export default function Branches() {
                 </div>
               </div>
             </FormSection>
+
+            {hotelShop && (
+              <FormSection
+                icon={<FaTable size={14} />}
+                title="Order Live Tracking"
+                subtitle="Control live tracking screens for this branch"
+              >
+                <ToggleRow
+                  label="Enable order live tracking"
+                  hint="Shows Order Live and KOT status management menus for this branch."
+                  checked={Boolean(form.order_live_tracking_enabled)}
+                  onChange={(checked) => setField("order_live_tracking_enabled", checked)}
+                />
+              </FormSection>
+            )}
 
             {/* Printing */}
             <FormSection

@@ -4,7 +4,13 @@ from app.schemas.branch_schema import BranchCreate, BranchUpdate
 from app.utils.branch_online_orders import BRANCH_ONLINE_ORDER_FIELDS
 
 _DISCOUNT_FIELDS = {"discount_enabled", "discount_type", "discount_value"}
-_PRINT_FIELDS = {"kot_required", "receipt_required"}
+_PRINT_FIELDS = {
+    "kot_required",
+    "receipt_required",
+    "paper_size",
+    "fssai_number",
+    "order_live_tracking_enabled",
+}
 _LOYALTY_FIELDS = {"loyalty_points_percentage"}
 _PARAM_ONLY_FIELDS = _DISCOUNT_FIELDS | _PRINT_FIELDS | _LOYALTY_FIELDS | set(BRANCH_ONLINE_ORDER_FIELDS)
 

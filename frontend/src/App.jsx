@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /** Redirects to /home if the shop's billing_type doesn't match the required type. */
 function ShopTypeGuard({ requireHotel, children }) {
@@ -9,6 +9,47 @@ function ShopTypeGuard({ requireHotel, children }) {
   const isHotel = billingType === "hotel";
   if (requireHotel && !isHotel) return <Navigate to="/home" replace />;
   if (!requireHotel && isHotel) return <Navigate to="/home" replace />;
+  return children;
+}
+
+function OrderLiveGuard({ children }) {
+  const session = getSession() || {};
+  const branchId = session?.branch_id ?? null;
+  const [enabled, setEnabled] = useState(() => (branchId ? null : true));
+
+  useEffect(() => {
+    let mounted = true;
+    if (!branchId) {
+      setEnabled(true);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    api.get(`/branch/${branchId}`)
+      .then((res) => {
+        if (!mounted) return;
+        setEnabled(res?.data?.order_live_tracking_enabled !== false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setEnabled(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [branchId]);
+
+  if (enabled === null) {
+    return (
+      <div className="mt-10 text-center text-sm font-medium text-gray-600">
+        Loading order live tracking...
+      </div>
+    );
+  }
+
+  if (!enabled) return <Navigate to="/home" replace />;
   return children;
 }
 
@@ -84,7 +125,8 @@ import PublicPayment from "./pages/PublicPayment";
 import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
 
 import { ToastProvider } from "./components/Toast";
-import { startActivityTracking } from "./utils/auth";
+import api from "./utils/apiClient";
+import { getSession, startActivityTracking } from "./utils/auth";
 
 export default function App() {
   useEffect(() => {
@@ -175,8 +217,26 @@ export default function App() {
             {/* TABLE BILLING */}
             <Route path="/table-billing" element={<TableGrid />} />
             <Route path="/qr-orders" element={<QrOrders />} />
-            <Route path="/order-live" element={<ShopTypeGuard requireHotel><OrderLiveTracking /></ShopTypeGuard>} />
-            <Route path="/kot" element={<ShopTypeGuard requireHotel><KitchenDisplay /></ShopTypeGuard>} />
+            <Route
+              path="/order-live"
+              element={
+                <ShopTypeGuard requireHotel>
+                  <OrderLiveGuard>
+                    <OrderLiveTracking />
+                  </OrderLiveGuard>
+                </ShopTypeGuard>
+              }
+            />
+            <Route
+              path="/kot"
+              element={
+                <ShopTypeGuard requireHotel>
+                  <OrderLiveGuard>
+                    <KitchenDisplay />
+                  </OrderLiveGuard>
+                </ShopTypeGuard>
+              }
+            />
 
             {/* ⭐ HOTEL-ONLY FEATURES */}
             <Route path="/reservations" element={<Reservations />} />
@@ -188,7 +248,16 @@ export default function App() {
           <Route element={<MainLayout hideSidebar />}>
             <Route path="/setup/items" element={<Items />} />
             <Route path="/table-order/:orderId" element={<ShopTypeGuard requireHotel><TableOrder /></ShopTypeGuard>} />
-            <Route path="/kitchen-display" element={<ShopTypeGuard requireHotel><KitchenDisplay /></ShopTypeGuard>} />
+            <Route
+              path="/kitchen-display"
+              element={
+                <ShopTypeGuard requireHotel>
+                  <OrderLiveGuard>
+                    <KitchenDisplay />
+                  </OrderLiveGuard>
+                </ShopTypeGuard>
+              }
+            />
           </Route>
 
         </Routes>

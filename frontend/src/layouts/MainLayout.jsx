@@ -78,6 +78,7 @@ export default function MainLayout({ hideSidebar = false }) {
   const [logoSrc, setLogoSrc] = useState(defaultLogo);
   const [permMap, setPermMap] = useState(null);
   const [permsEnabled, setPermsEnabled] = useState(false);
+  const [orderLiveTrackingEnabled, setOrderLiveTrackingEnabled] = useState(true);
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -178,6 +179,30 @@ export default function MainLayout({ hideSidebar = false }) {
         setPermMap(null);
       });
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!branchId) {
+      setOrderLiveTrackingEnabled(true);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    api.get(`/branch/${branchId}`)
+      .then((res) => {
+        if (!mounted) return;
+        setOrderLiveTrackingEnabled(res?.data?.order_live_tracking_enabled !== false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setOrderLiveTrackingEnabled(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [branchId]);
 
   useEffect(() => {
     const url = getShopLogoUrl(shop);
@@ -441,6 +466,7 @@ export default function MainLayout({ hideSidebar = false }) {
       roleLower,
       showTableBilling,
       isHeadOfficeClosed,
+      orderLiveTrackingEnabled,
     });
 
     let items;
@@ -451,6 +477,7 @@ export default function MainLayout({ hideSidebar = false }) {
         permMap,
         showTableBilling,
         isHeadOfficeClosed,
+        orderLiveTrackingEnabled,
       });
       items = rbac && rbac.length ? rbac : fallback;
     }
@@ -461,7 +488,15 @@ export default function MainLayout({ hideSidebar = false }) {
     }
 
     return items;
-  }, [permsEnabled, permMap, roleLower, showTableBilling, isHeadOfficeClosed, online]);
+  }, [
+    permsEnabled,
+    permMap,
+    roleLower,
+    showTableBilling,
+    isHeadOfficeClosed,
+    orderLiveTrackingEnabled,
+    online,
+  ]);
 
   const loadQrPending = async () => {
     if (!canQrOrders) {
