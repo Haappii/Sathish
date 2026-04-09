@@ -36,6 +36,7 @@ export default function PlatformDashboard() {
   const [selectedShopDetail, setSelectedShopDetail] = useState(null);
   const [shopDetailLoading, setShopDetailLoading] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ extend_days: "", paid_until: "", amount: "" });
+  const [limitsForm, setLimitsForm] = useState({ max_branches: "", max_users: "" });
   const [billingType, setBillingType] = useState("store");
 
   const [busyId, setBusyId] = useState(null);
@@ -100,6 +101,10 @@ export default function PlatformDashboard() {
       const res = await platformAxios.get(`/platform/shops/${shopId}/detail`);
       setSelectedShopDetail(res.data || null);
       setBillingType(String(res.data?.billing_type || "store").toLowerCase());
+      setLimitsForm({
+        max_branches: res.data?.max_branches != null ? String(res.data.max_branches) : "",
+        max_users: res.data?.max_users != null ? String(res.data.max_users) : "",
+      });
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to load shop detail", "error");
       setSelectedShopDetail(null);
@@ -292,6 +297,24 @@ export default function PlatformDashboard() {
       await load();
     } catch (e) {
       showToast(e?.response?.data?.detail || "Plan update failed", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const saveLimits = async () => {
+    if (!selectedShopId) return;
+    const payload = {
+      max_branches: limitsForm.max_branches !== "" ? Number(limitsForm.max_branches) : null,
+      max_users: limitsForm.max_users !== "" ? Number(limitsForm.max_users) : null,
+    };
+    setBusyId(selectedShopId);
+    try {
+      await platformAxios.post(`/platform/shops/${selectedShopId}/update-limits`, payload);
+      showToast("Limits updated", "success");
+      await loadShopDetail(selectedShopId);
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Update failed", "error");
     } finally {
       setBusyId(null);
     }
@@ -993,6 +1016,41 @@ export default function PlatformDashboard() {
                       className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm font-medium transition disabled:opacity-60"
                     >
                       Save Business Type
+                    </button>
+                  </div>
+
+                  {/* limits */}
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                    <p className="text-sm font-semibold">Branch & User Limits</p>
+                    <p className="text-xs text-slate-400">Leave blank to allow unlimited. Shop will get an error when the limit is reached.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400 font-medium block mb-1">Max Branches</label>
+                        <input
+                          type="number" min="1" max="500"
+                          className="w-full rounded-xl px-3 py-2 text-xs bg-slate-900/80 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          value={limitsForm.max_branches}
+                          onChange={(e) => setLimitsForm((f) => ({ ...f, max_branches: e.target.value }))}
+                          placeholder="Unlimited"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 font-medium block mb-1">Max Users</label>
+                        <input
+                          type="number" min="1" max="500"
+                          className="w-full rounded-xl px-3 py-2 text-xs bg-slate-900/80 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          value={limitsForm.max_users}
+                          onChange={(e) => setLimitsForm((f) => ({ ...f, max_users: e.target.value }))}
+                          placeholder="Unlimited"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={saveLimits}
+                      disabled={busyId === selectedShopId}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm font-medium transition disabled:opacity-60"
+                    >
+                      Save Limits
                     </button>
                   </div>
 

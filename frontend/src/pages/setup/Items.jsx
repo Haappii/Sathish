@@ -26,6 +26,7 @@ export default function Items() {
   const [activeSupplierId, setActiveSupplierId] = useState(null);
   const [categorySearch, setCategorySearch] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [form, setForm] = useState({
     item_name: "",
@@ -309,6 +310,10 @@ export default function Items() {
     const q = search.trim().toLowerCase();
     return (items || []).filter(i => {
       const searchOk = (i.item_name || "").toLowerCase().includes(q);
+      const statusOk =
+        statusFilter === "all" ||
+        (statusFilter === "on" ? !!i.item_status : !i.item_status);
+      if (!statusOk) return false;
       if (activeSupplierId) {
         return i.is_raw_material && String(i.supplier_id) === String(activeSupplierId) && searchOk;
       }
@@ -317,7 +322,15 @@ export default function Items() {
         String(i.category_id) === String(activeCategoryId);
       return catOk && searchOk;
     });
-  }, [items, activeCategoryId, activeSupplierId, search]);
+  }, [items, activeCategoryId, activeSupplierId, search, statusFilter]);
+
+  const statusCounts = useMemo(() => {
+    return (items || []).reduce((acc, item) => {
+      if (item.item_status) acc.on += 1;
+      else acc.off += 1;
+      return acc;
+    }, { on: 0, off: 0 });
+  }, [items]);
 
   const formCategoryName =
     categories.find(c => String(c.category_id) === String(form.category_id))
@@ -376,6 +389,41 @@ export default function Items() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 p-1 rounded-xl border bg-white shadow-sm">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                statusFilter === "all"
+                  ? "bg-slate-800 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              All ({items.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("on")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                statusFilter === "on"
+                  ? "bg-emerald-600 text-white"
+                  : "text-emerald-700 hover:bg-emerald-50"
+              }`}
+            >
+              On ({statusCounts.on})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("off")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                statusFilter === "off"
+                  ? "bg-rose-600 text-white"
+                  : "text-rose-700 hover:bg-rose-50"
+              }`}
+            >
+              Off ({statusCounts.off})
+            </button>
+          </div>
           <input ref={xlsxRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelImport} />
           <button
             type="button"

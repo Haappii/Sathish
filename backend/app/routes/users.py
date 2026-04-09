@@ -6,6 +6,7 @@ from typing import Optional
 from app.db import get_db
 from app.models.branch import Branch
 from app.models.roles import Role
+from app.models.shop_details import ShopDetails
 from app.models.users import User
 from app.models.bulk_import_log import BulkImportLog
 from app.schemas.users import UserCreate, UserUpdate, UserResponse
@@ -91,6 +92,16 @@ def create_user(
 
     if exists:
         raise HTTPException(400, "Username already exists")
+
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == current_user.shop_id).first()
+    max_users = getattr(shop, "max_users", None) if shop else None
+    if max_users is not None:
+        current_count = db.query(User).filter(
+            User.shop_id == current_user.shop_id,
+            User.status == True  # noqa: E712
+        ).count()
+        if current_count >= max_users:
+            raise HTTPException(400, f"User limit reached ({max_users}). Contact support to increase your limit.")
 
     branch_id = request.branch_id
     if not is_admin:

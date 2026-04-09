@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.models.branch import Branch
+from app.models.shop_details import ShopDetails
 from app.models.system_parameters import SystemParameter
 from app.schemas.branch_schema import BranchCreate, BranchUpdate, BranchOut
 from app.services.branch_service import (
@@ -388,6 +389,16 @@ def create(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    max_branches = getattr(shop, "max_branches", None) if shop else None
+    if max_branches is not None:
+        current_count = db.query(Branch).filter(
+            Branch.shop_id == user.shop_id,
+            Branch.status == "ACTIVE"
+        ).count()
+        if current_count >= max_branches:
+            raise HTTPException(400, f"Branch limit reached ({max_branches}). Contact support to increase your limit.")
+
     branch = create_branch(db, data, user.user_id, user.shop_id)
     _save_branch_discount(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)
     _save_branch_print_settings(db, shop_id=user.shop_id, branch_id=int(branch.branch_id), payload=data)

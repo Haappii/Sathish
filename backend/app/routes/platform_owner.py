@@ -618,6 +618,8 @@ def platform_shop_detail(
         "last_payment_on": getattr(s, "last_payment_on", None),
         "total_paid": float(getattr(s, "total_paid", 0) or 0),
         "status": status,
+        "max_branches": getattr(s, "max_branches", None),
+        "max_users": getattr(s, "max_users", None),
     }
 
 
@@ -702,6 +704,33 @@ class ShopPaymentUpdateIn(BaseModel):
     extend_days: int | None = Field(default=None, ge=1, le=3650)
     paid_until: str | None = None  # YYYY-MM-DD
     amount: float | None = Field(default=None, ge=0)
+
+
+class ShopLimitsUpdateIn(BaseModel):
+    max_branches: int | None = Field(default=None, ge=1, le=500)
+    max_users: int | None = Field(default=None, ge=1, le=500)
+
+
+@router.post("/shops/{shop_id}/update-limits")
+def update_shop_limits(
+    shop_id: int,
+    payload: ShopLimitsUpdateIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    s = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not s:
+        raise HTTPException(404, "Shop not found")
+    # Allow None to clear the limit (unlimited)
+    s.max_branches = payload.max_branches
+    s.max_users = payload.max_users
+    db.commit()
+    db.refresh(s)
+    return {
+        "success": True,
+        "max_branches": s.max_branches,
+        "max_users": s.max_users,
+    }
 
 
 class ShopStatusUpdateIn(BaseModel):

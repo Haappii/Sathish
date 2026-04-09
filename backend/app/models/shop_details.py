@@ -46,3 +46,7 @@ class ShopDetails(Base):
     # UPI / Reservation payment
     upi_id = Column(String(80), nullable=True)
     reservation_advance = Column(Numeric(10, 2), default=0)
+
+    # Platform-set limits (null = unlimited)
+    max_branches = Column(Integer, nullable=True)
+    max_users = Column(Integer, nullable=True)

@@ -23,7 +23,13 @@ import {
   syncOfflineBills,
 } from "../utils/offlineBills";
 
-import { FaBars, FaExclamationTriangle, FaThumbtack } from "react-icons/fa";
+import {
+  FaBars,
+  FaExclamationTriangle,
+  FaThumbtack,
+  FaToggleOn,
+  FaToggleOff,
+} from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 import {
   buildRbacMenu,
@@ -81,6 +87,13 @@ export default function MainLayout({ hideSidebar = false }) {
   const [lowStockItems, setLowStockItems] = useState([]);
   const lowStockBtnRef = useRef(null);
   const lowStockPopupRef = useRef(null);
+  const [itemQuickOpen, setItemQuickOpen] = useState(false);
+  const [itemQuickLoading, setItemQuickLoading] = useState(false);
+  const [itemQuickItems, setItemQuickItems] = useState([]);
+  const [itemQuickSearch, setItemQuickSearch] = useState("");
+  const [itemQuickBusyId, setItemQuickBusyId] = useState(null);
+  const itemQuickBtnRef = useRef(null);
+  const itemQuickPopupRef = useRef(null);
 
   const [qrPendingCount, setQrPendingCount] = useState(0);
 
@@ -276,6 +289,88 @@ export default function MainLayout({ hideSidebar = false }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [lowStockOpen]);
 
+  const loadQuickItems = async () => {
+    if (!canQuickToggleItems) {
+      setItemQuickItems([]);
+      return;
+    }
+
+    setItemQuickLoading(true);
+    try {
+      const res = await api.get("/items/", {
+        params: { limit: 500 },
+      });
+      setItemQuickItems(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      setItemQuickItems([]);
+    } finally {
+      setItemQuickLoading(false);
+    }
+  };
+
+  const toggleQuickItemStatus = async (item) => {
+    if (!item?.item_id || itemQuickBusyId) return;
+
+    const nextStatus = !Boolean(item.item_status);
+    const prevStatus = Boolean(item.item_status);
+
+    setItemQuickBusyId(item.item_id);
+    setItemQuickItems((prev) =>
+      prev.map((row) =>
+        row.item_id === item.item_id ? { ...row, item_status: nextStatus } : row
+      )
+    );
+
+    try {
+      await api.put(`/items/${item.item_id}`, { item_status: nextStatus });
+      showToast(
+        `${item.item_name} ${nextStatus ? "enabled" : "disabled"}`,
+        "success"
+      );
+    } catch (err) {
+      setItemQuickItems((prev) =>
+        prev.map((row) =>
+          row.item_id === item.item_id ? { ...row, item_status: prevStatus } : row
+        )
+      );
+      showToast(
+        err?.response?.data?.detail || "Item status update failed",
+        "error"
+      );
+    } finally {
+      setItemQuickBusyId(null);
+    }
+  };
+
+  const filteredQuickItems = useMemo(() => {
+    const q = String(itemQuickSearch || "").trim().toLowerCase();
+    if (!q) return itemQuickItems;
+    return itemQuickItems.filter((item) =>
+      String(item?.item_name || "").toLowerCase().includes(q)
+    );
+  }, [itemQuickItems, itemQuickSearch]);
+
+  useEffect(() => {
+    if (!itemQuickOpen) return;
+
+    const onDocClick = (e) => {
+      const t = e.target;
+      const btn = itemQuickBtnRef.current;
+      const pop = itemQuickPopupRef.current;
+      if (btn && btn.contains(t)) return;
+      if (pop && pop.contains(t)) return;
+      setItemQuickOpen(false);
+    };
+
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [itemQuickOpen]);
+
+  useEffect(() => {
+    setItemQuickOpen(false);
+    setItemQuickSearch("");
+  }, [branchId]);
+
   /* ================= SWITCH BRANCH ================= */
   const switchBranch = async id => {
     if (switching) return;
@@ -331,6 +426,13 @@ export default function MainLayout({ hideSidebar = false }) {
     }
     return Boolean(permMap?.qr_orders?.can_read);
   }, [showTableBilling, permsEnabled, permMap, roleLower]);
+
+  const canQuickToggleItems = useMemo(() => {
+    if (!permsEnabled || !permMap) {
+      return roleLower === "admin";
+    }
+    return Boolean(permMap?.items?.can_write);
+  }, [permsEnabled, permMap, roleLower]);
 
   const ADMIN_PATHS = new Set(["/setup"]);
 
@@ -560,6 +662,124 @@ export default function MainLayout({ hideSidebar = false }) {
             <span className="hidden md:inline px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-100 whitespace-nowrap">
               {appDateDisplay}
             </span>
+
+            {/* Quick item enable/disable */}
+            {canQuickToggleItems && (
+              <div className="relative">
+                <button
+                  ref={itemQuickBtnRef}
+                  type="button"
+                  disabled={!online}
+                  onClick={async () => {
+                    const next = !itemQuickOpen;
+                    setItemQuickOpen(next);
+                    if (next) {
+                      setLowStockOpen(false);
+                      setItemQuickSearch("");
+                      await loadQuickItems();
+                    }
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-semibold hover:bg-indigo-100 transition disabled:opacity-60"
+                  title={online ? "Quick item ON/OFF" : "Go online to update items"}
+                >
+                  {itemQuickOpen ? <FaToggleOn className="text-[12px]" /> : <FaToggleOff className="text-[12px]" />}
+                  Item On/Off
+                </button>
+
+                {itemQuickOpen && (
+                  <div
+                    ref={itemQuickPopupRef}
+                    className="absolute right-0 mt-2 w-[340px] max-w-[calc(100vw-24px)] bg-white border rounded-2xl shadow-xl z-50 overflow-hidden"
+                  >
+                    <div className="px-4 py-3 border-b flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[12px] font-bold text-gray-800">Item On / Off</div>
+                        <div className="text-[10px] text-gray-400">Enable or disable items quickly</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setItemQuickOpen(false)}
+                        className="text-gray-400 hover:text-gray-700 text-[12px]"
+                      >
+                        x
+                      </button>
+                    </div>
+
+                    <div className="p-3 border-b">
+                      <input
+                        type="text"
+                        value={itemQuickSearch}
+                        onChange={(e) => setItemQuickSearch(e.target.value)}
+                        placeholder="Search item..."
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[12px] bg-gray-50 focus:outline-none focus:border-indigo-300"
+                      />
+                    </div>
+
+                    <div className="max-h-[320px] overflow-auto divide-y">
+                      {itemQuickLoading ? (
+                        <div className="p-4 text-[12px] text-gray-400">Loading items...</div>
+                      ) : filteredQuickItems.length === 0 ? (
+                        <div className="p-4 text-[12px] text-gray-400">
+                          {itemQuickSearch ? "No matching items found" : "No items found"}
+                        </div>
+                      ) : (
+                        filteredQuickItems.map((item) => {
+                          const busy = itemQuickBusyId === item.item_id;
+                          return (
+                            <div
+                              key={item.item_id}
+                              className="px-4 py-3 flex items-center justify-between gap-3"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-[12px] font-semibold text-gray-800 truncate">
+                                  {item.item_name}
+                                </div>
+                                <div className="text-[10px] text-gray-400">
+                                  {item.item_status ? "Currently ON" : "Currently OFF"}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={busy || !online}
+                                onClick={() => toggleQuickItemStatus(item)}
+                                className={`min-w-[72px] px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition disabled:opacity-60 ${
+                                  item.item_status
+                                    ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {busy ? "Saving..." : item.item_status ? "Turn OFF" : "Turn ON"}
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="px-4 py-2.5 border-t flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItemQuickOpen(false);
+                          navigate("/setup/items");
+                        }}
+                        className="px-3 py-1.5 rounded-xl border text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition"
+                      >
+                        Manage All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => await loadQuickItems()}
+                        className="px-3 py-1.5 rounded-xl border text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Low Stock */}
             {shop?.inventory_enabled && (
