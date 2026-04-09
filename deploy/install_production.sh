@@ -7,6 +7,8 @@ FRONTEND_DIR="${ROOT_DIR}/frontend"
 DEPLOY_DIR="${ROOT_DIR}/deploy"
 SERVICE_NAME="pos-backend"
 NGINX_SITE_NAME="haappii-billing"
+MIGRATIONS_DIR="${BACKEND_DIR}/migrations"
+APPLIED_MIGRATIONS_FILE="${DEPLOY_DIR}/.applied_migrations"
 
 CONFIG_EXAMPLE_FILE="${ROOT_DIR}/config.example.txt"
 CONFIG_FILE="${ROOT_DIR}/config.txt"
@@ -38,6 +40,8 @@ RUN_USER="${SUDO_USER:-$(id -un)}"
 SWAPFILE_PATH="${SWAPFILE_PATH:-/swapfile}"
 SWAPFILE_SIZE_GB="${SWAPFILE_SIZE_GB:-2}"
 FRONTEND_NODE_HEAP_MB="${FRONTEND_NODE_HEAP_MB:-768}"
+DB_NAME="${DB_NAME:-shop_billing}"
+DB_USER="${DB_USER:-postgres}"
 
 require_cmd() {
   local cmd="$1"
@@ -104,6 +108,26 @@ print_memory_snapshot() {
   fi
 }
 
+# ── 1. Pull latest code ────────────────────────────────────────────────────────
+echo "==> Pulling latest code from git"
+cd "${ROOT_DIR}"
+git pull origin main
+
+# ── 2. Clean temp / cache files ───────────────────────────────────────────────
+echo "==> Cleaning build cache and temp files"
+
+# Frontend: remove old dist and vite cache so build is always fresh
+rm -rf "${FRONTEND_DIR}/dist"
+rm -rf "${FRONTEND_DIR}/node_modules/.cache"
+rm -rf "${FRONTEND_DIR}/.vite"
+echo "    Removed frontend/dist, node_modules/.cache, .vite"
+
+# Backend: remove Python bytecode cache
+find "${BACKEND_DIR}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "${BACKEND_DIR}" -name "*.pyc" -delete 2>/dev/null || true
+echo "    Removed backend __pycache__ and .pyc files"
+
+# ── 3. Backend setup ──────────────────────────────────────────────────────────
 echo "==> Backend setup"
 cd "${BACKEND_DIR}"
 
@@ -123,6 +147,26 @@ fi
 "${VENV_PYTHON}" -m pip install --upgrade pip
 "${VENV_PYTHON}" -m pip install -r requirements.txt
 
+# ── 4. Run pending SQL migrations ─────────────────────────────────────────────
+echo "==> Running database migrations"
+touch "${APPLIED_MIGRATIONS_FILE}"
+
+if [[ -d "${MIGRATIONS_DIR}" ]]; then
+  for sql_file in $(ls "${MIGRATIONS_DIR}"/*.sql 2>/dev/null | sort); do
+    filename="$(basename "${sql_file}")"
+    if grep -qxF "${filename}" "${APPLIED_MIGRATIONS_FILE}"; then
+      echo "    [skip] ${filename} (already applied)"
+    else
+      echo "    [run]  ${filename}"
+      sudo -u "${DB_USER}" psql "${DB_NAME}" -f "${sql_file}"
+      echo "${filename}" >> "${APPLIED_MIGRATIONS_FILE}"
+    fi
+  done
+else
+  echo "    No migrations directory found, skipping."
+fi
+
+# ── 5. Ensure swap space ──────────────────────────────────────────────────────
 echo "==> Ensuring swap space (prevents Node.js heap OOM on low-RAM servers)"
 if ! swapon --show | grep -q "${SWAPFILE_PATH}"; then
   if [[ ! -f "${SWAPFILE_PATH}" ]]; then
@@ -140,6 +184,7 @@ fi
 echo "==> Memory snapshot before frontend build"
 print_memory_snapshot
 
+# ── 6. Frontend build ─────────────────────────────────────────────────────────
 echo "==> Frontend build"
 cd "${FRONTEND_DIR}"
 npm install
@@ -150,6 +195,7 @@ if ! NODE_OPTIONS="--max-old-space-size=${FRONTEND_NODE_HEAP_MB}" VITE_API_BASE=
   exit 1
 fi
 
+# ── 7. Install / update backend systemd service ───────────────────────────────
 echo "==> Installing backend systemd service"
 TMP_SERVICE="$(mktemp)"
 cat > "${TMP_SERVICE}" <<EOF
@@ -173,8 +219,11 @@ EOF
 sudo cp "${TMP_SERVICE}" "/etc/systemd/system/${SERVICE_NAME}.service"
 rm -f "${TMP_SERVICE}"
 sudo systemctl daemon-reload
-sudo systemctl enable --now "${SERVICE_NAME}"
+sudo systemctl enable "${SERVICE_NAME}"
+sudo systemctl restart "${SERVICE_NAME}"
+echo "    Backend service restarted."
 
+# ── 8. Install / update nginx ─────────────────────────────────────────────────
 echo "==> Installing nginx site"
 TMP_NGINX="$(mktemp)"
 cat > "${TMP_NGINX}" <<EOF
@@ -214,17 +263,26 @@ server {
 }
 EOF
 
-sudo apt-get update
+sudo apt-get update -qq
 sudo apt-get install -y nginx
 sudo cp "${TMP_NGINX}" "/etc/nginx/sites-available/${NGINX_SITE_NAME}"
 rm -f "${TMP_NGINX}"
 sudo ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}"
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
-sudo systemctl enable --now nginx
+sudo systemctl enable nginx
 sudo systemctl restart nginx
+echo "    Nginx restarted."
+
+# ── 9. Health check ───────────────────────────────────────────────────────────
+echo "==> Health check"
+sleep 3
+HEALTH="$(curl -s http://127.0.0.1:8000/api/health || echo 'UNREACHABLE')"
+echo "    Backend: ${HEALTH}"
 
 echo
-echo "Production deployment complete."
-echo "Health:  http://127.0.0.1:8000/api/health"
-echo "Public:  http://${PUBLIC_HOST}/"
+echo "=========================================="
+echo "  Production deployment complete."
+echo "  Health:  http://127.0.0.1:8000/api/health"
+echo "  Public:  http://${PUBLIC_HOST}/"
+echo "=========================================="
