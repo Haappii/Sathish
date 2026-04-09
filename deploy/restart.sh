@@ -13,12 +13,16 @@ sudo systemctl restart nginx
 echo "    Done."
 
 echo "==> Health check..."
-sleep 2
+sleep 4
+
+# Backend health (direct)
 HEALTH="$(curl -s http://127.0.0.1:8000/api/health || echo 'UNREACHABLE')"
 echo "    Backend : ${HEALTH}"
 
-HTTP_STATUS="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/ || echo '000')"
-echo "    Frontend: HTTP ${HTTP_STATUS}"
+# Frontend via HTTPS (certbot manages SSL)
+HTTP_STATUS="$(curl -sk -o /dev/null -w '%{http_code}' https://haappiibilling.in/ 2>/dev/null || echo '000')"
+echo "    Site    : HTTPS ${HTTP_STATUS}"
 
 echo ""
 echo "Both services restarted successfully."
+echo "  https://haappiibilling.in"
