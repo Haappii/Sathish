@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -11,6 +13,7 @@ from app.models.shop_details import ShopDetails
 from app.utils.permissions import require_permission
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
+logger = logging.getLogger("uvicorn.error")
 
 
 class FeedbackSubmit(BaseModel):
@@ -38,9 +41,19 @@ def submit_feedback(payload: FeedbackSubmit, db: Session = Depends(get_db)):
         rating=payload.rating,
         comment=(payload.comment or "").strip() or None,
     )
-    db.add(fb)
-    db.commit()
-    db.refresh(fb)
+    try:
+        db.add(fb)
+        db.commit()
+        db.refresh(fb)
+    except Exception as e:
+        db.rollback()
+        logger.exception(
+            "Feedback submit failed for shop_id=%s invoice_no=%s: %s",
+            payload.shop_id,
+            payload.invoice_no,
+            e,
+        )
+        raise HTTPException(500, "Unable to save feedback right now") from e
     return {"success": True, "feedback_id": fb.feedback_id}
 
 
