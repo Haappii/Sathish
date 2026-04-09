@@ -304,17 +304,35 @@ export default function PlatformDashboard() {
 
   const saveLimits = async () => {
     if (!selectedShopId) return;
+    const maxBranches = limitsForm.max_branches !== "" ? Number(limitsForm.max_branches) : null;
+    const maxUsers = limitsForm.max_users !== "" ? Number(limitsForm.max_users) : null;
+    if (
+      (maxBranches !== null && (!Number.isFinite(maxBranches) || maxBranches < 1)) ||
+      (maxUsers !== null && (!Number.isFinite(maxUsers) || maxUsers < 1))
+    ) {
+      showToast("Limits must be 1 or greater, or left blank for unlimited", "error");
+      return;
+    }
     const payload = {
-      max_branches: limitsForm.max_branches !== "" ? Number(limitsForm.max_branches) : null,
-      max_users: limitsForm.max_users !== "" ? Number(limitsForm.max_users) : null,
+      max_branches: maxBranches,
+      max_users: maxUsers,
     };
     setBusyId(selectedShopId);
     try {
-      await platformAxios.post(`/platform/shops/${selectedShopId}/update-limits`, payload);
+      try {
+        await platformAxios.post(`/platform/shops/${selectedShopId}/update-limits`, payload);
+      } catch (postError) {
+        if (postError?.response?.status !== 405) throw postError;
+        await platformAxios.put(`/platform/shops/${selectedShopId}/update-limits`, payload);
+      }
       showToast("Limits updated", "success");
       await loadShopDetail(selectedShopId);
     } catch (e) {
-      showToast(e?.response?.data?.detail || "Update failed", "error");
+      if (e?.response?.status === 404 || e?.response?.status === 405) {
+        showToast("Restart the backend server, then try saving limits again", "error");
+      } else {
+        showToast(e?.response?.data?.detail || "Update failed", "error");
+      }
     } finally {
       setBusyId(null);
     }

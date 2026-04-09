@@ -711,7 +711,8 @@ class ShopLimitsUpdateIn(BaseModel):
     max_users: int | None = Field(default=None, ge=1, le=500)
 
 
-@router.post("/shops/{shop_id}/update-limits")
+@router.api_route("/shops/{shop_id}/update-limits", methods=["POST", "PUT"])
+@router.api_route("/shops/{shop_id}/update-limits/", methods=["POST", "PUT"], include_in_schema=False)
 def update_shop_limits(
     shop_id: int,
     payload: ShopLimitsUpdateIn,
