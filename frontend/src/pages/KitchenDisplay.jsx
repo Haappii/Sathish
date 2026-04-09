@@ -1,217 +1,316 @@
-import { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { MdRefresh, MdTableRestaurant } from "react-icons/md";
 
-const API = import.meta.env.VITE_API_URL || "";
+import api from "../utils/apiClient";
+import BackButton from "../components/BackButton";
+import { useToast } from "../components/Toast";
+import {
+  ORDER_LIVE_STAGES,
+  ORDER_LIVE_STAGE_MAP,
+  formatOrderLiveAge,
+  getNextOrderLiveAction,
+} from "../utils/orderLive";
 
-const STATUS_COLOR = {
-  PENDING:   { bg: "#ef4444", text: "#fff", label: "PENDING" },
-  PREPARING: { bg: "#f97316", text: "#fff", label: "PREPARING" },
-  READY:     { bg: "#22c55e", text: "#fff", label: "READY" },
-  SERVED:    { bg: "#6b7280", text: "#fff", label: "SERVED" },
+const STATUS_TONE = {
+  ORDER_PLACED: "bg-sky-50 text-sky-700 border-sky-200",
+  ORDER_PREPARING: "bg-amber-50 text-amber-700 border-amber-200",
+  FOOD_PREPARED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  MOVED_TO_TABLE: "bg-violet-50 text-violet-700 border-violet-200",
+  AWAITING_KOT: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
-export default function KitchenDisplay() {
-  const [kots, setKots]       = useState([]);
-  const [shopId, setShopId]   = useState(null);
-  const [branchId, setBranchId] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [error, setError]     = useState("");
-  const intervalRef           = useRef(null);
+function StatusStepper({ status }) {
+  const activeIndex = ORDER_LIVE_STAGE_MAP[String(status || "").toUpperCase()]?.index ?? -1;
 
-  // Read shop/branch from localStorage (set during login)
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {ORDER_LIVE_STAGES.map((stage, index) => {
+        const done = activeIndex >= index;
+        return (
+          <div
+            key={stage.key}
+            className={`rounded-xl border px-2 py-2 text-center transition ${
+              done
+                ? "border-blue-200 bg-blue-50 text-blue-700"
+                : "border-slate-200 bg-white text-slate-400"
+            }`}
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-wide">
+              Step {index + 1}
+            </div>
+            <div className="mt-1 text-[11px] font-bold leading-tight">
+              {stage.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function KitchenDisplay() {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const [lastRefresh, setLastRefresh] = useState("");
+
+  const load = async ({ silent = false } = {}) => {
+    if (!silent) setRefreshing(true);
+    try {
+      const res = await api.get("/kot/tracking/orders");
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setRows(
+        list.sort((a, b) => {
+          const ai = ORDER_LIVE_STAGE_MAP[String(a?.status || "").toUpperCase()]?.index ?? 99;
+          const bi = ORDER_LIVE_STAGE_MAP[String(b?.status || "").toUpperCase()]?.index ?? 99;
+          if (ai !== bi) return ai - bi;
+          return new Date(a?.opened_at || 0).getTime() - new Date(b?.opened_at || 0).getTime();
+        })
+      );
+      setLastRefresh(new Date().toLocaleTimeString());
+    } catch (err) {
+      setRows([]);
+      if (!silent) {
+        showToast(err?.response?.data?.detail || "Failed to load order statuses", "error");
+      }
+    } finally {
+      setLoading(false);
+      if (!silent) setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    const sid = localStorage.getItem("shop_id");
-    const bid = localStorage.getItem("branch_id");
-    setShopId(sid);
-    setBranchId(bid);
+    let mounted = true;
+    (async () => {
+      await load();
+    })();
+
+    const timer = setInterval(() => {
+      if (mounted) load({ silent: true });
+    }, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
   }, []);
 
-  const fetchKots = async () => {
-    if (!shopId || !branchId) return;
+  const counts = useMemo(() => {
+    return rows.reduce((acc, row) => {
+      const key = String(row?.status || "").toUpperCase();
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }, [rows]);
+
+  const updateStatus = async (row, nextStatus) => {
+    if (!row?.order_id || !nextStatus || busyId) return;
+    setBusyId(row.order_id);
     try {
-      const res = await axios.get(`${API}/api/kds/live`, {
-        params: { shop_id: shopId, branch_id: branchId },
+      await api.put(`/kot/tracking/order/${row.order_id}/status`, {
+        status: nextStatus,
       });
-      setKots(res.data.kots || []);
-      setLastUpdate(new Date().toLocaleTimeString());
-      setError("");
-    } catch {
-      setError("Could not reach server");
+      showToast(`Order #${row.order_id} updated`, "success");
+      await load({ silent: true });
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to update order status", "error");
+    } finally {
+      setBusyId(null);
     }
-  };
-
-  useEffect(() => {
-    if (!shopId || !branchId) return;
-    fetchKots();
-    intervalRef.current = setInterval(fetchKots, 5000);
-    return () => clearInterval(intervalRef.current);
-  }, [shopId, branchId]);
-
-  const updateStatus = async (kotId, newStatus) => {
-    try {
-      await axios.put(`${API}/api/kot/${kotId}/status`, { status: newStatus });
-      fetchKots();
-    } catch {
-      alert("Failed to update status");
-    }
-  };
-
-  const elapsed = (mins) => {
-    if (mins < 1)  return "< 1 min";
-    if (mins < 60) return `${mins} min`;
-    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-  };
-
-  const urgencyBg = (mins) => {
-    if (mins >= 20) return "#7f1d1d";
-    if (mins >= 10) return "#7c2d12";
-    return "#1e3a5f";
   };
 
   return (
-    <div style={{ background: "#111", minHeight: "100vh", color: "#fff", fontFamily: "monospace" }}>
-      {/* Header */}
-      <div style={{
-        background: "#1f1f1f", padding: "12px 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        borderBottom: "2px solid #ef4444",
-      }}>
-        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 2 }}>
-          🍳 KITCHEN DISPLAY
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <BackButton to="/table-billing" />
+          <div>
+            <h1 className="text-xl font-extrabold text-slate-800">Order Status Manager</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Advance orders from KOT placed through moved to table
+            </p>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-          <span style={{ color: "#9ca3af", fontSize: 13 }}>
-            Auto-refreshes every 5s
-          </span>
-          {lastUpdate && (
-            <span style={{ color: "#22c55e", fontSize: 13 }}>
-              Last updated: {lastUpdate}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {lastRefresh && (
+            <span className="px-3 py-1.5 rounded-xl border bg-white text-[11px] font-medium text-slate-500">
+              Updated {lastRefresh}
             </span>
           )}
-          {error && (
-            <span style={{ color: "#ef4444", fontSize: 13 }}>⚠ {error}</span>
-          )}
-          <div style={{ display: "flex", gap: 12 }}>
-            {Object.entries(STATUS_COLOR).map(([k, v]) => (
-              <span key={k} style={{
-                background: v.bg, color: v.text,
-                padding: "2px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700,
-              }}>{v.label}</span>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/order-live")}
+            className="px-3 py-1.5 rounded-xl border bg-white text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition"
+          >
+            Open Live Screen
+          </button>
+          <button
+            type="button"
+            onClick={() => load()}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-white text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-60"
+          >
+            <MdRefresh size={14} />
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
         </div>
       </div>
 
-      {/* KOT Cards */}
-      <div style={{
-        padding: 16,
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-        gap: 16,
-      }}>
-        {kots.length === 0 ? (
-          <div style={{
-            gridColumn: "1/-1", textAlign: "center",
-            color: "#4b5563", fontSize: 32, marginTop: 80,
-          }}>
-            ✓ No pending orders
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {ORDER_LIVE_STAGES.map((stage) => (
+          <div key={stage.key} className="rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              {stage.label}
+            </div>
+            <div className="mt-2 text-2xl font-extrabold text-slate-800">
+              {counts[stage.key] || 0}
+            </div>
           </div>
-        ) : kots.map((kot) => {
-          const sc = STATUS_COLOR[kot.status] || STATUS_COLOR.PENDING;
-          return (
-            <div key={kot.kot_id} style={{
-              background: urgencyBg(kot.elapsed_minutes),
-              border: `2px solid ${sc.bg}`,
-              borderRadius: 8, overflow: "hidden",
-            }}>
-              {/* Card Header */}
-              <div style={{
-                background: sc.bg, padding: "8px 14px",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
-                <span style={{ fontWeight: 700, fontSize: 16 }}>
-                  {kot.kot_number}
-                </span>
-                <span style={{ fontSize: 13 }}>
-                  {kot.table_name ? `Table: ${kot.table_name}` : "Takeaway"}
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>
-                  ⏱ {elapsed(kot.elapsed_minutes)}
-                </span>
-              </div>
+        ))}
+      </div>
 
-              {/* Items */}
-              <div style={{ padding: "10px 14px" }}>
-                {kot.items.map((item, idx) => (
-                  <div key={idx} style={{
-                    display: "flex", justifyContent: "space-between",
-                    padding: "5px 0",
-                    borderBottom: idx < kot.items.length - 1 ? "1px solid #374151" : "none",
-                  }}>
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: 15 }}>
-                        {item.item_name}
+      {loading ? (
+        <div className="rounded-2xl border bg-white py-20 text-center text-sm text-slate-400 shadow-sm">
+          Loading order statuses...
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-2xl border bg-white py-20 px-6 text-center shadow-sm">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center">
+            <MdTableRestaurant size={30} className="text-slate-300" />
+          </div>
+          <div className="mt-4 text-sm font-bold text-slate-700">No active KOT orders</div>
+          <p className="mt-1 text-xs text-slate-400">
+            Generate KOT from a table order to start managing statuses here.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {rows.map((row) => {
+            const action = getNextOrderLiveAction(row.status);
+            const busy = busyId === row.order_id;
+
+            return (
+              <div key={row.order_id} className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+                <div className="px-4 py-4 border-b flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-extrabold text-slate-800">
+                        {row.table_name ? `Table ${row.table_name}` : `Order #${row.order_id}`}
                       </span>
-                      {item.notes && (
-                        <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 2 }}>
-                          📝 {item.notes}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border bg-slate-50 text-slate-500">
+                        Order #{row.order_id}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {row.customer_name || "Walk-in"}{row.mobile ? ` · ${row.mobile}` : ""}{row.opened_at ? ` · ${formatOrderLiveAge(row.opened_at)}` : ""}
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full border text-[11px] font-bold ${
+                      STATUS_TONE[String(row.status || "").toUpperCase()] || STATUS_TONE.AWAITING_KOT
+                    }`}
+                  >
+                    {row.status_label || "Awaiting KOT"}
+                  </span>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  <StatusStepper status={row.status} />
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        KOTs
+                      </div>
+                      <div className="mt-1 text-lg font-bold text-slate-800">{row.kot_count || 0}</div>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        Lines
+                      </div>
+                      <div className="mt-1 text-lg font-bold text-slate-800">{row.item_count || 0}</div>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        Qty
+                      </div>
+                      <div className="mt-1 text-lg font-bold text-slate-800">{row.total_qty || 0}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                      KOT Summary
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(row.kots || []).map((kot) => (
+                        <span
+                          key={kot.kot_id}
+                          className="px-2.5 py-1 rounded-full border bg-slate-50 text-[11px] font-medium text-slate-600"
+                        >
+                          {kot.kot_number} · {kot.status}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                      Items
+                    </div>
+                    <div className="rounded-xl border overflow-hidden">
+                      {(row.items || []).slice(0, 6).map((item) => (
+                        <div
+                          key={item.order_item_id}
+                          className="px-3 py-2 flex items-center justify-between gap-3 border-b last:border-b-0"
+                        >
+                          <span className="text-sm text-slate-700 truncate">{item.item_name}</span>
+                          <span className="text-sm font-bold text-slate-800">{item.quantity}</span>
+                        </div>
+                      ))}
+                      {(row.items || []).length > 6 && (
+                        <div className="px-3 py-2 text-[11px] text-slate-400 bg-slate-50">
+                          + {(row.items || []).length - 6} more item lines
                         </div>
                       )}
                     </div>
-                    <span style={{
-                      fontWeight: 700, fontSize: 18,
-                      background: "#374151", padding: "0 10px",
-                      borderRadius: 4, minWidth: 36, textAlign: "center",
-                    }}>
-                      {item.quantity}
-                    </span>
                   </div>
-                ))}
-              </div>
 
-              {/* Action Buttons */}
-              <div style={{ padding: "8px 14px", display: "flex", gap: 8 }}>
-                {kot.status === "PENDING" && (
-                  <button
-                    onClick={() => updateStatus(kot.kot_id, "PREPARING")}
-                    style={{
-                      flex: 1, background: "#f97316", color: "#fff",
-                      border: "none", borderRadius: 4, padding: "7px 0",
-                      fontWeight: 700, cursor: "pointer", fontSize: 13,
-                    }}
-                  >
-                    Start Preparing
-                  </button>
-                )}
-                {kot.status === "PREPARING" && (
-                  <button
-                    onClick={() => updateStatus(kot.kot_id, "READY")}
-                    style={{
-                      flex: 1, background: "#22c55e", color: "#fff",
-                      border: "none", borderRadius: 4, padding: "7px 0",
-                      fontWeight: 700, cursor: "pointer", fontSize: 13,
-                    }}
-                  >
-                    Mark Ready ✓
-                  </button>
-                )}
-                {kot.status === "READY" && (
-                  <button
-                    onClick={() => updateStatus(kot.kot_id, "SERVED")}
-                    style={{
-                      flex: 1, background: "#6b7280", color: "#fff",
-                      border: "none", borderRadius: 4, padding: "7px 0",
-                      fontWeight: 700, cursor: "pointer", fontSize: 13,
-                    }}
-                  >
-                    Served ✓
-                  </button>
-                )}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/table-order/${row.table_id}`)}
+                      className="px-3 py-1.5 rounded-xl border text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition"
+                    >
+                      Open Order
+                    </button>
+                    {action ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => updateStatus(row, action.status)}
+                        className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 transition disabled:opacity-60"
+                      >
+                        {busy ? "Saving..." : action.label}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-600">
+                        Final stage reached
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

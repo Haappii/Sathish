@@ -49,6 +49,7 @@ import TableGrid from "./pages/TableGrid";
 import TableOrder from "./pages/TableOrder";
 import QrOrders from "./pages/QrOrders";
 import PublicQrMenu from "./pages/PublicQrMenu";
+import OrderLiveTracking from "./pages/OrderLiveTracking";
 
 // ⭐ HOTEL FEATURES
 import KitchenDisplay from "./pages/KitchenDisplay";
@@ -174,6 +175,8 @@ export default function App() {
             {/* TABLE BILLING */}
             <Route path="/table-billing" element={<TableGrid />} />
             <Route path="/qr-orders" element={<QrOrders />} />
+            <Route path="/order-live" element={<ShopTypeGuard requireHotel><OrderLiveTracking /></ShopTypeGuard>} />
+            <Route path="/kot" element={<ShopTypeGuard requireHotel><KitchenDisplay /></ShopTypeGuard>} />
 
             {/* ⭐ HOTEL-ONLY FEATURES */}
             <Route path="/reservations" element={<Reservations />} />

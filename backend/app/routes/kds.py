@@ -31,7 +31,7 @@ def kds_live_feed(
         .filter(
             KOT.shop_id == shop_id,
             KOT.branch_id == branch_id,
-            KOT.status.in_(["PENDING", "PREPARING"]),
+            KOT.status.in_(["PENDING", "PREPARING", "READY"]),
         )
         .order_by(KOT.printed_at)
         .all()

@@ -472,6 +472,12 @@ export default function TableOrder() {
       const kotRequired = branch?.kot_required !== false;
       const confirmPrint = window.confirm(kotRequired ? "Confirm order and print KOT?" : "Confirm order?");
       if (!confirmPrint) return;
+      const currentOrderId = orderIdRef.current || orderId;
+      if (!currentOrderId) {
+        showToast("Order not found", "error");
+        return;
+      }
+
       const res = await api.get(`/table-billing/order/by-table/${tableId}`);
       const latestItems = Array.isArray(res.data?.items) ? res.data.items : [];
       setOrderItems(latestItems);
@@ -479,9 +485,17 @@ export default function TableOrder() {
         showToast("Add items before confirming order", "warning");
         return;
       }
+
       if (kotRequired) {
-        await printKOT(latestItems);
-        showToast("Order confirmed and KOT printed", "success");
+        const kotRes = await api.post(`/kot/create/${currentOrderId}`);
+        const kotItems = Array.isArray(kotRes.data?.items) ? kotRes.data.items : [];
+        if (!kotItems.length) {
+          showToast("No new items to send to kitchen", "warning");
+          return;
+        }
+        await printKOT(kotItems);
+        showToast("Order confirmed and live tracking started", "success");
+        await loadOrder();
       } else {
         showToast("Order confirmed", "success");
       }

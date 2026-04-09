@@ -277,8 +277,9 @@ export default function QrOrders() {
       const res = await api.post(`/qr-orders/${id}/accept`);
       const data = res.data || {};
       if (printCfg.kot_required) {
-        await printKOT({ tableName: data.table_name, items: data.items || [] });
-        showToast("Order accepted · KOT printed", "success");
+        const kotRes = await api.post(`/kot/create/${data.order_id}`);
+        await printKOT({ tableName: data.table_name, items: kotRes.data?.items || data.items || [] });
+        showToast("Order accepted and live tracking started", "success");
       } else {
         showToast("Order accepted", "success");
       }

@@ -102,6 +102,14 @@ const MENU_CATALOG = [
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
+    key: "order_live",
+    name: "Order Live",
+    path: "/order-live",
+    icon: <MdTableRestaurant />,
+    perm: { module: "billing", action: "read" },
+    when: ({ showTableBilling }) => Boolean(showTableBilling),
+  },
+  {
     key: "kot_management",
     name: "KOT",
     path: "/kot",
@@ -352,6 +360,7 @@ export const buildRoleMenu = ({
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Order Live", path: "/order-live", icon: <MdTableRestaurant /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
             { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
           ]
@@ -372,6 +381,7 @@ export const buildRoleMenu = ({
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Order Live", path: "/order-live", icon: <MdTableRestaurant /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
           ]
         : []),
@@ -390,6 +400,7 @@ export const buildRoleMenu = ({
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Order Live", path: "/order-live", icon: <MdTableRestaurant /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
             { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
             { name: "Recipes", path: "/recipes", icon: <FaUtensils /> },
@@ -436,6 +447,7 @@ export const buildRoleMenu = ({
         ? [
             { name: "Table Billing", path: "/table-billing", icon: <MdTableRestaurant /> },
             { name: "QR Orders", path: "/qr-orders", icon: <MdTableRestaurant /> },
+            { name: "Order Live", path: "/order-live", icon: <MdTableRestaurant /> },
             { name: "KOT", path: "/kot", icon: <FaConciergeBell /> },
             { name: "Delivery", path: "/delivery", icon: <FaMotorcycle /> },
             { name: "Recipes", path: "/recipes", icon: <FaUtensils /> },
