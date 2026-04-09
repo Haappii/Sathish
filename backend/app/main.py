@@ -79,6 +79,7 @@ import app.models.reservation
 import app.models.recipe
 import app.models.delivery
 import app.models.mail_scheduler
+import app.models.feedback
 
 
 from app.models.users import User
@@ -472,6 +473,27 @@ def _auto_migrate_head_office_branch() -> None:
         logger.exception("Auto-migration (head office branch) failed: %s", e)
 
 
+def _auto_migrate_shop_detail_limits() -> None:
+    """
+    Add platform-managed limit columns to shop_details on older databases.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS shop_details
+                      ADD COLUMN IF NOT EXISTS max_branches INTEGER,
+                      ADD COLUMN IF NOT EXISTS max_users INTEGER;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (shop detail limits) failed: %s", e)
+
+
 def _auto_migrate_user_session_tracking() -> None:
     """
     Add server-tracked user session columns for single-login enforcement.
@@ -554,12 +576,30 @@ def _auto_migrate_table_name_unique_constraint() -> None:
                             EXECUTE 'ALTER TABLE tables_master DROP CONSTRAINT IF EXISTS '
                                     || quote_ident(r.conname);
                         END LOOP;
-                    END $$;
 
-                    ALTER TABLE tables_master
-                        ADD CONSTRAINT uq_tables_master_shop_branch_category_name
-                        UNIQUE (shop_id, branch_id, category_id, table_name)
-                        DEFERRABLE INITIALLY DEFERRED;
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM pg_constraint c
+                            JOIN pg_class t ON t.oid = c.conrelid
+                            WHERE t.relname = 'tables_master'
+                              AND c.contype = 'u'
+                              AND c.conname = 'uq_tables_master_shop_branch_category_name'
+                        ) THEN
+                            IF EXISTS (
+                                SELECT 1
+                                FROM pg_class i
+                                WHERE i.relname = 'uq_tables_master_shop_branch_category_name'
+                                  AND i.relkind = 'i'
+                            ) THEN
+                                EXECUTE 'DROP INDEX IF EXISTS uq_tables_master_shop_branch_category_name';
+                            END IF;
+
+                            ALTER TABLE tables_master
+                                ADD CONSTRAINT uq_tables_master_shop_branch_category_name
+                                UNIQUE (shop_id, branch_id, category_id, table_name)
+                                DEFERRABLE INITIALLY DEFERRED;
+                        END IF;
+                    END $$;
                     """
                 )
             )
@@ -625,6 +665,7 @@ def _startup_db_init():
     _auto_migrate_branch_service_charge()
     _auto_migrate_branch_service_charge_gst()
     _auto_migrate_head_office_branch()
+    _auto_migrate_shop_detail_limits()
     _auto_migrate_user_session_tracking()
     _auto_migrate_table_name_unique_constraint()
     _auto_migrate_items_supplier()
@@ -692,6 +733,7 @@ from app.routes import suppliers
 from app.routes import purchase_orders
 from app.routes import gift_cards
 from app.routes import platform_owner
+from app.routes import feedback as feedback_routes
 from app.routes import bulk_import_logs
 
 # ---------- REPORT ROUTES ----------
@@ -765,6 +807,7 @@ app.include_router(suppliers.router,     prefix="/api")
 app.include_router(purchase_orders.router, prefix="/api")
 app.include_router(gift_cards.router, prefix="/api")
 app.include_router(platform_owner.router, prefix="/api")
+app.include_router(feedback_routes.router, prefix="/api")
 app.include_router(bulk_import_logs.router, prefix="/api")
 
 # ---------- REPORTS ----------

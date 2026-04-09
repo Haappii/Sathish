@@ -626,8 +626,22 @@ const [customer, setCustomer] = useState({
     const fssai = String(branch?.fssai_number || shop?.fssai_number || "").trim();
     if (fssai) t += center(`FSSAI No: ${fssai}`) + "\n";
     // Footer + 4 blank lines to ensure the message prints on the same ticket
-    t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
+    t += center("Thank You! Visit Again") + "\n";
+    if (shop?.shop_id) t += center("Scan QR to share feedback") + "\n";
+    t += "\n".repeat(4);
     return t;
+  };
+
+  const generateFeedbackQrHtml = async (invoiceNo) => {
+    if (!shop?.shop_id) return "";
+    try {
+      const QRCode = (await import("qrcode")).default;
+      const url = `${window.location.origin}/feedback?shop_id=${shop.shop_id}&invoice_no=${encodeURIComponent(invoiceNo)}`;
+      const dataUrl = await QRCode.toDataURL(url, { width: 120, margin: 1 });
+      return `<div style="text-align:center;margin-top:4px;"><img src="${dataUrl}" width="100" height="100"/></div>`;
+    } catch {
+      return "";
+    }
   };
 
   const generateKOTText = (kotItems, invoiceNumber, customerName, categoryLabel = null) => {
@@ -759,9 +773,11 @@ const [customer, setCustomer] = useState({
       }
 
       if (print && branch?.receipt_required !== false) {
+        const qrHtml = await generateFeedbackQrHtml(res.data.invoice_number);
         const ok = await printDirectText(generateBillText(res.data.invoice_number), {
           fontSize: 6,
           paperSize: branch?.paper_size || "58mm",
+          extraHtml: qrHtml,
         });
         if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
       } else if (print && branch?.receipt_required === false) {

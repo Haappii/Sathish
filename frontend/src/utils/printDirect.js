@@ -8,7 +8,7 @@ const escapeHtml = (text) =>
  * Attempt silent print via Electron (desktop). Falls back to browser print.
  * Returns a promise resolving to true on success.
  */
-export async function printDirectText(text, { fontSize = 9, port = "COM7", paperSize = "58mm" } = {}) {
+export async function printDirectText(text, { fontSize = 9, port = "COM7", paperSize = "58mm", extraHtml = "" } = {}) {
   // Try Electron silent print first (desktop app)
   if (window?.electronAPI?.rawPrintText || window?.electronAPI?.silentPrintText) {
     const preferBrowserFonts = Number(fontSize) <= 8; // use browser path when tiny fonts are requested
@@ -57,7 +57,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
     doc.write(
       `<pre style="font-family: monospace; font-size: ${fontSize}px; margin:0;">${escapeHtml(
         text
-      )}</pre>`
+      )}</pre>${extraHtml || ""}`
     );
     doc.close();
 

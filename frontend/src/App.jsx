@@ -123,6 +123,8 @@ import PublicReservation from "./pages/PublicReservation";
 import PublicPayment from "./pages/PublicPayment";
 
 import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
+import PublicFeedback from "./pages/PublicFeedback";
+import FeedbackReview from "./pages/FeedbackReview";
 
 import { ToastProvider } from "./components/Toast";
 import api from "./utils/apiClient";
@@ -148,6 +150,7 @@ export default function App() {
           <Route path="/qr/:token" element={<PublicQrMenu />} />
           <Route path="/book" element={<PublicReservation />} />
           <Route path="/pay" element={<PublicPayment />} />
+          <Route path="/feedback" element={<PublicFeedback />} />
 
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>
@@ -187,6 +190,7 @@ export default function App() {
             <Route path="/online-orders" element={<OnlineOrders />} />
             <Route path="/employees" element={<Employees />} />
             <Route path="/employees/attendance" element={<EmployeeAttendance />} />
+            <Route path="/feedback-review" element={<FeedbackReview />} />
 
             {/* DELETED INVOICES (🔥 NOT IN REPORTS) */}
             <Route
