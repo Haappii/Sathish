@@ -264,7 +264,7 @@ server {
 EOF
 
 sudo apt-get update -qq
-sudo apt-get install -y nginx
+sudo apt-get install -y nginx certbot python3-certbot-nginx
 sudo cp "${TMP_NGINX}" "/etc/nginx/sites-available/${NGINX_SITE_NAME}"
 rm -f "${TMP_NGINX}"
 sudo ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}"
@@ -274,15 +274,32 @@ sudo systemctl enable nginx
 sudo systemctl restart nginx
 echo "    Nginx restarted."
 
-# ── 9. Health check ───────────────────────────────────────────────────────────
+# ── 9. Re-apply SSL (certbot keeps HTTPS after nginx config regeneration) ─────
+if [[ "${PUBLIC_HOST}" != "_" && "${PUBLIC_HOST}" != "" ]]; then
+  echo "==> Re-applying SSL certificate for ${PUBLIC_HOST}"
+  sudo certbot --nginx -d "${PUBLIC_HOST}" \
+    --non-interactive --agree-tos \
+    -m "${CERTBOT_EMAIL:-haappiigaming@gmail.com}" \
+    --redirect \
+    --keep-until-expiring 2>&1 || echo "    Certbot skipped (cert still valid or domain not reachable)."
+  sudo systemctl reload nginx
+  echo "    SSL applied."
+fi
+
+# ── 10. Health check ──────────────────────────────────────────────────────────
 echo "==> Health check"
 sleep 3
 HEALTH="$(curl -s http://127.0.0.1:8000/api/health || echo 'UNREACHABLE')"
 echo "    Backend: ${HEALTH}"
 
+if [[ "${PUBLIC_HOST}" != "_" && "${PUBLIC_HOST}" != "" ]]; then
+  HTTP_STATUS="$(curl -sk -o /dev/null -w '%{http_code}' "https://${PUBLIC_HOST}/" 2>/dev/null || echo '000')"
+  echo "    Site   : HTTPS ${HTTP_STATUS}"
+fi
+
 echo
 echo "=========================================="
 echo "  Production deployment complete."
 echo "  Health:  http://127.0.0.1:8000/api/health"
-echo "  Public:  http://${PUBLIC_HOST}/"
+echo "  Public:  https://${PUBLIC_HOST}/"
 echo "=========================================="
