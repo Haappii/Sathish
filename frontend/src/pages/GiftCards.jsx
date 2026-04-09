@@ -152,123 +152,148 @@ export default function GiftCards() {
       <style>{`
         #gift-card-print-area { display: none; }
         @media print {
-          body * { visibility: hidden; }
-          #gift-card-print-area, #gift-card-print-area * { visibility: visible; }
+          @page { margin: 0; size: A4 portrait; }
+          html, body { margin: 0; padding: 0; }
+          body > * { display: none !important; }
           #gift-card-print-area {
             display: flex !important;
-            position: fixed;
-            inset: 0;
+            width: 210mm;
+            height: 297mm;
             align-items: center;
             justify-content: center;
-            background: #f8f8f8;
+            background: #f0f0f0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          @page { margin: 0; size: A4 portrait; }
+          .gc-card {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `}</style>
 
       <div id="gift-card-print-area">
-        {selectedPrint && (
-          <div style={{
-            width: "176mm",
-            height: "102mm",
-            borderRadius: "18px",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f3460 100%)",
-            color: "white",
-            padding: "22px 26px",
-            fontFamily: "Arial, Helvetica, sans-serif",
-            position: "relative",
-            overflow: "hidden",
-            boxSizing: "border-box",
-          }}>
-            {/* Decorative circles */}
-            <div style={{ position:"absolute", right:"-40px", top:"-40px", width:"150px", height:"150px", borderRadius:"50%", background:"rgba(255,215,0,0.07)", pointerEvents:"none" }} />
-            <div style={{ position:"absolute", right:"60px", bottom:"-30px", width:"100px", height:"100px", borderRadius:"50%", background:"rgba(255,215,0,0.05)", pointerEvents:"none" }} />
-            <div style={{ position:"absolute", left:"-20px", bottom:"-20px", width:"80px", height:"80px", borderRadius:"50%", background:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
-
-            {/* Header row */}
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-              <div>
-                <div style={{ fontSize:"8px", letterSpacing:"4px", color:"#fbbf24", textTransform:"uppercase", marginBottom:"3px" }}>✦ Gift Card ✦</div>
-                <div style={{ fontSize:"17px", fontWeight:"800", color:"white", lineHeight:1.1 }}>{shop?.shop_name || "Store"}</div>
-                {shop?.mobile && (
-                  <div style={{ fontSize:"9px", color:"rgba(255,255,255,0.45)", marginTop:"2px" }}>{shop.mobile}</div>
-                )}
-              </div>
-              <div style={{
-                background: selectedPrint.status === "ACTIVE" ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
-                border: `1px solid ${selectedPrint.status === "ACTIVE" ? "rgba(52,211,153,0.6)" : "rgba(248,113,113,0.6)"}`,
-                borderRadius: "20px",
-                padding: "4px 13px",
-                fontSize: "8px",
-                fontWeight: "700",
-                color: selectedPrint.status === "ACTIVE" ? "#6ee7b7" : "#fca5a5",
-                letterSpacing: "1.5px",
-                textTransform: "uppercase",
-              }}>
-                {selectedPrint.status}
-              </div>
-            </div>
-
-            {/* Amount */}
-            <div style={{ marginTop: "16px" }}>
-              <div style={{ fontSize:"8px", color:"rgba(255,255,255,0.45)", letterSpacing:"2px", textTransform:"uppercase" }}>Gift Value</div>
-              <div style={{ fontSize:"34px", fontWeight:"900", color:"#fbbf24", lineHeight:1.1, marginTop:"2px" }}>
-                Rs.&nbsp;{Number(selectedPrint.initial_amount || 0).toFixed(2)}
-              </div>
-              {Number(selectedPrint.balance_amount) !== Number(selectedPrint.initial_amount) && (
-                <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.55)", marginTop:"2px" }}>
-                  Remaining balance: Rs. {Number(selectedPrint.balance_amount || 0).toFixed(2)}
-                </div>
-              )}
-            </div>
-
-            {/* Code */}
-            <div style={{ marginTop:"14px", display:"flex", alignItems:"center", gap:"10px" }}>
-              <div>
-                <div style={{ fontSize:"8px", color:"rgba(255,255,255,0.45)", letterSpacing:"2px", textTransform:"uppercase", marginBottom:"4px" }}>Card Code</div>
-                <div style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1px solid rgba(251,191,36,0.5)",
-                  borderRadius: "8px",
-                  padding: "6px 14px",
-                  fontFamily: "Courier New, monospace",
-                  fontSize: "15px",
-                  fontWeight: "700",
-                  letterSpacing: "4px",
-                  color: "white",
-                  display: "inline-block",
-                }}>
-                  {selectedPrint.code}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div style={{
-              position:"absolute", bottom:"18px", left:"26px", right:"26px",
-              display:"flex", justifyContent:"space-between", alignItems:"flex-end",
-              borderTop:"1px solid rgba(255,255,255,0.1)", paddingTop:"10px",
+        {selectedPrint && (() => {
+          const isActive = selectedPrint.status === "ACTIVE";
+          const hasRemaining = Number(selectedPrint.balance_amount) !== Number(selectedPrint.initial_amount);
+          return (
+            <div className="gc-card" style={{
+              width: "160mm",
+              background: "linear-gradient(135deg, #0f172a 0%, #1a3353 45%, #0e2a4a 100%)",
+              borderRadius: "16px",
+              fontFamily: "Arial, Helvetica, sans-serif",
+              overflow: "hidden",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              WebkitPrintColorAdjust: "exact",
+              printColorAdjust: "exact",
             }}>
-              <div>
-                {selectedPrint.customer_name && (
-                  <div style={{ fontSize:"11px", fontWeight:"600", color:"rgba(255,255,255,0.8)" }}>{selectedPrint.customer_name}</div>
-                )}
-                {selectedPrint.mobile && (
-                  <div style={{ fontSize:"9px", color:"rgba(255,255,255,0.45)" }}>{selectedPrint.mobile}</div>
-                )}
+
+              {/* Gold top bar */}
+              <div style={{ height: "5px", background: "linear-gradient(90deg, #b8860b, #fbbf24, #d4a017, #fbbf24, #b8860b)" }} />
+
+              {/* Main content */}
+              <div style={{ padding: "24px 28px 0" }}>
+
+                {/* Top row: label + status */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{
+                      width: "32px", height: "32px", borderRadius: "8px",
+                      background: "linear-gradient(135deg, #b8860b, #fbbf24)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "16px", fontWeight: "900", color: "#0f172a",
+                    }}>✦</div>
+                    <div>
+                      <div style={{ fontSize: "7px", letterSpacing: "3px", color: "#fbbf24", textTransform: "uppercase", fontWeight: "700" }}>Gift Card</div>
+                      <div style={{ fontSize: "15px", fontWeight: "800", color: "white", lineHeight: 1.1, marginTop: "1px" }}>{shop?.shop_name || "Store"}</div>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: isActive ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)",
+                    border: `1.5px solid ${isActive ? "#34d399" : "#f87171"}`,
+                    borderRadius: "20px", padding: "5px 14px",
+                    fontSize: "9px", fontWeight: "800",
+                    color: isActive ? "#6ee7b7" : "#fca5a5",
+                    letterSpacing: "2px", textTransform: "uppercase",
+                  }}>{selectedPrint.status}</div>
+                </div>
+
+                {/* Divider */}
+                <div style={{ height: "1px", background: "rgba(255,255,255,0.08)", marginBottom: "18px" }} />
+
+                {/* Amount section */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20px" }}>
+                  <div>
+                    <div style={{ fontSize: "8px", letterSpacing: "2.5px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: "4px" }}>Gift Value</div>
+                    <div style={{ fontSize: "40px", fontWeight: "900", color: "#fbbf24", lineHeight: 1, letterSpacing: "-1px" }}>
+                      Rs.&nbsp;{Number(selectedPrint.initial_amount || 0).toFixed(2)}
+                    </div>
+                    {hasRemaining && (
+                      <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", marginTop: "4px" }}>
+                        Remaining: Rs. {Number(selectedPrint.balance_amount || 0).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                  {/* Decorative circle */}
+                  <div style={{
+                    width: "64px", height: "64px", borderRadius: "50%",
+                    border: "2px solid rgba(251,191,36,0.2)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <div style={{
+                      width: "48px", height: "48px", borderRadius: "50%",
+                      background: "rgba(251,191,36,0.1)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "20px",
+                    }}>🎁</div>
+                  </div>
+                </div>
+
+                {/* Code */}
+                <div style={{ marginBottom: "22px" }}>
+                  <div style={{ fontSize: "8px", letterSpacing: "2.5px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: "8px" }}>Card Code</div>
+                  <div style={{
+                    display: "inline-flex", alignItems: "center", gap: "12px",
+                    background: "rgba(255,255,255,0.07)",
+                    border: "1.5px solid rgba(251,191,36,0.4)",
+                    borderRadius: "10px", padding: "10px 20px",
+                  }}>
+                    <span style={{ fontFamily: "Courier New, monospace", fontSize: "20px", fontWeight: "800", letterSpacing: "5px", color: "#fbbf24" }}>
+                      {selectedPrint.code}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div style={{ textAlign:"right" }}>
-                <div style={{ fontSize:"9px", color:"rgba(255,255,255,0.4)" }}>Issued: {selectedPrint.issued_on || "—"}</div>
-                {selectedPrint.expires_on && (
-                  <div style={{ fontSize:"9px", color:"#fca5a5", marginTop:"2px" }}>Valid till: {selectedPrint.expires_on}</div>
-                )}
-                {selectedPrint.note && (
-                  <div style={{ fontSize:"8px", color:"rgba(255,255,255,0.35)", marginTop:"2px", maxWidth:"100px", textAlign:"right" }}>{selectedPrint.note}</div>
-                )}
+
+              {/* Footer */}
+              <div style={{
+                background: "rgba(0,0,0,0.3)",
+                padding: "14px 28px",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                borderTop: "1px solid rgba(255,255,255,0.06)",
+              }}>
+                <div>
+                  {selectedPrint.customer_name
+                    ? <div style={{ fontSize: "12px", fontWeight: "700", color: "white" }}>{selectedPrint.customer_name}</div>
+                    : <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>—</div>
+                  }
+                  {selectedPrint.mobile && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", marginTop: "2px" }}>{selectedPrint.mobile}</div>}
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  {selectedPrint.issued_on && <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.35)" }}>Issued: {selectedPrint.issued_on}</div>}
+                  {selectedPrint.expires_on
+                    ? <div style={{ fontSize: "9px", color: "#fca5a5", marginTop: "3px", fontWeight: "600" }}>Valid till: {selectedPrint.expires_on}</div>
+                    : <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "3px" }}>No expiry</div>
+                  }
+                </div>
               </div>
+
+              {/* Gold bottom bar */}
+              <div style={{ height: "4px", background: "linear-gradient(90deg, #b8860b, #fbbf24, #d4a017, #fbbf24, #b8860b)" }} />
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       <div className="flex items-center justify-between">
@@ -329,29 +354,33 @@ export default function GiftCards() {
               {/* Card preview */}
               <div style={{
                 borderRadius:"12px",
-                background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f3460 100%)",
-                color:"white",
-                padding:"14px 16px",
-                fontFamily:"Arial,sans-serif",
-                position:"relative",
-                overflow:"hidden",
+                background:"linear-gradient(135deg,#0f172a 0%,#1a3353 45%,#0e2a4a 100%)",
+                overflow:"hidden", fontFamily:"Arial,sans-serif",
               }}>
-                <div style={{position:"absolute",right:"-15px",top:"-15px",width:"70px",height:"70px",borderRadius:"50%",background:"rgba(255,215,0,0.08)"}}/>
-                <div style={{fontSize:"7px",letterSpacing:"3px",color:"#fbbf24",textTransform:"uppercase",marginBottom:"2px"}}>✦ Gift Card ✦</div>
-                <div style={{fontSize:"13px",fontWeight:"800",color:"white"}}>{shop?.shop_name || "Store"}</div>
-                <div style={{fontSize:"22px",fontWeight:"900",color:"#fbbf24",lineHeight:1.1,margin:"8px 0 6px"}}>
-                  Rs. {Number(printCard.initial_amount||0).toFixed(2)}
+                <div style={{height:"3px",background:"linear-gradient(90deg,#b8860b,#fbbf24,#d4a017,#fbbf24,#b8860b)"}}/>
+                <div style={{padding:"12px 14px"}}>
+                  <div style={{fontSize:"6px",letterSpacing:"3px",color:"#fbbf24",textTransform:"uppercase",fontWeight:"700",marginBottom:"2px"}}>✦ Gift Card</div>
+                  <div style={{fontSize:"12px",fontWeight:"800",color:"white",marginBottom:"8px"}}>{shop?.shop_name || "Store"}</div>
+                  <div style={{fontSize:"8px",color:"rgba(255,255,255,0.4)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"2px"}}>Gift Value</div>
+                  <div style={{fontSize:"22px",fontWeight:"900",color:"#fbbf24",lineHeight:1,marginBottom:"8px"}}>
+                    Rs. {Number(printCard.initial_amount||0).toFixed(2)}
+                  </div>
+                  <div style={{
+                    display:"inline-block",background:"rgba(255,255,255,0.07)",
+                    border:"1.5px solid rgba(251,191,36,0.4)",borderRadius:"7px",
+                    padding:"5px 12px",fontFamily:"Courier New,monospace",
+                    fontSize:"13px",fontWeight:"800",letterSpacing:"4px",color:"#fbbf24",
+                  }}>{printCard.code}</div>
                 </div>
                 <div style={{
-                  background:"rgba(255,255,255,0.1)",border:"1px solid rgba(251,191,36,0.5)",
-                  borderRadius:"6px",padding:"4px 10px",fontFamily:"monospace",
-                  fontSize:"12px",fontWeight:"700",letterSpacing:"3px",color:"white",display:"inline-block",
+                  background:"rgba(0,0,0,0.3)",padding:"8px 14px",
+                  display:"flex",justifyContent:"space-between",alignItems:"center",
+                  borderTop:"1px solid rgba(255,255,255,0.06)",
                 }}>
-                  {printCard.code}
+                  <div style={{fontSize:"10px",color:"rgba(255,255,255,0.5)"}}>{printCard.customer_name || "—"}</div>
+                  {printCard.expires_on && <div style={{fontSize:"9px",color:"#fca5a5",fontWeight:"600"}}>Till: {printCard.expires_on}</div>}
                 </div>
-                {printCard.expires_on && (
-                  <div style={{fontSize:"8px",color:"#fca5a5",marginTop:"6px"}}>Valid till: {printCard.expires_on}</div>
-                )}
+                <div style={{height:"3px",background:"linear-gradient(90deg,#b8860b,#fbbf24,#d4a017,#fbbf24,#b8860b)"}}/>
               </div>
               <button
                 onClick={() => print(printCard)}
