@@ -10,6 +10,11 @@ from app.models.day_close import BranchDayClose, ShopDayClose
 from app.models.month_close import BranchMonthClose, ShopMonthClose
 from app.models.stock import Inventory
 from app.models.date_wise_stock import DateWiseStock
+from app.models.invoice import Invoice
+from app.models.branch_expense import BranchExpense
+from app.models.sales_return import SalesReturn
+from app.models.cash_drawer import CashShift
+from app.models.employee import EmployeeWagePayment
 from app.services.financials_service import calc_day_close_totals
 from app.utils.permissions import require_permission
 from app.utils.head_office import is_head_office_branch, get_head_office_branch_id
@@ -77,6 +82,180 @@ def count_open_table_orders(db: Session, shop_id: int, branch_id: int) -> int:
         )
         .count()
     )
+
+
+@router.get("/cash-summary")
+def day_close_cash_summary(
+    date_str: str,
+    branch_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("day_close", "read")),
+):
+    """
+    Returns a cash-flow summary:
+      Opening Balance + Cash In (sales) − Cash Out (expenses + wage payments + returns)
+    """
+    d = parse_date(date_str)
+    d_start = datetime.combine(d, datetime.min.time())
+    d_end   = datetime.combine(d, datetime.max.time())
+    shop_id = user.shop_id
+
+    # ── Opening balance (most recent shift opened on this date or earlier) ───
+    shift = (
+        db.query(CashShift)
+        .filter(
+            CashShift.shop_id == shop_id,
+            CashShift.branch_id == branch_id,
+            CashShift.opened_at >= d_start,
+            CashShift.opened_at <= d_end,
+        )
+        .order_by(CashShift.opened_at.desc())
+        .first()
+    )
+    opening_balance = float(shift.opening_cash or 0) if shift else 0.0
+
+    # ── Invoice payment mode breakdown ───────────────────────────────────────
+    invoice_rows = (
+        db.query(
+            Invoice.payment_mode,
+            Invoice.payment_split,
+            Invoice.total_amount,
+            Invoice.discounted_amt,
+        )
+        .filter(
+            Invoice.shop_id == shop_id,
+            Invoice.branch_id == branch_id,
+            Invoice.created_time >= d_start,
+            Invoice.created_time <= d_end,
+        )
+        .all()
+    )
+
+    payment_by_mode: dict[str, float] = {}
+    for row in invoice_rows:
+        mode = (row.payment_mode or "cash").strip().lower()
+        net = float(row.total_amount or 0) - float(row.discounted_amt or 0)
+        if mode == "split" and row.payment_split:
+            ps = row.payment_split if isinstance(row.payment_split, dict) else {}
+            for key in ("cash", "card", "upi"):
+                amt = float(ps.get(key) or 0)
+                if amt > 0:
+                    k = key.upper()
+                    payment_by_mode[k] = payment_by_mode.get(k, 0.0) + amt
+            gift = float(ps.get("gift_card_amount") or 0)
+            if gift > 0:
+                payment_by_mode["GIFT CARD"] = payment_by_mode.get("GIFT CARD", 0.0) + gift
+            wallet = float(ps.get("wallet_amount") or 0)
+            if wallet > 0:
+                payment_by_mode["WALLET"] = payment_by_mode.get("WALLET", 0.0) + wallet
+        else:
+            k = mode.upper()
+            payment_by_mode[k] = payment_by_mode.get(k, 0.0) + net
+
+    # ── Invoice summary ──────────────────────────────────────────────────────
+    inv_row = (
+        db.query(
+            func.count(func.distinct(Invoice.invoice_id)).label("bill_count"),
+            func.coalesce(func.sum(Invoice.total_amount), 0).label("gross"),
+            func.coalesce(func.sum(Invoice.tax_amt), 0).label("tax"),
+            func.coalesce(func.sum(Invoice.discounted_amt), 0).label("discount"),
+        )
+        .filter(
+            Invoice.shop_id == shop_id,
+            Invoice.branch_id == branch_id,
+            Invoice.created_time >= d_start,
+            Invoice.created_time <= d_end,
+        )
+        .first()
+    )
+
+    # ── Returns ──────────────────────────────────────────────────────────────
+    ret_row = (
+        db.query(
+            func.count(func.distinct(SalesReturn.return_id)).label("return_count"),
+            func.coalesce(func.sum(SalesReturn.refund_amount), 0).label("return_amount"),
+        )
+        .filter(
+            SalesReturn.shop_id == shop_id,
+            SalesReturn.branch_id == branch_id,
+            SalesReturn.status != "CANCELLED",
+            SalesReturn.created_on >= d_start,
+            SalesReturn.created_on <= d_end,
+        )
+        .first()
+    )
+    return_cash = float(ret_row.return_amount or 0) if ret_row else 0.0
+
+    # ── Cash expenses ─────────────────────────────────────────────────────────
+    exp_rows = (
+        db.query(
+            BranchExpense.category,
+            BranchExpense.payment_mode,
+            func.coalesce(func.sum(BranchExpense.amount), 0).label("total"),
+        )
+        .filter(
+            BranchExpense.shop_id == shop_id,
+            BranchExpense.branch_id == branch_id,
+            BranchExpense.expense_date == d,
+        )
+        .group_by(BranchExpense.category, BranchExpense.payment_mode)
+        .all()
+    )
+    expenses = [
+        {"category": r.category,
+         "payment_mode": (r.payment_mode or "cash").upper(),
+         "amount": float(r.total or 0)}
+        for r in exp_rows
+    ]
+    cash_expense = sum(e["amount"] for e in expenses if e["payment_mode"] == "CASH")
+
+    # ── Cash wage payments ────────────────────────────────────────────────────
+    wage_rows = (
+        db.query(
+            func.coalesce(func.sum(EmployeeWagePayment.amount), 0).label("total"),
+        )
+        .filter(
+            EmployeeWagePayment.shop_id == shop_id,
+            EmployeeWagePayment.branch_id == branch_id,
+            EmployeeWagePayment.payment_date == d,
+            func.upper(EmployeeWagePayment.payment_mode) == "CASH",
+        )
+        .first()
+    )
+    cash_wages = float(wage_rows.total or 0) if wage_rows else 0.0
+
+    # ── Final cash position ───────────────────────────────────────────────────
+    cash_in     = payment_by_mode.get("CASH", 0.0)
+    cash_out    = round(return_cash + cash_expense + cash_wages, 2)
+    system_cash = round(opening_balance + cash_in - cash_out, 2)
+
+    gross = float(inv_row.gross or 0) if inv_row else 0.0
+    net   = round(gross - float(inv_row.discount or 0), 2) if inv_row else 0.0
+
+    return {
+        "date": str(d),
+        "branch_id": branch_id,
+        # Opening
+        "opening_balance": round(opening_balance, 2),
+        # Sales
+        "bill_count":     int(inv_row.bill_count or 0) if inv_row else 0,
+        "gross_sales":    round(gross, 2),
+        "total_discount": round(float(inv_row.discount or 0), 2) if inv_row else 0.0,
+        "total_tax":      round(float(inv_row.tax or 0), 2) if inv_row else 0.0,
+        "net_sales":      net,
+        # Payment mode breakdown
+        "payment_modes":  payment_by_mode,
+        "cash_in":        round(cash_in, 2),
+        # Cash out breakdown
+        "return_count":   int(ret_row.return_count or 0) if ret_row else 0,
+        "return_cash":    round(return_cash, 2),
+        "expenses":       expenses,
+        "cash_expense":   round(cash_expense, 2),
+        "cash_wages":     round(cash_wages, 2),
+        "cash_out":       cash_out,
+        # Net
+        "system_cash":    system_cash,
+    }
 
 
 @router.get("/status")

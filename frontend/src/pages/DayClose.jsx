@@ -5,10 +5,16 @@ import { getSession, clearSession, isHeadOfficeBranch } from "../utils/auth";
 import { getBusinessDate, syncBusinessDate } from "../utils/businessDate";
 import { useToast } from "../components/Toast";
 import BackButton from "../components/BackButton";
-import { FaMoon, FaCheckCircle, FaCircle } from "react-icons/fa";
+import {
+  FaMoon, FaCheckCircle, FaCircle,
+  FaArrowDown, FaArrowUp, FaWallet,
+} from "react-icons/fa";
 import { MdStorefront } from "react-icons/md";
 
 const BLUE = "#0B3C8C";
+
+const fmt = (n) =>
+  "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function DayClose() {
   const navigate = useNavigate();
@@ -22,6 +28,12 @@ export default function DayClose() {
   const [status, setStatus] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [closing, setClosing] = useState(false);
+
+  // Cash summary state
+  const [cashSummary, setCashSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [physicalCash, setPhysicalCash] = useState("");
+  const [tallied, setTallied] = useState(false);
 
   const loadBranches = async () => {
     if (isHeadOffice) {
@@ -42,9 +54,24 @@ export default function DayClose() {
     else setStatus(rows.filter(x => String(x.branch_id) === String(session.branch_id)));
   };
 
+  const loadCashSummary = async (branchId, dateStr) => {
+    if (!branchId || !dateStr) { setCashSummary(null); return; }
+    setSummaryLoading(true);
+    try {
+      const r = await authAxios.get("/day-close/cash-summary", {
+        params: { date_str: dateStr, branch_id: branchId },
+      });
+      setCashSummary(r.data);
+    } catch {
+      setCashSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (role !== "admin" && role !== "manager") { navigate("/"); return; }
-    if (!navigator.onLine) return; // don't load if offline — UI blocks actions below
+    if (!navigator.onLine) return;
     loadBranches();
     authAxios.get("/shop/details")
       .then(res => {
@@ -55,6 +82,14 @@ export default function DayClose() {
   }, []);
 
   useEffect(() => { loadStatus(); }, [date]);
+
+  // Reload summary when branch or date changes
+  useEffect(() => {
+    setPhysicalCash("");
+    setTallied(false);
+    setCashSummary(null);
+    if (selectedBranch && date) loadCashSummary(selectedBranch, date);
+  }, [selectedBranch, date]);
 
   const closeBranch = async () => {
     if (!selectedBranch) return;
@@ -93,6 +128,12 @@ export default function DayClose() {
   const totalCount = status.length || 1;
   const pct = Math.round((closedCount / totalCount) * 100);
   const allClosed = closedCount === status.length && status.length > 0;
+
+  // Cash tally logic
+  const physical = parseFloat(physicalCash) || 0;
+  const systemCash = cashSummary ? Number(cashSummary.system_cash || 0) : 0;
+  const diff = physical - systemCash;
+  const hasTallied = physicalCash.trim() !== "" && tallied;
 
   if (!navigator.onLine) {
     return (
@@ -138,19 +179,16 @@ export default function DayClose() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-slate-800">Close Day</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Select date and branch, then close</p>
+            <p className="text-xs text-slate-500 mt-0.5">Select date and branch, then review cash and close</p>
           </div>
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Date */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">Date</label>
-                <input
-                  type="date"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                />
+                <label className="text-xs font-semibold text-slate-600">Business Date</label>
+                <div className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 text-slate-700 font-medium">
+                  {date}
+                </div>
               </div>
 
               {/* Branch */}
@@ -184,7 +222,7 @@ export default function DayClose() {
             <div className="flex flex-wrap gap-3 pt-2">
               <button
                 onClick={closeBranch}
-                disabled={!selectedBranch || closing}
+                disabled={!selectedBranch || closing || !hasTallied}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm hover:opacity-90 transition disabled:opacity-50"
                 style={{ background: BLUE }}
               >
@@ -202,8 +240,174 @@ export default function DayClose() {
                 </button>
               )}
             </div>
+            {selectedBranch && !hasTallied && (
+              <p className="text-[11px] text-amber-600">
+                Enter and confirm physical cash count below to enable branch close.
+              </p>
+            )}
           </div>
         </div>
+
+        {/* Cash Flow Summary */}
+        {selectedBranch && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `${BLUE}15` }}>
+                <FaWallet size={14} style={{ color: BLUE }} />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-800">Cash Flow Summary</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {cashSummary ? `${cashSummary.bill_count} bill${cashSummary.bill_count !== 1 ? "s" : ""} for ${date}` : "Loading…"}
+                </p>
+              </div>
+            </div>
+
+            {summaryLoading ? (
+              <div className="py-12 text-center text-sm text-slate-400">Loading cash summary…</div>
+            ) : !cashSummary ? (
+              <div className="py-10 text-center text-sm text-slate-400">No data available for this branch and date.</div>
+            ) : (
+              <div className="p-5 space-y-4">
+
+                {/* Flow: Opening → Cash In → Cash Out → System Cash */}
+                <div className="space-y-2">
+
+                  {/* Opening Balance */}
+                  <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-600">Opening Balance</p>
+                      <p className="text-[11px] text-slate-400">Cash in drawer at start of day</p>
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">{fmt(cashSummary.opening_balance)}</span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex justify-center text-slate-300 text-lg select-none">↓</div>
+
+                  {/* Cash In */}
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 overflow-hidden">
+                    <div className="px-4 py-2.5 flex items-center justify-between border-b border-emerald-100">
+                      <div className="flex items-center gap-2">
+                        <FaArrowDown size={11} className="text-emerald-600" />
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">+ Cash In (Sales)</span>
+                      </div>
+                      <span className="text-sm font-bold text-emerald-700">{fmt(cashSummary.cash_in)}</span>
+                    </div>
+                    <div className="px-4 py-3 space-y-1.5">
+                      {Object.entries(cashSummary.payment_modes || {}).map(([mode, amt]) => (
+                        <div key={mode} className="flex justify-between text-xs">
+                          <span className="text-slate-500">{mode}</span>
+                          <span className={`font-medium ${mode === "CASH" ? "text-emerald-700" : "text-slate-500"}`}>{fmt(amt)}</span>
+                        </div>
+                      ))}
+                      {Object.keys(cashSummary.payment_modes || {}).length === 0 && (
+                        <p className="text-xs text-slate-400">No sales recorded</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex justify-center text-slate-300 text-lg select-none">↓</div>
+
+                  {/* Cash Out */}
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 overflow-hidden">
+                    <div className="px-4 py-2.5 flex items-center justify-between border-b border-rose-100">
+                      <div className="flex items-center gap-2">
+                        <FaArrowUp size={11} className="text-rose-500" />
+                        <span className="text-xs font-bold text-rose-600 uppercase tracking-wide">− Cash Out</span>
+                      </div>
+                      <span className="text-sm font-bold text-rose-600">{fmt(cashSummary.cash_out)}</span>
+                    </div>
+                    <div className="px-4 py-3 space-y-1.5">
+                      {cashSummary.return_count > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500">Returns ({cashSummary.return_count})</span>
+                          <span className="font-medium text-rose-600">{fmt(cashSummary.return_cash)}</span>
+                        </div>
+                      )}
+                      {cashSummary.expenses.filter(e => e.payment_mode === "CASH").map((e, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-slate-500">{e.category || "Expense"}</span>
+                          <span className="font-medium text-rose-600">{fmt(e.amount)}</span>
+                        </div>
+                      ))}
+                      {cashSummary.cash_wages > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500">Wages (Cash)</span>
+                          <span className="font-medium text-rose-600">{fmt(cashSummary.cash_wages)}</span>
+                        </div>
+                      )}
+                      {cashSummary.cash_out === 0 && (
+                        <p className="text-xs text-slate-400">No cash outflows</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex justify-center text-slate-300 text-lg select-none">↓</div>
+
+                  {/* System Cash */}
+                  <div
+                    className="px-4 py-3.5 rounded-xl flex items-center justify-between"
+                    style={{ background: `${BLUE}08`, border: `1.5px solid ${BLUE}30` }}
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">System Cash</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Opening + Cash In − Cash Out</p>
+                    </div>
+                    <span className="text-xl font-bold" style={{ color: BLUE }}>{fmt(cashSummary.system_cash)}</span>
+                  </div>
+                </div>
+
+                {/* Physical Cash Tally */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-slate-700">Physical Cash Count</p>
+                  <div className="flex gap-3 items-center">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Enter cash in drawer"
+                      value={physicalCash}
+                      onChange={e => { setPhysicalCash(e.target.value); setTallied(false); }}
+                      className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+                    />
+                    <button
+                      onClick={() => { if (physicalCash.trim()) setTallied(true); }}
+                      disabled={!physicalCash.trim()}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90 transition disabled:opacity-40"
+                      style={{ background: BLUE }}
+                    >
+                      Confirm
+                    </button>
+                  </div>
+
+                  {tallied && physicalCash.trim() !== "" && (
+                    <div className={`rounded-lg px-4 py-3 flex items-center justify-between
+                      ${Math.abs(diff) < 0.01 ? "bg-emerald-50 border border-emerald-200" : "bg-rose-50 border border-rose-200"}`}
+                    >
+                      <div>
+                        <p className={`text-xs font-semibold ${Math.abs(diff) < 0.01 ? "text-emerald-700" : "text-rose-600"}`}>
+                          {Math.abs(diff) < 0.01 ? "✓ Cash tallied" : diff > 0 ? "Cash Over" : "Cash Short"}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          System: {fmt(systemCash)} · Physical: {fmt(physical)}
+                        </p>
+                      </div>
+                      {Math.abs(diff) >= 0.01 && (
+                        <span className={`text-lg font-bold ${diff > 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                          {fmt(Math.abs(diff))}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Progress card */}
         {status.length > 0 && (
@@ -218,15 +422,12 @@ export default function DayClose() {
               </span>
             </div>
             <div className="px-5 py-4 space-y-4">
-              {/* Progress bar */}
               <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, background: allClosed ? "#10b981" : BLUE }}
                 />
               </div>
-
-              {/* Branch status grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {status.map(s => (
                   <div
