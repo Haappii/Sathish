@@ -128,12 +128,9 @@ export default function EmployeeAttendance() {
           <p className="text-[11px] text-gray-400">{filteredEmployees.length} employee{filteredEmployees.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={attendanceDate}
-            onChange={(e) => setAttendanceDate(e.target.value)}
-            className={inputCls}
-          />
+          <div className={`${inputCls} bg-gray-100 text-gray-600 cursor-not-allowed select-none`}>
+            {attendanceDate}
+          </div>
           <input
             placeholder="Search employee..."
             value={search}

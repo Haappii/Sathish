@@ -590,7 +590,7 @@ export default function Employees() {
               <input type="number" className={inputCls} placeholder="Daily Wage" value={employeeForm.daily_wage} onChange={(e) => setEmployeeForm((p) => ({ ...p, daily_wage: e.target.value }))} />
               <input type="number" className={inputCls} placeholder="Monthly Wage" value={employeeForm.monthly_wage} onChange={(e) => setEmployeeForm((p) => ({ ...p, monthly_wage: e.target.value }))} />
             </div>
-            <input type="date" className={inputCls} value={employeeForm.join_date || ""} onChange={(e) => setEmployeeForm((p) => ({ ...p, join_date: e.target.value }))} />
+            <input type="date" className={inputCls} max={todayIso()} value={employeeForm.join_date || ""} onChange={(e) => setEmployeeForm((p) => ({ ...p, join_date: e.target.value }))} />
             <textarea className={inputCls} rows={2} placeholder="Notes" value={employeeForm.notes} onChange={(e) => setEmployeeForm((p) => ({ ...p, notes: e.target.value }))} />
             <label className="flex items-center gap-2 text-[12px] text-gray-600">
               <input type="checkbox" checked={Boolean(employeeForm.active)} onChange={(e) => setEmployeeForm((p) => ({ ...p, active: e.target.checked }))} />
@@ -757,7 +757,7 @@ export default function Employees() {
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <input type="date" className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400" value={paymentForm.payment_date} onChange={(e) => setPaymentForm((p) => ({ ...p, payment_date: e.target.value }))} />
+            <input type="date" className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400" min={todayIso()} max={todayIso()} value={paymentForm.payment_date} onChange={(e) => setPaymentForm((p) => ({ ...p, payment_date: e.target.value }))} />
             <input type="number" className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400" placeholder="Amount" value={paymentForm.amount} onChange={(e) => setPaymentForm((p) => ({ ...p, amount: e.target.value }))} />
             <select className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none" value={paymentForm.payment_mode} onChange={(e) => setPaymentForm((p) => ({ ...p, payment_mode: e.target.value }))}>
               {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
