@@ -23,6 +23,7 @@ class GiftCard(Base):
 
     customer_name = Column(String(120), nullable=True)
     mobile = Column(String(20), nullable=True)
+    customer_email = Column(String(200), nullable=True)
     note = Column(String(255), nullable=True)
 
     created_by = Column(Integer, nullable=True)

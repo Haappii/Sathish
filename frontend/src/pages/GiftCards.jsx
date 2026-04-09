@@ -25,6 +25,7 @@ export default function GiftCards() {
     expires_on: "",
     customer_name: "",
     mobile: "",
+    customer_email: "",
     note: "",
   });
 
@@ -94,11 +95,13 @@ export default function GiftCards() {
         expires_on: createForm.expires_on || null,
         customer_name: createForm.customer_name || null,
         mobile: createForm.mobile || null,
+        customer_email: createForm.customer_email || null,
         note: createForm.note || null,
       });
       const card = res?.data || null;
-      showToast(card?.code ? `Gift card created: ${card.code}` : "Gift card created", "success");
-      setCreateForm({ amount: "", expires_on: "", customer_name: "", mobile: "", note: "" });
+      const emailSent = createForm.customer_email ? ` • Email sent to ${createForm.customer_email}` : "";
+      showToast(card?.code ? `Gift card created: ${card.code}${emailSent}` : "Gift card created", "success");
+      setCreateForm({ amount: "", expires_on: "", customer_name: "", mobile: "", customer_email: "", note: "" });
       setPrintCard(card);
       await load();
     } catch (e) {
@@ -153,19 +156,23 @@ export default function GiftCards() {
         #gift-card-print-area { display: none; }
         @media print {
           @page { margin: 0; size: A4 portrait; }
-          html, body { margin: 0; padding: 0; }
-          body > * { display: none !important; }
+          body * { visibility: hidden; }
           #gift-card-print-area {
+            visibility: visible !important;
             display: flex !important;
-            width: 210mm;
-            height: 297mm;
-            align-items: center;
-            justify-content: center;
-            background: #f0f0f0 !important;
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: #e8edf2 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            z-index: 99999 !important;
           }
-          .gc-card {
+          #gift-card-print-area * {
+            visibility: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -334,6 +341,13 @@ export default function GiftCards() {
             placeholder="Mobile (optional)"
             value={createForm.mobile}
             onChange={(e) => setCreateForm((p) => ({ ...p, mobile: e.target.value }))}
+          />
+          <input
+            type="email"
+            className="border rounded-lg px-2 py-2 w-full"
+            placeholder="Customer email (send gift card)"
+            value={createForm.customer_email}
+            onChange={(e) => setCreateForm((p) => ({ ...p, customer_email: e.target.value }))}
           />
           <textarea
             className="border rounded-lg px-2 py-2 w-full"

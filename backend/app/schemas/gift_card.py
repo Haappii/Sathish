@@ -10,6 +10,7 @@ class GiftCardCreate(BaseModel):
     expires_on: Optional[date] = None
     customer_name: Optional[str] = None
     mobile: Optional[str] = None
+    customer_email: Optional[str] = None
     note: Optional[str] = None
 
 
@@ -31,6 +32,7 @@ class GiftCardOut(BaseModel):
     redeemed_on: Optional[str] = None
     customer_name: Optional[str] = None
     mobile: Optional[str] = None
+    customer_email: Optional[str] = None
     note: Optional[str] = None
 
     class Config:

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, date
+import logging
+import os
 import secrets
+import smtplib
+import threading
+from email.message import EmailMessage
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -19,6 +24,80 @@ from app.services.gift_card_service import (
 )
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
+
+logger = logging.getLogger(__name__)
+
+_SMTP_HOST = (os.getenv("SUPPORT_SMTP_HOST") or "smtp.gmail.com").strip()
+_SMTP_PORT = int((os.getenv("SUPPORT_SMTP_PORT") or "465").strip())
+_SENDER    = (os.getenv("SUPPORT_SENDER_EMAIL") or "").strip()
+_PASSWORD  = (os.getenv("SUPPORT_SENDER_PASSWORD") or "").strip()
+
+
+def _send_gift_card_email(
+    to_email: str,
+    customer_name: str | None,
+    shop_name: str,
+    code: str,
+    amount: float,
+    expires_on: str | None,
+):
+    if not (_SENDER and _PASSWORD):
+        logger.warning("Gift card email skipped: SMTP credentials not configured")
+        return
+
+    name_line = f"Hi {customer_name}," if customer_name else "Hi,"
+    expiry_line = f"Valid till: {expires_on}" if expires_on else "No expiry date"
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Your Gift Card from {shop_name} — {code}"
+    msg["From"]    = _SENDER
+    msg["To"]      = to_email
+    msg.set_content(
+        f"{name_line}\n\n"
+        f"Your gift card has been issued from {shop_name}.\n\n"
+        f"  Gift Card Code : {code}\n"
+        f"  Gift Value     : Rs. {amount:.2f}\n"
+        f"  {expiry_line}\n\n"
+        f"Present this code at checkout to redeem your gift card.\n\n"
+        f"Thank you!\n{shop_name}"
+    )
+    msg.add_alternative(f"""
+<html><body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:30px;">
+  <div style="max-width:480px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+    <div style="background:linear-gradient(135deg,#0f172a,#1a3353);padding:28px 32px;">
+      <div style="font-size:11px;letter-spacing:3px;color:#fbbf24;text-transform:uppercase;margin-bottom:6px;">✦ Gift Card</div>
+      <div style="font-size:22px;font-weight:800;color:#fff;">{shop_name}</div>
+    </div>
+    <div style="padding:28px 32px;">
+      <p style="color:#374151;margin:0 0 20px;">{name_line}</p>
+      <p style="color:#374151;margin:0 0 20px;">Your gift card has been issued. Use the code below at checkout.</p>
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:20px;text-align:center;margin-bottom:20px;">
+        <div style="font-size:11px;color:#9ca3af;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Gift Value</div>
+        <div style="font-size:32px;font-weight:900;color:#b8860b;">Rs. {amount:.2f}</div>
+      </div>
+      <div style="background:#0f172a;border-radius:10px;padding:16px;text-align:center;margin-bottom:16px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Card Code</div>
+        <div style="font-family:monospace;font-size:22px;font-weight:800;letter-spacing:5px;color:#fbbf24;">{code}</div>
+      </div>
+      <p style="color:#6b7280;font-size:12px;text-align:center;margin:0;">{expiry_line}</p>
+    </div>
+    <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+      <p style="color:#9ca3af;font-size:11px;margin:0;">This is an automated message from {shop_name} via Haappii Billing</p>
+    </div>
+  </div>
+</body></html>
+""", subtype="html")
+
+    def _send():
+        try:
+            with smtplib.SMTP_SSL(_SMTP_HOST, _SMTP_PORT) as smtp:
+                smtp.login(_SENDER, _PASSWORD)
+                smtp.send_message(msg)
+            logger.info("Gift card email sent to %s", to_email)
+        except Exception:
+            logger.exception("Failed to send gift card email to %s", to_email)
+
+    threading.Thread(target=_send, daemon=True).start()
 
 router = APIRouter(prefix="/gift-cards", tags=["Gift Cards"])
 
@@ -54,6 +133,7 @@ def _to_out(card: GiftCard) -> dict:
         "redeemed_on": card.redeemed_on.strftime("%Y-%m-%d %H:%M") if card.redeemed_on else None,
         "customer_name": card.customer_name,
         "mobile": card.mobile,
+        "customer_email": card.customer_email,
         "note": card.note,
     }
 
@@ -73,6 +153,7 @@ def create_gift_card(
         raise HTTPException(400, "Expiry date must be today or future")
 
     code = _generate_code(db, int(user.shop_id))
+    customer_email = (payload.customer_email or "").strip() or None
     card = GiftCard(
         shop_id=user.shop_id,
         code=code,
@@ -82,6 +163,7 @@ def create_gift_card(
         expires_on=expires_on,
         customer_name=(payload.customer_name or "").strip() or None,
         mobile=(payload.mobile or "").strip() or None,
+        customer_email=customer_email,
         note=(payload.note or "").strip() or None,
         created_by=user.user_id,
     )
@@ -117,6 +199,21 @@ def create_gift_card(
         },
         user_id=user.user_id,
     )
+
+    # Send email to customer if email was provided
+    if customer_email:
+        from app.models.shop_details import ShopDetails
+        shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+        shop_name = getattr(shop, "shop_name", "Store") or "Store"
+        _send_gift_card_email(
+            to_email=customer_email,
+            customer_name=card.customer_name,
+            shop_name=shop_name,
+            code=card.code,
+            amount=float(amt),
+            expires_on=card.expires_on.strftime("%Y-%m-%d") if card.expires_on else None,
+        )
+
     return _to_out(card)
 
 
