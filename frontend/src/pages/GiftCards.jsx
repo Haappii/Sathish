@@ -275,23 +275,27 @@ export default function GiftCards() {
 
               {/* Footer */}
               <div style={{
-                background: "rgba(0,0,0,0.3)",
+                background: "#0a1628",
                 padding: "14px 28px",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                borderTop: "1px solid rgba(255,255,255,0.06)",
+                borderTop: "2px solid #1e3a5f",
               }}>
                 <div>
                   {selectedPrint.customer_name
-                    ? <div style={{ fontSize: "12px", fontWeight: "700", color: "white" }}>{selectedPrint.customer_name}</div>
-                    : <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>—</div>
+                    ? <div style={{ fontSize: "12px", fontWeight: "700", color: "#ffffff" }}>{selectedPrint.customer_name}</div>
+                    : <div style={{ fontSize: "11px", color: "#6b7280" }}>—</div>
                   }
-                  {selectedPrint.mobile && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", marginTop: "2px" }}>{selectedPrint.mobile}</div>}
+                  {selectedPrint.mobile && <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>{selectedPrint.mobile}</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  {selectedPrint.issued_on && <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.35)" }}>Issued: {selectedPrint.issued_on}</div>}
+                  {selectedPrint.issued_on && (
+                    <div style={{ fontSize: "10px", color: "#9ca3af", marginBottom: "4px" }}>
+                      Issued: <strong style={{ color: "#d1d5db" }}>{selectedPrint.issued_on}</strong>
+                    </div>
+                  )}
                   {selectedPrint.expires_on
-                    ? <div style={{ fontSize: "9px", color: "#fca5a5", marginTop: "3px", fontWeight: "600" }}>Valid till: {selectedPrint.expires_on}</div>
-                    : <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "3px" }}>No expiry</div>
+                    ? <div style={{ fontSize: "11px", color: "#fbbf24", fontWeight: "700" }}>Valid till: {selectedPrint.expires_on}</div>
+                    : <div style={{ fontSize: "10px", color: "#6b7280" }}>No expiry</div>
                   }
                 </div>
               </div>

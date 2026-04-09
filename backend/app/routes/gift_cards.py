@@ -39,14 +39,18 @@ def _send_gift_card_email(
     shop_name: str,
     code: str,
     amount: float,
+    issued_on: str | None,
     expires_on: str | None,
 ):
     if not (_SENDER and _PASSWORD):
         logger.warning("Gift card email skipped: SMTP credentials not configured")
         return
 
-    name_line = f"Hi {customer_name}," if customer_name else "Hi,"
-    expiry_line = f"Valid till: {expires_on}" if expires_on else "No expiry date"
+    from datetime import datetime as _dt
+    issued_display = issued_on or _dt.now().strftime("%Y-%m-%d")
+    name_line    = f"Hi {customer_name}," if customer_name else "Hi,"
+    expiry_label = f"Valid till: <strong>{expires_on}</strong>" if expires_on else "No expiry date"
+    expiry_plain = f"Valid till: {expires_on}" if expires_on else "No expiry date"
 
     msg = EmailMessage()
     msg["Subject"] = f"Your Gift Card from {shop_name} — {code}"
@@ -57,7 +61,8 @@ def _send_gift_card_email(
         f"Your gift card has been issued from {shop_name}.\n\n"
         f"  Gift Card Code : {code}\n"
         f"  Gift Value     : Rs. {amount:.2f}\n"
-        f"  {expiry_line}\n\n"
+        f"  Issued Date    : {issued_display}\n"
+        f"  {expiry_plain}\n\n"
         f"Present this code at checkout to redeem your gift card.\n\n"
         f"Thank you!\n{shop_name}"
     )
@@ -65,7 +70,7 @@ def _send_gift_card_email(
 <html><body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:30px;">
   <div style="max-width:480px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
     <div style="background:linear-gradient(135deg,#0f172a,#1a3353);padding:28px 32px;">
-      <div style="font-size:11px;letter-spacing:3px;color:#fbbf24;text-transform:uppercase;margin-bottom:6px;">✦ Gift Card</div>
+      <div style="font-size:11px;letter-spacing:3px;color:#fbbf24;text-transform:uppercase;margin-bottom:6px;">&#10022; Gift Card</div>
       <div style="font-size:22px;font-weight:800;color:#fff;">{shop_name}</div>
     </div>
     <div style="padding:28px 32px;">
@@ -75,11 +80,20 @@ def _send_gift_card_email(
         <div style="font-size:11px;color:#9ca3af;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Gift Value</div>
         <div style="font-size:32px;font-weight:900;color:#b8860b;">Rs. {amount:.2f}</div>
       </div>
-      <div style="background:#0f172a;border-radius:10px;padding:16px;text-align:center;margin-bottom:16px;">
+      <div style="background:#0f172a;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px;">
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Card Code</div>
         <div style="font-family:monospace;font-size:22px;font-weight:800;letter-spacing:5px;color:#fbbf24;">{code}</div>
       </div>
-      <p style="color:#6b7280;font-size:12px;text-align:center;margin:0;">{expiry_line}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;border-bottom:1px solid #f3f4f6;">Issued Date</td>
+          <td style="padding:8px 0;text-align:right;font-weight:700;color:#111827;border-bottom:1px solid #f3f4f6;">{issued_display}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#6b7280;">Expiry</td>
+          <td style="padding:8px 0;text-align:right;font-weight:700;color:{"#b45309" if expires_on else "#6b7280"};">{expiry_label}</td>
+        </tr>
+      </table>
     </div>
     <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
       <p style="color:#9ca3af;font-size:11px;margin:0;">This is an automated message from {shop_name} via Haappii Billing</p>
@@ -211,6 +225,7 @@ def create_gift_card(
             shop_name=shop_name,
             code=card.code,
             amount=float(amt),
+            issued_on=card.issued_on.strftime("%Y-%m-%d") if card.issued_on else None,
             expires_on=card.expires_on.strftime("%Y-%m-%d") if card.expires_on else None,
         )
 
