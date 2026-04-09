@@ -4,6 +4,7 @@ import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { getBusinessDate, syncBusinessDate } from "../utils/businessDate";
+import { generateFeedbackQrHtml } from "../utils/feedbackQr";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 
@@ -385,7 +386,16 @@ export default function SalesHistory() {
       showToast("Receipt printing disabled for this branch", "warning");
       return;
     }
-    const ok = await printDirectText(generateBillText(), { fontSize: 6, paperSize: branch?.paper_size || "58mm" });
+    const qrHtml = await generateFeedbackQrHtml({
+      shopId: shop?.shop_id,
+      invoiceNo: activeBill?.invoice_number,
+      enabled: branch?.feedback_qr_enabled !== false,
+    });
+    const ok = await printDirectText(generateBillText(), {
+      fontSize: 8,
+      paperSize: branch?.paper_size || "58mm",
+      extraHtml: qrHtml,
+    });
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 

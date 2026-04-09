@@ -543,7 +543,8 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
   const { text = "", options = {} } = payload || {};
   const fontSize = Number(options.fontSize || 12) || 12;
   const paperWidth = (String(options.paperSize || "58mm") === "80mm") ? "80mm" : "58mm";
-  const scale = fontSize <= 8 ? Math.max(0.4, fontSize / 12) : 1; // shrink aggressively for tiny receipts
+  const pageWidth = paperWidth === "80mm" ? 80000 : 58000;
+  const extraHtml = String(options.extraHtml || "");
 
   const printWin = new BrowserWindow({
     show: false,
@@ -552,28 +553,84 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
 
   const html = `<!DOCTYPE html><html><head><style>
     @page { size: ${paperWidth} auto; margin: 0; }
-    body { margin: 0; padding: 0; }
+    body { margin: 0; padding: 0; width: ${paperWidth}; }
     pre {
       margin: 0;
       padding: 0;
-      font-family: monospace;
+      box-sizing: border-box;
+      padding: 0 1.5mm;
+      font-family: Consolas, "Courier New", monospace;
       font-size: ${Math.max(fontSize, 6)}px;
       line-height: 1.1;
-      width: ${paperWidth};
-      transform: scale(${scale.toFixed(2)});
-      transform-origin: top left;
+      width: 100%;
+      letter-spacing: 0;
       white-space: pre;
     }
-  </style></head><body><pre>${escapeHtml(text)}</pre></body></html>`;
+    .extra-html {
+      box-sizing: border-box;
+      width: 100%;
+      margin: 0;
+      padding: 2mm 1.5mm 0;
+    }
+    .extra-html img {
+      display: block;
+      margin: 0 auto;
+      max-width: calc(${paperWidth} - 8mm);
+      height: auto;
+    }
+  </style></head><body><pre>${escapeHtml(text)}</pre><div class="extra-html">${extraHtml}</div></body></html>`;
 
   await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  await printWin.webContents.executeJavaScript(
+    `(async () => {
+      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      try {
+        if (document.fonts?.ready) {
+          await document.fonts.ready.catch(() => {});
+        }
+      } catch {}
+
+      const images = Array.from(document.images || []);
+      if (images.length) {
+        await Promise.race([
+          Promise.all(images.map((img) => new Promise((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              resolve();
+            };
+
+            if (img.complete) {
+              if (typeof img.decode === "function") {
+                img.decode().catch(() => {}).finally(finish);
+              } else {
+                finish();
+              }
+              return;
+            }
+
+            img.addEventListener("load", finish, { once: true });
+            img.addEventListener("error", finish, { once: true });
+          }))),
+          delay(2000),
+        ]);
+      } else {
+        await delay(120);
+      }
+
+      await delay(120);
+      return true;
+    })()`,
+    true
+  );
 
   return new Promise((resolve, reject) => {
     const opts = {
       silent: true,
-      printBackground: false,
+      printBackground: true,
       margins: { marginType: "none" },
-      pageSize: { width: 58000, height: 200000 }, // 58mm wide roll; tall enough for long bills
+      pageSize: { width: pageWidth, height: 200000 },
     };
     if (process.env.THERMAL_PRINTER_NAME) opts.deviceName = process.env.THERMAL_PRINTER_NAME;
 

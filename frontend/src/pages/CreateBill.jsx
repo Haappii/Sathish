@@ -7,6 +7,7 @@ import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { buildBusinessDateTimeLabel, formatBusinessDate, getBusinessDate } from "../utils/businessDate";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
+import { generateFeedbackQrHtml as buildFeedbackQrHtml } from "../utils/feedbackQr";
 import { printDirectText } from "../utils/printDirect";
 import {
   cacheMasterData,
@@ -627,27 +628,23 @@ const [customer, setCustomer] = useState({
     if (fssai) t += center(`FSSAI No: ${fssai}`) + "\n";
     // Footer + 4 blank lines to ensure the message prints on the same ticket
     t += center("Thank You! Visit Again") + "\n";
-    if (shop?.shop_id) t += center("Scan QR to share feedback") + "\n";
     t += "\n".repeat(4);
     return t;
   };
 
   const generateFeedbackQrHtml = async (invoiceNo) => {
-    if (!shop?.shop_id) return "";
-    try {
-      const QRCode = (await import("qrcode")).default;
-      const url = `${window.location.origin}/feedback?shop_id=${shop.shop_id}&invoice_no=${encodeURIComponent(invoiceNo)}`;
-      const dataUrl = await QRCode.toDataURL(url, { width: 120, margin: 1 });
-      return `<div style="text-align:center;margin-top:4px;"><img src="${dataUrl}" width="100" height="100"/></div>`;
-    } catch {
-      return "";
-    }
+    return buildFeedbackQrHtml({
+      shopId: shop?.shop_id,
+      invoiceNo,
+      enabled: branch?.feedback_qr_enabled !== false,
+    });
   };
 
   const generateKOTText = (kotItems, invoiceNumber, customerName, categoryLabel = null) => {
-    const WIDTH = 32;
-    const NAME_COL = 22;
-    const COUNT_COL = 8;
+    const is80mm = (branch?.paper_size || "58mm") === "80mm";
+    const WIDTH = is80mm ? 48 : 32;
+    const NAME_COL = is80mm ? 34 : 22;
+    const COUNT_COL = is80mm ? 10 : 8;
     const line = "-".repeat(WIDTH);
     const center = txt =>
       " ".repeat(Math.max(0, Math.floor((WIDTH - txt.length) / 2))) + txt;
@@ -699,13 +696,48 @@ const [customer, setCustomer] = useState({
       const label = multiCat ? (categoryNameById[catId] || catId) : null;
       const ok = await printDirectText(
         generateKOTText(grouped[catId], invoiceNumber, customerName, label),
-        { fontSize: 9 }
+        { fontSize: 9, paperSize: branch?.paper_size || "58mm" }
       );
       if (!ok) {
         showToast("Printing failed. Check printer/popup settings.", "error");
         break;
       }
     }
+  };
+
+  const createTrackedTakeawayKot = async (invoiceNumber) => {
+    if (!isHotel || branch?.kot_required === false) return;
+
+    const takeawayRes = await authAxios.post("/table-billing/takeaway", {
+      customer_name: customer.name,
+      mobile: customer.mobile,
+      notes: invoiceNumber ? `Sales billing invoice ${invoiceNumber}` : "Sales billing takeaway",
+      token_number: invoiceNumber || null,
+      items: cart.map((item) => ({
+        item_id: item.item_id,
+        quantity: item.qty,
+      })),
+    });
+
+    const orderId = takeawayRes?.data?.order_id;
+    if (!orderId) {
+      throw new Error("Tracked takeaway order was not created");
+    }
+
+    await authAxios.post(`/kot/create/${orderId}`);
+  };
+
+  const resetBillForm = () => {
+    setCart([]);
+    setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
+    setDiscount(0);
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponMsg("");
+    setPaymentMode("cash");
+    setSplitEnabled(false);
+    setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
+    setGiftCardCode("");
   };
 
   const saveInvoice = async (print = false) => {
@@ -767,15 +799,27 @@ const [customer, setCustomer] = useState({
 
     try {
       const res = await authAxios.post(`/invoice/`, payload);
+      let trackingWarning = "";
 
       if (branch?.kot_required !== false) {
-        printKOT(res?.data?.invoice_number, customer.name);
+        if (isHotel) {
+          try {
+            await createTrackedTakeawayKot(res?.data?.invoice_number);
+          } catch (trackingErr) {
+            trackingWarning =
+              trackingErr?.response?.data?.detail ||
+              trackingErr?.message ||
+              "Order tracking was not created for this takeaway bill";
+          }
+        }
+
+        await printKOT(res?.data?.invoice_number, customer.name);
       }
 
       if (print && branch?.receipt_required !== false) {
         const qrHtml = await generateFeedbackQrHtml(res.data.invoice_number);
         const ok = await printDirectText(generateBillText(res.data.invoice_number), {
-          fontSize: 6,
+          fontSize: 8,
           paperSize: branch?.paper_size || "58mm",
           extraHtml: qrHtml,
         });
@@ -784,17 +828,11 @@ const [customer, setCustomer] = useState({
         showToast("Receipt printing disabled for this branch", "warning");
       }
 
-      showToast("Bill saved", "success");
-      setCart([]);
-      setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
-      setDiscount(0);
-      setCouponCode("");
-      setCouponDiscount(0);
-      setCouponMsg("");
-      setPaymentMode("cash");
-      setSplitEnabled(false);
-      setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
-      setGiftCardCode("");
+      showToast(
+        trackingWarning ? `Bill saved. ${trackingWarning}` : "Bill saved",
+        trackingWarning ? "warning" : "success"
+      );
+      resetBillForm();
       defaultDiscountBranchRef.current = null;
       await loadData({ forceDefaultDiscount: true });
     } catch (err) {
@@ -803,16 +841,7 @@ const [customer, setCustomer] = useState({
         addOfflineBill(payload);
         showToast("Saved offline. It will auto-sync when internet returns.", "warning");
 
-        setCart([]);
-        setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
-        setDiscount(0);
-        setCouponCode("");
-        setCouponDiscount(0);
-        setCouponMsg("");
-        setPaymentMode("cash");
-        setSplitEnabled(false);
-        setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
-        setGiftCardCode("");
+        resetBillForm();
         return;
       }
 

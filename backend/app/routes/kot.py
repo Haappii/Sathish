@@ -19,6 +19,7 @@ ORDER_LIVE_FLOW = [
     {"key": "ORDER_PREPARING", "label": "Order Preparing", "kot_status": "PREPARING", "step_index": 1},
     {"key": "FOOD_PREPARED", "label": "Food Prepared", "kot_status": "READY", "step_index": 2},
     {"key": "MOVED_TO_TABLE", "label": "Moved To Table", "kot_status": "SERVED", "step_index": 3},
+    {"key": "COMPLETED", "label": "Completed", "kot_status": "COMPLETED", "step_index": 4},
 ]
 ORDER_LIVE_META = {row["key"]: row for row in ORDER_LIVE_FLOW}
 ORDER_LIVE_TO_KOT = {row["key"]: row["kot_status"] for row in ORDER_LIVE_FLOW}
@@ -47,7 +48,9 @@ def _derive_order_live_status(kots: list[KOT]) -> dict:
             "next_status": "ORDER_PLACED",
         }
 
-    if all(s == "PENDING" for s in statuses):
+    if all(s == "COMPLETED" for s in statuses):
+        key = "COMPLETED"
+    elif all(s == "PENDING" for s in statuses):
         key = "ORDER_PLACED"
     elif all(s == "SERVED" for s in statuses):
         key = "MOVED_TO_TABLE"
@@ -105,14 +108,59 @@ def _serialize_tracking_order(order: Order, kots: list[KOT]) -> dict:
             {
                 "kot_id": k.kot_id,
                 "kot_number": k.kot_number,
-                "status": k.status,
+                "status": str(k.status or "").upper(),
+                "status_label": ORDER_LIVE_META.get(
+                    KOT_TO_ORDER_LIVE.get(str(k.status or "").upper(), ""),
+                    {}
+                ).get("label", str(k.status or "").replace("_", " ").title()),
                 "printed_at": k.printed_at,
                 "completed_at": k.completed_at,
                 "item_count": len(k.items or []),
+                "items": [
+                    {
+                        "id": ki.id,
+                        "order_item_id": ki.order_item_id,
+                        "item_id": ki.item_id,
+                        "item_name": ki.item_name,
+                        "quantity": ki.quantity,
+                        "notes": ki.notes,
+                        "status": str(ki.status or "").upper(),
+                    }
+                    for ki in (k.items or [])
+                ],
             }
             for k in (kots or [])
         ],
     }
+
+
+def _close_takeaway_order_if_completed(db: Session, *, shop_id: int, order_id: int) -> None:
+    order = (
+        db.query(Order)
+        .filter(
+            Order.shop_id == shop_id,
+            Order.order_id == order_id,
+            Order.status == "OPEN",
+        )
+        .first()
+    )
+    if not order or str(order.order_type or "").upper() != "TAKEAWAY":
+        return
+
+    statuses = {
+        str(status or "").upper()
+        for status, in (
+            db.query(KOT.status)
+            .filter(
+                KOT.shop_id == shop_id,
+                KOT.order_id == order_id,
+            )
+            .all()
+        )
+    }
+    if statuses and statuses == {"COMPLETED"}:
+        order.status = "CLOSED"
+        order.closed_at = datetime.utcnow()
 
 
 # ── CREATE KOT (send unsent items to kitchen) ─────────────────────────────────
@@ -284,7 +332,10 @@ def list_tracking_orders(
         kots = kot_map.get(int(order.order_id), [])
         if not include_without_kot and not kots:
             continue
-        result.append(_serialize_tracking_order(order, kots))
+        tracking_order = _serialize_tracking_order(order, kots)
+        if tracking_order["status"] == "COMPLETED":
+            continue
+        result.append(tracking_order)
 
     return result
 
@@ -305,7 +356,7 @@ def update_tracking_order_status(
     if requested not in ORDER_LIVE_TO_KOT:
         raise HTTPException(
             400,
-            "Invalid status. Must be one of: ORDER_PLACED, ORDER_PREPARING, FOOD_PREPARED, MOVED_TO_TABLE",
+            "Invalid status. Must be one of: ORDER_PLACED, ORDER_PREPARING, FOOD_PREPARED, MOVED_TO_TABLE, COMPLETED",
         )
 
     q = (
@@ -343,10 +394,11 @@ def update_tracking_order_status(
     now = datetime.utcnow()
     for kot in kots:
         kot.status = target_kot_status
-        kot.completed_at = now if target_kot_status in {"READY", "SERVED"} else None
+        kot.completed_at = now if target_kot_status in {"READY", "SERVED", "COMPLETED"} else None
         for ki in kot.items:
             ki.status = target_kot_status
 
+    _close_takeaway_order_if_completed(db, shop_id=user.shop_id, order_id=order_id)
     db.commit()
 
     return {
@@ -394,7 +446,7 @@ def update_kot_status(
     db: Session = Depends(get_db),
     user=Depends(require_permission("billing", "write")),
 ):
-    valid = {"PENDING", "PREPARING", "READY", "SERVED"}
+    valid = {"PENDING", "PREPARING", "READY", "SERVED", "COMPLETED"}
     new_status = str(payload.get("status", "")).upper()
     if new_status not in valid:
         raise HTTPException(400, f"Invalid status. Must be one of: {valid}")
@@ -404,10 +456,11 @@ def update_kot_status(
         raise HTTPException(404, "KOT not found")
 
     kot.status = new_status
-    kot.completed_at = datetime.utcnow() if new_status in {"READY", "SERVED"} else None
+    kot.completed_at = datetime.utcnow() if new_status in {"READY", "SERVED", "COMPLETED"} else None
     for ki in kot.items:
         ki.status = new_status
 
+    _close_takeaway_order_if_completed(db, shop_id=user.shop_id, order_id=kot.order_id)
     db.commit()
     return {"success": True, "kot_id": kot_id, "status": new_status}
 
@@ -421,7 +474,7 @@ def update_kot_item_status(
     db: Session = Depends(get_db),
     user=Depends(require_permission("billing", "write")),
 ):
-    valid = {"PENDING", "PREPARING", "READY", "SERVED"}
+    valid = {"PENDING", "PREPARING", "READY", "SERVED", "COMPLETED"}
     new_status = str(payload.get("status", "")).upper()
     if new_status not in valid:
         raise HTTPException(400, f"Invalid status. Must be one of: {valid}")
@@ -438,7 +491,10 @@ def update_kot_item_status(
 
     # Auto-update KOT status based on all items
     all_statuses = {i.status for i in kot.items}
-    if all_statuses == {"SERVED"}:
+    if all_statuses == {"COMPLETED"}:
+        kot.status = "COMPLETED"
+        kot.completed_at = datetime.utcnow()
+    elif all_statuses == {"SERVED"}:
         kot.status = "SERVED"
         kot.completed_at = datetime.utcnow()
     elif all_statuses.issubset({"READY", "SERVED"}) and "READY" in all_statuses:
@@ -451,5 +507,6 @@ def update_kot_item_status(
         kot.status = "PENDING"
         kot.completed_at = None
 
+    _close_takeaway_order_if_completed(db, shop_id=user.shop_id, order_id=kot.order_id)
     db.commit()
     return {"success": True, "item_id": item_id, "status": new_status}

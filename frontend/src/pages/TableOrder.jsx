@@ -5,6 +5,7 @@ import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { buildBusinessDateTimeLabel, getBusinessDate } from "../utils/businessDate";
+import { generateFeedbackQrHtml } from "../utils/feedbackQr";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 import { isHotelShop } from "../utils/shopType";
@@ -25,6 +26,7 @@ export default function TableOrder() {
   const printTextRef = useRef(null);
   const kotPrintRef = useRef(null);
 
+  const [confirmDialog, setConfirmDialog] = useState(null); // { title, message, confirmLabel, confirmClassName, onConfirm }
   const [orderId, setOrderId] = useState(null);
   const [orderItems, setOrderItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -232,21 +234,25 @@ export default function TableOrder() {
 
   const clearOrder = async () => {
     if (!orderId || !orderItems.length) return;
-    const confirmed = window.confirm(
-      `Clear all ${orderItems.length} item${orderItems.length > 1 ? "s" : ""} from ${tableName || "this table"}?`
-    );
-    if (!confirmed) return;
-
-    setCartBusy(true);
-    try {
-      await api.post(`/table-billing/order/clear/${orderId}`);
-      await loadOrder();
-      showToast("Order cleared", "success");
-    } catch (err) {
-      showToast(errorDetail(err, "Failed to clear order"), "error");
-    } finally {
-      setCartBusy(false);
-    }
+    setConfirmDialog({
+      title: "Clear Order",
+      message: `Clear all ${orderItems.length} item${orderItems.length > 1 ? "s" : ""} from ${tableName || "this table"}?`,
+      confirmLabel: "Clear Order",
+      confirmClassName: "bg-rose-600 hover:bg-rose-700",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setCartBusy(true);
+        try {
+          await api.post(`/table-billing/order/clear/${orderId}`);
+          await loadOrder();
+          showToast("Order cleared", "success");
+        } catch (err) {
+          showToast(errorDetail(err, "Failed to clear order"), "error");
+        } finally {
+          setCartBusy(false);
+        }
+      },
+    });
   };
 
   /* ================= PRINT ================= */
@@ -373,10 +379,18 @@ export default function TableOrder() {
     return t;
   }; 
 
+  const getFeedbackQrHtml = async (invoiceNo) =>
+    generateFeedbackQrHtml({
+      shopId: shop?.shop_id,
+      invoiceNo,
+      enabled: branch?.feedback_qr_enabled !== false,
+    });
+
   const printInvoice = async invoiceNo => {
     if (!invoiceNo) return;
     const res = await api.get(`/invoice/by-number/${invoiceNo}`);
     const invoice = res.data || {};
+    const qrHtml = await getFeedbackQrHtml(invoice.invoice_number || invoiceNo);
     const ok = await printDirectText(
       generateBillText({
         invoiceNumber: invoice.invoice_number || invoiceNo,
@@ -389,15 +403,20 @@ export default function TableOrder() {
         invoiceDiscount: invoice.discounted_amt,
         invoiceTotal: invoice.total_amount,
       }),
-      { fontSize: 6, paperSize: branch?.paper_size || "58mm" }
+      {
+        fontSize: 8,
+        paperSize: branch?.paper_size || "58mm",
+        extraHtml: qrHtml,
+      }
     );
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 
   const generateKOTText = (kotItems, categoryLabel = null) => {
-    const WIDTH = 32;
-    const NAME_COL = 22;
-    const COUNT_COL = 8;
+    const is80mm = (branch?.paper_size || "58mm") === "80mm";
+    const WIDTH = is80mm ? 48 : 32;
+    const NAME_COL = is80mm ? 34 : 22;
+    const COUNT_COL = is80mm ? 10 : 8;
     const line = "-".repeat(WIDTH);
     const center = txt =>
       " ".repeat(Math.max(0, Math.floor((WIDTH - txt.length) / 2))) + txt;
@@ -459,7 +478,10 @@ export default function TableOrder() {
 
     for (const catId of catIds) {
       const label = multiCat ? (catNameMap[catId] || catId) : null;
-      const ok = await printDirectText(generateKOTText(grouped[catId], label));
+      const ok = await printDirectText(generateKOTText(grouped[catId], label), {
+        fontSize: 9,
+        paperSize: branch?.paper_size || "58mm",
+      });
       if (!ok) {
         showToast("Printing failed. Check printer/popup settings.", "error");
         break;
@@ -468,40 +490,47 @@ export default function TableOrder() {
   };
 
   const confirmOrderAndPrintKOT = async () => {
-    try {
-      const kotRequired = branch?.kot_required !== false;
-      const confirmPrint = window.confirm(kotRequired ? "Confirm order and print KOT?" : "Confirm order?");
-      if (!confirmPrint) return;
-      const currentOrderId = orderIdRef.current || orderId;
-      if (!currentOrderId) {
-        showToast("Order not found", "error");
-        return;
-      }
+    const kotRequired = branch?.kot_required !== false;
+    setConfirmDialog({
+      title: kotRequired ? "Confirm Order & Print KOT" : "Confirm Order",
+      message: kotRequired ? "Confirm order and print KOT?" : "Confirm this order?",
+      confirmLabel: kotRequired ? "Confirm & Print" : "Confirm Order",
+      confirmClassName: "bg-amber-500 hover:bg-amber-600",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const currentOrderId = orderIdRef.current || orderId;
+          if (!currentOrderId) {
+            showToast("Order not found", "error");
+            return;
+          }
 
-      const res = await api.get(`/table-billing/order/by-table/${tableId}`);
-      const latestItems = Array.isArray(res.data?.items) ? res.data.items : [];
-      setOrderItems(latestItems);
-      if (!latestItems.length) {
-        showToast("Add items before confirming order", "warning");
-        return;
-      }
+          const res = await api.get(`/table-billing/order/by-table/${tableId}`);
+          const latestItems = Array.isArray(res.data?.items) ? res.data.items : [];
+          setOrderItems(latestItems);
+          if (!latestItems.length) {
+            showToast("Add items before confirming order", "warning");
+            return;
+          }
 
-      if (kotRequired) {
-        const kotRes = await api.post(`/kot/create/${currentOrderId}`);
-        const kotItems = Array.isArray(kotRes.data?.items) ? kotRes.data.items : [];
-        if (!kotItems.length) {
-          showToast("No new items to send to kitchen", "warning");
-          return;
+          if (kotRequired) {
+            const kotRes = await api.post(`/kot/create/${currentOrderId}`);
+            const kotItems = Array.isArray(kotRes.data?.items) ? kotRes.data.items : [];
+            if (!kotItems.length) {
+              showToast("No new items to send to kitchen", "warning");
+              return;
+            }
+            await printKOT(kotItems);
+            showToast("Order confirmed and live tracking started", "success");
+            await loadOrder();
+          } else {
+            showToast("Order confirmed", "success");
+          }
+        } catch (err) {
+          showToast(errorDetail(err, "Failed to confirm order"), "error");
         }
-        await printKOT(kotItems);
-        showToast("Order confirmed and live tracking started", "success");
-        await loadOrder();
-      } else {
-        showToast("Order confirmed", "success");
-      }
-    } catch (err) {
-      showToast(errorDetail(err, "Failed to confirm order"), "error");
-    }
+      },
+    });
   };
 
   /* ================= COMPLETE ORDER ================= */
@@ -1005,6 +1034,33 @@ export default function TableOrder() {
       <div style={{ display: "none" }}>
         <pre ref={kotPrintRef} />
       </div>
+
+      {confirmDialog && (
+        <div className="fixed right-4 top-4 z-[1000] w-[calc(100vw-2rem)] max-w-sm">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-[0_20px_50px_rgba(0,0,0,.18)] backdrop-blur-xl">
+            <div className="border-b px-5 py-4">
+              <h2 className="text-sm font-semibold text-gray-800">{confirmDialog.title || "Confirm Action"}</h2>
+              <p className="mt-1 text-[12px] text-gray-500">{confirmDialog.message}</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 rounded-b-2xl bg-gray-50 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="rounded-lg border bg-white px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDialog.onConfirm}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium text-white ${confirmDialog.confirmClassName || "bg-blue-600 hover:bg-blue-700"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -22,6 +22,7 @@ import {
   FaCalendarAlt,
   FaUtensils,
   FaConciergeBell,
+  FaStar,
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
@@ -255,6 +256,13 @@ const MENU_CATALOG = [
     perm: { module: "reports", action: "read" },
   },
   {
+    key: "feedback_review",
+    name: "Feedback Review",
+    path: "/feedback-review",
+    icon: <FaStar />,
+    perm: { module: "feedback", action: "read" },
+  },
+  {
     key: "deleted_invoices",
     name: "Deleted Invoice",
     path: "/deleted-invoices",
@@ -298,6 +306,19 @@ const HEAD_OFFICE_CLOSED_KEYS = new Set([
   "admin",
 ]);
 
+const getSalesBillingName = (showTableBilling) =>
+  showTableBilling ? "Take Away" : "Billing";
+
+const applyDynamicMenuLabels = (item, { showTableBilling }) => {
+  if (item.key === "sales_billing") {
+    return { ...item, name: getSalesBillingName(showTableBilling) };
+  }
+  if (item.key === "inventory" && showTableBilling) {
+    return { ...item, name: "Raw Materials" };
+  }
+  return item;
+};
+
 export const modulesToPermMap = (modules) => {
   const map = {};
   for (const m of modules || []) {
@@ -333,15 +354,9 @@ export const buildRbacMenu = ({
     items = items.filter((x) => HEAD_OFFICE_CLOSED_KEYS.has(x.key));
   }
 
-  const filtered = items.filter((x) => canAccess(permMap, x.perm));
-
-  if (!showTableBilling) return filtered;
-
-  // Hotel: inventory means raw materials stock.
-  return filtered.map((x) => {
-    if (x.key === "inventory") return { ...x, name: "Raw Materials" };
-    return x;
-  });
+  return items
+    .filter((x) => canAccess(permMap, x.perm))
+    .map((x) => applyDynamicMenuLabels(x, { showTableBilling }));
 };
 
 export const buildRoleMenu = ({
@@ -352,6 +367,7 @@ export const buildRoleMenu = ({
 }) => {
   let menuItems = [];
   const inventoryName = showTableBilling ? "Raw Materials" : "Inventory";
+  const salesBillingName = getSalesBillingName(showTableBilling);
   const showOrderLiveMenus = Boolean(showTableBilling) && orderLiveTrackingEnabled !== false;
 
   if (roleLower === "cashier") {
@@ -359,7 +375,7 @@ export const buildRoleMenu = ({
       { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: salesBillingName, path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       ...(showTableBilling
         ? [
@@ -384,7 +400,7 @@ export const buildRoleMenu = ({
     menuItems = [
       { name: "Home", path: "/home", icon: <FaHome /> },
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: salesBillingName, path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       ...(showTableBilling
         ? [
@@ -406,7 +422,7 @@ export const buildRoleMenu = ({
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: salesBillingName, path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
       ...(showTableBilling
@@ -445,6 +461,7 @@ export const buildRoleMenu = ({
         : []),
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
+      { name: "Feedback Review", path: "/feedback-review", icon: <FaStar /> },
       { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
       { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
@@ -457,7 +474,7 @@ export const buildRoleMenu = ({
       { name: "Trends", path: "/trends", icon: <FaChartLine /> },
       { name: "Analytics", path: "/analytics", icon: <FaChartBar /> },
       { name: "Cash Drawer", path: "/cash-drawer", icon: <FaCashRegister /> },
-      { name: "Sales Billing", path: "/sales/create", icon: <FaShoppingCart /> },
+      { name: salesBillingName, path: "/sales/create", icon: <FaShoppingCart /> },
       { name: "Billing History", path: "/sales/history", icon: <FaHistory /> },
       { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
       ...(showTableBilling
@@ -497,6 +514,7 @@ export const buildRoleMenu = ({
       { name: "Transfers", path: "/stock-transfers", icon: <FaBoxes /> },
       { name: "Alerts", path: "/alerts", icon: <FaBell /> },
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
+      { name: "Feedback Review", path: "/feedback-review", icon: <FaStar /> },
       { name: "Deleted Invoice", path: "/deleted-invoices", icon: <FaFileInvoice /> },
       { name: inventoryName, path: "/inventory", icon: <FaBoxes /> },
       { name: "Support Tickets", path: "/support-tickets", icon: <FaLifeRing /> },

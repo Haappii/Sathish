@@ -31,10 +31,11 @@ function timeAgo(ts) {
 }
 
 /* ── KOT text builder (unchanged) ────────────────────────────────────────── */
-function generateKOTText({ tableName, items }) {
-  const WIDTH = 32;
-  const NAME_COL = 22;
-  const COUNT_COL = 8;
+function generateKOTText({ tableName, items, paperSize = "58mm" }) {
+  const is80mm = String(paperSize || "58mm") === "80mm";
+  const WIDTH = is80mm ? 48 : 32;
+  const NAME_COL = is80mm ? 34 : 22;
+  const COUNT_COL = is80mm ? 10 : 8;
   const line = "-".repeat(WIDTH);
   const center = (txt) =>
     " ".repeat(Math.max(0, Math.floor((WIDTH - txt.length) / 2))) + txt;
@@ -229,7 +230,7 @@ export default function QrOrders() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [busyId, setBusyId] = useState(null);
-  const [printCfg, setPrintCfg] = useState({ kot_required: true });
+  const [printCfg, setPrintCfg] = useState({ kot_required: true, paper_size: "58mm" });
   const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   const load = async () => {
@@ -251,7 +252,10 @@ export default function QrOrders() {
         if (s?.branch_id) {
           const br = await api.get(`/branch/${s.branch_id}`);
           if (mounted) {
-            setPrintCfg({ kot_required: Boolean(br?.data?.kot_required ?? true) });
+            setPrintCfg({
+              kot_required: Boolean(br?.data?.kot_required ?? true),
+              paper_size: br?.data?.paper_size || "58mm",
+            });
           }
         }
       } catch { /* keep defaults */ }
@@ -266,7 +270,10 @@ export default function QrOrders() {
   const printKOT = async ({ tableName, items }) => {
     const it = (Array.isArray(items) ? items : []).filter((x) => Number(x.quantity || 0) > 0);
     if (!it.length) return;
-    const ok = await printDirectText(generateKOTText({ tableName, items: it }));
+    const ok = await printDirectText(
+      generateKOTText({ tableName, items: it, paperSize: printCfg.paper_size }),
+      { fontSize: 9, paperSize: printCfg.paper_size || "58mm" }
+    );
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 

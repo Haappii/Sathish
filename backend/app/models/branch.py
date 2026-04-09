@@ -29,5 +29,6 @@ class Branch(Base):
     service_charge_amount = Column(Numeric(10, 2), default=0)
     service_charge_gst_required = Column(Boolean, default=False)
     service_charge_gst_percent = Column(Numeric(5, 2), default=0)
+    feedback_qr_enabled = Column(Boolean, default=True)
     created_date = Column(TIMESTAMP(timezone=True), server_default=func.now())
     created_by = Column(Integer)
