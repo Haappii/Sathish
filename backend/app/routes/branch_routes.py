@@ -43,6 +43,8 @@ def _print_param_keys(branch_id: int) -> dict[str, str]:
     return {
         "kot_required": f"branch:{branch_id}:kot_required",
         "receipt_required": f"branch:{branch_id}:receipt_required",
+        "paper_size": f"branch:{branch_id}:paper_size",
+        "fssai_number": f"branch:{branch_id}:fssai_number",
     }
 
 
@@ -73,12 +75,17 @@ def _read_branch_discount_from_params(pmap: dict[str, str], branch_id: int) -> d
 def _read_branch_print_from_params(pmap: dict[str, str], branch_id: int) -> dict:
     keys = _print_param_keys(branch_id)
 
-    # Default YES when missing.
     kot = str(pmap.get(keys["kot_required"], "YES") or "YES").strip().upper() == "YES"
     receipt = str(pmap.get(keys["receipt_required"], "YES") or "YES").strip().upper() == "YES"
+    paper_size = str(pmap.get(keys["paper_size"], "58mm") or "58mm").strip().lower()
+    if paper_size not in ("58mm", "80mm"):
+        paper_size = "58mm"
+    fssai_number = str(pmap.get(keys["fssai_number"], "") or "").strip()
     return {
         "kot_required": bool(kot),
         "receipt_required": bool(receipt),
+        "paper_size": paper_size,
+        "fssai_number": fssai_number,
     }
 
 
@@ -139,16 +146,22 @@ def _save_branch_discount(db: Session, *, shop_id: int, branch_id: int, payload:
 
 
 def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, payload: BranchCreate | BranchUpdate):
-    has_any = any(getattr(payload, k, None) is not None for k in ("kot_required", "receipt_required"))
+    has_any = any(getattr(payload, k, None) is not None for k in ("kot_required", "receipt_required", "paper_size", "fssai_number"))
     if not has_any:
         return
 
     kot_required = bool(getattr(payload, "kot_required", True))
     receipt_required = bool(getattr(payload, "receipt_required", True))
+    paper_size = str(getattr(payload, "paper_size", "58mm") or "58mm").strip().lower()
+    if paper_size not in ("58mm", "80mm"):
+        paper_size = "58mm"
+    fssai_number = str(getattr(payload, "fssai_number", "") or "").strip()
 
     keys = _print_param_keys(branch_id)
     _upsert_param(db, shop_id=shop_id, key=keys["kot_required"], value=("YES" if kot_required else "NO"))
     _upsert_param(db, shop_id=shop_id, key=keys["receipt_required"], value=("YES" if receipt_required else "NO"))
+    _upsert_param(db, shop_id=shop_id, key=keys["paper_size"], value=paper_size)
+    _upsert_param(db, shop_id=shop_id, key=keys["fssai_number"], value=fssai_number)
     db.commit()
 
 

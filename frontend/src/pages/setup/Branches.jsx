@@ -55,6 +55,8 @@ export default function Branches() {
       loyalty_points_percentage: 0,
       kot_required: true,
       receipt_required: true,
+      paper_size: "58mm",
+      fssai_number: "",
       service_charge_required: false,
       service_charge_amount: 0,
       swiggy_enabled: false,
@@ -99,6 +101,8 @@ export default function Branches() {
         discount_value: Number(branch?.discount_value || 0),
         kot_required: branch?.kot_required !== false,
         receipt_required: branch?.receipt_required !== false,
+        paper_size: branch?.paper_size || "58mm",
+        fssai_number: branch?.fssai_number || "",
         service_charge_required: normalizedServiceChargeRequired,
         service_charge_amount: rawServiceChargeAmount,
         loyalty_points_percentage: Number(branch?.loyalty_points_percentage || 0),
@@ -495,6 +499,40 @@ export default function Branches() {
                   checked={Boolean(form.receipt_required)}
                   onChange={(checked) => setField("receipt_required", checked)}
                 />
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Paper Size</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Thermal printer roll width</p>
+                  </div>
+                  <div className="flex rounded-lg overflow-hidden border border-slate-200">
+                    {["58mm", "80mm"].map(size => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setField("paper_size", size)}
+                        className={`px-4 py-1.5 text-xs font-semibold transition ${
+                          form.paper_size === size
+                            ? "bg-blue-600 text-white"
+                            : "bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="py-2 space-y-1.5">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">FSSAI Number</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Branch-specific FSSAI (leave blank to use shop-level)</p>
+                  </div>
+                  <input
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+                    placeholder="e.g. 11223344556677"
+                    value={form.fssai_number || ""}
+                    onChange={e => setField("fssai_number", e.target.value)}
+                  />
+                </div>
               </div>
             </FormSection>
 

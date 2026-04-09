@@ -534,10 +534,11 @@ const [customer, setCustomer] = useState({
 
   /* ---------------- PRINT ---------------- */
   const generateBillText = invoiceNo => {
-    const WIDTH = 32;
-    const ITEM_COL = 14;
-    const QTY_COL = 4;
-    const RATE_COL = 6;
+    const is80mm = (branch?.paper_size || "58mm") === "80mm";
+    const WIDTH    = is80mm ? 48 : 32;
+    const ITEM_COL = is80mm ? 22 : 14;
+    const QTY_COL  = is80mm ? 5  : 4;
+    const RATE_COL = is80mm ? 9  : 6;
     const TOTAL_COL = WIDTH - ITEM_COL - QTY_COL - RATE_COL;
     const line = "-".repeat(WIDTH);
     const center = txt => " ".repeat(Math.max(0, Math.floor((WIDTH - txt.length) / 2))) + txt;
@@ -622,10 +623,8 @@ const [customer, setCustomer] = useState({
     if (discountValue) t += rightKV("Discount", discountValue.toFixed(2)) + "\n";
     t += rightKV("Grand Total", payable.toFixed(2)) + "\n";
     t += line + "\n";
-    const isHotel = String(shop?.billing_type || "").toLowerCase() === "hotel";
-    if (isHotel && String(shop?.fssai_number || "").trim()) {
-      t += center(`FSSAI No: ${String(shop.fssai_number).trim()}`) + "\n";
-    }
+    const fssai = String(branch?.fssai_number || shop?.fssai_number || "").trim();
+    if (fssai) t += center(`FSSAI No: ${fssai}`) + "\n";
     // Footer + 4 blank lines to ensure the message prints on the same ticket
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
     return t;
@@ -761,7 +760,8 @@ const [customer, setCustomer] = useState({
 
       if (print && branch?.receipt_required !== false) {
         const ok = await printDirectText(generateBillText(res.data.invoice_number), {
-          fontSize: 6, // 50% size for compact receipts
+          fontSize: 6,
+          paperSize: branch?.paper_size || "58mm",
         });
         if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
       } else if (print && branch?.receipt_required === false) {

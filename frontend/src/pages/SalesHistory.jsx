@@ -290,10 +290,11 @@ export default function SalesHistory() {
 
   /* ================= PRINT ================= */
   const generateBillText = () => {
-    const WIDTH = 32;
-    const ITEM_COL = 14;
-    const QTY_COL = 4;
-    const RATE_COL = 6;
+    const is80mm = (branch?.paper_size || "58mm") === "80mm";
+    const WIDTH    = is80mm ? 48 : 32;
+    const ITEM_COL = is80mm ? 22 : 14;
+    const QTY_COL  = is80mm ? 5  : 4;
+    const RATE_COL = is80mm ? 9  : 6;
     const TOTAL_COL = WIDTH - ITEM_COL - QTY_COL - RATE_COL;
     const line = "-".repeat(WIDTH);
     const center = txt => {
@@ -372,6 +373,8 @@ export default function SalesHistory() {
       t += rightKV("Discount", Number(activeBill.discounted_amt).toFixed(2)) + "\n";
     t += rightKV("Grand Total", billingTotal.toFixed(2)) + "\n";
     t += line + "\n";
+    const fssai = String(branch?.fssai_number || shop?.fssai_number || "").trim();
+    if (fssai) t += center(`FSSAI No: ${fssai}`) + "\n";
     // Footer + 4 blank lines so the final message is always on the same slip
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
     return t;
@@ -382,7 +385,7 @@ export default function SalesHistory() {
       showToast("Receipt printing disabled for this branch", "warning");
       return;
     }
-    const ok = await printDirectText(generateBillText(), { fontSize: 6 });
+    const ok = await printDirectText(generateBillText(), { fontSize: 6, paperSize: branch?.paper_size || "58mm" });
     if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
   };
 

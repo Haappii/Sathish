@@ -195,10 +195,11 @@ export default function TableGrid() {
   }; 
 
   const generateBillText = (invoice, shop, branch, items) => {
-    const WIDTH = 32;
-    const ITEM_COL = 14;
-    const QTY_COL = 4;
-    const RATE_COL = 6;
+    const is80mm = (branch?.paper_size || "58mm") === "80mm";
+    const WIDTH    = is80mm ? 48 : 32;
+    const ITEM_COL = is80mm ? 22 : 14;
+    const QTY_COL  = is80mm ? 5  : 4;
+    const RATE_COL = is80mm ? 9  : 6;
     const TOTAL_COL = WIDTH - ITEM_COL - QTY_COL - RATE_COL;
     const line = "-".repeat(WIDTH);
 
@@ -287,10 +288,8 @@ export default function TableGrid() {
 
     t += rightKV("Grand Total", (invoice.total_amount || 0).toFixed(2)) + "\n";
     t += line + "\n";
-    const isHotel = String(shop?.billing_type || "").toLowerCase() === "hotel";
-    if (isHotel && String(shop?.fssai_number || "").trim()) {
-      t += center(`FSSAI No: ${String(shop.fssai_number).trim()}`) + "\n";
-    }
+    const fssai = String(branch?.fssai_number || shop?.fssai_number || "").trim();
+    if (fssai) t += center(`FSSAI No: ${fssai}`) + "\n";
     // Footer + 4 blank lines to keep the message with the same receipt
     t += center("Thank You! Visit Again") + "\n" + "\n".repeat(4);
 
@@ -374,7 +373,7 @@ export default function TableGrid() {
         if (receiptRequired) {
           const ok = await printDirectText(
             generateBillText(invoice, shopRes.data || {}, branchData, items),
-            { fontSize: 6 }
+            { fontSize: 6, paperSize: branchData?.paper_size || "58mm" }
           );
           if (ok) {
             showToast("Order completed and invoice printed", "success");

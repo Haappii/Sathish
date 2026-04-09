@@ -542,6 +542,7 @@ ipcMain.handle("offline-queue-remove", (_event, ids) => {
 ipcMain.handle("silent-print-text", async (_event, payload) => {
   const { text = "", options = {} } = payload || {};
   const fontSize = Number(options.fontSize || 12) || 12;
+  const paperWidth = (String(options.paperSize || "58mm") === "80mm") ? "80mm" : "58mm";
   const scale = fontSize <= 8 ? Math.max(0.4, fontSize / 12) : 1; // shrink aggressively for tiny receipts
 
   const printWin = new BrowserWindow({
@@ -550,7 +551,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
   });
 
   const html = `<!DOCTYPE html><html><head><style>
-    @page { size: 58mm auto; margin: 0; }
+    @page { size: ${paperWidth} auto; margin: 0; }
     body { margin: 0; padding: 0; }
     pre {
       margin: 0;
@@ -558,7 +559,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
       font-family: monospace;
       font-size: ${Math.max(fontSize, 6)}px;
       line-height: 1.1;
-      width: 58mm;
+      width: ${paperWidth};
       transform: scale(${scale.toFixed(2)});
       transform-origin: top left;
       white-space: pre;
@@ -608,7 +609,7 @@ function buildEscPosBuffer(text, { codepage = 0, fontSize = 12, feedLines = 4 } 
 }
 
 ipcMain.handle("raw-print-text", async (_event, payload) => {
-  const { text = "", port, codepage, fontSize, feedLines } = payload || {};
+  const { text = "", port, codepage, fontSize, feedLines, paperSize } = payload || {};
   ensureThermalDriverInstalled();
   const detected = findBluetoothPrinterPort();
   const candidates = Array.from(
