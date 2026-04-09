@@ -133,7 +133,7 @@ def _to_out(card: GiftCard) -> dict:
         "redeemed_on": card.redeemed_on.strftime("%Y-%m-%d %H:%M") if card.redeemed_on else None,
         "customer_name": card.customer_name,
         "mobile": card.mobile,
-        "customer_email": card.customer_email,
+        "customer_email": getattr(card, "customer_email", None),
         "note": card.note,
     }
 
