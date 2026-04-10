@@ -57,6 +57,20 @@ loadSharedEnv();
 // Point this to the hosted frontend that talks to your backend API.
 const DEFAULT_APP_URL = process.env.APP_URL_DEFAULT || "http://localhost:5180";
 
+function normalizeAppUrl(url) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(String(url));
+    const path = String(parsed.pathname || "").trim();
+    if (!path || path === "/") {
+      parsed.pathname = "/login";
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function findBluetoothPrinterPort() {
   try {
     const script =
@@ -151,17 +165,17 @@ function ensureThermalDriverInstalled() {
 function resolveAppUrl() {
   const argv = process.argv || [];
   const urlArg = argv.find((a) => String(a || "").startsWith("--url="));
-  if (urlArg) return String(urlArg).slice("--url=".length);
+  if (urlArg) return normalizeAppUrl(String(urlArg).slice("--url=".length));
 
-  if (process.env.APP_URL) return String(process.env.APP_URL);
+  if (process.env.APP_URL) return normalizeAppUrl(String(process.env.APP_URL));
   // Optional: allow a build-time / deployment default via APP_URL_DEFAULT.
-  if (process.env.APP_URL_DEFAULT) return String(process.env.APP_URL_DEFAULT);
+  if (process.env.APP_URL_DEFAULT) return normalizeAppUrl(String(process.env.APP_URL_DEFAULT));
 
   const cfg = readUserConfig();
-  if (cfg && cfg.app_url) return String(cfg.app_url);
+  if (cfg && cfg.app_url) return normalizeAppUrl(String(cfg.app_url));
 
-  // Fallback to the hosted production/staging URL so first-run succeeds for users.
-  return DEFAULT_APP_URL;
+  // Fallback to a generic local development URL when no runtime config is present.
+  return normalizeAppUrl(DEFAULT_APP_URL);
 }
 
 function persistAppUrl(url) {
