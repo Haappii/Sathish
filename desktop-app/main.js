@@ -53,10 +53,22 @@ function loadSharedEnv() {
 
 loadSharedEnv();
 
+function isLocalhostUrl(value) {
+  try {
+    const parsed = new URL(String(value));
+    const host = String(parsed.hostname || "").toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+  } catch {
+    return false;
+  }
+}
+
 // Default URL the desktop app will open if nothing else is configured.
 // Packaged builds should default to the hosted production frontend.
 const DEFAULT_APP_URL = app.isPackaged
-  ? process.env.APP_URL_DEFAULT || "https://haappiibilling.in/"
+  ? (process.env.APP_URL_DEFAULT && !isLocalhostUrl(process.env.APP_URL_DEFAULT)
+      ? process.env.APP_URL_DEFAULT
+      : "https://haappiibilling.in/")
   : process.env.APP_URL_DEFAULT || "http://localhost:5180";
 
 function normalizeAppUrl(url) {
@@ -169,9 +181,19 @@ function resolveAppUrl() {
   const urlArg = argv.find((a) => String(a || "").startsWith("--url="));
   if (urlArg) return normalizeAppUrl(String(urlArg).slice("--url=".length));
 
-  if (process.env.APP_URL) return normalizeAppUrl(String(process.env.APP_URL));
-  // Optional: allow a build-time / deployment default via APP_URL_DEFAULT.
-  if (process.env.APP_URL_DEFAULT) return normalizeAppUrl(String(process.env.APP_URL_DEFAULT));
+  if (process.env.APP_URL) {
+    const raw = String(process.env.APP_URL);
+    if (!app.isPackaged || !isLocalhostUrl(raw)) {
+      return normalizeAppUrl(raw);
+    }
+  }
+
+  if (process.env.APP_URL_DEFAULT) {
+    const raw = String(process.env.APP_URL_DEFAULT);
+    if (!app.isPackaged || !isLocalhostUrl(raw)) {
+      return normalizeAppUrl(raw);
+    }
+  }
 
   const cfg = readUserConfig();
   if (cfg && cfg.app_url) return normalizeAppUrl(String(cfg.app_url));
