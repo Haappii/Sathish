@@ -113,6 +113,30 @@ def _as_float(val) -> float:
         return 0.0
 
 
+def _normalize_day_close_payment_mode(mode: str | None) -> str:
+    normalized = str(mode or "").strip().lower().replace("-", "_").replace(" ", "_")
+    mapping = {
+        "cash": "CASH",
+        "upi": "UPI",
+        "card": "CARD",
+        "gift_card": "GIFT CARD",
+        "giftcard": "GIFT CARD",
+        "wallet": "WALLET",
+    }
+    return mapping.get(normalized, str(mode or "cash").strip().upper() or "CASH")
+
+
+def _add_day_close_payment(bucket: dict, mode: str | None, amount) -> None:
+    amt = _q(amount)
+    if amt <= 0:
+        return
+
+    label = _normalize_day_close_payment_mode(mode)
+    payment_modes = bucket.setdefault("payment_modes", {})
+    payment_modes[label] = _q(payment_modes.get(label, 0) + amt)
+    bucket["total_amount"] = _q(bucket.get("total_amount", 0) + amt)
+
+
 def _detail_tax_breakup(detail, inv_ctx: dict) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
     """
     Returns (taxable, cgst, sgst, igst, cess) using stored split when present
@@ -2147,6 +2171,105 @@ def cash_drawer_movements(
         }
         for r in rows
     ]
+
+
+# =====================================================
+# DAY CLOSE REPORT
+# =====================================================
+@router.get("/day-close/report")
+def day_close_report(
+    from_date: str,
+    to_date: str,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports", "read")),
+):
+    f, t_end = parse_dt_range(from_date, to_date)
+    branch_id = _force_branch(branch_id, user)
+
+    q = (
+        db.query(
+            Invoice.created_time.label("created_time"),
+            Invoice.branch_id.label("branch_id"),
+            Branch.branch_name.label("branch_name"),
+            Invoice.payment_mode.label("payment_mode"),
+            Invoice.payment_split.label("payment_split"),
+            Invoice.total_amount.label("total_amount"),
+            Invoice.discounted_amt.label("discounted_amt"),
+            Invoice.tax_amt.label("tax_amt"),
+            Invoice.invoice_id.label("invoice_id"),
+        )
+        .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
+        .filter(Invoice.shop_id == user.shop_id)
+        .filter(Invoice.created_time >= f)
+        .filter(Invoice.created_time < t_end)
+        .order_by(Invoice.created_time.asc(), Invoice.branch_id.asc(), Invoice.invoice_id.asc())
+    )
+
+    if branch_id is not None:
+        q = q.filter(Invoice.branch_id == branch_id)
+
+    grouped: dict[tuple[str, int], dict] = {}
+
+    for row in q.all():
+        business_date = row.created_time.date().isoformat() if row.created_time else ""
+        branch_key = int(row.branch_id or 0)
+        key = (business_date, branch_key)
+
+        bucket = grouped.setdefault(
+            key,
+            {
+                "business_date": business_date,
+                "branch": row.branch_name or f"Branch {branch_key}",
+                "bill_count": 0,
+                "total_amount": Decimal("0.00"),
+                "discount": Decimal("0.00"),
+                "gst": Decimal("0.00"),
+                "payment_modes": {},
+            },
+        )
+
+        bucket["bill_count"] += 1
+        bucket["discount"] = _q(bucket["discount"] + _dec(row.discounted_amt))
+        bucket["gst"] = _q(bucket["gst"] + _dec(row.tax_amt))
+
+        payment_mode = str(row.payment_mode or "cash").strip().lower()
+        net_amount = _q(_dec(row.total_amount) - _dec(row.discounted_amt))
+
+        if payment_mode == "split":
+            split = row.payment_split if isinstance(row.payment_split, dict) else {}
+            for key_name in ("cash", "card", "upi"):
+                _add_day_close_payment(bucket, key_name, split.get(key_name) or 0)
+            _add_day_close_payment(bucket, "gift_card", split.get("gift_card_amount") or 0)
+            _add_day_close_payment(bucket, "wallet", split.get("wallet_amount") or 0)
+        else:
+            _add_day_close_payment(bucket, payment_mode, net_amount)
+
+    tracked_modes = {"CASH", "UPI", "CARD", "GIFT CARD", "WALLET"}
+    rows = []
+    for _, bucket in sorted(grouped.items(), key=lambda item: (item[0][0], item[1]["branch"])):
+        payment_modes = bucket.get("payment_modes", {})
+        other_total = _q(
+            sum(_dec(amount) for mode, amount in payment_modes.items() if mode not in tracked_modes)
+        )
+        rows.append(
+            {
+                "business_date": bucket["business_date"],
+                "branch": bucket["branch"],
+                "bill_count": int(bucket["bill_count"] or 0),
+                "total_amount": _as_float(bucket["total_amount"]),
+                "cash": _as_float(payment_modes.get("CASH", 0)),
+                "upi": _as_float(payment_modes.get("UPI", 0)),
+                "card": _as_float(payment_modes.get("CARD", 0)),
+                "gift_card": _as_float(payment_modes.get("GIFT CARD", 0)),
+                "wallet": _as_float(payment_modes.get("WALLET", 0)),
+                "other": _as_float(other_total),
+                "discount": _as_float(bucket["discount"]),
+                "gst": _as_float(bucket["gst"]),
+            }
+        )
+
+    return rows
 
 
 # =====================================================

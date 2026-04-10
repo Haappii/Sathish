@@ -98,6 +98,7 @@ const REPORTS = [
   // Accounting
   { key: "accounting/cash-bank-book", label: "Cash / Bank Book", group: "Accounting" },
   { key: "accounting/day-book", label: "Day Book", group: "Accounting" },
+  { key: "day-close/report", label: "Day Closing Report", group: "Accounting" },
   { key: "accounting/trial-balance", label: "Trial Balance", group: "Accounting", requiresDateRange: false },
   { key: "accounting/pnl", label: "Profit & Loss", group: "Accounting" },
   { key: "accounting/balance-sheet", label: "Balance Sheet", group: "Accounting", requiresDateRange: false },
@@ -157,6 +158,7 @@ const NO_USER_FILTER_KEYS = new Set([
   "gst/itc-register",
   "accounting/cash-bank-book",
   "accounting/day-book",
+  "day-close/report",
   "accounting/trial-balance",
   "accounting/pnl",
   "accounting/balance-sheet",
@@ -555,7 +557,32 @@ export default function Reports() {
         setData(normalized);
         return;
       }
-      if (activeReport?.key === "sales/summary") {
+      if (activeReport?.key === "cash-drawer/shifts") {
+        let normalized = rows.map((row) => {
+          const actualCashEntered =
+            row.actual_cash !== null &&
+            row.actual_cash !== undefined &&
+            row.actual_cash !== "";
+
+          if (!actualCashEntered) return row;
+          return { ...row, expected_cash: "" };
+        });
+
+        const hasVisibleExpectedCash = normalized.some(
+          (row) =>
+            row.expected_cash !== null &&
+            row.expected_cash !== undefined &&
+            row.expected_cash !== "",
+        );
+
+        if (!hasVisibleExpectedCash) {
+          normalized = normalized.map((row) =>
+            Object.fromEntries(Object.entries(row).filter(([key]) => key !== "expected_cash")),
+          );
+        }
+
+        setData(normalized);
+      } else if (activeReport?.key === "sales/summary") {
         const normalized = rows.map(row => {
           const sub = Number(row.sub_total || 0);
           const gst = Number(row.gst || 0);
@@ -839,14 +866,42 @@ export default function Reports() {
   const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition";
 
   const buildDisplayRows = () => {
+    const isCashShiftReport = activeReport?.key === "cash-drawer/shifts";
     const isInvoiceDetail =
       activeReport?.key === "sales/invoice-details" ||
       activeReport?.key === "sales/customer-invoices";
 
-    if (!isInvoiceDetail) return data;
+    let rows = data;
+
+    if (isCashShiftReport) {
+      rows = data.map((row) => {
+        const actualCashEntered =
+          row.actual_cash !== null &&
+          row.actual_cash !== undefined &&
+          row.actual_cash !== "";
+
+        if (!actualCashEntered) return row;
+        return { ...row, expected_cash: "" };
+      });
+
+      const hasVisibleExpectedCash = rows.some(
+        (row) =>
+          row.expected_cash !== null &&
+          row.expected_cash !== undefined &&
+          row.expected_cash !== "",
+      );
+
+      if (!hasVisibleExpectedCash) {
+        rows = rows.map((row) =>
+          Object.fromEntries(Object.entries(row).filter(([key]) => key !== "expected_cash")),
+        );
+      }
+    }
+
+    if (!isInvoiceDetail) return rows;
 
     const grouped = {};
-    data.forEach(row => {
+    rows.forEach(row => {
       const key = row.invoice_number;
       if (!grouped[key]) {
         grouped[key] = {

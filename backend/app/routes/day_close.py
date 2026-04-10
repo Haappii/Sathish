@@ -23,6 +23,20 @@ from app.models.shop_details import ShopDetails
 router = APIRouter(prefix="/day-close", tags=["Day Close"])
 TAKEAWAY_TABLE_NAME = "__TAKEAWAY__"
 
+
+def _normalize_payment_mode_label(mode: str | None) -> str:
+    normalized = str(mode or "").strip().lower().replace("-", "_").replace(" ", "_")
+    mapping = {
+        "cash": "CASH",
+        "upi": "UPI",
+        "card": "CARD",
+        "gift_card": "GIFT CARD",
+        "giftcard": "GIFT CARD",
+        "wallet": "WALLET",
+    }
+    return mapping.get(normalized, str(mode or "cash").strip().upper() or "CASH")
+
+
 def parse_date(d: str) -> date:
     try:
         return datetime.strptime(d, "%Y-%m-%d").date()
@@ -158,25 +172,33 @@ def day_close_cash_summary(
     )
 
     payment_by_mode: dict[str, float] = {}
+
+    def add_payment(mode_key: str | None, amount: float):
+        amt = round(float(amount or 0), 2)
+        if amt <= 0:
+            return
+        label = _normalize_payment_mode_label(mode_key)
+        payment_by_mode[label] = round(payment_by_mode.get(label, 0.0) + amt, 2)
+
     for row in invoice_rows:
         mode = (row.payment_mode or "cash").strip().lower()
         net = float(row.total_amount or 0) - float(row.discounted_amt or 0)
         if mode == "split" and row.payment_split:
             ps = row.payment_split if isinstance(row.payment_split, dict) else {}
             for key in ("cash", "card", "upi"):
-                amt = float(ps.get(key) or 0)
-                if amt > 0:
-                    k = key.upper()
-                    payment_by_mode[k] = payment_by_mode.get(k, 0.0) + amt
+                add_payment(key, float(ps.get(key) or 0))
             gift = float(ps.get("gift_card_amount") or 0)
-            if gift > 0:
-                payment_by_mode["GIFT CARD"] = payment_by_mode.get("GIFT CARD", 0.0) + gift
+            add_payment("gift_card", gift)
             wallet = float(ps.get("wallet_amount") or 0)
-            if wallet > 0:
-                payment_by_mode["WALLET"] = payment_by_mode.get("WALLET", 0.0) + wallet
+            add_payment("wallet", wallet)
         else:
-            k = mode.upper()
-            payment_by_mode[k] = payment_by_mode.get(k, 0.0) + net
+            add_payment(mode, net)
+
+    payment_by_mode = {
+        key: round(float(value or 0), 2)
+        for key, value in payment_by_mode.items()
+        if round(float(value or 0), 2) > 0
+    }
 
     # ── Invoice summary ──────────────────────────────────────────────────────
     inv_row = (
@@ -259,6 +281,24 @@ def day_close_cash_summary(
 
     gross = float(inv_row.gross or 0) if inv_row else 0.0
     net   = round(gross - float(inv_row.discount or 0), 2) if inv_row else 0.0
+    total_amount = round(sum(payment_by_mode.values()), 2)
+    tracked_modes = {"CASH", "UPI", "CARD", "GIFT CARD", "WALLET"}
+    other_payments = round(
+        sum(amount for key, amount in payment_by_mode.items() if key not in tracked_modes),
+        2,
+    )
+    report_totals = {
+        "bill_count": int(inv_row.bill_count or 0) if inv_row else 0,
+        "total_amount": total_amount,
+        "cash": round(payment_by_mode.get("CASH", 0.0), 2),
+        "upi": round(payment_by_mode.get("UPI", 0.0), 2),
+        "card": round(payment_by_mode.get("CARD", 0.0), 2),
+        "gift_card": round(payment_by_mode.get("GIFT CARD", 0.0), 2),
+        "wallet": round(payment_by_mode.get("WALLET", 0.0), 2),
+        "other": other_payments,
+        "discount": round(float(inv_row.discount or 0), 2) if inv_row else 0.0,
+        "gst": round(float(inv_row.tax or 0), 2) if inv_row else 0.0,
+    }
 
     return {
         "date": str(d),
@@ -271,6 +311,9 @@ def day_close_cash_summary(
         "total_discount": round(float(inv_row.discount or 0), 2) if inv_row else 0.0,
         "total_tax":      round(float(inv_row.tax or 0), 2) if inv_row else 0.0,
         "net_sales":      net,
+        "total_amount":   total_amount,
+        "total_cash":     round(sales_cash, 2),
+        "report_totals":  report_totals,
         # Payment mode breakdown
         "payment_modes":  payment_by_mode,
         "cash_sales":     round(sales_cash, 2),
