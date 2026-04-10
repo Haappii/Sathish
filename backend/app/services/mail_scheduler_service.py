@@ -22,6 +22,7 @@ from openpyxl.utils import get_column_letter
 
 from app.db import SessionLocal
 from app.models.mail_scheduler import MailScheduler
+from app.models.shop_details import ShopDetails
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,10 @@ def _write_title(ws, title: str, date_str: str, col_count: int):
 
 # ─── Yesterday ───────────────────────────────────────────────────────────────
 
-def _yesterday():
-    return (datetime.now() - timedelta(days=1)).date()
+def _report_date_for_shop(db, shop_id: int):
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    base_date = shop.app_date if shop and shop.app_date else datetime.utcnow().date()
+    return base_date - timedelta(days=1)
 
 
 # ─── Report generators (return xlsx bytes) ───────────────────────────────────
@@ -115,7 +118,7 @@ def _generate_daily_sales_xlsx(db, shop_id: int) -> bytes:
     from app.models.invoice import Invoice
     from app.models.branch import Branch
 
-    d       = _yesterday()
+    d       = _report_date_for_shop(db, shop_id)
     d_start = datetime.combine(d, datetime.min.time())
     d_end   = datetime.combine(d, datetime.max.time())
 
@@ -189,7 +192,7 @@ def _generate_item_sales_xlsx(db, shop_id: int) -> bytes:
     from app.models.items import Item
     from app.models.branch import Branch
 
-    d       = _yesterday()
+    d       = _report_date_for_shop(db, shop_id)
     d_start = datetime.combine(d, datetime.min.time())
     d_end   = datetime.combine(d, datetime.max.time())
 
@@ -252,7 +255,7 @@ def _generate_gst_xlsx(db, shop_id: int) -> bytes:
     from sqlalchemy import func
     from app.models.invoice import Invoice
 
-    d       = _yesterday()
+    d       = _report_date_for_shop(db, shop_id)
     d_start = datetime.combine(d, datetime.min.time())
     d_end   = datetime.combine(d, datetime.max.time())
 
@@ -355,7 +358,7 @@ def _run_due_schedulers():
             try:
                 xlsx_bytes = gen(db, sched.shop_id)
                 label      = REPORT_LABELS.get(sched.report_type, sched.report_type)
-                date_str   = str(_yesterday())
+                date_str   = str(_report_date_for_shop(db, sched.shop_id))
                 subject    = f"{sched.name} — {label} ({date_str})"
                 filename   = f"{sched.report_type}_{date_str}.xlsx"
                 _send_report_email(sched.recipient_email, subject, xlsx_bytes, filename)
