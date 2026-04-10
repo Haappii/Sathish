@@ -11,13 +11,13 @@ const CONFIG_FILE = "config.json";
 
 function loadSharedEnv() {
   const candidates = [
-    // Bundled production defaults (lowest priority — always present in packaged app)
-    path.resolve(__dirname, "app.config.txt"),
+    // Bundled production defaults (lowest priority — only loaded from packaged app)
+    app.isPackaged ? path.resolve(__dirname, "app.config.txt") : null,
     // Outer files override for dev / self-hosted deployments (not bundled in installer)
     path.resolve(__dirname, "..", ".env"),
     path.resolve(__dirname, "..", "config.example.txt"),
     path.resolve(__dirname, "..", "config.txt"),
-  ];
+  ].filter(Boolean);
   const merged = {};
 
   for (const envPath of candidates) {
@@ -53,9 +53,11 @@ function loadSharedEnv() {
 
 loadSharedEnv();
 
-// Default URL the packaged desktop app will open if nothing else is configured.
-// Point this to the hosted frontend that talks to your backend API.
-const DEFAULT_APP_URL = process.env.APP_URL_DEFAULT || "http://localhost:5180";
+// Default URL the desktop app will open if nothing else is configured.
+// Packaged builds should default to the hosted production frontend.
+const DEFAULT_APP_URL = app.isPackaged
+  ? process.env.APP_URL_DEFAULT || "https://haappiibilling.in/"
+  : process.env.APP_URL_DEFAULT || "http://localhost:5180";
 
 function normalizeAppUrl(url) {
   if (!url) return url;

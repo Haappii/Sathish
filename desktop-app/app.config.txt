@@ -2,5 +2,5 @@
 # This file ships inside the packaged app (resources/app.asar).
 # Override by setting APP_URL in the outer config.txt or via --url= launch arg.
 #
-# Default to a local development target, and allow override via runtime config.
-APP_URL_DEFAULT=http://localhost:5180/
+# Default to the hosted production frontend for packaged builds.
+APP_URL_DEFAULT=https://haappiibilling.in/
