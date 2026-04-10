@@ -561,7 +561,6 @@ export default function Home() {
               </div>
               <span className="text-2xl opacity-30 select-none">{s.icon}</span>
             </div>
-            <div className="absolute -bottom-3 -right-3 w-16 h-16 rounded-full bg-white/10" />
           </div>
         ))}
       </div>
