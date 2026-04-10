@@ -19,6 +19,7 @@ import { useToast } from "../../components/Toast";
 import BackButton from "../../components/BackButton";
 import { getSession } from "../../utils/auth";
 import { isHotelShop } from "../../utils/shopType";
+import { setBillingTypeCache } from "../../utils/sharedLocalState";
 
 const BLUE = "#0B3C8C";
 const inputClass =
@@ -149,7 +150,7 @@ export default function Branches() {
       .then((res) => {
         const data = res.data || {};
         if (data.billing_type) {
-          localStorage.setItem("billing_type", data.billing_type.toLowerCase());
+          setBillingTypeCache(data.billing_type);
         }
         setHotelShop(isHotelShop(data));
       })

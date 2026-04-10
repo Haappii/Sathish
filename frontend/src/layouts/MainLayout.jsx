@@ -22,6 +22,8 @@ import {
   hasPendingOfflineBills,
   syncOfflineBills,
 } from "../utils/offlineBills";
+import { cacheMasterData } from "../utils/offlineCache";
+import { setBillingTypeCache } from "../utils/sharedLocalState";
 
 import {
   FaBars,
@@ -130,6 +132,107 @@ export default function MainLayout({ hideSidebar = false }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const sessionToken = session?.access_token || session?.token;
+
+    const primeBillingCache = async () => {
+      if (!navigator.onLine || !sessionToken) return;
+
+      try {
+        const shopRes = await api.get("/shop/details");
+        const shopData = shopRes?.data || {};
+        if (cancelled) return;
+        cacheMasterData({ shop: shopData });
+
+        if (branchId) {
+          try {
+            const branchRes = await api.get(`/branch/${branchId}`);
+            if (!cancelled) {
+              cacheMasterData({
+                branch: branchRes?.data || {},
+                branchId,
+              });
+            }
+          } catch {
+            // Ignore branch cache refresh failures.
+          }
+        }
+
+        try {
+          const [categoriesRes, itemsRes] = await Promise.all([
+            api.get("/category/"),
+            api.get("/items/"),
+          ]);
+
+          if (!cancelled) {
+            cacheMasterData({
+              categories: categoriesRes?.data || [],
+              items: (itemsRes?.data || []).filter((item) => !item?.is_raw_material),
+            });
+          }
+        } catch {
+          // Ignore master-data refresh failures.
+        }
+
+        try {
+          const [levelsRes, pricingRes] = await Promise.all([
+            api.get("/pricing/levels"),
+            api.get("/pricing/all"),
+          ]);
+
+          if (!cancelled) {
+            const levels = (levelsRes?.data || [])
+              .map((row) => String(row?.level || "").trim().toUpperCase())
+              .filter(Boolean);
+            const priceMap = {};
+
+            for (const row of pricingRes?.data || []) {
+              const itemId = String(row?.item_id || "");
+              const level = String(row?.level || "").trim().toUpperCase();
+              if (!itemId || !level) continue;
+              if (!priceMap[itemId]) priceMap[itemId] = {};
+              priceMap[itemId][level] = Number(row?.price || 0);
+            }
+
+            cacheMasterData({
+              priceLevels: ["BASE", ...levels],
+              priceMap,
+            });
+          }
+        } catch {
+          // Pricing is optional.
+        }
+
+        if (shopData?.inventory_enabled && branchId) {
+          try {
+            const stockRes = await api.get("/inventory/list", {
+              params: { branch_id: branchId },
+            });
+            if (!cancelled) {
+              cacheMasterData({
+                stock: stockRes?.data || [],
+                branchId,
+              });
+            }
+          } catch {
+            // Ignore stock cache refresh failures.
+          }
+        }
+      } catch {
+        // Ignore background cache warm-up failures.
+      }
+    };
+
+    primeBillingCache();
+    window.addEventListener("online", primeBillingCache);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", primeBillingCache);
+    };
+  }, [branchId, session?.access_token, session?.token]);
+
+  useEffect(() => {
     const attemptSync = async () => {
       if (!navigator.onLine) return;
       if (!hasPendingOfflineBills()) return;
@@ -152,7 +255,7 @@ export default function MainLayout({ hideSidebar = false }) {
       .then(res => {
         const data = res.data || {};
         if (data.shop_name) setShopName(data.shop_name);
-        localStorage.setItem("billing_type", (data.billing_type || "shop").toLowerCase());
+        setBillingTypeCache((data.billing_type || "shop").toLowerCase());
         setShop(data);
         if (data.app_date) {
           setSessionAndRerender((cur) => {

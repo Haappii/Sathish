@@ -5,6 +5,7 @@ import { getSession } from "../../utils/auth";
 import * as XLSX from "xlsx";
 import { API_BASE } from "../../config/api";
 import BackButton from "../../components/BackButton";
+import { setBillingTypeCache } from "../../utils/sharedLocalState";
 import {
   FaPlus, FaTrash, FaFileInvoice, FaDownload,
   FaPaperclip, FaMoneyBillWave, FaTruck,
@@ -91,7 +92,7 @@ export default function PurchaseOrders() {
     authAxios.get("/shop/details").then(res => {
       const hotel = String(res.data?.billing_type || "").toLowerCase() === "hotel";
       setIsHotel(hotel);
-      localStorage.setItem("billing_type", hotel ? "hotel" : "store");
+      setBillingTypeCache(hotel ? "hotel" : "store");
       loadItems(hotel);
     }).catch(() => {});
   }, []);

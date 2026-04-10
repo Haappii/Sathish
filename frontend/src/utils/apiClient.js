@@ -10,6 +10,9 @@ const api = axios.create({
   timeout: 20000,
 });
 
+const shouldQueueMutation = (url = "") =>
+  !/^\/auth\/(login|logout|ping|set-branch)(\/|$)/i.test(String(url || ""));
+
 /* =========================
    REQUEST INTERCEPTOR
 ========================= */
@@ -96,7 +99,7 @@ api.interceptors.response.use(
       }
 
       // Mutations: queue for replay when server comes back.
-      if (["post", "put", "delete"].includes(method)) {
+      if (["post", "put", "delete"].includes(method) && shouldQueueMutation(url)) {
         let body = null;
         try { body = error.config.data ? JSON.parse(error.config.data) : null; } catch { /* ignore */ }
         await queueMutation(method.toUpperCase(), url, body);

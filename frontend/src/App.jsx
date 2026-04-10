@@ -130,11 +130,14 @@ import FeedbackReview from "./pages/FeedbackReview";
 import { ToastProvider } from "./components/Toast";
 import api from "./utils/apiClient";
 import { getSession, startActivityTracking } from "./utils/auth";
+import { isDesktopApp } from "./utils/sharedLocalState";
 
 export default function App() {
   useEffect(() => {
     startActivityTracking();
   }, []);
+
+  const desktopApp = isDesktopApp();
 
   return (
     <ToastProvider>
@@ -142,8 +145,14 @@ export default function App() {
         <Routes>
 
           {/* PUBLIC */}
-          <Route path="/" element={<About />} />
-          <Route path="/about" element={<Navigate to="/" replace />} />
+          <Route
+            path="/"
+            element={desktopApp ? <Navigate to="/login" replace /> : <About />}
+          />
+          <Route
+            path="/about"
+            element={desktopApp ? <Navigate to="/login" replace /> : <Navigate to="/" replace />}
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/setup/onboard" element={<SetupOnboard />} />
           <Route path="/platform/login" element={<PlatformLogin />} />

@@ -18,24 +18,36 @@ const isElectron = () =>
  * Only these endpoints are snapshotted for offline use.
  */
 const SNAPSHOT_MAP = [
-  { pattern: /\/items(\/list)?(\/)?(\?.*)?$/, key: "items" },
-  { pattern: /\/category(\/list)?(\/)?(\?.*)?$/, key: "categories" },
-  { pattern: /\/tables(\/list)?/, key: "tables" },
-  { pattern: /\/customers(\/list)?/, key: "customers" },
-  { pattern: /\/branch\/scoped/, key: "branch" },
-  { pattern: /\/shop\/details/, key: "shop_details" },
-  { pattern: /\/order(\/list)?/, key: "orders" },
-  { pattern: /\/pricing\/levels/, key: "pricing_levels" },
-  { pattern: /\/pricing\/all/, key: "pricing_all" },
-  { pattern: /\/purchase-orders(\/list)?(\/)?(\?.*)?$/, key: "purchase_orders" },
-  { pattern: /\/inventory\/list/, key: "inventory" },
-  { pattern: /\/suppliers(\/list)?(\/)?(\?.*)?$/, key: "suppliers" },
+  { pattern: /^\/shop\/details\/?$/, key: "shop_details" },
+  { pattern: /^\/branch\/list\/?$/, key: "branch_list" },
+  { pattern: /^\/branch\/active\/?$/, key: "branch_active" },
+  { pattern: /^\/branch\/scoped\/?$/, key: "branch_scoped" },
+  { pattern: /^\/branch\/([^/?]+)(?:\/|$)/, key: (match) => `branch_${match[1]}` },
+  { pattern: /^\/category(?:\/list)?\/?$/, key: "categories" },
+  { pattern: /^\/items(?:\/list)?\/?$/, key: "items" },
+  { pattern: /^\/tables(?:\/list)?\/?$/, key: "tables" },
+  { pattern: /^\/tables\/branch\/([^/?]+)(?:\/|$)/, key: (match) => `tables_branch_${match[1]}` },
+  { pattern: /^\/customers(?:\/list)?\/?$/, key: "customers" },
+  { pattern: /^\/customers\/by-mobile\/([^/?]+)(?:\/|$)/, key: (match) => `customers_by_mobile_${match[1]}` },
+  { pattern: /^\/invoice\/customer\/by-mobile\/([^/?]+)(?:\/|$)/, key: (match) => `invoice_customer_by_mobile_${match[1]}` },
+  { pattern: /^\/invoice\/draft\/list\/?$/, key: "invoice_drafts" },
+  { pattern: /^\/order(?:\/list)?\/?$/, key: "orders" },
+  { pattern: /^\/pricing\/levels\/?$/, key: "pricing_levels" },
+  { pattern: /^\/pricing\/all\/?$/, key: "pricing_all" },
+  { pattern: /^\/purchase-orders(?:\/list)?\/?$/, key: "purchase_orders" },
+  { pattern: /^\/inventory\/list\/?$/, key: "inventory" },
+  { pattern: /^\/suppliers(?:\/list)?\/?$/, key: "suppliers" },
+  { pattern: /^\/permissions\/my\/?$/, key: "permissions_my" },
 ];
 
 export function getSnapshotKey(url) {
   if (!url) return null;
+  const normalized = String(url || "").split("?")[0];
   for (const { pattern, key } of SNAPSHOT_MAP) {
-    if (pattern.test(url)) return key;
+    const match = pattern.exec(normalized);
+    if (match) {
+      return typeof key === "function" ? key(match) : key;
+    }
   }
   return null;
 }

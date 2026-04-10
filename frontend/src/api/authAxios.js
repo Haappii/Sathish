@@ -1,12 +1,23 @@
 import axios from "axios";
 import { API_BASE, getApiBaseIssue } from "../config/api";
 import { clearSession, getSession } from "../utils/auth";
+import {
+  snapshotResponse,
+  getSnapshotKey,
+  readSnapshot,
+  queueMutation,
+} from "../utils/offlineStore";
+
+const shouldQueueMutation = (url = "") =>
+  !/^\/auth\/(login|logout|ping|set-branch)(\/|$)/i.test(String(url || "")) &&
+  !/^\/invoice(\/|$)/i.test(String(url || ""));
 
 const authAxios = axios.create({
-  baseURL: API_BASE
+  baseURL: API_BASE,
+  timeout: 20000,
 });
 
-authAxios.interceptors.request.use(config => {
+authAxios.interceptors.request.use((config) => {
   const apiIssue = getApiBaseIssue();
   if (apiIssue) return Promise.reject(new Error(apiIssue));
 
@@ -16,22 +27,21 @@ authAxios.interceptors.request.use(config => {
 
   const roleLower = (session?.role || "").toString().toLowerCase();
   const isAdmin = roleLower === "admin";
-  let token =
+  const token =
+    session?.access_token ||
+    session?.token ||
     localStorage.getItem("token") ||
-    localStorage.getItem("access_token");   // 👈 fallback
+    localStorage.getItem("access_token") ||
+    null;
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  } else {
-    console.warn("No token found for request:", config.url);
   }
 
-  // Only set x-branch-id from session if the caller hasn't already set it explicitly
   if (session?.branch_id && !config.headers["x-branch-id"]) {
     config.headers["x-branch-id"] = session.branch_id;
   }
 
-  // Enforce branch scope for non-admin users only.
   if (!isAdmin) {
     if (
       session?.branch_id &&
@@ -45,12 +55,49 @@ authAxios.interceptors.request.use(config => {
 });
 
 authAxios.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => {
+    if (response.config?.method === "get") {
+      snapshotResponse(response.config.url, response.data);
+    }
+    return response;
+  },
+  async (error) => {
     if (error?.response?.status === 401) {
       clearSession();
       window.location.replace("/");
+      return Promise.reject(error);
     }
+
+    if (!error.response && error.config) {
+      const method = (error.config.method || "").toLowerCase();
+      const url = error.config.url || "";
+
+      if (method === "get") {
+        const key = getSnapshotKey(url);
+        if (key) {
+          const cached = await readSnapshot(key);
+          if (cached != null) {
+            return { data: cached, status: 200, _offline: true };
+          }
+        }
+      }
+
+      if (["post", "put", "delete"].includes(method) && shouldQueueMutation(url)) {
+        let body = null;
+        try {
+          body = error.config.data ? JSON.parse(error.config.data) : null;
+        } catch {
+          body = null;
+        }
+        await queueMutation(method.toUpperCase(), url, body);
+        const offlineErr = new Error(
+          "You are offline. This action will sync when reconnected."
+        );
+        offlineErr.offline = true;
+        return Promise.reject(offlineErr);
+      }
+    }
+
     return Promise.reject(error);
   }
 );
