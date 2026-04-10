@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import and_, func
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 
@@ -13,7 +13,7 @@ from app.models.date_wise_stock import DateWiseStock
 from app.models.invoice import Invoice
 from app.models.branch_expense import BranchExpense
 from app.models.sales_return import SalesReturn
-from app.models.cash_drawer import CashShift
+from app.models.cash_drawer import CashMovement, CashShift
 from app.models.employee import EmployeeWagePayment
 from app.services.financials_service import calc_day_close_totals
 from app.utils.permissions import require_permission
@@ -113,6 +113,32 @@ def day_close_cash_summary(
         .first()
     )
     opening_balance = float(shift.opening_cash or 0) if shift else 0.0
+
+    mov_row = (
+        db.query(
+            func.coalesce(
+                func.sum(
+                    case((CashMovement.movement_type == "IN", CashMovement.amount), else_=0)
+                ),
+                0,
+            ).label("cash_top_up"),
+            func.coalesce(
+                func.sum(
+                    case((CashMovement.movement_type == "OUT", CashMovement.amount), else_=0)
+                ),
+                0,
+            ).label("cash_withdrawal"),
+        )
+        .filter(
+            CashMovement.shop_id == shop_id,
+            CashMovement.branch_id == branch_id,
+            CashMovement.created_at >= d_start,
+            CashMovement.created_at <= d_end,
+        )
+        .first()
+    )
+    cash_top_up = float(getattr(mov_row, "cash_top_up", 0) or 0)
+    cash_withdrawal = float(getattr(mov_row, "cash_withdrawal", 0) or 0)
 
     # ── Invoice payment mode breakdown ───────────────────────────────────────
     invoice_rows = (
@@ -225,8 +251,10 @@ def day_close_cash_summary(
     cash_wages = float(wage_rows.total or 0) if wage_rows else 0.0
 
     # ── Final cash position ───────────────────────────────────────────────────
-    cash_in     = payment_by_mode.get("CASH", 0.0)
-    cash_out    = round(return_cash + cash_expense + cash_wages, 2)
+    sales_cash = payment_by_mode.get("CASH", 0.0)
+    operational_cash_out = round(return_cash + cash_expense + cash_wages, 2)
+    cash_in     = round(sales_cash + cash_top_up, 2)
+    cash_out    = round(operational_cash_out + cash_withdrawal, 2)
     system_cash = round(opening_balance + cash_in - cash_out, 2)
 
     gross = float(inv_row.gross or 0) if inv_row else 0.0
@@ -245,6 +273,8 @@ def day_close_cash_summary(
         "net_sales":      net,
         # Payment mode breakdown
         "payment_modes":  payment_by_mode,
+        "cash_sales":     round(sales_cash, 2),
+        "cash_top_up":    round(cash_top_up, 2),
         "cash_in":        round(cash_in, 2),
         # Cash out breakdown
         "return_count":   int(ret_row.return_count or 0) if ret_row else 0,
@@ -252,6 +282,8 @@ def day_close_cash_summary(
         "expenses":       expenses,
         "cash_expense":   round(cash_expense, 2),
         "cash_wages":     round(cash_wages, 2),
+        "operational_cash_out": round(operational_cash_out, 2),
+        "cash_withdrawal": round(cash_withdrawal, 2),
         "cash_out":       cash_out,
         # Net
         "system_cash":    system_cash,

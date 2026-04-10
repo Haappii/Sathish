@@ -205,9 +205,13 @@ def _compute_expected_cash(
         "opening_cash": opening,
         "cash_in": cash_in,
         "cash_out": cash_out,
+        "cash_top_up": cash_in,
+        "cash_withdrawal": cash_out,
         "cash_sales": cash_sales,
         "cash_collections": cash_collections,
         "cash_refunds": cash_refunds,
+        "total_cash_in": float(Decimal(str(cash_in + cash_sales + cash_collections)).quantize(Decimal("0.01"))),
+        "total_cash_out": float(Decimal(str(cash_out + cash_refunds)).quantize(Decimal("0.01"))),
         "expected_cash": float(Decimal(str(expected)).quantize(Decimal("0.01"))),
     }
 

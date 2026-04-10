@@ -19,6 +19,7 @@ import {
   FaCodeBranch,
   FaFileExcel,
   FaEnvelope,
+  FaCashRegister,
 } from "react-icons/fa";
 import api from "../utils/apiClient";
 import { getSession, isHeadOfficeBranch } from "../utils/auth";
@@ -183,6 +184,13 @@ export default function Setup() {
       desc: "Schedule automated daily report emails",
       icon: FaEnvelope,
       color: "text-blue-700",
+    },
+    {
+      title: "Cash Denominations",
+      link: "/setup/cash-denominations",
+      desc: "Configure note and coin denominations for cash counting",
+      icon: FaCashRegister,
+      color: "text-emerald-600",
     },
   ];
 

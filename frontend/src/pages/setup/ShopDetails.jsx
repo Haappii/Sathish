@@ -5,6 +5,11 @@ import { getSession, setSession } from "../../utils/auth";
 import defaultLogo from "../../assets/logo.png";
 import { getShopLogoUrl } from "../../utils/shopLogo";
 import BackButton from "../../components/BackButton";
+import {
+  DEFAULT_CASH_DENOMINATIONS,
+  formatCashDenomination,
+  normalizeCashDenominations,
+} from "../../utils/cashDenominations";
 
 const ONLINE_ORDER_FIELDS = [
   "swiggy_partner_id","zomato_partner_id","swiggy_enabled","zomato_enabled",
@@ -20,12 +25,14 @@ export default function ShopDetails() {
   const session = getSession();
   const fileRef = useRef();
 
-  const userRole = session?.role || "User";
-  const isSuperAdmin = userRole === "Admin";
+  const userRole = session?.role || session?.role_name || "User";
+  const normalizedRole = String(userRole || "").trim().toLowerCase();
+  const isSuperAdmin = normalizedRole === "admin" || normalizedRole === "super admin";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState([]);
+  const [newDenomination, setNewDenomination] = useState("");
 
   const [form, setForm] = useState({
     shop_id: "", shop_name: "", owner_name: "", mobile: "", mailid: "",
@@ -37,6 +44,7 @@ export default function ShopDetails() {
     gst_enabled: false, gst_percent: 0, gst_mode: "inclusive",
     inventory_enabled: false, inventory_cost_method: "LAST",
     items_branch_wise: false,
+    cash_denominations: [...DEFAULT_CASH_DENOMINATIONS],
   });
 
   const [logoFile, setLogoFile] = useState(null);
@@ -57,7 +65,13 @@ export default function ShopDetails() {
     ])
       .then(([shopRes, branchRes]) => {
         if (!mounted) return;
-        if (shopRes?.data) setForm(f => ({ ...f, ...shopRes.data }));
+        if (shopRes?.data) {
+          setForm((f) => ({
+            ...f,
+            ...shopRes.data,
+            cash_denominations: normalizeCashDenominations(shopRes.data?.cash_denominations),
+          }));
+        }
         setBranches(Array.isArray(branchRes?.data) ? branchRes.data : []);
       })
       .catch(() => showToast("Failed to load shop details", "error"))
@@ -66,6 +80,34 @@ export default function ShopDetails() {
   }, [showToast]);
 
   const setField = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+
+  const addDenomination = () => {
+    const value = Number(newDenomination);
+    if (!Number.isFinite(value) || value <= 0) {
+      showToast("Enter a valid denomination value", "error");
+      return;
+    }
+    setField(
+      "cash_denominations",
+      normalizeCashDenominations([...(form.cash_denominations || []), value])
+    );
+    setNewDenomination("");
+  };
+
+  const removeDenomination = (value) => {
+    if ((form.cash_denominations || []).length <= 1) {
+      showToast("Keep at least one denomination", "error");
+      return;
+    }
+    const remaining = (form.cash_denominations || []).filter(
+      (item) => Number(item) !== Number(value)
+    );
+    setField("cash_denominations", remaining);
+  };
+
+  const resetDenominations = () => {
+    setField("cash_denominations", [...DEFAULT_CASH_DENOMINATIONS]);
+  };
 
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0] || null;
@@ -431,6 +473,68 @@ export default function ShopDetails() {
                 </div>
               </div>
             )}
+          </Card>
+
+          <Card title="Cash Drawer" subtitle="Configure denominations for cash counting">
+            {!isSuperAdmin && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                <span>âš ï¸</span> Only Admin can change denomination settings.
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {normalizeCashDenominations(form.cash_denominations).map((value) => (
+                  <div
+                    key={String(value)}
+                    className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700"
+                  >
+                    <span>₹{formatCashDenomination(value)}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeDenomination(value)}
+                      disabled={!isSuperAdmin || (form.cash_denominations || []).length <= 1}
+                      className="rounded-full border border-blue-200 bg-white px-1.5 text-[11px] leading-5 text-blue-700 disabled:opacity-40"
+                      title="Remove denomination"
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+                <Input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={newDenomination}
+                  onChange={(e) => setNewDenomination(e.target.value)}
+                  placeholder="Add denomination"
+                  disabled={!isSuperAdmin}
+                />
+                <button
+                  type="button"
+                  onClick={addDenomination}
+                  disabled={!isSuperAdmin}
+                  className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-40"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={resetDenominations}
+                  disabled={!isSuperAdmin}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-600 disabled:opacity-40"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                These denominations are used in Cash Drawer and Day Close cash counting. Add or remove values to match your counter setup.
+              </p>
+            </div>
           </Card>
 
         </div>

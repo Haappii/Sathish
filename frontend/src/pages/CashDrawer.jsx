@@ -1,436 +1,626 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
+import { useCallback, useEffect, useState } from "react";
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
-import { modulesToPermMap } from "../utils/navigationMenu";
+import BackButton from "../components/BackButton";
+import {
+  buildDenominationCounts,
+  calcDenominationTotal,
+  formatCashDenomination,
+  normalizeCashDenominations,
+  DEFAULT_CASH_DENOMINATIONS,
+} from "../utils/cashDenominations";
+import {
+  FaCashRegister, FaArrowUp, FaArrowDown,
+  FaLock, FaUnlock, FaHistory,
+} from "react-icons/fa";
+import { MdOutlineAdd, MdOutlineRemove } from "react-icons/md";
 
-const DENOMS = ["2000", "500", "200", "100", "50", "20", "10", "5", "2", "1"];
+const BLUE = "#0B3C8C";
+const GREEN = "#059669";
+const RED = "#dc2626";
 
-const calcDenomTotal = (counts) => {
-  let total = 0;
-  for (const d of DENOMS) {
-    const c = Number(counts?.[d] || 0);
-    total += Number(d) * (Number.isFinite(c) ? c : 0);
-  }
-  return total;
+const fmt = (n) =>
+  "₹" + Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const fmtTime = (dt) => {
+  if (!dt) return "";
+  return new Date(dt).toLocaleString("en-IN", {
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+  });
 };
 
-const inputCls = "border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none focus:border-blue-400 focus:bg-white transition w-full";
-const labelCls = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";
-
 export default function CashDrawer() {
-  const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [allowed, setAllowed] = useState(null);
-  const [canWrite, setCanWrite] = useState(false);
-
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState({ shift: null, movements: [], summary: null });
+  const [actionLoading, setActionLoading] = useState(false);
+  const [shift, setShift] = useState(null);
+  const [movements, setMovements] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [denominations, setDenominations] = useState(DEFAULT_CASH_DENOMINATIONS);
 
-  const [openForm, setOpenForm] = useState({ opening_cash: "", opening_notes: "" });
-  const [moveForm, setMoveForm] = useState({ movement_type: "IN", amount: "", reason: "" });
-  const [closeForm, setCloseForm] = useState({ closing_notes: "" });
-  const [denoms, setDenoms] = useState(() =>
-    Object.fromEntries(DENOMS.map((d) => [d, ""]))
-  );
+  // modal: null | "open" | "topup" | "withdrawal" | "close"
+  const [modal, setModal] = useState(null);
 
-  const denomTotal = useMemo(() => calcDenomTotal(denoms), [denoms]);
+  // open-shift form
+  const [openingCash, setOpeningCash] = useState("");
 
-  useEffect(() => {
-    authAxios
-      .get("/permissions/my")
-      .then((r) => {
-        const map = modulesToPermMap(r?.data?.modules);
-        setAllowed(Boolean(map?.cash_drawer?.can_read));
-        setCanWrite(Boolean(map?.cash_drawer?.can_write));
-      })
-      .catch(() => {
-        setAllowed(false);
-        setCanWrite(false);
-      });
-  }, []);
+  // movement form
+  const [movAmount, setMovAmount] = useState("");
+  const [movReason, setMovReason] = useState("");
 
-  const load = async () => {
+  // close-shift form
+  const [denomCounts, setDenomCounts] = useState({});
+  const [closingNotes, setClosingNotes] = useState("");
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await authAxios.get("/cash-drawer/current");
-      setData(res.data || { shift: null, movements: [], summary: null });
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to load cash drawer", "error");
+      const [shiftRes, shopRes] = await Promise.all([
+        authAxios.get("/cash-drawer/current"),
+        authAxios.get("/shop/details").catch(() => ({ data: {} })),
+      ]);
+      const data = shiftRes.data || {};
+      setShift(data.shift || null);
+      setMovements(data.movements || []);
+      setSummary(data.summary || null);
+      setDenominations(normalizeCashDenominations(shopRes.data?.cash_denominations));
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to load cash drawer", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  useEffect(() => {
-    if (!allowed) return;
-    load();
-  }, [allowed]);
+  useEffect(() => { load(); }, [load]);
 
-  const openShift = async () => {
-    if (!canWrite) return showToast("Not allowed", "error");
-    const amt = Number(openForm.opening_cash || 0);
-    if (amt < 0) return showToast("Opening cash must be >= 0", "error");
-    if (amt > 9999999.99) return showToast("Amount exceeds maximum limit", "error");
-    try {
-      await authAxios.post("/cash-drawer/open", {
-        opening_cash: amt,
-        opening_notes: openForm.opening_notes || undefined,
-      });
-      setOpenForm({ opening_cash: "", opening_notes: "" });
-      showToast("Shift opened", "success");
-      load();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to open shift", "error");
+  const openModal = (type) => {
+    setMovAmount("");
+    setMovReason("");
+    setOpeningCash("");
+    if (type === "close") {
+      setDenomCounts(buildDenominationCounts(denominations));
+      setClosingNotes("");
     }
+    setModal(type);
+  };
+  const closeModal = () => setModal(null);
+
+  /* ── Actions ─────────────────────────────────────────────────── */
+
+  const handleOpenShift = async () => {
+    const amt = parseFloat(openingCash);
+    if (isNaN(amt) || amt < 0) {
+      showToast("Enter a valid opening cash amount (0 or more)", "error");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await authAxios.post("/cash-drawer/open", { opening_cash: amt });
+      closeModal();
+      showToast("Shift opened", "success");
+      await load();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to open shift", "error");
+    } finally { setActionLoading(false); }
   };
 
-  const addMovement = async () => {
-    if (!canWrite) return showToast("Not allowed", "error");
-    const amt = Number(moveForm.amount || 0);
-    if (!amt || amt <= 0) return showToast("Enter amount", "error");
-    if (amt > 9999999.99) return showToast("Amount exceeds maximum limit", "error");
-    const cleanAmt = Math.round(amt * 100) / 100; // Fix float precision
+  const handleMovement = async (movType) => {
+    const amt = parseFloat(movAmount);
+    if (isNaN(amt) || amt <= 0) {
+      showToast("Enter a valid amount greater than 0", "error");
+      return;
+    }
+    setActionLoading(true);
     try {
       await authAxios.post("/cash-drawer/movement", {
-        movement_type: moveForm.movement_type,
-        amount: cleanAmt,
-        reason: moveForm.reason || undefined,
+        movement_type: movType,
+        amount: amt,
+        reason: movReason.trim() || null,
       });
-      setMoveForm({ movement_type: "IN", amount: "", reason: "" });
-      showToast("Saved", "success");
-      load();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to save", "error");
-    }
+      closeModal();
+      showToast(movType === "IN" ? "Cash top-up recorded" : "Cash withdrawal recorded", "success");
+      await load();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to record movement", "error");
+    } finally { setActionLoading(false); }
   };
 
-  const closeShift = async () => {
-    if (!canWrite) return showToast("Not allowed", "error");
-    
-    // Validate that at least one denomination is provided
-    const denomTotal2 = calcDenomTotal(denoms);
-    if (denomTotal2 <= 0) {
-      return showToast("Please enter denomination counts", "error");
+  const denomTotal = calcDenominationTotal(denominations, denomCounts);
+  const expectedCash = Number(summary?.expected_cash || 0);
+  const closingDiff = denomTotal - expectedCash;
+
+  const handleCloseShift = async () => {
+    const denoms = normalizeCashDenominations(denominations);
+    const hasInput = denoms.some(
+      (d) => Number(denomCounts[formatCashDenomination(d)] || 0) > 0
+    );
+    if (!hasInput) {
+      showToast("Enter at least one denomination count before closing", "error");
+      return;
     }
-    
-    // Validate variance is acceptable
-    const variance = denomTotal2 - Number(summary?.expected_cash || 0);
-    if (Math.abs(variance) > 1000) {
-      const confirmed = window.confirm(
-        `Large variance detected: ₹${variance.toFixed(2)}\nDo you want to close the shift anyway?`
-      );
-      if (!confirmed) return;
-    }
-    
+    setActionLoading(true);
     try {
-      const denomCounts = Object.fromEntries(
-        DENOMS.map((d) => [d, Number(denoms?.[d] || 0)])
-      );
-      const response = await authAxios.post("/cash-drawer/close", {
-        denomination_counts: denomCounts,
-        closing_notes: closeForm.closing_notes || undefined,
+      const counts = {};
+      denoms.forEach((denom) => {
+        const key = formatCashDenomination(denom);
+        const val = Number(denomCounts[key] || 0);
+        if (val > 0) counts[key] = val;
       });
-      
-      const closedShift = response.data;
-      const finalVariance = Number(closedShift.diff_cash || 0);
-      const varianceMsg = `Shift closed. Variance: ₹${finalVariance.toFixed(2)} ${finalVariance >= 0 ? "(+)" : "(-)" }`;
-      
-      setCloseForm({ closing_notes: "" });
-      setDenoms(Object.fromEntries(DENOMS.map((d) => [d, ""])));
-      showToast(varianceMsg, finalVariance >= -10 ? "success" : "warning");
-      load();
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to close shift", "error");
-    }
+      await authAxios.post("/cash-drawer/close", {
+        denomination_counts: counts,
+        closing_notes: closingNotes.trim() || null,
+      });
+      closeModal();
+      showToast("Shift closed successfully", "success");
+      await load();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to close shift", "error");
+    } finally { setActionLoading(false); }
   };
 
-  if (allowed === null) {
+  /* ── Render ─────────────────────────────────────────────────── */
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-500">Loading...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-[3px] border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+          <span className="text-sm text-slate-400">Loading cash drawer…</span>
+        </div>
       </div>
     );
   }
 
-  if (!allowed) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-sm text-red-500 font-medium">You are not authorized to access this page</p>
-      </div>
-    );
-  }
-
-  const shift = data?.shift || null;
-  const movements = data?.movements || [];
-  const summary = data?.summary || null;
+  const isOpen = shift?.status === "OPEN";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b px-4 sm:px-6 py-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate("/home", { replace: true })}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
-        >
-          ← Back
-        </button>
-        <div className="flex-1">
-          <h1 className="text-base font-bold text-gray-800">Cash Drawer</h1>
-          <p className="text-[11px] text-gray-400">
-            {shift ? (
-              <span className="text-emerald-600 font-semibold">Shift Open · since {new Date(shift.opened_at).toLocaleTimeString()}</span>
-            ) : (
-              "No active shift"
-            )}
-          </p>
-        </div>
-        <button
-          onClick={load}
-          className="px-4 py-1.5 rounded-xl border text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="px-4 sm:px-6 py-4 space-y-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-40 text-sm text-gray-400">Loading...</div>
-        ) : !shift ? (
-          /* Open Shift */
-          <div className="bg-white border rounded-2xl shadow-sm p-5 max-w-md">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Open New Shift</p>
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className={labelCls}>Opening Cash</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="9999999.99"
-                  className={inputCls}
-                  placeholder="0.00"
-                  value={openForm.opening_cash}
-                  onChange={(e) => setOpenForm({ ...openForm, opening_cash: e.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className={labelCls}>Notes (optional)</label>
-                <input
-                  className={inputCls}
-                  placeholder="Opening notes..."
-                  value={openForm.opening_notes}
-                  onChange={(e) => setOpenForm({ ...openForm, opening_notes: e.target.value })}
-                />
-              </div>
-              <button
-                onClick={openShift}
-                disabled={!canWrite}
-                className="w-full px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-semibold transition disabled:opacity-60"
-              >
-                Open Shift
-              </button>
+      <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${BLUE}15` }}>
+              <FaCashRegister size={16} style={{ color: BLUE }} />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-800">Cash Drawer</h1>
+              <p className="text-xs text-slate-500">Manage cash shifts and movements</p>
             </div>
           </div>
-        ) : (
+          {/* Status badge */}
+          <span className={`ml-auto px-3 py-1 rounded-full text-xs font-bold ${isOpen ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+            {isOpen ? "● OPEN" : "○ CLOSED"}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-5 max-w-3xl mx-auto space-y-5">
+
+        {/* ── No Shift ── */}
+        {!isOpen && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: `${BLUE}12` }}>
+              <FaUnlock size={24} style={{ color: BLUE }} />
+            </div>
+            <div>
+              <p className="text-base font-bold text-slate-800">No open shift</p>
+              <p className="text-sm text-slate-500 mt-1">Open a shift to start recording cash transactions</p>
+            </div>
+            <button
+              onClick={() => openModal("open")}
+              className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm hover:opacity-90 transition"
+              style={{ background: GREEN }}
+            >
+              Open Shift
+            </button>
+            {shift && (
+              <p className="text-xs text-slate-400">Last shift closed: {fmtTime(shift.closed_at)}</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Open Shift ── */}
+        {isOpen && summary && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Current Shift Summary */}
-              <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-3">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Current Shift</p>
-                <div className="space-y-2 text-[12px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Status</span>
-                    <span className="font-semibold text-emerald-600">{shift.status}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Opened</span>
-                    <span className="font-semibold text-gray-800">{new Date(shift.opened_at).toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Opening Cash</span>
-                    <span className="font-semibold text-gray-800">₹{Number(shift.opening_cash || 0).toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {summary && (
-                  <div className="border-t pt-3 space-y-2 text-[12px]">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Expected Cash</p>
-                    {[
-                      { label: "Cash Sales", val: summary.cash_sales, color: "text-gray-800" },
-                      { label: "Collections", val: summary.cash_collections, color: "text-gray-800" },
-                      { label: "Cash In", val: summary.cash_in, color: "text-emerald-600" },
-                      { label: "Cash Out", val: summary.cash_out, color: "text-rose-600" },
-                      { label: "Refunds", val: summary.cash_refunds, color: "text-amber-600" },
-                    ].map(({ label, val, color }) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <span className="text-gray-500">{label}</span>
-                        <span className={`font-semibold ${color}`}>₹{Number(val || 0).toFixed(2)}</span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between border-t pt-2 mt-1">
-                      <span className="font-bold text-gray-700">Expected</span>
-                      <span className="font-bold text-gray-900">₹{Number(summary.expected_cash || 0).toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Cash In / Out */}
-              <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-3">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Cash In / Out</p>
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>Movement Type</label>
-                    <div className="flex gap-2">
-                      {["IN", "OUT"].map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setMoveForm({ ...moveForm, movement_type: t })}
-                          className={`flex-1 py-1.5 rounded-xl text-[12px] font-semibold border transition ${
-                            moveForm.movement_type === t
-                              ? t === "IN"
-                                ? "bg-emerald-600 text-white border-emerald-600"
-                                : "bg-rose-600 text-white border-rose-600"
-                              : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                          }`}
-                        >
-                          {t === "IN" ? "Cash In" : "Cash Out"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>Amount</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      max="9999999.99"
-                      className={inputCls}
-                      placeholder="0.00"
-                      value={moveForm.amount}
-                      onChange={(e) => setMoveForm({ ...moveForm, amount: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>Reason (optional)</label>
-                    <input
-                      className={inputCls}
-                      placeholder="Reason..."
-                      value={moveForm.reason}
-                      onChange={(e) => setMoveForm({ ...moveForm, reason: e.target.value })}
-                    />
-                  </div>
-                  <button
-                    onClick={addMovement}
-                    disabled={!canWrite}
-                    className="w-full px-4 py-2 rounded-xl text-white text-[12px] font-semibold transition disabled:opacity-60"
-                    style={{ backgroundColor: "#0B3C8C" }}
-                  >
-                    Save Movement
-                  </button>
-                </div>
-              </div>
-
-              {/* Close Shift */}
-              <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-3">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Close Shift — Denomination Count</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {DENOMS.map((d) => (
-                    <div key={d} className="flex items-center gap-2">
-                      <span className="w-10 text-[11px] font-semibold text-gray-600 flex-shrink-0">₹{d}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="999999"
-                        className="border border-gray-200 rounded-xl px-2 py-1 text-[12px] bg-gray-50 focus:outline-none w-full"
-                        placeholder="0"
-                        value={denoms?.[d] ?? ""}
-                        onChange={(e) => setDenoms({ ...denoms, [d]: e.target.value })}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between text-[12px] bg-gray-50 rounded-xl px-3 py-2">
-                  <span className="text-gray-600">Actual Cash</span>
-                  <span className="font-bold text-gray-800">₹{Number(denomTotal || 0).toFixed(2)}</span>
-                </div>
-                {summary && (
-                  <div className="flex items-center justify-between text-[12px] bg-amber-50 rounded-xl px-3 py-2">
-                    <span className="text-amber-700">Variance</span>
-                    <span className={`font-bold ${denomTotal - Number(summary.expected_cash || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                      ₹{(denomTotal - Number(summary.expected_cash || 0)).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col gap-1">
-                  <label className={labelCls}>Closing Notes (optional)</label>
-                  <textarea
-                    className="border border-gray-200 rounded-xl px-3 py-1.5 text-[12px] bg-gray-50 focus:outline-none w-full resize-none"
-                    placeholder="Notes..."
-                    rows={2}
-                    value={closeForm.closing_notes}
-                    onChange={(e) => setCloseForm({ closing_notes: e.target.value })}
-                  />
+            {/* Shift Info + Action Buttons */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Current Shift</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Opened: {fmtTime(shift.opened_at)}</p>
                 </div>
                 <button
-                  onClick={closeShift}
-                  disabled={!canWrite}
-                  className="w-full px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[12px] font-semibold transition disabled:opacity-60"
+                  onClick={() => openModal("close")}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-sm hover:opacity-90 transition"
+                  style={{ background: RED }}
                 >
+                  <FaLock size={11} />
                   Close Shift
+                </button>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <SummaryCard label="Opening Cash" value={fmt(summary.opening_cash)} />
+                <SummaryCard label="Cash Sales" value={fmt(summary.cash_sales)} color="emerald" />
+                <SummaryCard label="Collections" value={fmt(summary.cash_collections)} color="emerald" />
+                <SummaryCard label="Cash Top-Up" value={fmt(summary.cash_top_up)} color="blue" />
+                <SummaryCard label="Cash Withdrawal" value={fmt(summary.cash_withdrawal)} color="rose" />
+                <SummaryCard label="Cash Refunds" value={fmt(summary.cash_refunds)} color="rose" />
+              </div>
+
+              {/* Expected Cash */}
+              <div className="mx-4 mb-4 px-4 py-3 rounded-xl flex items-center justify-between"
+                style={{ background: `${BLUE}08`, border: `1.5px solid ${BLUE}25` }}>
+                <div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Expected Cash in Drawer</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Opening + Sales + Top-Up + Collections − Refunds − Withdrawal</p>
+                </div>
+                <span className="text-xl font-bold" style={{ color: BLUE }}>{fmt(summary.expected_cash)}</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => openModal("topup")}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold shadow-sm hover:opacity-90 transition"
+                  style={{ background: GREEN }}
+                >
+                  <MdOutlineAdd size={18} />
+                  Cash Top-Up
+                </button>
+                <button
+                  onClick={() => openModal("withdrawal")}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold shadow-sm hover:opacity-90 transition"
+                  style={{ background: "#b45309" }}
+                >
+                  <MdOutlineRemove size={18} />
+                  Cash Withdrawal
                 </button>
               </div>
             </div>
 
-            {/* Movements Table */}
-            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Movements · {movements.length}</p>
+            {/* Movement History */}
+            {movements.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
+                  <FaHistory size={13} style={{ color: BLUE }} />
+                  <p className="text-sm font-bold text-slate-800">Movement History</p>
+                  <span className="ml-auto text-xs text-slate-400">{movements.length} record{movements.length !== 1 ? "s" : ""}</span>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {movements.map((m) => (
+                    <div key={m.movement_id} className="flex items-center justify-between px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${m.movement_type === "IN" ? "bg-emerald-50" : "bg-amber-50"}`}>
+                          {m.movement_type === "IN"
+                            ? <FaArrowDown size={12} className="text-emerald-600" />
+                            : <FaArrowUp size={12} className="text-amber-600" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-700">
+                            {m.movement_type === "IN" ? "Top-Up" : "Withdrawal"}
+                          </p>
+                          {m.reason && <p className="text-xs text-slate-400">{m.reason}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-bold ${m.movement_type === "IN" ? "text-emerald-600" : "text-amber-700"}`}>
+                          {m.movement_type === "IN" ? "+" : "−"}{fmt(m.amount)}
+                        </p>
+                        <p className="text-[11px] text-slate-400">{fmtTime(m.created_at)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              {movements.length === 0 ? (
-                <div className="flex items-center justify-center h-24">
-                  <p className="text-[12px] text-gray-400">No movements this shift</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-[600px] w-full text-[12px]">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Type</th>
-                        <th className="px-4 py-2.5 text-right font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount</th>
-                        <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Reason</th>
-                        <th className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {movements.map((m, idx) => (
-                        <tr key={m.movement_id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold ${
-                              m.movement_type === "IN"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-rose-50 text-rose-700"
-                            }`}>
-                              {m.movement_type === "IN" ? "↑ IN" : "↓ OUT"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-bold text-gray-800">₹{Number(m.amount || 0).toFixed(2)}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{m.reason || "—"}</td>
-                          <td className="px-4 py-2.5 text-gray-500">
-                            {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            )}
           </>
         )}
+      </div>
+
+      {/* ════ MODALS ════ */}
+
+      {/* Open Shift Modal */}
+      {modal === "open" && (
+        <Modal title="Open Cash Shift" onClose={closeModal}>
+          <p className="text-xs text-slate-500">Enter the opening cash amount already in the drawer.</p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600">Opening Cash (₹)</label>
+            <input
+              type="number" min="0" step="0.01"
+              value={openingCash}
+              onChange={(e) => setOpeningCash(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleOpenShift()}
+              placeholder="0.00"
+              autoFocus
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button onClick={closeModal}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+              Cancel
+            </button>
+            <button onClick={handleOpenShift} disabled={actionLoading}
+              className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+              style={{ background: GREEN }}>
+              {actionLoading ? "Opening…" : "Open Shift"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Top-Up Modal */}
+      {modal === "topup" && (
+        <Modal title="Cash Top-Up" onClose={closeModal}>
+          <p className="text-xs text-slate-500">Record cash added into the drawer (e.g. petty cash replenishment).</p>
+          <MovementForm
+            amount={movAmount} setAmount={setMovAmount}
+            reason={movReason} setReason={setMovReason}
+            amountLabel="Top-Up Amount (₹)"
+            reasonPlaceholder="e.g. Petty cash refill"
+          />
+          <div className="flex gap-3 pt-1">
+            <button onClick={closeModal}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+              Cancel
+            </button>
+            <button onClick={() => handleMovement("IN")} disabled={actionLoading}
+              className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+              style={{ background: GREEN }}>
+              {actionLoading ? "Saving…" : "Add Top-Up"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Withdrawal Modal */}
+      {modal === "withdrawal" && (
+        <Modal title="Cash Withdrawal" onClose={closeModal}>
+          <p className="text-xs text-slate-500">Record cash removed from the drawer (e.g. deposited to bank, given to manager).</p>
+          <MovementForm
+            amount={movAmount} setAmount={setMovAmount}
+            reason={movReason} setReason={setMovReason}
+            amountLabel="Withdrawal Amount (₹)"
+            reasonPlaceholder="e.g. Bank deposit, Manager collection"
+          />
+          <div className="flex gap-3 pt-1">
+            <button onClick={closeModal}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+              Cancel
+            </button>
+            <button onClick={() => handleMovement("OUT")} disabled={actionLoading}
+              className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+              style={{ background: "#b45309" }}>
+              {actionLoading ? "Saving…" : "Record Withdrawal"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Close Shift Modal */}
+      {modal === "close" && (
+        <ClosingModal
+          denominations={denominations}
+          denomCounts={denomCounts}
+          setDenomCounts={setDenomCounts}
+          denomTotal={denomTotal}
+          expectedCash={expectedCash}
+          closingDiff={closingDiff}
+          closingNotes={closingNotes}
+          setClosingNotes={setClosingNotes}
+          summary={summary}
+          onClose={closeModal}
+          onConfirm={handleCloseShift}
+          loading={actionLoading}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Sub-components ──────────────────────────────────────────────── */
+
+function SummaryCard({ label, value, color }) {
+  const colorMap = {
+    emerald: "text-emerald-700 bg-emerald-50 border-emerald-100",
+    rose: "text-rose-600 bg-rose-50 border-rose-100",
+    blue: "text-blue-700 bg-blue-50 border-blue-100",
+  };
+  const cls = colorMap[color] || "text-slate-700 bg-slate-50 border-slate-100";
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${cls}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{label}</p>
+      <p className="text-sm font-bold mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function MovementForm({ amount, setAmount, reason, setReason, amountLabel, reasonPlaceholder }) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-slate-600">{amountLabel}</label>
+        <input
+          type="number" min="0.01" step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          autoFocus
+          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-slate-600">Reason (optional)</label>
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={reasonPlaceholder}
+          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+        />
+      </div>
+    </div>
+  );
+}
+
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">{title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition text-xl leading-none">×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ClosingModal({
+  denominations, denomCounts, setDenomCounts,
+  denomTotal, expectedCash, closingDiff,
+  closingNotes, setClosingNotes,
+  summary, onClose, onConfirm, loading,
+}) {
+  const denoms = normalizeCashDenominations(denominations);
+  const diff = closingDiff;
+  const hasCounts = denoms.some((d) => Number(denomCounts[formatCashDenomination(d)] || 0) > 0);
+
+  const setCount = (key, val) => {
+    const n = parseInt(val, 10);
+    setDenomCounts((prev) => ({ ...prev, [key]: isNaN(n) || n < 0 ? "" : String(n) }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-base font-bold text-slate-800">Close Shift — Cash Count</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
+
+          {/* Mini summary: top-up and withdrawal */}
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-center">
+              <p className="text-emerald-600 font-semibold">Top-Ups</p>
+              <p className="text-emerald-700 font-bold text-sm mt-0.5">+{"₹"}{Number(summary?.cash_top_up || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-center">
+              <p className="text-amber-600 font-semibold">Withdrawals</p>
+              <p className="text-amber-700 font-bold text-sm mt-0.5">−{"₹"}{Number(summary?.cash_withdrawal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
+          {/* Expected */}
+          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
+            <span className="text-xs font-semibold text-blue-700">Expected Cash</span>
+            <span className="text-sm font-bold text-blue-800">₹{Number(expectedCash).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+
+          {/* Denomination grid */}
+          <div>
+            <p className="text-xs font-bold text-slate-700 mb-2">Enter Denomination Counts</p>
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                <span>Denomination</span>
+                <span className="text-center">Count</span>
+                <span className="text-right">Amount</span>
+              </div>
+              {denoms.map((denom) => {
+                const key = formatCashDenomination(denom);
+                const cnt = Number(denomCounts[key] || 0);
+                const subtotal = denom * cnt;
+                return (
+                  <div key={key} className="grid grid-cols-3 items-center px-3 py-1.5 border-b border-slate-100 last:border-0">
+                    <span className="text-sm font-semibold text-slate-700">₹{key}</span>
+                    <div className="flex justify-center">
+                      <input
+                        type="number"
+                        min="0"
+                        value={denomCounts[key] ?? ""}
+                        onChange={(e) => setCount(key, e.target.value)}
+                        placeholder="0"
+                        className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                      />
+                    </div>
+                    <span className={`text-right text-sm font-medium ${subtotal > 0 ? "text-slate-700" : "text-slate-300"}`}>
+                      {subtotal > 0 ? `₹${subtotal.toLocaleString("en-IN")}` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+              {/* Total row */}
+              <div className="grid grid-cols-3 items-center px-3 py-2 bg-slate-50 border-t-2 border-slate-200">
+                <span className="text-xs font-bold text-slate-700 col-span-2">Physical Total</span>
+                <span className="text-right text-sm font-bold text-slate-800">
+                  {hasCounts ? `₹${denomTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Difference */}
+          {hasCounts && (
+            <div className={`px-4 py-3 rounded-xl flex items-center justify-between
+              ${Math.abs(diff) < 0.01 ? "bg-emerald-50 border border-emerald-200" : diff > 0 ? "bg-blue-50 border border-blue-200" : "bg-rose-50 border border-rose-200"}`}>
+              <div>
+                <p className={`text-xs font-bold ${Math.abs(diff) < 0.01 ? "text-emerald-700" : diff > 0 ? "text-blue-700" : "text-rose-600"}`}>
+                  {Math.abs(diff) < 0.01 ? "✓ Cash tallied perfectly" : diff > 0 ? "Cash Over" : "Cash Short"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Expected {fmt(expectedCash)} · Physical {fmt(denomTotal)}
+                </p>
+              </div>
+              {Math.abs(diff) >= 0.01 && (
+                <span className={`text-base font-bold ${diff > 0 ? "text-blue-700" : "text-rose-600"}`}>
+                  {diff > 0 ? "+" : ""}{fmt(diff)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600">Closing Notes (optional)</label>
+            <textarea
+              value={closingNotes}
+              onChange={(e) => setClosingNotes(e.target.value)}
+              placeholder="Any remarks for end-of-shift…"
+              rows={2}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading || !hasCounts}
+            className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+            style={{ background: RED }}
+          >
+            {loading ? "Closing…" : "Close Shift"}
+          </button>
+        </div>
       </div>
     </div>
   );

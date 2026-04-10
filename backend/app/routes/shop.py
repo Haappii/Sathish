@@ -1,3 +1,4 @@
+import json
 import time
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from sqlalchemy.orm import Session
@@ -9,6 +10,11 @@ from app.models.system_parameters import SystemParameter
 from app.schemas.shop import ShopDetailsBase, ShopDetailsResponse
 from app.utils.head_office import get_head_office_branch
 from app.utils.shop_logo import SHOP_LOGOS_DIR, build_logo_filename, save_shop_logo_file
+from app.utils.cash_denominations import (
+    CASH_DENOMINATIONS_PARAM_KEY,
+    get_shop_cash_denominations,
+    serialize_cash_denominations,
+)
 
 router = APIRouter(prefix="/shop", tags=["Shop"])
 
@@ -20,7 +26,10 @@ INT_PARAM_KEYS: set = set()
 TEXT_PARAM_KEYS = {
     "inventory_cost_method",
 }
-SHOP_PARAM_KEYS = BOOL_PARAM_KEYS | INT_PARAM_KEYS | TEXT_PARAM_KEYS
+JSON_PARAM_KEYS = {
+    CASH_DENOMINATIONS_PARAM_KEY,
+}
+SHOP_PARAM_KEYS = BOOL_PARAM_KEYS | INT_PARAM_KEYS | TEXT_PARAM_KEYS | JSON_PARAM_KEYS
 
 
 def require_super_admin(role: str | None):
@@ -75,6 +84,7 @@ def get_shop_details(
         "inventory_enabled":   str(pmap.get("inventory_enabled",   "NO")).upper() == "YES",
         "inventory_cost_method": (pmap.get("inventory_cost_method") or "LAST").strip().upper(),
         "items_branch_wise":   str(pmap.get("items_branch_wise",   "NO")).upper() == "YES",
+        "cash_denominations": get_shop_cash_denominations(db, user.shop_id),
     }
 
 
@@ -164,13 +174,18 @@ def save_shop_details(
 
     # handle shop-level param flags (inventory_enabled, inventory_cost_method)
     if any(k in payload for k in SHOP_PARAM_KEYS):
-        require_super_admin(x_user_role)
+        require_super_admin(getattr(user, "role_name", None) or x_user_role)
         for key in SHOP_PARAM_KEYS:
             if key not in payload:
                 continue
             value = payload.get(key)
             if key in BOOL_PARAM_KEYS:
                 _set_param(db, user.shop_id, key, "YES" if bool(value) else "NO")
+            elif key in JSON_PARAM_KEYS:
+                try:
+                    _set_param(db, user.shop_id, key, serialize_cash_denominations(value))
+                except ValueError as exc:
+                    raise HTTPException(400, str(exc))
             else:
                 _set_param(db, user.shop_id, key, str(value or "").strip())
 

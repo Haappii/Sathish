@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import date
 from typing import Optional
 
+
 class ShopDetailsBase(BaseModel):
     shop_name: Optional[str] = None
     owner_name: Optional[str] = None
@@ -31,6 +32,8 @@ class ShopDetailsBase(BaseModel):
     # Stored in system_parameters (not in shop_details table)
     inventory_enabled: Optional[bool] = None
     inventory_cost_method: Optional[str] = None
+    items_branch_wise: Optional[bool] = None
+    cash_denominations: Optional[list[float]] = None
 
 
 class ShopDetailsResponse(ShopDetailsBase):

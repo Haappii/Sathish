@@ -111,6 +111,7 @@ import Permissions from "./pages/setup/Permissions";
 import OnlineOrderSetup from "./pages/setup/OnlineOrderSetup";
 import ExcelUpload from "./pages/setup/ExcelUpload";
 import MailScheduler from "./pages/setup/MailScheduler";
+import CashDenominationSetup from "./pages/setup/CashDenominationSetup";
 import SetupOnboard from "./pages/SetupOnboard";
 import About from "./pages/About";
 
@@ -140,9 +141,10 @@ export default function App() {
       <BrowserRouter>
         <Routes>
 
-          {/* LOGIN */}
-          <Route path="/" element={<Login />} />
-          <Route path="/about" element={<About />} />
+          {/* PUBLIC */}
+          <Route path="/" element={<About />} />
+          <Route path="/about" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/setup/onboard" element={<SetupOnboard />} />
           <Route path="/platform/login" element={<PlatformLogin />} />
           <Route path="/platform/dashboard" element={<PlatformDashboard />} />
@@ -212,6 +214,7 @@ export default function App() {
             <Route path="/setup/permissions" element={<Permissions />} />
             <Route path="/setup/excel-upload" element={<ExcelUpload />} />
             <Route path="/setup/mail-scheduler" element={<MailScheduler />} />
+            <Route path="/setup/cash-denominations" element={<CashDenominationSetup />} />
             <Route path="/setup/online-orders" element={<OnlineOrderSetup />} />
             <Route
               path="/setup/branches/:branchId/tables"

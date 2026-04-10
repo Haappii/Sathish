@@ -270,7 +270,7 @@ export default function About() {
           <Link className="btn btn-ghost" to="/setup/onboard">
             Setup
           </Link>
-          <Link className="btn btn-primary" to="/">
+          <Link className="btn btn-primary" to="/login">
             Login
           </Link>
         </div>
@@ -401,7 +401,7 @@ export default function About() {
                 operations without installing anything first.
               </p>
               <div className="ab-dl-actions">
-                <Link className="btn btn-ghost" to="/">
+                <Link className="btn btn-ghost" to="/login">
                   Open Login
                 </Link>
                 <Link className="btn btn-ghost" to="/setup/onboard">

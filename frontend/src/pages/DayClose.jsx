@@ -10,6 +10,14 @@ import {
   FaArrowDown, FaArrowUp, FaWallet,
 } from "react-icons/fa";
 import { MdStorefront } from "react-icons/md";
+import {
+  buildDenominationCounts,
+  calcDenominationTotal,
+  formatCashDenomination,
+  normalizeCashDenominations,
+  DEFAULT_CASH_DENOMINATIONS,
+  hasAnyDenominationInput,
+} from "../utils/cashDenominations";
 
 const BLUE = "#0B3C8C";
 
@@ -32,8 +40,8 @@ export default function DayClose() {
   // Cash summary state
   const [cashSummary, setCashSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [physicalCash, setPhysicalCash] = useState("");
-  const [tallied, setTallied] = useState(false);
+  const [denominations, setDenominations] = useState(DEFAULT_CASH_DENOMINATIONS);
+  const [denomCounts, setDenomCounts] = useState({});
 
   const loadBranches = async () => {
     if (isHeadOffice) {
@@ -77,6 +85,9 @@ export default function DayClose() {
       .then(res => {
         const appDate = syncBusinessDate(res?.data?.app_date);
         if (appDate) setDate(appDate);
+        const denoms = normalizeCashDenominations(res?.data?.cash_denominations);
+        setDenominations(denoms);
+        setDenomCounts(buildDenominationCounts(denoms));
       })
       .catch(() => {});
   }, []);
@@ -85,11 +96,10 @@ export default function DayClose() {
 
   // Reload summary when branch or date changes
   useEffect(() => {
-    setPhysicalCash("");
-    setTallied(false);
+    setDenomCounts(buildDenominationCounts(denominations));
     setCashSummary(null);
     if (selectedBranch && date) loadCashSummary(selectedBranch, date);
-  }, [selectedBranch, date]);
+  }, [selectedBranch, date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const closeBranch = async () => {
     if (!selectedBranch) return;
@@ -129,11 +139,11 @@ export default function DayClose() {
   const pct = Math.round((closedCount / totalCount) * 100);
   const allClosed = closedCount === status.length && status.length > 0;
 
-  // Cash tally logic
-  const physical = parseFloat(physicalCash) || 0;
+  // Cash tally logic (denomination-based)
+  const physical = calcDenominationTotal(denominations, denomCounts);
   const systemCash = cashSummary ? Number(cashSummary.system_cash || 0) : 0;
   const diff = physical - systemCash;
-  const hasTallied = physicalCash.trim() !== "" && tallied;
+  const hasTallied = hasAnyDenominationInput(denomCounts);
 
   if (!navigator.onLine) {
     return (
@@ -242,7 +252,7 @@ export default function DayClose() {
             </div>
             {selectedBranch && !hasTallied && (
               <p className="text-[11px] text-amber-600">
-                Enter and confirm physical cash count below to enable branch close.
+                Enter denomination counts in the cash tally below to enable branch close.
               </p>
             )}
           </div>
@@ -290,19 +300,27 @@ export default function DayClose() {
                     <div className="px-4 py-2.5 flex items-center justify-between border-b border-emerald-100">
                       <div className="flex items-center gap-2">
                         <FaArrowDown size={11} className="text-emerald-600" />
-                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">+ Cash In (Sales)</span>
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">+ Cash In</span>
                       </div>
                       <span className="text-sm font-bold text-emerald-700">{fmt(cashSummary.cash_in)}</span>
                     </div>
                     <div className="px-4 py-3 space-y-1.5">
+                      {/* Sales breakdown */}
                       {Object.entries(cashSummary.payment_modes || {}).map(([mode, amt]) => (
                         <div key={mode} className="flex justify-between text-xs">
-                          <span className="text-slate-500">{mode}</span>
+                          <span className="text-slate-500">{mode} {mode === "CASH" ? "(Sales)" : ""}</span>
                           <span className={`font-medium ${mode === "CASH" ? "text-emerald-700" : "text-slate-500"}`}>{fmt(amt)}</span>
                         </div>
                       ))}
-                      {Object.keys(cashSummary.payment_modes || {}).length === 0 && (
-                        <p className="text-xs text-slate-400">No sales recorded</p>
+                      {/* Top-Up */}
+                      {(cashSummary.cash_top_up > 0) && (
+                        <div className="flex justify-between text-xs border-t border-emerald-100 pt-1.5 mt-1.5">
+                          <span className="text-slate-500 font-semibold">Cash Top-Up</span>
+                          <span className="font-bold text-emerald-700">{fmt(cashSummary.cash_top_up)}</span>
+                        </div>
+                      )}
+                      {Object.keys(cashSummary.payment_modes || {}).length === 0 && !cashSummary.cash_top_up && (
+                        <p className="text-xs text-slate-400">No cash inflows</p>
                       )}
                     </div>
                   </div>
@@ -338,6 +356,13 @@ export default function DayClose() {
                           <span className="font-medium text-rose-600">{fmt(cashSummary.cash_wages)}</span>
                         </div>
                       )}
+                      {/* Withdrawal */}
+                      {(cashSummary.cash_withdrawal > 0) && (
+                        <div className="flex justify-between text-xs border-t border-rose-100 pt-1.5 mt-1.5">
+                          <span className="text-slate-500 font-semibold">Cash Withdrawal</span>
+                          <span className="font-bold text-rose-600">{fmt(cashSummary.cash_withdrawal)}</span>
+                        </div>
+                      )}
                       {cashSummary.cash_out === 0 && (
                         <p className="text-xs text-slate-400">No cash outflows</p>
                       )}
@@ -360,44 +385,66 @@ export default function DayClose() {
                   </div>
                 </div>
 
-                {/* Physical Cash Tally */}
+                {/* Physical Cash Count — Denomination Entry */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                  <p className="text-xs font-semibold text-slate-700">Physical Cash Count</p>
-                  <div className="flex gap-3 items-center">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Enter cash in drawer"
-                      value={physicalCash}
-                      onChange={e => { setPhysicalCash(e.target.value); setTallied(false); }}
-                      className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
-                    />
-                    <button
-                      onClick={() => { if (physicalCash.trim()) setTallied(true); }}
-                      disabled={!physicalCash.trim()}
-                      className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90 transition disabled:opacity-40"
-                      style={{ background: BLUE }}
-                    >
-                      Confirm
-                    </button>
+                  <p className="text-xs font-semibold text-slate-700">Physical Cash Count (Denomination-wise)</p>
+
+                  <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                    <div className="grid grid-cols-3 bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                      <span>Note / Coin</span>
+                      <span className="text-center">Count</span>
+                      <span className="text-right">Amount</span>
+                    </div>
+                    {normalizeCashDenominations(denominations).map(denom => {
+                      const key = formatCashDenomination(denom);
+                      const cnt = Number(denomCounts[key] || 0);
+                      const subtotal = denom * cnt;
+                      return (
+                        <div key={key} className="grid grid-cols-3 items-center px-3 py-1.5 border-t border-slate-100">
+                          <span className="text-sm font-semibold text-slate-700">₹{key}</span>
+                          <div className="flex justify-center">
+                            <input
+                              type="number"
+                              min="0"
+                              value={denomCounts[key] ?? ""}
+                              onChange={e => {
+                                const n = parseInt(e.target.value, 10);
+                                setDenomCounts(prev => ({ ...prev, [key]: isNaN(n) || n < 0 ? "" : String(n) }));
+                              }}
+                              placeholder="0"
+                              className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+                            />
+                          </div>
+                          <span className={`text-right text-sm font-medium ${subtotal > 0 ? "text-slate-700" : "text-slate-300"}`}>
+                            {subtotal > 0 ? `₹${subtotal.toLocaleString("en-IN")}` : "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {/* Total row */}
+                    <div className="grid grid-cols-3 items-center px-3 py-2 bg-slate-50 border-t-2 border-slate-200">
+                      <span className="text-xs font-bold text-slate-700 col-span-2">Physical Total</span>
+                      <span className="text-right text-sm font-bold text-slate-800">
+                        {hasTallied ? `₹${physical.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
+                      </span>
+                    </div>
                   </div>
 
-                  {tallied && physicalCash.trim() !== "" && (
+                  {hasTallied && (
                     <div className={`rounded-lg px-4 py-3 flex items-center justify-between
-                      ${Math.abs(diff) < 0.01 ? "bg-emerald-50 border border-emerald-200" : "bg-rose-50 border border-rose-200"}`}
+                      ${Math.abs(diff) < 0.01 ? "bg-emerald-50 border border-emerald-200" : diff > 0 ? "bg-blue-50 border border-blue-200" : "bg-rose-50 border border-rose-200"}`}
                     >
                       <div>
-                        <p className={`text-xs font-semibold ${Math.abs(diff) < 0.01 ? "text-emerald-700" : "text-rose-600"}`}>
-                          {Math.abs(diff) < 0.01 ? "✓ Cash tallied" : diff > 0 ? "Cash Over" : "Cash Short"}
+                        <p className={`text-xs font-semibold ${Math.abs(diff) < 0.01 ? "text-emerald-700" : diff > 0 ? "text-blue-700" : "text-rose-600"}`}>
+                          {Math.abs(diff) < 0.01 ? "✓ Cash tallied perfectly" : diff > 0 ? "Cash Over" : "Cash Short"}
                         </p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
                           System: {fmt(systemCash)} · Physical: {fmt(physical)}
                         </p>
                       </div>
                       {Math.abs(diff) >= 0.01 && (
-                        <span className={`text-lg font-bold ${diff > 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                          {fmt(Math.abs(diff))}
+                        <span className={`text-lg font-bold ${diff > 0 ? "text-blue-700" : "text-rose-600"}`}>
+                          {diff > 0 ? "+" : ""}{fmt(Math.abs(diff))}
                         </span>
                       )}
                     </div>
