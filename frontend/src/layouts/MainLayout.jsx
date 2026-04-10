@@ -814,7 +814,7 @@ export default function MainLayout({ hideSidebar = false }) {
               type="button"
               onClick={toggleTheme}
               title={`Switch to ${themeMode === ThemeModes.DARK ? "light" : "dark"} theme`}
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition"
             >
               {themeMode === ThemeModes.DARK ? <FaSun className="text-sm" /> : <FaMoon className="text-sm" />}
               <span className="text-[11px] font-semibold">
