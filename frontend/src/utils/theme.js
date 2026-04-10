@@ -27,8 +27,13 @@ export const getTheme = () => {
 export const applyTheme = (theme = ThemeModes.LIGHT) => {
   if (typeof document === "undefined") return;
   const nextTheme = safeTheme(theme);
-  document.documentElement.classList.toggle("theme-dark", nextTheme === ThemeModes.DARK);
-  document.documentElement.classList.toggle("theme-light", nextTheme !== ThemeModes.DARK);
+  const root = document.documentElement;
+  const body = document.body;
+
+  root.classList.toggle("theme-dark", nextTheme === ThemeModes.DARK);
+  root.classList.toggle("theme-light", nextTheme !== ThemeModes.DARK);
+  body.classList.toggle("theme-dark", nextTheme === ThemeModes.DARK);
+  body.classList.toggle("theme-light", nextTheme !== ThemeModes.DARK);
 };
 
 export const setTheme = (theme) => {
