@@ -11,13 +11,13 @@ export default function ProtectedRoute({ children }) {
 
   // Not logged in → go to login
   if (!session) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // Expired → force logout
   if (isSessionExpired()) {
     clearSession();
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // Keep session alive

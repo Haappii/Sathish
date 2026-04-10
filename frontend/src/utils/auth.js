@@ -97,7 +97,7 @@ export async function logoutSession({ redirect = true } = {}) {
       clearSession();
       logoutPromise = null;
       if (redirect && typeof window !== "undefined") {
-        window.location.replace("/");
+        window.location.replace("/login");
       }
     });
 

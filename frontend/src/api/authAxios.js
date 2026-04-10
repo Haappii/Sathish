@@ -64,7 +64,7 @@ authAxios.interceptors.response.use(
   async (error) => {
     if (error?.response?.status === 401) {
       clearSession();
-      window.location.replace("/");
+      window.location.replace("/login");
       return Promise.reject(error);
     }
 

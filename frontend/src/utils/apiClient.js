@@ -78,7 +78,7 @@ api.interceptors.response.use(
     // 401 — session expired, force logout.
     if (status === 401) {
       clearSession();
-      window.location.replace("/");
+      window.location.replace("/login");
       return Promise.reject(error);
     }
 
