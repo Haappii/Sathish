@@ -39,7 +39,7 @@ PUBLIC_HOST="${PUBLIC_HOST:-_}"
 RUN_USER="${SUDO_USER:-$(id -un)}"
 SWAPFILE_PATH="${SWAPFILE_PATH:-/swapfile}"
 SWAPFILE_SIZE_GB="${SWAPFILE_SIZE_GB:-2}"
-FRONTEND_NODE_HEAP_MB="${FRONTEND_NODE_HEAP_MB:-768}"
+FRONTEND_NODE_HEAP_MB="${FRONTEND_NODE_HEAP_MB:-1536}"
 DB_NAME="${DB_NAME:-shop_billing}"
 DB_USER="${DB_USER:-postgres}"
 
@@ -188,6 +188,7 @@ print_memory_snapshot
 echo "==> Frontend build"
 cd "${FRONTEND_DIR}"
 npm install
+echo "    Using Node heap limit: ${FRONTEND_NODE_HEAP_MB} MB"
 if ! NODE_OPTIONS="--max-old-space-size=${FRONTEND_NODE_HEAP_MB}" VITE_API_BASE=/api npm run build; then
   echo "Frontend build failed. If you saw 'Killed', the Linux OOM killer likely stopped Vite." >&2
   echo "Memory snapshot after failure:" >&2

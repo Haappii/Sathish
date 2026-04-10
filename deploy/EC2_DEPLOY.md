@@ -38,6 +38,9 @@ This script will:
 - install the backend systemd service
 - install the Nginx site on port `80`
 
+If the frontend build runs out of Node.js heap on a small EC2 instance, set
+`FRONTEND_NODE_HEAP_MB=1536` or `2048` in `config.txt` before rerunning the installer.
+
 ## 5) Verify
 
 Health check:
