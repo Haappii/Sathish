@@ -8,6 +8,7 @@ import {
   hydrateSharedLocalState,
   isDesktopApp,
 } from "./utils/sharedLocalState.js";
+import { applyTheme, getTheme } from "./utils/theme.js";
 
 async function bootstrap() {
   if (isDesktopApp()) {
@@ -17,6 +18,8 @@ async function bootstrap() {
       // Ignore hydration issues and keep current-origin localStorage as fallback.
     }
   }
+
+  applyTheme(getTheme());
 
   ReactDOM.createRoot(document.getElementById("root")).render(
     <React.StrictMode>

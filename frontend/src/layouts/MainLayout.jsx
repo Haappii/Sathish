@@ -24,10 +24,13 @@ import {
 } from "../utils/offlineBills";
 import { cacheMasterData } from "../utils/offlineCache";
 import { setBillingTypeCache } from "../utils/sharedLocalState";
+import { getTheme, setTheme, ThemeModes } from "../utils/theme";
 
 import {
   FaBars,
   FaExclamationTriangle,
+  FaMoon,
+  FaSun,
   FaThumbtack,
   FaToggleOn,
   FaToggleOff,
@@ -79,6 +82,12 @@ export default function MainLayout({ hideSidebar = false }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [logoSrc, setLogoSrc] = useState(defaultLogo);
   const [permMap, setPermMap] = useState(null);
+  const [themeMode, setThemeMode] = useState(() => getTheme());
+
+  const toggleTheme = () => {
+    const nextTheme = themeMode === ThemeModes.DARK ? ThemeModes.LIGHT : ThemeModes.DARK;
+    setThemeMode(setTheme(nextTheme));
+  };
   const [permsEnabled, setPermsEnabled] = useState(false);
   const [orderLiveTrackingEnabled, setOrderLiveTrackingEnabled] = useState(true);
 
@@ -800,6 +809,18 @@ export default function MainLayout({ hideSidebar = false }) {
             <span className="hidden md:inline px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-100 whitespace-nowrap">
               {appDateDisplay}
             </span>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${themeMode === ThemeModes.DARK ? "light" : "dark"} theme`}
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition"
+            >
+              {themeMode === ThemeModes.DARK ? <FaSun className="text-sm" /> : <FaMoon className="text-sm" />}
+              <span className="text-[11px] font-semibold">
+                {themeMode === ThemeModes.DARK ? "Light" : "Dark"}
+              </span>
+            </button>
 
             {/* Quick item enable/disable */}
             {canQuickToggleItems && (

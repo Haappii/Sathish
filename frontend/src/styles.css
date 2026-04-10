@@ -167,3 +167,64 @@
 /* Hide scrollbar but keep scroll functionality */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+html.theme-dark {
+  color-scheme: dark;
+}
+
+body.theme-dark {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+body.theme-dark .bg-white {
+  background-color: #111827 !important;
+}
+body.theme-dark .bg-gray-50,
+body.theme-dark .bg-slate-50,
+body.theme-dark .bg-white\/10,
+body.theme-dark .bg-white\/20 {
+  background-color: #111827 !important;
+}
+body.theme-dark .bg-gray-100,
+body.theme-dark .bg-slate-100,
+body.theme-dark .bg-gray-200,
+body.theme-dark .bg-slate-200 {
+  background-color: #17233c !important;
+}
+body.theme-dark .bg-amber-50 { background-color: #4b2f0f !important; }
+body.theme-dark .bg-emerald-50 { background-color: #06372f !important; }
+body.theme-dark .bg-indigo-50 { background-color: #0f172a !important; }
+body.theme-dark .border-gray-100,
+body.theme-dark .border-gray-200,
+body.theme-dark .border-slate-100,
+body.theme-dark .border-slate-200,
+body.theme-dark .border-slate-50,
+body.theme-dark .border-emerald-200,
+body.theme-dark .border-indigo-200,
+body.theme-dark .border-amber-200 {
+  border-color: #334155 !important;
+}
+body.theme-dark .text-gray-900,
+body.theme-dark .text-gray-800,
+body.theme-dark .text-gray-700,
+body.theme-dark .text-slate-900,
+body.theme-dark .text-slate-800,
+body.theme-dark .text-slate-700,
+body.theme-dark .text-gray-600,
+body.theme-dark .text-gray-500 {
+  color: #e2e8f0 !important;
+}
+body.theme-dark .text-gray-400,
+body.theme-dark .text-slate-400,
+body.theme-dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+body.theme-dark .hover\:bg-gray-50:hover,
+body.theme-dark .hover\:bg-slate-50:hover,
+body.theme-dark .hover\:bg-white:hover,
+body.theme-dark .hover\:bg-indigo-100:hover,
+body.theme-dark .hover\:bg-emerald-100:hover,
+body.theme-dark .hover\:bg-amber-100:hover {
+  background-color: #1f2937 !important;
+}

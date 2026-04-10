@@ -6,6 +6,7 @@ const SHARED_LOCAL_STORAGE_KEYS = [
   "hb_offline_auth_v1",
   "hb_offline_cache_v1",
   "offline_bills_v1",
+  "hb_theme",
   "billing_type",
 ];
 const REMOVED_SENTINEL = { __deleted: true };
