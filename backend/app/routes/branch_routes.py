@@ -264,6 +264,7 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
         return None
 
     feedback_qr_enabled = getattr(branch, "feedback_qr_enabled", True)
+    print_logo_enabled = getattr(branch, "print_logo_enabled", True)
 
     out = {
         "branch_id": bid,
@@ -281,6 +282,7 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
         "service_charge_gst_required": bool(getattr(branch, "service_charge_gst_required", False)),
         "service_charge_gst_percent": float(getattr(branch, "service_charge_gst_percent", 0) or 0),
         "feedback_qr_enabled": False if feedback_qr_enabled is False else True,
+        "print_logo_enabled": False if print_logo_enabled is False else True,
     }
 
     out.update(_read_branch_discount_from_params(pmap, bid))

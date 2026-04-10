@@ -56,6 +56,7 @@ export default function Branches() {
       kot_required: true,
       receipt_required: true,
       feedback_qr_enabled: true,
+      print_logo_enabled: true,
       order_live_tracking_enabled: true,
       paper_size: "58mm",
       fssai_number: "",
@@ -104,6 +105,7 @@ export default function Branches() {
         kot_required: branch?.kot_required !== false,
         receipt_required: branch?.receipt_required !== false,
         feedback_qr_enabled: branch?.feedback_qr_enabled !== false,
+        print_logo_enabled: branch?.print_logo_enabled !== false,
         order_live_tracking_enabled: branch?.order_live_tracking_enabled !== false,
         paper_size: branch?.paper_size || "58mm",
         fssai_number: branch?.fssai_number || "",
@@ -523,6 +525,12 @@ export default function Branches() {
                   hint="Print feedback QR code at the bottom of receipts."
                   checked={Boolean(form.feedback_qr_enabled)}
                   onChange={(checked) => setField("feedback_qr_enabled", checked)}
+                />
+                <ToggleRow
+                  label="Logo on receipt"
+                  hint="Print shop logo at the top of receipts."
+                  checked={Boolean(form.print_logo_enabled)}
+                  onChange={(checked) => setField("print_logo_enabled", checked)}
                 />
                 <div className="flex items-center justify-between py-2">
                   <div>

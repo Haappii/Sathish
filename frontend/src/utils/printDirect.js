@@ -60,8 +60,8 @@ const waitForPrintAssets = async (targetWindow, timeoutMs = 2000) => {
  * Attempt silent print via Electron (desktop). Falls back to browser print.
  * Returns a promise resolving to true on success.
  */
-export async function printDirectText(text, { fontSize = 9, port = "COM7", paperSize = "58mm", extraHtml = "" } = {}) {
-  const hasExtraHtml = String(extraHtml || "").trim().length > 0;
+export async function printDirectText(text, { fontSize = 9, port = "COM7", paperSize = "58mm", extraHtml = "", headerHtml = "" } = {}) {
+  const hasExtraHtml = String(extraHtml || "").trim().length > 0 || String(headerHtml || "").trim().length > 0;
   const paperWidth = String(paperSize || "58mm") === "80mm" ? "80mm" : "58mm";
 
   // Try Electron silent print first (desktop app)
@@ -87,7 +87,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
     // 2) Silent browser print (honors fontSize and paperSize)
     if (window.electronAPI.silentPrintText) {
       try {
-        const ok = await window.electronAPI.silentPrintText(text, { fontSize, paperSize, extraHtml });
+        const ok = await window.electronAPI.silentPrintText(text, { fontSize, paperSize, extraHtml, headerHtml });
         if (ok) return true;
       } catch (e) {
         console.warn("Silent browser print failed", e);
@@ -146,6 +146,21 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               letter-spacing: 0;
               white-space: pre;
             }
+            .header-html {
+              box-sizing: border-box;
+              width: 100%;
+              margin: 0;
+              padding: 1.5mm 1.5mm 0;
+              text-align: center;
+            }
+            .header-html img {
+              display: block;
+              margin: 0 auto;
+              max-width: calc(${paperWidth} - 8mm);
+              max-height: 20mm;
+              height: auto;
+              object-fit: contain;
+            }
             .extra-html {
               box-sizing: border-box;
               width: 100%;
@@ -162,6 +177,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
         </head>
         <body>
           <div class="receipt">
+            ${headerHtml ? `<div class="header-html">${headerHtml}</div>` : ""}
             <pre>${escapeHtml(text)}</pre>
             <div class="extra-html">${extraHtml || ""}</div>
           </div>

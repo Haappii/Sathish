@@ -23,6 +23,7 @@ class BranchBase(BaseModel):
     kot_required: Optional[bool] = True
     receipt_required: Optional[bool] = True
     feedback_qr_enabled: Optional[bool] = True
+    print_logo_enabled: Optional[bool] = True
     order_live_tracking_enabled: Optional[bool] = True
     paper_size: Optional[str] = "58mm"  # 58mm | 80mm
     fssai_number: Optional[str] = ""   # branch-level FSSAI (overrides shop-level)

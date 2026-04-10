@@ -8,6 +8,7 @@ import { getSession } from "../utils/auth";
 import { buildBusinessDateTimeLabel, formatBusinessDate, getBusinessDate } from "../utils/businessDate";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { generateFeedbackQrHtml as buildFeedbackQrHtml } from "../utils/feedbackQr";
+import { getShopLogoUrl } from "../utils/shopLogo";
 import { printDirectText } from "../utils/printDirect";
 import {
   cacheMasterData,
@@ -640,6 +641,26 @@ const [customer, setCustomer] = useState({
     });
   };
 
+  const generateLogoHtml = async () => {
+    if (branch?.print_logo_enabled === false) return "";
+    const url = getShopLogoUrl(shop);
+    if (!url) return "";
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return "";
+      const blob = await res.blob();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      return `<img src="${dataUrl}" alt="Logo" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
+    } catch {
+      return "";
+    }
+  };
+
   const generateKOTText = (kotItems, invoiceNumber, customerName, categoryLabel = null) => {
     const is80mm = (branch?.paper_size || "58mm") === "80mm";
     const WIDTH = is80mm ? 48 : 32;
@@ -817,10 +838,14 @@ const [customer, setCustomer] = useState({
       }
 
       if (print && branch?.receipt_required !== false) {
-        const qrHtml = await generateFeedbackQrHtml(res.data.invoice_number);
+        const [logoHtml, qrHtml] = await Promise.all([
+          generateLogoHtml(),
+          generateFeedbackQrHtml(res.data.invoice_number),
+        ]);
         const ok = await printDirectText(generateBillText(res.data.invoice_number), {
           fontSize: 8,
           paperSize: branch?.paper_size || "58mm",
+          headerHtml: logoHtml,
           extraHtml: qrHtml,
         });
         if (!ok) showToast("Printing failed. Check printer/popup settings.", "error");
