@@ -1,4 +1,4 @@
-import { writeSharedLocalValue } from "./sharedLocalState";
+import { writeSharedLocalValue } from "./sharedLocalState.js";
 
 const OFFLINE_AUTH_KEY = "hb_offline_auth_v1";
 

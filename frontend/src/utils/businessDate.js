@@ -1,4 +1,5 @@
 import { getSession, setSession } from "./auth";
+import { writeSharedLocalValue } from "./sharedLocalState.js";
 
 const BUSINESS_DATE_KEY = "hb_business_date";
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})/;
@@ -54,9 +55,7 @@ export function syncBusinessDate(value) {
   const iso = normalizeBusinessDate(value);
   if (!iso) return "";
 
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(BUSINESS_DATE_KEY, iso);
-  }
+  writeSharedLocalValue(BUSINESS_DATE_KEY, iso);
 
   const session = getSession();
   if (session && normalizeBusinessDate(session.app_date) !== iso) {
@@ -111,4 +110,3 @@ export function buildBusinessDateTimeLabel(
 
   return timePart ? `${datePart}, ${timePart}` : datePart;
 }
-

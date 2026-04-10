@@ -1,6 +1,10 @@
 // src/utils/auth.js
 
 import { API_BASE } from "../config/api";
+import {
+  removeSharedLocalValue,
+  writeSharedLocalValue,
+} from "./sharedLocalState.js";
 
 const KEY = "hb_session";
 const BUSINESS_DATE_KEY = "hb_business_date";
@@ -53,14 +57,14 @@ export function setSession(data) {
   };
   lastServerActivitySync = 0;
 
-  localStorage.setItem(KEY, JSON.stringify(session));
+  writeSharedLocalValue(KEY, JSON.stringify(session));
 
   if (session?.token) {
-    localStorage.setItem("token", session.token);
-    localStorage.setItem("access_token", session.token);
+    writeSharedLocalValue("token", session.token);
+    writeSharedLocalValue("access_token", session.token);
   }
   if (session?.access_token) {
-    localStorage.setItem("access_token", session.access_token);
+    writeSharedLocalValue("access_token", session.access_token);
   }
 
   const appDate =
@@ -68,17 +72,17 @@ export function setSession(data) {
       ? session.app_date.trim().slice(0, 10)
       : "";
   if (appDate) {
-    localStorage.setItem(BUSINESS_DATE_KEY, appDate);
+    writeSharedLocalValue(BUSINESS_DATE_KEY, appDate);
   } else {
-    localStorage.removeItem(BUSINESS_DATE_KEY);
+    removeSharedLocalValue(BUSINESS_DATE_KEY);
   }
 }
 
 export function clearSession() {
-  localStorage.removeItem(KEY);
-  localStorage.removeItem("token");
-  localStorage.removeItem("access_token");
-  localStorage.removeItem(BUSINESS_DATE_KEY);
+  removeSharedLocalValue(KEY);
+  removeSharedLocalValue("token");
+  removeSharedLocalValue("access_token");
+  removeSharedLocalValue(BUSINESS_DATE_KEY);
   lastServerActivitySync = 0;
 }
 
@@ -119,14 +123,14 @@ export function refreshSessionActivity() {
   if (!s) return;
 
   s.last_activity = Date.now();
-  localStorage.setItem(KEY, JSON.stringify(s));
+  writeSharedLocalValue(KEY, JSON.stringify(s));
 
   if (s?.token) {
-    localStorage.setItem("token", s.token);
-    localStorage.setItem("access_token", s.token);
+    writeSharedLocalValue("token", s.token);
+    writeSharedLocalValue("access_token", s.token);
   }
   if (s?.access_token) {
-    localStorage.setItem("access_token", s.access_token);
+    writeSharedLocalValue("access_token", s.access_token);
   }
 }
 

@@ -1,4 +1,5 @@
 import authAxios from "../api/authAxios";
+import { writeSharedLocalValue } from "./sharedLocalState.js";
 
 export const OFFLINE_BILLS_KEY = "offline_bills_v1";
 
@@ -15,7 +16,7 @@ export const getOfflineBills = () => safeParse(localStorage.getItem(OFFLINE_BILL
 
 export const saveOfflineBills = (rows) => {
   try {
-    localStorage.setItem(OFFLINE_BILLS_KEY, JSON.stringify(rows || []));
+    writeSharedLocalValue(OFFLINE_BILLS_KEY, JSON.stringify(rows || []));
   } catch {
     // ignore quota issues
   }

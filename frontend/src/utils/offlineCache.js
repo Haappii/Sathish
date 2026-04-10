@@ -1,5 +1,9 @@
 // Simple localStorage-based cache for master data to enable offline billing.
 // We keep everything under a single key to reduce quota overhead.
+import {
+  removeSharedLocalValue,
+  writeSharedLocalValue,
+} from "./sharedLocalState.js";
 
 const CACHE_KEY = "hb_offline_cache_v1";
 
@@ -15,7 +19,7 @@ const readCache = () => {
 
 const writeCache = (data) => {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data || {}));
+    writeSharedLocalValue(CACHE_KEY, JSON.stringify(data || {}));
   } catch {
     // ignore quota errors silently; offline will just miss cache
   }
@@ -50,7 +54,7 @@ export const getCacheEntry = (key, branchId = null) => {
 };
 
 export const clearOfflineCache = () => {
-  localStorage.removeItem(CACHE_KEY);
+  removeSharedLocalValue(CACHE_KEY);
 };
 
 export const getCachedMasterData = (branchId = null) => {
