@@ -3,10 +3,17 @@
 Migration runner script to execute SQL migration files
 """
 import os
+import sys
+
 import psycopg2
-from psycopg2 import sql
+
+sys.path.insert(0, os.path.dirname(__file__))
+from app.env import load_project_env
 
 def run_migrations():
+    load_project_env()
+    conn = None
+
     # Get database URL
     db_url = os.getenv(
         "DATABASE_URL",
@@ -45,8 +52,5 @@ def run_migrations():
     return True
 
 if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-    
     success = run_migrations()
     sys.exit(0 if success else 1)

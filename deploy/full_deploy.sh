@@ -2,6 +2,18 @@
 
 set -e
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT_DIR}"
+
+for env_file in .env backend/.env config.example.txt config.txt; do
+  if [ -f "${env_file}" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source <(sed 's/\r$//' "${env_file}")
+    set +a
+  fi
+done
+
 echo "==> Pulling latest code from git"
 git pull origin main
 
