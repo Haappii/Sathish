@@ -94,13 +94,17 @@ export default function Login() {
 
       setSession(sessionPayload);
 
-      rememberOfflineAuth({
-        shop_id: form.shop_id,
-        username: form.username,
-        password: form.password,
-        branch_id: sessionPayload.branch_id,
-        session: sessionPayload,
-      }).catch(() => {});
+      try {
+        await rememberOfflineAuth({
+          shop_id: form.shop_id,
+          username: form.username,
+          password: form.password,
+          branch_id: sessionPayload.branch_id,
+          session: sessionPayload,
+        });
+      } catch (err) {
+        console.warn("Failed to persist offline auth", err);
+      }
 
       navigate("/home", { replace: true });
 

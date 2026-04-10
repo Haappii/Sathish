@@ -245,11 +245,10 @@ const MIME_TYPES = {
 function startOfflineServer(staticDir) {
   return new Promise((resolve, reject) => {
     const safeRoot = path.resolve(staticDir);
-
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, "http://localhost");
       const decodedPath = decodeURIComponent(url.pathname || "/");
-      const normalized = path.normalize(decodedPath).replace(/^(\.\.[/\\])+/, "");
+      const normalized = path.normalize(decodedPath).replace(/^([\.\.][\/\\])+/, "");
       let filePath = path.join(safeRoot, normalized);
 
       if (!filePath.startsWith(safeRoot)) {
@@ -274,12 +273,33 @@ function startOfflineServer(staticDir) {
       });
     });
 
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const port = server.address().port;
-      resolve({
-        server,
-        url: `http://127.0.0.1:${port}`,
+    const listenPort = 5181;
+    const tryListen = (port, callback) => {
+      const onError = (err) => {
+        server.removeListener("error", onError);
+        callback(err);
+      };
+      server.once("error", onError);
+      server.listen(port, "127.0.0.1", () => {
+        server.removeListener("error", onError);
+        callback(null);
+      });
+    };
+
+    tryListen(listenPort, (err) => {
+      if (!err) {
+        const port = server.address().port;
+        resolve({ server, url: `http://127.0.0.1:${port}` });
+        return;
+      }
+      if (err.code !== "EADDRINUSE") {
+        reject(err);
+        return;
+      }
+      server.removeAllListeners("error");
+      server.listen(0, "127.0.0.1", () => {
+        const port = server.address().port;
+        resolve({ server, url: `http://127.0.0.1:${port}` });
       });
     });
   });

@@ -1,12 +1,16 @@
+import { writeSharedLocalValue } from "./sharedLocalState";
+
 const OFFLINE_AUTH_KEY = "hb_offline_auth_v1";
 
 const toHex = (buf) => Array.from(new Uint8Array(buf))
   .map((b) => b.toString(16).padStart(2, "0"))
   .join("");
 
+const normalizeInput = (value) => String(value || "").trim();
+
 const hashSecret = async ({ shop_id, username, password, branch_id }) => {
   const encoder = new TextEncoder();
-  const text = `${shop_id || ""}::${username || ""}::${password || ""}::${branch_id || ""}`;
+  const text = `${normalizeInput(shop_id)}::${normalizeInput(username)}::${normalizeInput(password)}::${normalizeInput(branch_id)}`;
   const data = encoder.encode(text);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return toHex(digest);
@@ -40,7 +44,7 @@ export const rememberOfflineAuth = async ({
       session,
       savedAt: Date.now(),
     };
-    localStorage.setItem(OFFLINE_AUTH_KEY, JSON.stringify(payload));
+    writeSharedLocalValue(OFFLINE_AUTH_KEY, JSON.stringify(payload));
   } catch {
     // ignore
   }
