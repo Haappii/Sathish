@@ -226,6 +226,7 @@ export default function Items() {
           min_stock: Number(form.min_stock) || 0,
           item_status: !!form.item_status,
           sold_by_weight: !!form.sold_by_weight,
+          soldByWeight: !!form.sold_by_weight,
         };
 
     const uploadImage = async itemId => {

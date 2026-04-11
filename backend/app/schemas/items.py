@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 from typing import Optional
 
 
@@ -11,7 +11,11 @@ class ItemBase(BaseModel):
     mrp_price: Optional[float] = None
     item_status: Optional[bool] = None
     is_raw_material: Optional[bool] = None
-    sold_by_weight: Optional[bool] = None
+    sold_by_weight: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices("sold_by_weight", "soldByWeight"),
+        serialization_alias="sold_by_weight",
+    )
     min_stock: Optional[int] = None
 
 
