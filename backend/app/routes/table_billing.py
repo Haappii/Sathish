@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -764,6 +764,56 @@ def cancel_order(
         .filter(
             Order.shop_id == user.shop_id,
             Order.order_id == order_id,
+            Order.branch_id == user.branch_id,
+            Order.status == "OPEN"
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    for it in order.items:
+        db.delete(it)
+
+    order.status = "CANCELLED"
+    order.closed_at = datetime.now()
+    order.table.status = "FREE"
+    order.table.table_start_time = None
+    _end_active_qr_session(db=db, shop_id=int(user.shop_id), table_id=int(order.table_id))
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Order cancelled and table freed"
+    }
+
+
+@router.api_route("/order/cancel", methods=["POST", "PUT", "DELETE"])
+def cancel_order_compat(
+    order_id: Optional[int] = Query(default=None),
+    payload: Optional[Dict[str, Any]] = Body(default=None),
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("billing", "write"))
+):
+    ensure_hotel_billing_type(db, user.shop_id)
+
+    resolved_order_id: Optional[int] = order_id
+    if resolved_order_id is None and isinstance(payload, dict):
+        try:
+            resolved_order_id = int(payload.get("order_id")) if payload.get("order_id") is not None else None
+        except Exception:
+            resolved_order_id = None
+
+    if not resolved_order_id:
+        raise HTTPException(422, "order_id is required")
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.shop_id == user.shop_id,
+            Order.order_id == resolved_order_id,
             Order.branch_id == user.branch_id,
             Order.status == "OPEN"
         )

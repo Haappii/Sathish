@@ -160,8 +160,11 @@ export default function HomeScreen({ navigation }) {
     const candidates = [
       () => api.post(`/table-billing/order/cancel/${holdOrderId}`),
       () => api.post(`/table-billing/order/cancel/${holdOrderId}/`),
+      () => api.post(`/table-billing/order/cancel?order_id=${holdOrderId}`),
       () => api.post(`/table-billing/orders/${holdOrderId}/cancel`),
       () => api.put(`/table-billing/orders/${holdOrderId}/cancel`),
+      () => api.put(`/table-billing/order/cancel?order_id=${holdOrderId}`),
+      () => api.delete(`/table-billing/order/cancel?order_id=${holdOrderId}`),
       () => api.delete(`/table-billing/orders/${holdOrderId}`),
       () => api.post("/table-billing/order/cancel", { order_id: holdOrderId }),
     ];
