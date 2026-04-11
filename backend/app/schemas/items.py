@@ -11,6 +11,7 @@ class ItemBase(BaseModel):
     mrp_price: Optional[float] = None
     item_status: Optional[bool] = None
     is_raw_material: Optional[bool] = None
+    sold_by_weight: Optional[bool] = None
     min_stock: Optional[int] = None
 
 
@@ -24,6 +25,7 @@ class ItemCreate(ItemBase):
     item_status: bool = True
     min_stock: int = 0
     is_raw_material: bool = False
+    sold_by_weight: bool = False
 
 
 class ItemUpdate(ItemBase):
@@ -41,6 +43,7 @@ class ItemResponse(BaseModel):
     image_filename: Optional[str] = None
     min_stock: int
     is_raw_material: bool = False
+    sold_by_weight: bool = False
     item_status: bool
 
     class Config:

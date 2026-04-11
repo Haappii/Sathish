@@ -38,6 +38,7 @@ export default function Items() {
     min_stock: "",
     item_status: true,
     is_raw_material: false,
+    sold_by_weight: false,
   });
 
   const [editingId, setEditingId] = useState(null);
@@ -165,6 +166,7 @@ export default function Items() {
       min_stock: "",
       item_status: true,
       is_raw_material: !!activeSupplierId,
+      sold_by_weight: false,
     });
     setEditingId(null);
     setEditingItem(null);
@@ -211,6 +213,7 @@ export default function Items() {
           mrp_price: 0,
           min_stock: Number(form.min_stock) || 0,
           item_status: !!form.item_status,
+          sold_by_weight: false,
         }
       : {
           item_name: form.item_name.toUpperCase(),
@@ -222,6 +225,7 @@ export default function Items() {
           mrp_price: hotelShop ? 0 : (Number(form.mrp_price) || 0),
           min_stock: Number(form.min_stock) || 0,
           item_status: !!form.item_status,
+          sold_by_weight: !!form.sold_by_weight,
         };
 
     const uploadImage = async itemId => {
@@ -293,6 +297,7 @@ export default function Items() {
       min_stock: item.min_stock ?? 0,
       item_status: !!item.item_status,
       is_raw_material: isRaw,
+      sold_by_weight: !isRaw && !!item.sold_by_weight,
     });
     setImageFile(null);
   };
@@ -605,6 +610,11 @@ export default function Items() {
                               RAW
                             </span>
                           )}
+                          {!item.is_raw_material && item.sold_by_weight && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-blue-300 bg-blue-50 text-blue-700 flex-shrink-0 font-medium">
+                              KG
+                            </span>
+                          )}
                         </div>
 
                         {item.is_raw_material ? (
@@ -695,7 +705,7 @@ export default function Items() {
                   checked={form.is_raw_material}
                   onChange={e => {
                     const raw = e.target.checked;
-                    setForm({ ...form, is_raw_material: raw, price: "", buy_price: "", mrp_price: "", category_id: raw ? "" : form.category_id, supplier_id: raw ? form.supplier_id : "" });
+                    setForm({ ...form, is_raw_material: raw, sold_by_weight: raw ? false : form.sold_by_weight, price: "", buy_price: "", mrp_price: "", category_id: raw ? "" : form.category_id, supplier_id: raw ? form.supplier_id : "" });
                     if (!raw) setActiveSupplierId(null);
                   }}
                 />
@@ -796,6 +806,21 @@ export default function Items() {
                     </div>
                   </div>
                 )}
+
+                <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+                  <div>
+                    <div className="text-[10px] font-semibold text-blue-800">Sell by Weight (KG)</div>
+                    <div className="text-[10px] text-blue-600">Use grams in billing and auto-round line total</div>
+                  </div>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={!!form.sold_by_weight}
+                      onChange={e => setForm({ ...form, sold_by_weight: e.target.checked })}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                </div>
               </div>
             )}
 

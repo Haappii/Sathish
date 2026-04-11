@@ -29,6 +29,7 @@ class Item(Base):
 
     min_stock = Column(Integer, nullable=False, default=0)   # 👈 Moved here
     is_raw_material = Column(Boolean, nullable=False, default=False)
+    sold_by_weight = Column(Boolean, nullable=False, default=False)
 
     item_status = Column(Boolean, default=True)
     created_on = Column(TIMESTAMP(timezone=True), server_default=func.now())

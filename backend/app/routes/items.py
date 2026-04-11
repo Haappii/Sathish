@@ -29,6 +29,7 @@ class ItemBulkRow(BaseModel):
     buy_price: Optional[float] = 0
     mrp_price: Optional[float] = 0
     min_stock: Optional[int] = 0
+    sold_by_weight: Optional[bool] = False
 
 
 class ItemBulkImport(BaseModel):
@@ -255,6 +256,7 @@ def create_item(
         mrp_price=request_data.mrp_price or 0,
         min_stock=request_data.min_stock or 0,
         is_raw_material=is_raw,
+        sold_by_weight=bool(request_data.sold_by_weight) if not is_raw else False,
         created_by=None
     )
 
@@ -313,6 +315,7 @@ def create_item(
             "mrp_price": item.mrp_price,
             "min_stock": item.min_stock,
             "is_raw_material": getattr(item, "is_raw_material", False),
+            "sold_by_weight": getattr(item, "sold_by_weight", False),
         },
         user_id=user.user_id,
     )
@@ -356,6 +359,7 @@ def bulk_import_items(
         buy_price = float(row.buy_price or 0)
         mrp_price = float(row.mrp_price or 0)
         min_stock = int(row.min_stock or 0)
+        sold_by_weight = bool(row.sold_by_weight)
 
         if shop_type == "hotel":
             buy_price = 0
@@ -382,6 +386,7 @@ def bulk_import_items(
                 existing.buy_price = buy_price
                 existing.mrp_price = mrp_price
                 existing.min_stock = min_stock
+                existing.sold_by_weight = sold_by_weight
                 existing.item_status = True
                 db.flush()
                 upsert_branch_item_price(
@@ -402,6 +407,7 @@ def bulk_import_items(
                     min_stock=min_stock,
                     item_status=True,
                     is_raw_material=False,
+                    sold_by_weight=sold_by_weight,
                 )
                 db.add(item)
                 db.flush()
@@ -468,6 +474,7 @@ def update_item(
         "mrp_price": item.mrp_price,
         "min_stock": item.min_stock,
         "is_raw_material": getattr(item, "is_raw_material", False),
+        "sold_by_weight": getattr(item, "sold_by_weight", False),
     }
 
     if request_data.item_name is not None:
@@ -486,6 +493,7 @@ def update_item(
         item.price = 0
         item.buy_price = 0
         item.mrp_price = 0
+        item.sold_by_weight = False
         if request_data.min_stock is not None:
             item.min_stock = request_data.min_stock
         if request_data.item_status is not None:
@@ -513,6 +521,9 @@ def update_item(
 
         if request_data.min_stock is not None:
             item.min_stock = request_data.min_stock
+
+        if request_data.sold_by_weight is not None:
+            item.sold_by_weight = bool(request_data.sold_by_weight)
 
         # Post-validate prices only when price fields were explicitly sent
         price_fields_sent = any(
@@ -568,6 +579,7 @@ def update_item(
             "mrp_price": item.mrp_price,
             "min_stock": item.min_stock,
             "is_raw_material": getattr(item, "is_raw_material", False),
+            "sold_by_weight": getattr(item, "sold_by_weight", False),
         },
         user_id=user.user_id,
     )

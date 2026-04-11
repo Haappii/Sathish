@@ -8,8 +8,8 @@ import { getSession } from "../utils/auth";
 import { buildBusinessDateTimeLabel, formatBusinessDate, getBusinessDate } from "../utils/businessDate";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { generateFeedbackQrHtml as buildFeedbackQrHtml } from "../utils/feedbackQr";
-import { getShopLogoUrl } from "../utils/shopLogo";
 import { printDirectText } from "../utils/printDirect";
+import appLogo from "../assets/app_logo.png";
 import {
   cacheMasterData,
   getCachedMasterData,
@@ -390,19 +390,83 @@ const [customer, setCustomer] = useState({
     )
     .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0));
 
+  const isWeightItem = item => Boolean(item?.sold_by_weight);
+
+  const normalizeWeightGrams = value => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(1, Math.round(n));
+  };
+
+  const computeWeightLineAmount = (ratePerKg, grams) => {
+    const weightKg = normalizeWeightGrams(grams) / 1000;
+    return Math.round(Number(ratePerKg || 0) * weightKg);
+  };
+
+  const promptWeightGrams = (itemName, initial = 250) => {
+    const entered = window.prompt(`Enter weight in grams for ${itemName}`, String(initial));
+    if (entered === null) return null;
+    const grams = normalizeWeightGrams(entered);
+    if (!grams) {
+      showToast("Enter valid weight in grams", "error");
+      return null;
+    }
+    return grams;
+  };
+
+  const getLineAmount = item => {
+    if (isWeightItem(item)) return Number(item.price || 0);
+    return Number(item.price || 0) * Number(item.qty || 0);
+  };
+
   /* ---------------- CART FUNCTIONS ---------------- */
   const addToCart = item => {
     const isRaw = Boolean(item?.is_raw_material);
-    if (inventoryEnabled && (!isHotel || isRaw) && getEffectiveStock(item.item_id) <= 0)
+    if (!isWeightItem(item) && inventoryEnabled && (!isHotel || isRaw) && getEffectiveStock(item.item_id) <= 0)
       return showToast("Out of stock", "error");
 
     setCart(prev => {
       const ex = prev.find(x => x.item_id === item.item_id);
-      if (ex)
+      if (ex && !isWeightItem(item))
         return prev.map(x =>
           x.item_id === item.item_id ? { ...x, qty: x.qty + 1 } : x
         );
+
       const unitPrice = getPriceForItem(item);
+
+      if (isWeightItem(item)) {
+        const grams = promptWeightGrams(item.item_name, ex?.weight_grams || 250);
+        if (!grams) return prev;
+
+        if (ex) {
+          const nextGrams = normalizeWeightGrams(Number(ex.weight_grams || 0) + grams);
+          return prev.map(x =>
+            x.item_id === item.item_id
+              ? {
+                  ...x,
+                  qty: 1,
+                  weight_grams: nextGrams,
+                  unit_rate: unitPrice,
+                  price: computeWeightLineAmount(unitPrice, nextGrams),
+                }
+              : x
+          );
+        }
+
+        return [
+          ...prev,
+          {
+            ...item,
+            base_price: Number(item.price || 0),
+            price_level: String(priceLevel || "BASE").toUpperCase(),
+            qty: 1,
+            weight_grams: grams,
+            unit_rate: unitPrice,
+            price: computeWeightLineAmount(unitPrice, grams),
+          },
+        ];
+      }
+
       return [
         ...prev,
         {
@@ -419,11 +483,15 @@ const [customer, setCustomer] = useState({
   const changeQty = (id, delta) =>
     setCart(prev =>
       prev.map(x =>
-        x.item_id === id ? { ...x, qty: Math.max(1, x.qty + delta) } : x
+        x.item_id === id
+          ? (isWeightItem(x) ? x : { ...x, qty: Math.max(1, x.qty + delta) })
+          : x
       )
     );
 
   const setQty = (id, val) => {
+    const inCart = cart.find(i => i.item_id === id);
+    if (isWeightItem(inCart)) return;
     const q = Math.max(1, Number(val) || 1);
     const item = itemsData.find(i => i.item_id === id);
     const isRaw = Boolean(item?.is_raw_material);
@@ -432,6 +500,23 @@ const [customer, setCustomer] = useState({
 
     setCart(prev =>
       prev.map(x => (x.item_id === id ? { ...x, qty: q } : x))
+    );
+  };
+
+  const setWeightGrams = (id, val) => {
+    const grams = normalizeWeightGrams(val);
+    if (!grams) return;
+    setCart(prev =>
+      prev.map(x =>
+        x.item_id === id
+          ? {
+              ...x,
+              qty: 1,
+              weight_grams: grams,
+              price: computeWeightLineAmount(x.unit_rate ?? x.price, grams),
+            }
+          : x
+      )
     );
   };
 
@@ -452,7 +537,10 @@ const [customer, setCustomer] = useState({
       prev.map(x => ({
         ...x,
         price_level: String(priceLevel || "BASE").toUpperCase(),
-        price: getPriceForItem(x)
+        unit_rate: isWeightItem(x) ? getPriceForItem(x) : x.unit_rate,
+        price: isWeightItem(x)
+          ? computeWeightLineAmount(getPriceForItem(x), x.weight_grams || 250)
+          : getPriceForItem(x)
       }))
     );
   };
@@ -493,7 +581,7 @@ const [customer, setCustomer] = useState({
   };
 
   /* ---------------- TOTALS ---------------- */
-  const subTotal = cart.reduce((t, x) => t + x.price * x.qty, 0);
+  const subTotal = cart.reduce((t, x) => t + getLineAmount(x), 0);
 
   let tax = 0;
   if (gstEnabled) {
@@ -608,15 +696,22 @@ const [customer, setCustomer] = useState({
       "\n";
     t += line + "\n";
     cart.forEach(i => {
+      const qtyLabel = isWeightItem(i)
+        ? `${Math.round(Number(i.weight_grams || 0))}g`
+        : String(i.qty);
+      const rateValue = isWeightItem(i)
+        ? Number(i.unit_rate || i.price || 0)
+        : Number(i.price || 0);
+      const lineAmount = getLineAmount(i);
       t +=
         i.item_name.slice(0, ITEM_COL).padEnd(ITEM_COL) +
-        String(i.qty).padStart(QTY_COL) +
-        i.price.toFixed(2).padStart(RATE_COL) +
-        (i.qty * i.price).toFixed(2).padStart(TOTAL_COL) +
+        qtyLabel.padStart(QTY_COL) +
+        rateValue.toFixed(2).padStart(RATE_COL) +
+        lineAmount.toFixed(2).padStart(TOTAL_COL) +
         "\n";
     });
     t += line + "\n";
-    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
+    const totalItems = cart.reduce((s, i) => s + (isWeightItem(i) ? 1 : Number(i.qty || 0)), 0);
     const left = `Items: ${totalItems}`;
     const right = `Subtotal : ${subTotal.toFixed(2)}`;
     const gap = Math.max(1, WIDTH - left.length - right.length);
@@ -643,22 +738,7 @@ const [customer, setCustomer] = useState({
 
   const generateLogoHtml = async () => {
     if (branch?.print_logo_enabled === false) return "";
-    const url = getShopLogoUrl(shop);
-    if (!url) return "";
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return "";
-      const blob = await res.blob();
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      return `<img src="${dataUrl}" alt="Logo" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
-    } catch {
-      return "";
-    }
+    return `<img src="${appLogo}" alt="Logo" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
   };
 
   const generateKOTText = (kotItems, invoiceNumber, customerName, categoryLabel = null) => {
@@ -691,11 +771,13 @@ const [customer, setCustomer] = useState({
     t += line + "\n";
     kotItems.forEach(i => {
       const name = String(i.item_name || "").slice(0, NAME_COL).padEnd(NAME_COL);
-      const count = String(i.qty || 0);
+      const count = isWeightItem(i)
+        ? `${Math.round(Number(i.weight_grams || 0))}g`
+        : String(i.qty || 0);
       t += name + rightCol(count, COUNT_COL) + "\n";
     });
     t += line + "\n";
-    const totalItems = kotItems.reduce((s, i) => s + (i.qty || 0), 0);
+    const totalItems = kotItems.reduce((s, i) => s + (isWeightItem(i) ? 1 : Number(i.qty || 0)), 0);
     t += center(`Total Count - ${totalItems}`) + "\n";
     t += line + "\n";
     return t;
@@ -814,7 +896,7 @@ const [customer, setCustomer] = useState({
       items: cart.map(x => ({
         item_id: x.item_id,
         quantity: x.qty,
-        amount: x.qty * x.price
+        amount: getLineAmount(x)
       }))
     };
 
@@ -926,7 +1008,7 @@ const [customer, setCustomer] = useState({
       items: cart.map(x => ({
         item_id: x.item_id,
         quantity: x.qty,
-        amount: x.qty * x.price
+        amount: getLineAmount(x)
       }))
     };
 
@@ -962,12 +1044,19 @@ const [customer, setCustomer] = useState({
       const price = draftItem.quantity > 0
         ? draftItem.amount / draftItem.quantity
         : Number(fullItem.price || 0);
+      const derivedWeight = fullItem?.sold_by_weight && Number(fullItem.price || 0) > 0
+        ? Math.max(1, Math.round((Number(draftItem.amount || 0) * 1000) / Number(fullItem.price || 1)))
+        : null;
       restoredCart.push({
         ...fullItem,
         base_price: Number(fullItem.price || 0),
         price_level: "BASE",
-        price,
-        qty: draftItem.quantity,
+        unit_rate: fullItem?.sold_by_weight ? Number(fullItem.price || 0) : undefined,
+        weight_grams: derivedWeight,
+        price: fullItem?.sold_by_weight
+          ? computeWeightLineAmount(Number(fullItem.price || 0), derivedWeight || 250)
+          : price,
+        qty: fullItem?.sold_by_weight ? 1 : draftItem.quantity,
       });
     }
     setCart(restoredCart);
@@ -1151,7 +1240,8 @@ const [customer, setCustomer] = useState({
                 const imgUrl = item.image_filename ? `${API_BASE}/item-images/${item.image_filename}` : "";
                 const showStockLabel = inventoryEnabled && (isRaw || !isHotel);
                 const isSelected = selectedItemIds.has(item.item_id);
-                const cartQty = cart.find(c => c.item_id === item.item_id)?.qty || 0;
+                const cartEntry = cart.find(c => c.item_id === item.item_id);
+                const cartQty = cartEntry?.qty || 0;
                 const categoryName = categoryNameById[String(item.category_id)] || "Item";
 
                 return (
@@ -1191,7 +1281,7 @@ const [customer, setCustomer] = useState({
 
                     {isSelected && (
                       <span className="absolute right-1 top-1 min-w-[18px] h-4.5 rounded-full bg-blue-600 px-1 text-[8px] font-bold text-white shadow-sm flex items-center justify-center">
-                        {cartQty}
+                        {isWeightItem(cartEntry) ? `${Math.round(Number(cartEntry?.weight_grams || 0))}g` : cartQty}
                       </span>
                     )}
                     {out && (
@@ -1313,23 +1403,39 @@ const [customer, setCustomer] = useState({
                     <tr key={item.item_id} className="border-b border-gray-50 hover:bg-gray-50/50">
                       <td className="py-1 pr-1">
                         <p className="font-semibold text-gray-800 leading-tight truncate max-w-[120px]">{item.item_name}</p>
-                        <p className="text-[10px] text-gray-400">₹{item.price.toFixed(2)} each</p>
+                        <p className="text-[10px] text-gray-400">
+                          {isWeightItem(item)
+                            ? `₹${Number(item.unit_rate || item.price || 0).toFixed(2)}/kg`
+                            : `₹${Number(item.price || 0).toFixed(2)} each`}
+                        </p>
                       </td>
                       <td className="py-1">
-                        <div className="flex items-center justify-center gap-0.5">
-                          <button onClick={() => changeQty(item.item_id, -1)}
-                            className="w-5 h-5 rounded border bg-white text-gray-500 text-xs font-bold flex items-center justify-center hover:bg-gray-100">−</button>
-                          <input
-                            type="number"
-                            className="w-8 border border-gray-200 rounded text-center text-[11px] py-0 bg-white focus:outline-none"
-                            value={item.qty}
-                            onChange={e => setQty(item.item_id, e.target.value)}
-                          />
-                          <button onClick={() => changeQty(item.item_id, 1)}
-                            className="w-5 h-5 rounded border bg-white text-gray-500 text-xs font-bold flex items-center justify-center hover:bg-gray-100">+</button>
-                        </div>
+                        {isWeightItem(item) ? (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <input
+                              type="number"
+                              className="w-14 border border-gray-200 rounded text-center text-[11px] py-0 bg-white focus:outline-none"
+                              value={Math.round(Number(item.weight_grams || 0))}
+                              onChange={e => setWeightGrams(item.item_id, e.target.value)}
+                            />
+                            <span className="text-[10px] text-gray-400">g</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <button onClick={() => changeQty(item.item_id, -1)}
+                              className="w-5 h-5 rounded border bg-white text-gray-500 text-xs font-bold flex items-center justify-center hover:bg-gray-100">−</button>
+                            <input
+                              type="number"
+                              className="w-8 border border-gray-200 rounded text-center text-[11px] py-0 bg-white focus:outline-none"
+                              value={item.qty}
+                              onChange={e => setQty(item.item_id, e.target.value)}
+                            />
+                            <button onClick={() => changeQty(item.item_id, 1)}
+                              className="w-5 h-5 rounded border bg-white text-gray-500 text-xs font-bold flex items-center justify-center hover:bg-gray-100">+</button>
+                          </div>
+                        )}
                       </td>
-                      <td className="py-1 text-right font-bold text-gray-800">₹{(item.price * item.qty).toFixed(2)}</td>
+                      <td className="py-1 text-right font-bold text-gray-800">₹{getLineAmount(item).toFixed(2)}</td>
                       <td className="py-1 pl-1">
                         <button onClick={() => removeItem(item.item_id)}
                           className="w-5 h-5 rounded bg-red-50 text-red-400 text-[10px] flex items-center justify-center hover:bg-red-100">✕</button>

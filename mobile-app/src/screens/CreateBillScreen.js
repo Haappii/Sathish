@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -14,6 +15,8 @@ import {
 
 import api from "../api/client";
 import useOnlineStatus from "../hooks/useOnlineStatus";
+import { WEB_APP_BASE } from "../config/api";
+import { useAuth } from "../context/AuthContext";
 import {
   cacheCategories,
   cacheItems,
@@ -22,13 +25,32 @@ import {
 } from "../offline/cache";
 import { enqueueInvoice, getPendingCount } from "../offline/queue";
 import { syncOfflineQueue } from "../offline/sync";
+import { printInvoiceByNumber, printKotTokenSlip } from "../utils/printInvoice";
 
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES  = ["cash", "card", "upi", "credit"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
+const BILL_ACTIONS = {
+  PRINT_BOTH: "print_both",
+  SAVE_ONLY: "save_only",
+  HOLD: "hold",
+};
 
-export default function CreateBillScreen() {
+const normalizeWeightGrams = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(1, Math.round(n));
+};
+
+const computeWeightLineAmount = (ratePerKg, grams) => {
+  const g = normalizeWeightGrams(grams);
+  const kg = g / 1000;
+  return Math.round(Number(ratePerKg || 0) * kg);
+};
+
+export default function CreateBillScreen({ route }) {
   const { isOnline } = useOnlineStatus();
+  const { session } = useAuth();
 
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -37,10 +59,32 @@ export default function CreateBillScreen() {
   const [selectedCat, setSelectedCat] = useState("ALL");
   const [itemSearch, setItemSearch]   = useState("");
   const [cart, setCart]           = useState([]);
-  const [customer, setCustomer]   = useState({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
+  const [customer, setCustomer]   = useState({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
   const [paymentMode, setPaymentMode] = useState("cash");
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]     = useState(false);
+  const [shopName, setShopName]   = useState("Haappii Billing");
+  const [shopDetails, setShopDetails] = useState({});
+  const [branchDetails, setBranchDetails] = useState({});
+  const [weightModalVisible, setWeightModalVisible] = useState(false);
+  const [pendingWeightItem, setPendingWeightItem] = useState(null);
+  const [weightInput, setWeightInput] = useState("250");
+  const routeOrderId = Number(route?.params?.prefillOrderId || 0) || null;
+  const isTableBillingFlow = Boolean(routeOrderId);
+  const isHotelFlow = String(shopDetails?.billing_type || shopDetails?.shop_type || "").toLowerCase() === "hotel";
+
+  const fetchLatestKotToken = async (orderId) => {
+    const id = Number(orderId || 0);
+    if (!id) return "";
+    try {
+      const res = await api.get(`/kot/order/${id}`);
+      const list = Array.isArray(res?.data) ? res.data : [];
+      const latest = list[list.length - 1] || {};
+      return String(latest?.kot_number || latest?.kot_token || "").trim();
+    } catch {
+      return "";
+    }
+  };
 
   // ── Load data (API first, fallback to cache) ───────────────────────────────
   useEffect(() => {
@@ -48,12 +92,22 @@ export default function CreateBillScreen() {
       setLoading(true);
       try {
         if (isOnline) {
-          const [catRes, itemRes] = await Promise.all([
+          const branchPromise = session?.branch_id
+            ? api.get(`/branch/${session.branch_id}`).catch(() => null)
+            : Promise.resolve(null);
+
+          const [catRes, itemRes, shopRes, branchRes] = await Promise.all([
             api.get("/category/"),
             api.get("/items/"),
+            api.get("/shop/details"),
+            branchPromise,
           ]);
           const cats  = catRes?.data || [];
           const items = itemRes?.data || [];
+          const nextShop = shopRes?.data || {};
+          setShopName(nextShop?.shop_name || "Haappii Billing");
+          setShopDetails(nextShop);
+          setBranchDetails(branchRes?.data || {});
           setCategories(cats);
           setItemsData(items);
           // Refresh cache
@@ -83,7 +137,7 @@ export default function CreateBillScreen() {
       const count = await getPendingCount();
       setPendingCount(count);
     })();
-  }, [isOnline]);
+  }, [isOnline, session?.branch_id]);
 
   // ── Auto-sync when coming back online ─────────────────────────────────────
   useEffect(() => {
@@ -121,7 +175,69 @@ export default function CreateBillScreen() {
   }, [itemsData, itemSearch, selectedCat]);
 
   // ── Cart management ────────────────────────────────────────────────────────
+  const isWeightItem = (item) => Boolean(item?.sold_by_weight);
+
+  const getLineAmount = (item) => {
+    if (isWeightItem(item)) return Number(item.price || 0);
+    return Number(item.price || 0) * Number(item.qty || 0);
+  };
+
+  const openWeightModal = (item, initialGrams = 250) => {
+    setPendingWeightItem(item);
+    setWeightInput(String(normalizeWeightGrams(initialGrams)));
+    setWeightModalVisible(true);
+  };
+
+  const confirmWeightAddOrUpdate = () => {
+    if (!pendingWeightItem) return;
+    const grams = normalizeWeightGrams(weightInput);
+    if (!grams) {
+      Alert.alert("Validation", "Enter valid weight in grams");
+      return;
+    }
+
+    const item = pendingWeightItem;
+    const ratePerKg = Number(item.selling_price || item.price || 0);
+    setCart((prev) => {
+      const found = prev.find((x) => x.item_id === item.item_id);
+      if (found) {
+        const totalGrams = normalizeWeightGrams(Number(found.weight_grams || 0) + grams);
+        return prev.map((x) =>
+          x.item_id === item.item_id
+            ? {
+                ...x,
+                qty: 1,
+                unit_rate: ratePerKg,
+                weight_grams: totalGrams,
+                price: computeWeightLineAmount(ratePerKg, totalGrams),
+              }
+            : x
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          ...item,
+          qty: 1,
+          unit_rate: ratePerKg,
+          weight_grams: grams,
+          price: computeWeightLineAmount(ratePerKg, grams),
+        },
+      ];
+    });
+
+    setWeightModalVisible(false);
+    setPendingWeightItem(null);
+  };
+
   const addToCart = (item) => {
+    if (isWeightItem(item)) {
+      const found = cart.find((x) => x.item_id === item.item_id);
+      openWeightModal(item, found?.weight_grams || 250);
+      return;
+    }
+
     setCart((prev) => {
       const found = prev.find((x) => x.item_id === item.item_id);
       if (found) {
@@ -135,15 +251,34 @@ export default function CreateBillScreen() {
   const changeQty = (itemId, delta) => {
     setCart((prev) =>
       prev
-        .map((x) => x.item_id === itemId ? { ...x, qty: Math.max(1, x.qty + delta) } : x)
+        .map((x) => x.item_id === itemId
+          ? (isWeightItem(x) ? x : { ...x, qty: Math.max(1, x.qty + delta) })
+          : x)
         .filter((x) => x.qty > 0)
+    );
+  };
+
+  const setWeightGrams = (itemId, gramsInput) => {
+    const grams = normalizeWeightGrams(gramsInput);
+    if (!grams) return;
+    setCart((prev) =>
+      prev.map((x) =>
+        x.item_id === itemId
+          ? {
+              ...x,
+              qty: 1,
+              weight_grams: grams,
+              price: computeWeightLineAmount(x.unit_rate ?? x.price, grams),
+            }
+          : x
+      )
     );
   };
 
   const removeItem = (itemId) => setCart((prev) => prev.filter((x) => x.item_id !== itemId));
 
   const subtotal = useMemo(
-    () => cart.reduce((t, x) => t + x.price * x.qty, 0),
+    () => cart.reduce((t, x) => t + getLineAmount(x), 0),
     [cart]
   );
 
@@ -164,13 +299,27 @@ export default function CreateBillScreen() {
     }
   };
 
-  // ── Save invoice (online → API, offline → queue) ───────────────────────────
-  const saveInvoice = async () => {
+  const resetForm = () => {
+    setCart([]);
+    setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
+    setPaymentMode("cash");
+  };
+
+  // ── Save invoice variants (print both / save only / hold) ──────────────────
+  const saveInvoice = async (action = BILL_ACTIONS.PRINT_BOTH) => {
     if (!cart.length) return Alert.alert("Validation", "Add at least one item");
 
     const mobile = String(customer.mobile || "").replace(/\D/g, "");
     if (mobile.length !== 10) return Alert.alert("Validation", "Enter a valid 10-digit mobile");
     if (!String(customer.name || "").trim()) return Alert.alert("Validation", "Customer name is required");
+
+    if (action === BILL_ACTIONS.HOLD && isTableBillingFlow) {
+      return Alert.alert("Not Allowed", "Hold bill is available only for Take Away flow.");
+    }
+
+    if (action === BILL_ACTIONS.HOLD && !isOnline) {
+      return Alert.alert("Offline", "Hold bill requires online connection.");
+    }
 
     const payload = {
       customer_name: String(customer.name || "").trim(),
@@ -182,17 +331,113 @@ export default function CreateBillScreen() {
       items: cart.map((x) => ({
         item_id: x.item_id,
         quantity: x.qty,
-        amount: x.qty * x.price,
+        amount: getLineAmount(x),
       })),
+    };
+
+    const checkoutPayload = {
+      customer_name: payload.customer_name,
+      mobile: payload.mobile,
+      payment_mode: payload.payment_mode,
+      payment_split: null,
+      service_charge: 0,
     };
 
     setSaving(true);
     try {
       if (isOnline) {
-        // Online — submit directly
-        const res = await api.post("/invoice/", payload);
-        const invoiceNo = res?.data?.invoice_number || "";
-        Alert.alert("Saved ✓", invoiceNo ? `Invoice: ${invoiceNo}` : "Invoice saved");
+        let invoiceNo = "";
+        let kotToken = "";
+        let sourceOrderId = routeOrderId;
+
+        if (isTableBillingFlow && isHotelFlow) {
+          const checkoutRes = await api.post(`/table-billing/order/checkout/${routeOrderId}`, checkoutPayload);
+          invoiceNo = String(checkoutRes?.data?.invoice_number || "").trim();
+        } else if (isHotelFlow) {
+          const takeawayRes = await api.post("/table-billing/takeaway", {
+            customer_name: payload.customer_name,
+            mobile: payload.mobile,
+            notes: "",
+            token_number: null,
+            items: cart.map((x) => ({
+              item_id: x.item_id,
+              quantity: x.qty,
+              price: isWeightItem(x) ? Number(x.unit_rate || x.price || 0) : x.price,
+            })),
+          });
+
+          sourceOrderId = Number(takeawayRes?.data?.order_id || 0) || null;
+          kotToken = String(takeawayRes?.data?.token_number || "").trim();
+
+          if (action === BILL_ACTIONS.HOLD) {
+            Alert.alert(
+              "Hold Saved",
+              `Token: ${kotToken || "-"}\nOrder: #${sourceOrderId || "-"}\nYou can complete or cancel this hold bill from Home.`
+            );
+            resetForm();
+            return;
+          }
+
+          const kotRes = await api.post(`/kot/create/${sourceOrderId}`);
+          kotToken =
+            String(kotRes?.data?.kot_number || "").trim() ||
+            String(kotRes?.data?.kot_token || "").trim() ||
+            kotToken;
+
+          const checkoutRes = await api.post(`/table-billing/order/checkout/${sourceOrderId}`, checkoutPayload);
+          invoiceNo = String(checkoutRes?.data?.invoice_number || "").trim();
+        } else {
+          const res = await api.post("/invoice/", payload);
+          invoiceNo = String(res?.data?.invoice_number || "").trim();
+          kotToken =
+            String(res?.data?.kot_number || "").trim() ||
+            String(res?.data?.kot_token || "").trim() ||
+            "";
+          const fallbackOrderId = Number(res?.data?.order_id || 0) || routeOrderId || null;
+          if (!kotToken && fallbackOrderId) {
+            kotToken = await fetchLatestKotToken(fallbackOrderId);
+          }
+        }
+
+        if (!kotToken && sourceOrderId) {
+          kotToken = await fetchLatestKotToken(sourceOrderId);
+        }
+
+        const receiptRequired = branchDetails?.receipt_required !== false;
+        if (action === BILL_ACTIONS.PRINT_BOTH && invoiceNo) {
+          try {
+            if (kotToken) {
+              await printKotTokenSlip(
+                {
+                  tokenNumber: kotToken,
+                  orderId: sourceOrderId,
+                  items: cart.map((x) => ({ item_name: x.item_name, quantity: x.qty })),
+                  customerName: payload.customer_name,
+                },
+                {
+                  shop: shopDetails,
+                  branch: branchDetails,
+                  shopName,
+                }
+              );
+            }
+
+            if (receiptRequired) {
+              await printInvoiceByNumber(api, invoiceNo, {
+                shop: shopDetails,
+                branch: branchDetails,
+                shopName,
+                webBase: WEB_APP_BASE,
+                kotToken,
+              });
+            }
+            Alert.alert("Saved ✓", `Invoice: ${invoiceNo}\nPrinted KOT token and invoice.`);
+          } catch {
+            Alert.alert("Saved ✓", `Invoice: ${invoiceNo}\nOpen print and select Bluetooth printer.`);
+          }
+        } else {
+          Alert.alert("Saved ✓", invoiceNo ? `Invoice: ${invoiceNo}\nSaved without printing.` : "Invoice saved");
+        }
       } else {
         // Offline — save to local queue
         const localId = await enqueueInvoice(payload);
@@ -204,18 +449,14 @@ export default function CreateBillScreen() {
         );
       }
       // Reset form
-      setCart([]);
-      setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
-      setPaymentMode("cash");
+      resetForm();
     } catch (err) {
       // API call failed even though we thought we were online — queue it
       await enqueueInvoice(payload);
       const count = await getPendingCount();
       setPendingCount(count);
       Alert.alert("Network Error", "Bill saved locally and will sync when reconnected.");
-      setCart([]);
-      setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
-      setPaymentMode("cash");
+      resetForm();
     } finally {
       setSaving(false);
     }
@@ -290,8 +531,16 @@ export default function CreateBillScreen() {
               return (
                 <Pressable style={[styles.itemCard, inCart && styles.itemCardActive]} onPress={() => addToCart(item)}>
                   <Text style={styles.itemName} numberOfLines={2}>{item.item_name}</Text>
-                  <Text style={styles.itemPrice}>₹{Number(item.selling_price || item.price || 0).toFixed(2)}</Text>
-                  {inCart && <Text style={styles.inCartBadge}>×{inCart.qty} in cart</Text>}
+                  <Text style={styles.itemPrice}>
+                    ₹{Number(item.selling_price || item.price || 0).toFixed(2)}{isWeightItem(item) ? "/kg" : ""}
+                  </Text>
+                  {inCart && (
+                    <Text style={styles.inCartBadge}>
+                      {isWeightItem(inCart)
+                        ? `${Math.round(Number(inCart.weight_grams || 0))}g in cart`
+                        : `×${inCart.qty} in cart`}
+                    </Text>
+                  )}
                 </Pressable>
               );
             }}
@@ -306,16 +555,35 @@ export default function CreateBillScreen() {
               <View key={String(x.item_id)} style={styles.cartRow}>
                 <View style={{ flex: 1, paddingRight: 8 }}>
                   <Text style={styles.cartName} numberOfLines={2}>{x.item_name}</Text>
-                  <Text style={styles.cartAmount}>{fmt(x.qty * x.price)}</Text>
+                  <Text style={styles.cartAmount}>{fmt(getLineAmount(x))}</Text>
+                  {isWeightItem(x) && (
+                    <Text style={styles.cartMeta}>
+                      {Math.round(Number(x.weight_grams || 0))}g @ ₹{Number(x.unit_rate || x.price || 0).toFixed(2)}/kg
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.qtyWrap}>
-                  <Pressable style={styles.qtyBtn} onPress={() => changeQty(x.item_id, -1)}>
-                    <Text style={styles.qtyTxt}>−</Text>
-                  </Pressable>
-                  <Text style={styles.qtyValue}>{x.qty}</Text>
-                  <Pressable style={[styles.qtyBtn, { backgroundColor: "#1d4ed8" }]} onPress={() => changeQty(x.item_id, 1)}>
-                    <Text style={[styles.qtyTxt, { color: "#fff" }]}>+</Text>
-                  </Pressable>
+                  {isWeightItem(x) ? (
+                    <>
+                      <TextInput
+                        style={styles.weightInput}
+                        keyboardType="numeric"
+                        value={String(Math.round(Number(x.weight_grams || 0)))}
+                        onChangeText={(v) => setWeightGrams(x.item_id, v)}
+                      />
+                      <Text style={styles.gramTxt}>g</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Pressable style={styles.qtyBtn} onPress={() => changeQty(x.item_id, -1)}>
+                        <Text style={styles.qtyTxt}>−</Text>
+                      </Pressable>
+                      <Text style={styles.qtyValue}>{x.qty}</Text>
+                      <Pressable style={[styles.qtyBtn, { backgroundColor: "#1d4ed8" }]} onPress={() => changeQty(x.item_id, 1)}>
+                        <Text style={[styles.qtyTxt, { color: "#fff" }]}>+</Text>
+                      </Pressable>
+                    </>
+                  )}
                   <Pressable onPress={() => removeItem(x.item_id)}>
                     <Text style={styles.removeTxt}>✕</Text>
                   </Pressable>
@@ -377,18 +645,63 @@ export default function CreateBillScreen() {
           <Pressable
             style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
             disabled={saving}
-            onPress={saveInvoice}
+            onPress={() => saveInvoice(BILL_ACTIONS.PRINT_BOTH)}
           >
             <Text style={styles.saveTxt}>
               {saving
                 ? "Saving…"
                 : isOnline
-                  ? `Save Invoice  ${fmt(subtotal)}`
+                  ? `Print KOT + Invoice  ${fmt(subtotal)}`
                   : `Save Offline  ${fmt(subtotal)}`}
             </Text>
           </Pressable>
+
+          {isOnline && (
+            <Pressable
+              style={[styles.saveOnlyBtn, saving && styles.saveBtnDisabled]}
+              disabled={saving}
+              onPress={() => saveInvoice(BILL_ACTIONS.SAVE_ONLY)}
+            >
+              <Text style={styles.saveOnlyTxt}>{saving ? "Saving…" : "Save Without Printing"}</Text>
+            </Pressable>
+          )}
+
+          {isOnline && !isTableBillingFlow && (
+            <Pressable
+              style={[styles.holdBtn, saving && styles.saveBtnDisabled]}
+              disabled={saving}
+              onPress={() => saveInvoice(BILL_ACTIONS.HOLD)}
+            >
+              <Text style={styles.holdTxt}>{saving ? "Holding…" : "Hold Bill"}</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
+
+      <Modal transparent visible={weightModalVisible} animationType="fade" onRequestClose={() => setWeightModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.weightModalCard}>
+            <Text style={styles.weightModalTitle}>Enter Weight (grams)</Text>
+            <Text style={styles.weightModalItem}>{pendingWeightItem?.item_name || ""}</Text>
+            <TextInput
+              style={styles.weightModalInput}
+              keyboardType="numeric"
+              value={weightInput}
+              onChangeText={setWeightInput}
+              placeholder="e.g. 250"
+              placeholderTextColor="#94a3b8"
+            />
+            <View style={styles.weightModalRow}>
+              <Pressable style={[styles.weightModalBtn, styles.weightModalCancel]} onPress={() => setWeightModalVisible(false)}>
+                <Text style={styles.weightModalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.weightModalBtn, styles.weightModalConfirm]} onPress={confirmWeightAddOrUpdate}>
+                <Text style={styles.weightModalConfirmText}>Apply</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -455,6 +768,7 @@ const styles = StyleSheet.create({
   },
   cartName:   { fontWeight: "700", color: "#0f172a" },
   cartAmount: { marginTop: 2, color: "#475569" },
+  cartMeta: { marginTop: 2, color: "#64748b", fontSize: 11 },
   qtyWrap:    { flexDirection: "row", alignItems: "center", gap: 8 },
   qtyBtn: {
     width: 30,
@@ -467,6 +781,18 @@ const styles = StyleSheet.create({
   },
   qtyTxt:   { fontSize: 18, color: "#0f172a", fontWeight: "700" },
   qtyValue: { fontWeight: "700", color: "#0f172a", minWidth: 20, textAlign: "center" },
+  weightInput: {
+    minWidth: 54,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    textAlign: "center",
+    color: "#0f172a",
+    backgroundColor: "#fff",
+  },
+  gramTxt: { color: "#64748b", fontWeight: "700", fontSize: 12 },
   removeTxt: { color: "#b91c1c", fontSize: 16, fontWeight: "700", paddingHorizontal: 4 },
   total: { fontSize: 16, fontWeight: "800", color: "#047857", textAlign: "right" },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -490,4 +816,59 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  saveOnlyBtn: {
+    marginTop: 2,
+    borderRadius: 10,
+    backgroundColor: "#0f766e",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  saveOnlyTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  holdBtn: {
+    marginTop: 2,
+    borderRadius: 10,
+    backgroundColor: "#b45309",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  holdTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(2, 6, 23, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  weightModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    gap: 10,
+  },
+  weightModalTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  weightModalItem: { color: "#334155", fontWeight: "600" },
+  weightModalInput: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#0f172a",
+    backgroundColor: "#f8fafc",
+  },
+  weightModalRow: { flexDirection: "row", gap: 10 },
+  weightModalBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  weightModalCancel: { backgroundColor: "#e2e8f0" },
+  weightModalConfirm: { backgroundColor: "#1d4ed8" },
+  weightModalCancelText: { color: "#334155", fontWeight: "700" },
+  weightModalConfirmText: { color: "#fff", fontWeight: "700" },
 });
