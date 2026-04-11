@@ -429,7 +429,8 @@ export default function TableGrid() {
       await loadTables();
     } catch (err) {
       const status = Number(err?.response?.status || 0);
-      if (status === 404 || status === 405) {
+      const shouldFallback = status === 404 || status === 405 || status === 422;
+      if (shouldFallback) {
         try {
           const sourceRes = await api.get(`/table-billing/order/by-table/${Number(transfering.from_table_id)}`);
           const sourceOrderId = Number(sourceRes?.data?.order_id || 0);
