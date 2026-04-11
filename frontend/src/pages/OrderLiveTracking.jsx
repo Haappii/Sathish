@@ -32,8 +32,15 @@ export default function OrderLiveTracking() {
     try {
       const res = await api.get("/kot/tracking/orders");
       const list = Array.isArray(res?.data) ? res.data : [];
+      const visibleRows = list.filter((row) => {
+        const orderType = String(row?.order_type || "").trim().toUpperCase();
+        const status = String(row?.status || "").trim().toUpperCase();
+        const isHandedOverTakeaway =
+          orderType === "TAKEAWAY" && (status === "SERVED" || status === "MOVED_TO_TABLE");
+        return !isHandedOverTakeaway;
+      });
       setRows(
-        list.sort((a, b) => {
+        visibleRows.sort((a, b) => {
           const ai = ORDER_LIVE_STAGE_MAP[String(a?.status || "").toUpperCase()]?.index ?? 99;
           const bi = ORDER_LIVE_STAGE_MAP[String(b?.status || "").toUpperCase()]?.index ?? 99;
           if (ai !== bi) return ai - bi;
@@ -115,42 +122,52 @@ export default function OrderLiveTracking() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {rows.map((row) => (
-            <div key={row.order_id} className="rounded-xl border bg-white p-3 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 truncate text-sm font-extrabold text-slate-800">
-                  {getTrackingDisplayTitle({
-                    tableName: row.table_name,
-                    orderType: row.order_type,
-                    tokenNumber: row.token_number,
-                    orderId: row.order_id,
-                  })}
-                </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                    STATUS_TONE[String(row.status || "").toUpperCase()] || STATUS_TONE.AWAITING_KOT
-                  }`}
-                >
-                  {formatTrackingStatusLabel(row.status, row.status_label || "Awaiting KOT", row.order_type)}
-                </span>
-              </div>
+          {rows.map((row) => {
+            const statusLabel = formatTrackingStatusLabel(
+              row.status,
+              row.status_label || "Awaiting KOT",
+              row.order_type
+            );
 
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {(row.items || []).length > 0 ? (
-                  row.items.map((item) => (
+            return (
+              <div key={row.order_id} className="rounded-xl border bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 truncate text-sm font-extrabold text-slate-800">
+                    {getTrackingDisplayTitle({
+                      tableName: row.table_name,
+                      orderType: row.order_type,
+                      tokenNumber: row.token_number,
+                      orderId: row.order_id,
+                    })}
+                  </div>
+                  {statusLabel ? (
                     <span
-                      key={item.order_item_id}
-                      className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700"
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                        STATUS_TONE[String(row.status || "").toUpperCase()] || STATUS_TONE.AWAITING_KOT
+                      }`}
                     >
-                      {item.item_name || "Item"}
+                      {statusLabel}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-[11px] text-slate-400">No items</span>
-                )}
+                  ) : null}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(row.items || []).length > 0 ? (
+                    row.items.map((item) => (
+                      <span
+                        key={item.order_item_id}
+                        className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700"
+                      >
+                        {item.item_name || "Item"}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-slate-400">No items</span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

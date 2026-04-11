@@ -78,10 +78,10 @@ export function formatTrackingStatusLabel(status, fallbackLabel, orderType) {
   const normalizedStatus = String(status || "").trim().toUpperCase();
 
   if (normalizedType === "TAKEAWAY" && normalizedStatus === "SERVED") {
-    return "Handed Over";
+    return "";
   }
   if (normalizedType === "TAKEAWAY" && normalizedStatus === "MOVED_TO_TABLE") {
-    return "Handed Over";
+    return "";
   }
 
   if (fallbackLabel) return fallbackLabel;
