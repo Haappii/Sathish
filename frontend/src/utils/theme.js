@@ -33,11 +33,6 @@ export const getTheme = () => {
   if (typeof window === "undefined") return ThemeModes.LIGHT;
   const saved = localStorage.getItem(getThemeKey());
   if (saved) return safeTheme(saved);
-
-  if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
-    return ThemeModes.DARK;
-  }
-
   return ThemeModes.LIGHT;
 };
 
