@@ -7,6 +7,23 @@ export const ThemeModes = {
 
 const THEME_KEY = "hb_theme";
 
+const getSessionShopId = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = localStorage.getItem("hb_session");
+    if (!raw) return "";
+    const parsed = JSON.parse(raw);
+    return String(parsed?.shop_id || "").trim();
+  } catch {
+    return "";
+  }
+};
+
+const getThemeKey = () => {
+  const shopId = getSessionShopId();
+  return shopId ? `${THEME_KEY}__shop_${shopId}` : `${THEME_KEY}__guest`;
+};
+
 const safeTheme = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
   return normalized === ThemeModes.DARK ? ThemeModes.DARK : ThemeModes.LIGHT;
@@ -14,7 +31,7 @@ const safeTheme = (value) => {
 
 export const getTheme = () => {
   if (typeof window === "undefined") return ThemeModes.LIGHT;
-  const saved = localStorage.getItem(THEME_KEY);
+  const saved = localStorage.getItem(getThemeKey());
   if (saved) return safeTheme(saved);
 
   if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
@@ -38,9 +55,9 @@ export const applyTheme = (theme = ThemeModes.LIGHT) => {
 
 export const setTheme = (theme) => {
   const nextTheme = safeTheme(theme);
-  writeSharedLocalValue(THEME_KEY, nextTheme);
+  writeSharedLocalValue(getThemeKey(), nextTheme);
   try {
-    localStorage.setItem(THEME_KEY, nextTheme);
+    localStorage.setItem(getThemeKey(), nextTheme);
   } catch {
     // ignore storage failures
   }
