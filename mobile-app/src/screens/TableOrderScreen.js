@@ -272,7 +272,49 @@ export default function TableOrderScreen({ route, navigation }) {
         [{ text: "OK", onPress: () => navigation.goBack() }]
       );
     } catch (err) {
-      Alert.alert("Error", err?.response?.data?.detail || "Failed to transfer table");
+      const status = Number(err?.response?.status || 0);
+      if (status === 404 || status === 405) {
+        try {
+          const sourceRes = await api.get(`/table-billing/order/by-table/${Number(table.table_id)}`);
+          const sourceOrderId = Number(sourceRes?.data?.order_id || 0);
+          const sourceItems = Array.isArray(sourceRes?.data?.items) ? sourceRes.data.items : [];
+          if (!sourceOrderId || !sourceItems.length) {
+            throw new Error("No items found on source table");
+          }
+
+          const destRes = await api.get(`/table-billing/order/by-table/${Number(transferTableId)}`);
+          const destOrderId = Number(destRes?.data?.order_id || 0);
+          if (!destOrderId) {
+            throw new Error("Unable to open destination table");
+          }
+
+          for (const row of sourceItems) {
+            const qty = Number(row?.quantity || 0);
+            const itemId = Number(row?.item_id || 0);
+            if (!itemId || qty <= 0) continue;
+            await api.post("/table-billing/order/item/add", null, {
+              params: {
+                order_id: destOrderId,
+                item_id: itemId,
+                qty,
+              },
+            });
+          }
+
+          await api.post(`/table-billing/order/cancel/${sourceOrderId}`);
+          setTransferOpen(false);
+          setTransferTableId(null);
+          Alert.alert(
+            "Transferred",
+            "Order transferred successfully.",
+            [{ text: "OK", onPress: () => navigation.goBack() }]
+          );
+        } catch (fallbackErr) {
+          Alert.alert("Error", fallbackErr?.response?.data?.detail || fallbackErr?.message || "Failed to transfer table");
+        }
+      } else {
+        Alert.alert("Error", err?.response?.data?.detail || "Failed to transfer table");
+      }
     } finally {
       setTransferBusy(false);
     }
