@@ -61,6 +61,9 @@ export default function TableGrid() {
 
   const [tables, setTables] = useState([]);
   const [confirming, setConfirming] = useState(null);
+  const [transfering, setTransfering] = useState(null);
+  const [transferTargetId, setTransferTargetId] = useState("");
+  const [transferBusy, setTransferBusy] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [hotelAllowed, setHotelAllowed] = useState(
     () => localStorage.getItem("billing_type") === "hotel"
@@ -397,6 +400,40 @@ export default function TableGrid() {
     setCheckoutLoading(false);
   };
 
+  const submitTransfer = async () => {
+    if (!transfering?.from_table_id) {
+      showToast("Source table not selected", "error");
+      return;
+    }
+
+    const toTableId = Number(transferTargetId);
+    if (!toTableId) {
+      showToast("Select destination table", "warning");
+      return;
+    }
+
+    if (toTableId === Number(transfering.from_table_id)) {
+      showToast("Select a different table", "warning");
+      return;
+    }
+
+    setTransferBusy(true);
+    try {
+      const res = await api.post("/table-billing/order/transfer", {
+        from_table_id: Number(transfering.from_table_id),
+        to_table_id: toTableId,
+      });
+      showToast(`Transferred to ${res.data?.to_table_name || "selected table"}`, "success");
+      setTransfering(null);
+      setTransferTargetId("");
+      await loadTables();
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to transfer table", "error");
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+
 
   /* ================= FILTER ================= */
   const list = tables;
@@ -568,6 +605,19 @@ export default function TableGrid() {
                               >
                                 Open
                               </button>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setTransferTargetId("");
+                                  setTransfering({
+                                    from_table_id: t.table_id,
+                                    from_table_name: t.table_name,
+                                  });
+                                }}
+                                className="flex-1 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[11px] text-indigo-700 font-semibold"
+                              >
+                                Transfer
+                              </button>
                             </div>
                           </div>
                         ) : isPaid ? (
@@ -587,6 +637,58 @@ export default function TableGrid() {
             </div>
           ));
         })()
+      )}
+
+      {transfering && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b">
+              <div>
+                <div className="font-semibold text-gray-800 text-sm">Transfer Table</div>
+                <div className="text-[11px] text-gray-400">From: {transfering.from_table_name}</div>
+              </div>
+              <button
+                onClick={() => setTransfering(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg leading-none"
+              >×</button>
+            </div>
+
+            <div className="px-5 py-4 space-y-2">
+              <label className="text-[10px] text-gray-400 uppercase tracking-wide">Destination Table</label>
+              <select
+                className="w-full border rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                value={transferTargetId}
+                onChange={(e) => setTransferTargetId(e.target.value)}
+              >
+                <option value="">Select free table</option>
+                {tables
+                  .filter((x) => Number(x.table_id) !== Number(transfering.from_table_id) && !x.order_id)
+                  .map((x) => (
+                    <option key={x.table_id} value={String(x.table_id)}>
+                      {x.table_name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setTransfering(null)}
+                className="px-4 py-1.5 rounded-lg border bg-white text-sm text-gray-600 hover:bg-gray-50"
+                disabled={transferBusy}
+              >
+                Close
+              </button>
+              <button
+                onClick={submitTransfer}
+                disabled={transferBusy}
+                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-60"
+              >
+                {transferBusy ? "Transferring..." : "Transfer"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Checkout modal ── */}
