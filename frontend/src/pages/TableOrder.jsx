@@ -9,6 +9,7 @@ import { generateFeedbackQrHtml } from "../utils/feedbackQr";
 import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { printDirectText } from "../utils/printDirect";
 import { isHotelShop } from "../utils/shopType";
+import appLogo from "../assets/app_logo.png";
 
 
 const DEFAULT_MOBILE = "9999999999";
@@ -386,11 +387,19 @@ export default function TableOrder() {
       enabled: branch?.feedback_qr_enabled !== false,
     });
 
+  const getLogoHtml = async () => {
+    if (branch?.print_logo_enabled === false) return "";
+    return `<img src="${appLogo}" alt="Logo" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
+  };
+
   const printInvoice = async invoiceNo => {
     if (!invoiceNo) return;
     const res = await api.get(`/invoice/by-number/${invoiceNo}`);
     const invoice = res.data || {};
-    const qrHtml = await getFeedbackQrHtml(invoice.invoice_number || invoiceNo);
+    const [logoHtml, qrHtml] = await Promise.all([
+      getLogoHtml(),
+      getFeedbackQrHtml(invoice.invoice_number || invoiceNo),
+    ]);
     const ok = await printDirectText(
       generateBillText({
         invoiceNumber: invoice.invoice_number || invoiceNo,
@@ -406,6 +415,7 @@ export default function TableOrder() {
       {
         fontSize: 8,
         paperSize: branch?.paper_size || "58mm",
+        headerHtml: logoHtml,
         extraHtml: qrHtml,
       }
     );

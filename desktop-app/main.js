@@ -602,6 +602,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
   const fontSize = Number(options.fontSize || 12) || 12;
   const paperWidth = (String(options.paperSize || "58mm") === "80mm") ? "80mm" : "58mm";
   const pageWidth = paperWidth === "80mm" ? 80000 : 58000;
+  const headerHtml = String(options.headerHtml || "");
   const extraHtml = String(options.extraHtml || "");
 
   const printWin = new BrowserWindow({
@@ -611,7 +612,20 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
 
   const html = `<!DOCTYPE html><html><head><style>
     @page { size: ${paperWidth} auto; margin: 0; }
-    body { margin: 0; padding: 0; width: ${paperWidth}; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: ${paperWidth};
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body { font-family: monospace; }
+    .receipt {
+      width: ${paperWidth};
+      margin: 0;
+      padding: 0;
+    }
     pre {
       margin: 0;
       padding: 0;
@@ -624,11 +638,35 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
       letter-spacing: 0;
       white-space: pre;
     }
+    .header-html {
+      box-sizing: border-box;
+      width: 100%;
+      margin: 0;
+      padding: 1.5mm 1.5mm 0;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .header-html img {
+      display: block;
+      margin: 0 auto;
+      max-width: calc(${paperWidth} - 8mm);
+      max-height: 20mm;
+      height: auto;
+      object-fit: contain;
+    }
     .extra-html {
       box-sizing: border-box;
       width: 100%;
       margin: 0;
       padding: 2mm 1.5mm 0;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
     .extra-html img {
       display: block;
@@ -636,7 +674,22 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
       max-width: calc(${paperWidth} - 8mm);
       height: auto;
     }
-  </style></head><body><pre>${escapeHtml(text)}</pre><div class="extra-html">${extraHtml}</div></body></html>`;
+    .header-html * {
+      text-align: center !important;
+    }
+    .extra-html * {
+      text-align: center !important;
+    }
+    .header-html img,
+    .header-html svg,
+    .header-html canvas,
+    .extra-html img,
+    .extra-html svg,
+    .extra-html canvas {
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+  </style></head><body><div class="receipt">${headerHtml ? `<div class="header-html">${headerHtml}</div>` : ""}<pre>${escapeHtml(text)}</pre><div class="extra-html">${extraHtml}</div></div></body></html>`;
 
   await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   await printWin.webContents.executeJavaScript(
