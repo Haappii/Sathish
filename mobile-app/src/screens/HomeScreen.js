@@ -37,6 +37,15 @@ export default function HomeScreen({ navigation }) {
   const branchName = String(session?.branch_name || "").trim();
   const shopBranchLabel = branchName ? `${shopName} - ${branchName}` : shopName;
 
+  const normalizeHoldBills = (data) => {
+    const list = Array.isArray(data) ? data : [];
+    return list.filter((row) => {
+      const orderId = Number(row?.order_id || 0);
+      const itemCount = Array.isArray(row?.items) ? row.items.length : 0;
+      return Number.isFinite(orderId) && orderId > 0 && itemCount > 0;
+    });
+  };
+
   useEffect(() => {
     let mounted = true;
     const loadHoldBills = async () => {
@@ -46,7 +55,7 @@ export default function HomeScreen({ navigation }) {
       }
       try {
         const res = await api.get("/table-billing/takeaway/orders");
-        setHoldBills(Array.isArray(res?.data) ? res.data : []);
+        setHoldBills(normalizeHoldBills(res?.data));
       } catch {
         setHoldBills([]);
       }
@@ -75,7 +84,7 @@ export default function HomeScreen({ navigation }) {
         setPendingCount(count);
         if (billingType === "hotel") {
           const holdRes = await api.get("/table-billing/takeaway/orders");
-          setHoldBills(Array.isArray(holdRes?.data) ? holdRes.data : []);
+          setHoldBills(normalizeHoldBills(holdRes?.data));
         }
       } catch (err) {
         if (!mounted) return;
@@ -92,7 +101,7 @@ export default function HomeScreen({ navigation }) {
     if (!isHotel) return;
     try {
       const res = await api.get("/table-billing/takeaway/orders");
-      setHoldBills(Array.isArray(res?.data) ? res.data : []);
+      setHoldBills(normalizeHoldBills(res?.data));
     } catch {
       setHoldBills([]);
     }

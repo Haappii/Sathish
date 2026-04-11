@@ -27,7 +27,15 @@ export default function OrderLiveScreen() {
       const res = await api.get("/kot/tracking/orders", {
         params: { include_without_kot: false },
       });
-      setRows(Array.isArray(res?.data) ? res.data : []);
+      const list = Array.isArray(res?.data) ? res.data : [];
+      const visibleRows = list.filter((row) => {
+        const orderType = String(row?.order_type || "").trim().toUpperCase();
+        const status = String(row?.status || "").trim().toUpperCase();
+        const isHandedOverTakeaway =
+          orderType === "TAKEAWAY" && (status === "SERVED" || status === "MOVED_TO_TABLE");
+        return !isHandedOverTakeaway;
+      });
+      setRows(visibleRows);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load order live");
     } finally {
