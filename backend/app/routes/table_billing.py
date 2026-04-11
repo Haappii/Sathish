@@ -165,6 +165,11 @@ class TakeawayCreateRequest(BaseModel):
     items: list[TakeawayItemRequest]
 
 
+class TransferTableRequest(BaseModel):
+    from_table_id: int
+    to_table_id: int
+
+
 # ======================================================
 # LIST TABLES
 # ======================================================
@@ -383,6 +388,8 @@ def get_or_create_order(
         .first()
     )
 
+    table_status_updated = False
+
     if not order:
         table_started_at = _table_started_now()
         order = Order(
@@ -394,10 +401,22 @@ def get_or_create_order(
 
         table.status = "OCCUPIED"
         table.table_start_time = table_started_at
+        table_status_updated = True
 
         db.add(order)
         db.commit()
         db.refresh(order)
+    else:
+        # Keep table state aligned when an OPEN order already exists.
+        if str(table.status or "").upper() != "OCCUPIED":
+            table.status = "OCCUPIED"
+            table_status_updated = True
+        if not table.table_start_time:
+            table.table_start_time = order.opened_at or _table_started_now()
+            table_status_updated = True
+
+        if table_status_updated:
+            db.commit()
 
     sc_info = _branch_service_charge_info(db, shop_id=user.shop_id, branch_id=int(user.branch_id))
     return {
@@ -521,6 +540,94 @@ def clear_order(
         "success": True,
         "removed_count": removed_count,
         "message": "Order cleared"
+    }
+
+
+@router.post("/order/transfer")
+def transfer_order_to_table(
+    payload: TransferTableRequest,
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("billing", "write"))
+):
+    ensure_hotel_billing_type(db, user.shop_id)
+
+    from_table_id = int(payload.from_table_id)
+    to_table_id = int(payload.to_table_id)
+
+    if from_table_id == to_table_id:
+        raise HTTPException(400, "Source and destination table cannot be the same")
+
+    from_table = (
+        db.query(TableMaster)
+        .filter(
+            TableMaster.shop_id == user.shop_id,
+            TableMaster.branch_id == user.branch_id,
+            TableMaster.table_id == from_table_id,
+            TableMaster.table_name != TAKEAWAY_TABLE_NAME,
+        )
+        .first()
+    )
+    if not from_table:
+        raise HTTPException(404, "Source table not found")
+
+    to_table = (
+        db.query(TableMaster)
+        .filter(
+            TableMaster.shop_id == user.shop_id,
+            TableMaster.branch_id == user.branch_id,
+            TableMaster.table_id == to_table_id,
+            TableMaster.table_name != TAKEAWAY_TABLE_NAME,
+        )
+        .first()
+    )
+    if not to_table:
+        raise HTTPException(404, "Destination table not found")
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.shop_id == user.shop_id,
+            Order.branch_id == user.branch_id,
+            Order.table_id == from_table_id,
+            Order.status == "OPEN",
+        )
+        .first()
+    )
+    if not order:
+        raise HTTPException(404, "No open order found on source table")
+
+    destination_open_order = (
+        db.query(Order)
+        .filter(
+            Order.shop_id == user.shop_id,
+            Order.branch_id == user.branch_id,
+            Order.table_id == to_table_id,
+            Order.status == "OPEN",
+        )
+        .first()
+    )
+    if destination_open_order:
+        raise HTTPException(400, "Destination table already has an open order")
+
+    started_at = from_table.table_start_time or order.opened_at or _table_started_now()
+
+    order.table_id = to_table_id
+    to_table.status = "OCCUPIED"
+    to_table.table_start_time = started_at
+
+    from_table.status = "FREE"
+    from_table.table_start_time = None
+    _end_active_qr_session(db=db, shop_id=int(user.shop_id), table_id=from_table_id)
+
+    db.commit()
+
+    return {
+        "success": True,
+        "order_id": order.order_id,
+        "from_table_id": from_table_id,
+        "from_table_name": from_table.table_name,
+        "to_table_id": to_table_id,
+        "to_table_name": to_table.table_name,
     }
 
 

@@ -53,6 +53,10 @@ export default function TableOrder() {
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
   const [showTotals, setShowTotals] = useState(false);
   const [cartBusy, setCartBusy] = useState(false);
+  const [tables, setTables] = useState([]);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [targetTableId, setTargetTableId] = useState("");
+  const [transferBusy, setTransferBusy] = useState(false);
 
   // Ref to always have the latest orderId without closure staleness
   const orderIdRef = useRef(null);
@@ -70,12 +74,14 @@ export default function TableOrder() {
   }, [tableId]);
 
   const loadData = useCallback(async (shopData = null) => {
-    const [c, i] = await Promise.all([
+    const [c, i, t] = await Promise.all([
       api.get("/category/"),
       api.get("/items/"),
+      api.get("/table-billing/tables"),
     ]);
     setCategories(c.data || []);
     setItems((i.data || []).filter((it) => !it?.is_raw_material));
+    setTables(t.data || []);
     setShop(shopData || {});
     const session = getSession() || {};
     if (session.branch_id) {
@@ -254,6 +260,44 @@ export default function TableOrder() {
         }
       },
     });
+  };
+
+  const transferTable = async () => {
+    if (!orderId) {
+      showToast("Order not found", "error");
+      return;
+    }
+
+    const toTableId = Number(targetTableId);
+    if (!toTableId) {
+      showToast("Select a destination table", "warning");
+      return;
+    }
+
+    if (toTableId === Number(tableId)) {
+      showToast("Choose a different table", "warning");
+      return;
+    }
+
+    setTransferBusy(true);
+    try {
+      const res = await api.post("/table-billing/order/transfer", {
+        from_table_id: Number(tableId),
+        to_table_id: toTableId,
+      });
+
+      showToast(
+        `Transferred to ${res.data?.to_table_name || "new table"}`,
+        "success"
+      );
+      setTransferOpen(false);
+      setTargetTableId("");
+      navigate("/table-billing", { replace: true });
+    } catch (err) {
+      showToast(errorDetail(err, "Failed to transfer table"), "error");
+    } finally {
+      setTransferBusy(false);
+    }
   };
 
   /* ================= PRINT ================= */
@@ -1028,6 +1072,17 @@ export default function TableOrder() {
               </button>
             </div>
             <button
+              type="button"
+              onClick={() => {
+                setTargetTableId("");
+                setTransferOpen(true);
+              }}
+              disabled={!orderItems.length || cartBusy || transferBusy}
+              className="w-full py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 text-[12px] font-bold transition disabled:opacity-60"
+            >
+              Transfer Table
+            </button>
+            <button
               onClick={cancelTable}
               className="w-full py-2 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-600 text-[12px] font-bold transition"
             >
@@ -1066,6 +1121,56 @@ export default function TableOrder() {
                 className={`rounded-lg px-4 py-1.5 text-sm font-medium text-white ${confirmDialog.confirmClassName || "bg-blue-600 hover:bg-blue-700"}`}
               >
                 {confirmDialog.confirmLabel || "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {transferOpen && (
+        <div className="fixed inset-0 z-[1000] bg-black/40 px-4 py-6 flex items-start justify-center">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="border-b px-4 py-3">
+              <h2 className="text-sm font-semibold text-gray-800">Transfer Table</h2>
+              <p className="mt-1 text-[12px] text-gray-500">
+                Move current order to another free table.
+              </p>
+            </div>
+
+            <div className="px-4 py-3 space-y-2">
+              <label className="text-[11px] font-semibold text-gray-500 uppercase">Destination Table</label>
+              <select
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                value={targetTableId}
+                onChange={(e) => setTargetTableId(e.target.value)}
+              >
+                <option value="">Select table</option>
+                {tables
+                  .filter((t) => Number(t.table_id) !== Number(tableId) && !t.order_id)
+                  .map((t) => (
+                    <option key={t.table_id} value={String(t.table_id)}>
+                      {t.table_name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="bg-slate-50 px-4 py-3 flex items-center justify-end gap-2 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setTransferOpen(false)}
+                className="rounded-lg border bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                disabled={transferBusy}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={transferTable}
+                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                disabled={transferBusy}
+              >
+                {transferBusy ? "Transferring..." : "Transfer"}
               </button>
             </div>
           </div>
