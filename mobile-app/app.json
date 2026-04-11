@@ -3,9 +3,11 @@
     "name": "Haappii Billing",
     "slug": "haappii-billing-mobile",
     "version": "2.1.0",
+    "icon": "./assets/app_logo.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/app_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#1d4ed8"
     },
@@ -20,6 +22,7 @@
       "package": "com.haappii.billing",
       "versionCode": 2,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/app_logo.png",
         "backgroundColor": "#1d4ed8"
       },
       "permissions": [
@@ -32,8 +35,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "haappii-billing-mobile"
+        "projectId": "baea398b-7c61-43b2-9622-7588b887a60a"
       }
-    }
+    },
+    "owner": "sathi52"
   }
 }

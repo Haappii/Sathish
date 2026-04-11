@@ -8,6 +8,12 @@ export const authApi = axios.create({
   timeout: 20000,
 });
 
+let unauthorizedHandler = null;
+
+export function setUnauthorizedHandler(handler) {
+  unauthorizedHandler = typeof handler === "function" ? handler : null;
+}
+
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 20000,
@@ -29,6 +35,7 @@ api.interceptors.response.use(
   async (error) => {
     if (error?.response?.status === 401) {
       await clearStoredSession();
+      if (unauthorizedHandler) unauthorizedHandler();
     }
     return Promise.reject(error);
   }

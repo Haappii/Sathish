@@ -91,10 +91,13 @@ export async function logoutSession({ redirect = true } = {}) {
 
   const token = getSessionToken();
 
-  logoutPromise = postAuth("/logout", { token, keepalive: true })
-    .catch(() => {})
-    .finally(() => {
-      clearSession();
+  // Clear client session immediately so UI/login state updates without waiting on network.
+  clearSession();
+
+  logoutPromise = Promise.race([
+    postAuth("/logout", { token, keepalive: true }).catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, 4000)),
+  ]).finally(() => {
       logoutPromise = null;
       if (redirect && typeof window !== "undefined") {
         window.location.replace("/login");

@@ -1,65 +1,65 @@
-/**
- * Mobile RBAC — defines which menu items appear for each role,
- * with hotel-only items gated by isHotel flag.
- */
+const ALL_ROLES = new Set(["admin", "manager", "cashier", "waiter"]);
 
 export const mobileMenuCatalog = [
   {
-    key: "dashboard",
-    title: "Dashboard",
-    icon: "📊",
-    route: "Dashboard",
-    perm: { module: "billing", action: "read" },
-    fallbackRoles: new Set(["admin", "manager", "cashier"]),
-  },
-  {
     key: "sales_billing",
-    title: "Create Bill",
+    title: "Take Away Billing",
     icon: "🧾",
     route: "CreateBill",
     perm: { module: "billing", action: "write" },
-    fallbackRoles: new Set(["admin", "manager", "cashier", "waiter"]),
+    fallbackRoles: ALL_ROLES,
   },
   {
     key: "billing_history",
-    title: "Sales History",
-    icon: "📋",
+    title: "Billing History",
+    icon: "🧾",
     route: "SalesHistory",
     perm: { module: "billing", action: "read" },
-    fallbackRoles: new Set(["admin", "manager", "cashier", "waiter"]),
-  },
-  {
-    key: "cash_drawer",
-    title: "Cash Drawer",
-    icon: "💰",
-    route: "CashDrawer",
-    perm: { module: "cash_drawer", action: "read" },
-    fallbackRoles: new Set(["admin", "manager", "cashier"]),
+    fallbackRoles: ALL_ROLES,
   },
   {
     key: "customers",
-    title: "Customers",
+    title: "Customer",
     icon: "👥",
     route: "Customers",
     perm: { module: "customers", action: "read" },
-    fallbackRoles: new Set(["admin", "manager", "cashier"]),
+    fallbackRoles: ALL_ROLES,
   },
-  {
-    key: "expenses",
-    title: "Expenses",
-    icon: "💸",
-    route: "Expenses",
-    perm: { module: "expenses", action: "read" },
-    fallbackRoles: new Set(["admin", "manager"]),
-  },
-  // ── Hotel-only items ──────────────────────────────────────────────────────
+
   {
     key: "table_billing",
     title: "Table Billing",
     icon: "🍽️",
     route: "TableGrid",
     perm: { module: "billing", action: "write" },
-    fallbackRoles: new Set(["admin", "manager", "cashier", "waiter"]),
+    fallbackRoles: ALL_ROLES,
+    hotelOnly: true,
+  },
+  {
+    key: "order_live",
+    title: "Order live",
+    icon: "🛎️",
+    route: "OrderLive",
+    perm: { module: "billing", action: "read" },
+    fallbackRoles: ALL_ROLES,
+    hotelOnly: true,
+  },
+  {
+    key: "kot_management",
+    title: "KOT mangement",
+    icon: "🍳",
+    route: "KotManagement",
+    perm: { module: "billing", action: "write" },
+    fallbackRoles: ALL_ROLES,
+    hotelOnly: true,
+  },
+  {
+    key: "qr_order_accept",
+    title: "QR order accept",
+    icon: "📱",
+    route: "QrOrdersAccept",
+    perm: { module: "qr_orders", action: "write" },
+    fallbackRoles: ALL_ROLES,
     hotelOnly: true,
   },
 ];

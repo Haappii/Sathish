@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import { authApi } from "../api/client";
+import { authApi, setUnauthorizedHandler } from "../api/client";
 import { clearStoredSession, getStoredSession, setStoredSession } from "../storage/session";
 
 const AuthContext = createContext(null);
@@ -21,6 +21,13 @@ export function AuthProvider({ children }) {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setSession(null);
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const login = async ({ shop_id, username, password }) => {
@@ -53,8 +60,17 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await clearStoredSession();
-    setSession(null);
+    try {
+      const token = session?.access_token || session?.token;
+      if (token) {
+        await authApi.post("/auth/logout", null, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+      await clearStoredSession();
+    } finally {
+      setSession(null);
+    }
   };
 
   const value = useMemo(

@@ -24,8 +24,15 @@ const dateRanges = [
   { key: "30d", label: "Last 30 Days" },
 ];
 
-function getRange(mode) {
-  const to = new Date();
+function parseBusinessDate(appDate) {
+  if (!appDate || typeof appDate !== "string") return new Date();
+  const [y, m, d] = appDate.slice(0, 10).split("-").map((v) => Number(v));
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+}
+
+function getRange(mode, appDate) {
+  const to = parseBusinessDate(appDate);
   const from = new Date(to);
   if (mode === "7d") from.setDate(from.getDate() - 6);
   if (mode === "30d") from.setDate(from.getDate() - 29);
@@ -43,6 +50,7 @@ export default function SalesHistoryScreen() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [businessDate, setBusinessDate] = useState(null);
 
   const [rows, setRows] = useState([]);
   const [activeInvoice, setActiveInvoice] = useState(null);
@@ -52,7 +60,13 @@ export default function SalesHistoryScreen() {
     else setRefreshing(true);
 
     try {
-      const params = getRange(range);
+      let activeBusinessDate = businessDate;
+      if (!activeBusinessDate) {
+        const shopRes = await api.get("/shop/details");
+        activeBusinessDate = shopRes?.data?.app_date || null;
+        setBusinessDate(activeBusinessDate);
+      }
+      const params = getRange(range, activeBusinessDate);
       const res = await api.get("/invoice/list", { params });
       setRows(res?.data || []);
     } catch (err) {
@@ -66,7 +80,7 @@ export default function SalesHistoryScreen() {
 
   useEffect(() => {
     loadRows(true);
-  }, [range]);
+  }, [range, businessDate]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -102,6 +116,9 @@ export default function SalesHistoryScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Filters</Text>
+          {businessDate ? (
+            <Text style={styles.businessDate}>Business Date: {String(businessDate).slice(0, 10)}</Text>
+          ) : null}
           <View style={styles.rangeRow}>
             {dateRanges.map((r) => (
               <Pressable
@@ -213,6 +230,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  businessDate: { color: "#1d4ed8", fontWeight: "700", fontSize: 12 },
   input: {
     borderWidth: 1,
     borderColor: "#cbd5e1",

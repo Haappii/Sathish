@@ -15,10 +15,9 @@ import {
   View,
 } from "react-native";
 import api from "../api/client";
+import { formatBusinessDateLabel, toBusinessYmd } from "../utils/businessDate";
 
 const CATEGORIES = ["Food", "Maintenance", "Salary", "Utilities", "Rent", "Other"];
-
-const TODAY = new Date().toISOString().slice(0, 10);
 
 export default function ExpensesScreen() {
   const [expenses, setExpenses]   = useState([]);
@@ -28,11 +27,16 @@ export default function ExpensesScreen() {
   const [addModal, setAddModal]   = useState(false);
   const [saving, setSaving]       = useState(false);
   const [form, setForm] = useState({ category: "Other", description: "", amount: "" });
+  const [businessDate, setBusinessDate] = useState(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const res = await api.get("/expenses/", { params: { date_from: TODAY, date_to: TODAY } });
+      const shopRes = await api.get("/shop/details");
+      const appDate = shopRes?.data?.app_date || null;
+      setBusinessDate(appDate);
+      const ymd = toBusinessYmd(appDate);
+      const res = await api.get("/expenses/", { params: { date_from: ymd, date_to: ymd } });
       const list = res.data?.expenses ?? res.data ?? [];
       setExpenses(list);
       setTotal(list.reduce((s, e) => s + Number(e.amount || 0), 0));
@@ -56,7 +60,7 @@ export default function ExpensesScreen() {
         category: form.category,
         description: form.description.trim(),
         amount,
-        expense_date: TODAY,
+        expense_date: toBusinessYmd(businessDate),
       });
       setAddModal(false);
       setForm({ category: "Other", description: "", amount: "" });
@@ -74,6 +78,7 @@ export default function ExpensesScreen() {
       <View style={styles.topBar}>
         <View>
           <Text style={styles.topLabel}>Today's Expenses</Text>
+          <Text style={styles.bizDate}>{formatBusinessDateLabel(businessDate)}</Text>
           <Text style={styles.topTotal}>₹{fmt(total)}</Text>
         </View>
         <Pressable style={styles.addBtn} onPress={() => setAddModal(true)}>
@@ -101,7 +106,7 @@ export default function ExpensesScreen() {
                   </View>
                   <View>
                     <Text style={styles.description} numberOfLines={2}>{exp.description}</Text>
-                    <Text style={styles.meta}>{exp.expense_date || TODAY}</Text>
+                    <Text style={styles.meta}>{exp.expense_date || toBusinessYmd(businessDate)}</Text>
                   </View>
                 </View>
                 <Text style={styles.amount}>₹{fmt(exp.amount)}</Text>
@@ -177,6 +182,7 @@ const styles = StyleSheet.create({
   center:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   topBar:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
   topLabel: { color: "#64748b", fontSize: 12 },
+  bizDate: { color: "#1d4ed8", fontSize: 11, fontWeight: "700" },
   topTotal: { fontSize: 22, fontWeight: "800", color: "#b45309" },
   addBtn:   { backgroundColor: "#1d4ed8", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   addBtnText: { color: "#fff", fontWeight: "700" },

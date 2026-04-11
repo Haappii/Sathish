@@ -152,6 +152,10 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               margin: 0;
               padding: 1.5mm 1.5mm 0;
               text-align: center;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
             }
             .header-html img {
               display: block;
@@ -166,12 +170,32 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               width: 100%;
               margin: 0;
               padding: 2mm 1.5mm 0;
+              text-align: center;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
             }
             .extra-html img {
               display: block;
               margin: 0 auto;
               max-width: calc(${paperWidth} - 8mm);
               height: auto;
+            }
+            .header-html * {
+              text-align: center !important;
+            }
+            .extra-html * {
+              text-align: center !important;
+            }
+            .header-html img,
+            .header-html svg,
+            .header-html canvas,
+            .extra-html img,
+            .extra-html svg,
+            .extra-html canvas {
+              margin-left: auto !important;
+              margin-right: auto !important;
             }
           </style>
         </head>

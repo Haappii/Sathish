@@ -11,18 +11,21 @@ import {
   View,
 } from "react-native";
 import api from "../api/client";
-
-const TODAY = new Date().toISOString().slice(0, 10);
+import { formatBusinessDateLabel, toBusinessYmd } from "../utils/businessDate";
 
 export default function DashboardScreen() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [businessDate, setBusinessDate] = useState(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const res = await api.get("/dashboard/", { params: { date: TODAY } });
+      const shopRes = await api.get("/shop/details");
+      const appDate = shopRes?.data?.app_date || null;
+      setBusinessDate(appDate);
+      const res = await api.get("/dashboard/stats", { params: { date: toBusinessYmd(appDate) } });
       setData(res.data);
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to load dashboard";
@@ -43,8 +46,8 @@ export default function DashboardScreen() {
     );
   }
 
-  const sales   = data?.total_sales   ?? 0;
-  const invoices = data?.total_invoices ?? 0;
+  const sales   = data?.today_sales   ?? 0;
+  const invoices = data?.today_bills ?? 0;
   const expense = data?.total_expenses ?? 0;
   const due     = data?.total_dues     ?? 0;
   const topItems = data?.top_items      ?? [];
@@ -57,7 +60,7 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
         {/* Date */}
-        <Text style={styles.dateLabel}>{new Date().toDateString()}</Text>
+        <Text style={styles.dateLabel}>Business Date: {formatBusinessDateLabel(businessDate)}</Text>
 
         {/* Summary Cards */}
         <View style={styles.cardRow}>

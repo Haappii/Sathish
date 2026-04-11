@@ -4,6 +4,7 @@
  * Tap a table to open TableOrderScreen.
  */
 import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +22,15 @@ const STATUS_META = {
   available: { label: "Available", bg: "#dcfce7", text: "#15803d", border: "#86efac" },
   occupied:  { label: "Occupied",  bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" },
   reserved:  { label: "Reserved",  bg: "#fef3c7", text: "#b45309", border: "#fcd34d" },
+  paid:      { label: "Paid",      bg: "#dbeafe", text: "#1d4ed8", border: "#93c5fd" },
+  free:      { label: "Available", bg: "#dcfce7", text: "#15803d", border: "#86efac" },
   default:   { label: "Unknown",   bg: "#f1f5f9", text: "#475569", border: "#e2e8f0" },
+};
+
+const normalizeStatus = (value) => {
+  const status = String(value || "").trim().toLowerCase();
+  if (status === "free") return "available";
+  return status || "available";
 };
 
 export default function TableGridScreen({ navigation }) {
@@ -55,6 +64,11 @@ export default function TableGridScreen({ navigation }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load(true);
+    }, [load])
+  );
 
   const openTable = (table) => {
     navigation.navigate("TableOrder", { table });
@@ -62,14 +76,14 @@ export default function TableGridScreen({ navigation }) {
 
   const filteredSections = sections.map(([name, tbls]) => [
     name,
-    filter === "all" ? tbls : tbls.filter((t) => (t.status || "available") === filter),
+    filter === "all" ? tbls : tbls.filter((t) => normalizeStatus(t.status) === filter),
   ]).filter(([, tbls]) => tbls.length > 0);
 
   const counts = {
     all:       tables.length,
-    available: tables.filter((t) => (t.status || "available") === "available").length,
-    occupied:  tables.filter((t) => t.status === "occupied").length,
-    reserved:  tables.filter((t) => t.status === "reserved").length,
+    available: tables.filter((t) => normalizeStatus(t.status) === "available").length,
+    occupied:  tables.filter((t) => normalizeStatus(t.status) === "occupied").length,
+    reserved:  tables.filter((t) => normalizeStatus(t.status) === "reserved").length,
   };
 
   return (
@@ -106,7 +120,7 @@ export default function TableGridScreen({ navigation }) {
                 <Text style={styles.sectionHeader}>{sectionName}</Text>
                 <View style={styles.grid}>
                   {sectionTables.map((table) => {
-                    const status = (table.status || "available").toLowerCase();
+                    const status = normalizeStatus(table.status);
                     const meta = STATUS_META[status] || STATUS_META.default;
                     return (
                       <Pressable
@@ -125,9 +139,9 @@ export default function TableGridScreen({ navigation }) {
                             {table.capacity} seats
                           </Text>
                         )}
-                        {table.current_order_id && (
+                        {table.order_id && (
                           <Text style={[styles.orderHint, { color: meta.text }]}>
-                            Order #{table.current_order_id}
+                            Order #{table.order_id}
                           </Text>
                         )}
                       </Pressable>

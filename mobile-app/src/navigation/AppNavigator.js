@@ -14,6 +14,9 @@ import ExpensesScreen     from "../screens/ExpensesScreen";
 import CashDrawerScreen   from "../screens/CashDrawerScreen";
 import TableGridScreen    from "../screens/TableGridScreen";
 import TableOrderScreen   from "../screens/TableOrderScreen";
+import OrderLiveScreen    from "../screens/OrderLiveScreen";
+import KotManagementScreen from "../screens/KotManagementScreen";
+import QrOrdersAcceptScreen from "../screens/QrOrdersAcceptScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +35,7 @@ export default function AppNavigator() {
 
   return (
     <Stack.Navigator
+      key={isLoggedIn ? "logged-in" : "logged-out"}
       screenOptions={{
         headerTitleStyle: { fontWeight: "700" },
         contentStyle:     { backgroundColor: "#f1f5f9" },
@@ -59,12 +63,12 @@ export default function AppNavigator() {
           <Stack.Screen
             name="CreateBill"
             component={CreateBillScreen}
-            options={{ title: "Create Bill" }}
+            options={{ title: "Take Away Billing" }}
           />
           <Stack.Screen
             name="SalesHistory"
             component={SalesHistoryScreen}
-            options={{ title: "Sales History" }}
+            options={{ title: "Billing History" }}
           />
           <Stack.Screen
             name="Customers"
@@ -91,6 +95,21 @@ export default function AppNavigator() {
             name="TableOrder"
             component={TableOrderScreen}
             options={{ title: "Table Order" }}
+          />
+          <Stack.Screen
+            name="OrderLive"
+            component={OrderLiveScreen}
+            options={{ title: "Order Live" }}
+          />
+          <Stack.Screen
+            name="KotManagement"
+            component={KotManagementScreen}
+            options={{ title: "KOT Management" }}
+          />
+          <Stack.Screen
+            name="QrOrdersAccept"
+            component={QrOrdersAcceptScreen}
+            options={{ title: "QR order accept" }}
           />
         </>
       )}

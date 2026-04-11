@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,7 +12,6 @@ import {
   View,
 } from "react-native";
 
-import { apiBaseHint, API_BASE } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
@@ -50,9 +50,12 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
       >
+        <View style={styles.heroGlow} />
         <View style={styles.card}>
-          <Text style={styles.title}>HAAPPII BILLING</Text>
-          <Text style={styles.subtitle}>Mobile v2.0.0 - Phase 1</Text>
+          <Image source={require("../../assets/app_logo.png")} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.brand}>HAAPPII BILLING</Text>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in to continue billing</Text>
 
           <TextInput
             style={styles.input}
@@ -83,47 +86,57 @@ export default function LoginScreen() {
           >
             <Text style={styles.buttonText}>{loading ? "Signing In..." : "Login"}</Text>
           </Pressable>
-
-          <Text style={styles.hint}>API: {API_BASE}</Text>
-          {apiBaseHint() ? <Text style={styles.warn}>{apiBaseHint()}</Text> : null}
         </View>
+        <Text style={styles.version}>v2.0.0</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#dbeafe" },
+  safe: { flex: 1, backgroundColor: "#eef2ff" },
   container: { flex: 1, justifyContent: "center", padding: 20 },
+  heroGlow: {
+    position: "absolute",
+    top: -120,
+    left: -80,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "#bfdbfe",
+    opacity: 0.45,
+  },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 22,
+    padding: 22,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  title: { fontSize: 22, fontWeight: "800", color: "#1d4ed8", textAlign: "center" },
-  subtitle: { marginTop: 4, marginBottom: 14, textAlign: "center", color: "#475569" },
+  logo: { width: 70, height: 70, alignSelf: "center", marginBottom: 6 },
+  brand: { fontSize: 12, fontWeight: "800", color: "#1d4ed8", letterSpacing: 1.2, textAlign: "center" },
+  title: { fontSize: 28, fontWeight: "800", color: "#0f172a", textAlign: "center", marginTop: 6 },
+  subtitle: { marginTop: 4, marginBottom: 18, textAlign: "center", color: "#64748b" },
   input: {
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-    backgroundColor: "#fff",
+    borderWidth: 1.2,
+    borderColor: "#dbeafe",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    backgroundColor: "#f8fafc",
+    color: "#0f172a",
   },
   button: {
-    marginTop: 4,
+    marginTop: 8,
     backgroundColor: "#1d4ed8",
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: "center",
   },
   buttonDisabled: { opacity: 0.65 },
-  buttonText: { color: "#fff", fontWeight: "700" },
-  hint: { marginTop: 12, fontSize: 12, color: "#334155" },
-  warn: { marginTop: 6, fontSize: 12, color: "#b45309" },
+  buttonText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  version: { position: "absolute", bottom: 24, alignSelf: "center", color: "#64748b", fontWeight: "700" },
 });
