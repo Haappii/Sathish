@@ -13,6 +13,9 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { WEB_APP_BASE } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import { printInvoiceByData } from "../utils/printInvoice";
 
 const pad = (n) => String(n).padStart(2, "0");
 const toYmd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -45,12 +48,29 @@ function displayDate(v) {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function getServiceChargeValue(inv = {}) {
+  const candidates = [
+    inv?.service_charge,
+    inv?.service_charge_amt,
+    inv?.service_charge_amount,
+  ];
+  for (const value of candidates) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
 export default function SalesHistoryScreen() {
+  const { session } = useAuth();
   const [range, setRange] = useState("today");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [businessDate, setBusinessDate] = useState(null);
+  const [printing, setPrinting] = useState(false);
+  const [shopDetails, setShopDetails] = useState({});
+  const [branchDetails, setBranchDetails] = useState({});
 
   const [rows, setRows] = useState([]);
   const [activeInvoice, setActiveInvoice] = useState(null);
@@ -62,9 +82,17 @@ export default function SalesHistoryScreen() {
     try {
       let activeBusinessDate = businessDate;
       if (!activeBusinessDate) {
-        const shopRes = await api.get("/shop/details");
+        const branchPromise = session?.branch_id
+          ? api.get(`/branch/${session.branch_id}`).catch(() => null)
+          : Promise.resolve(null);
+        const [shopRes, branchRes] = await Promise.all([
+          api.get("/shop/details"),
+          branchPromise,
+        ]);
         activeBusinessDate = shopRes?.data?.app_date || null;
         setBusinessDate(activeBusinessDate);
+        setShopDetails(shopRes?.data || {});
+        setBranchDetails(branchRes?.data || {});
       }
       const params = getRange(range, activeBusinessDate);
       const res = await api.get("/invoice/list", { params });
@@ -98,6 +126,30 @@ export default function SalesHistoryScreen() {
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to load invoice details";
       Alert.alert("Error", String(msg));
+    }
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!activeInvoice) return;
+    if (branchDetails?.receipt_required === false) {
+      Alert.alert("Print Disabled", "Receipt printing is disabled for this branch.");
+      return;
+    }
+
+    setPrinting(true);
+    try {
+      await printInvoiceByData(activeInvoice, {
+        shop: shopDetails,
+        branch: branchDetails,
+        shopName: shopDetails?.shop_name || "Haappii Billing",
+        webBase: WEB_APP_BASE,
+        disableNative: true,
+      });
+      Alert.alert("Print", "Invoice sent to printer.");
+    } catch (err) {
+      Alert.alert("Print Error", err?.message || "Failed to print invoice.");
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -175,9 +227,18 @@ export default function SalesHistoryScreen() {
         <SafeAreaView style={styles.modalSafe}>
           <View style={styles.modalHead}>
             <Text style={styles.modalTitle}>Invoice Details</Text>
-            <Pressable onPress={() => setActiveInvoice(null)}>
-              <Text style={styles.close}>Close</Text>
-            </Pressable>
+            <View style={styles.modalHeadActions}>
+              <Pressable
+                style={[styles.printBtn, printing && styles.printBtnDisabled]}
+                disabled={printing}
+                onPress={handlePrintInvoice}
+              >
+                <Text style={styles.printBtnText}>{printing ? "Printing..." : "Print"}</Text>
+              </Pressable>
+              <Pressable onPress={() => setActiveInvoice(null)}>
+                <Text style={styles.close}>Close</Text>
+              </Pressable>
+            </View>
           </View>
 
           {activeInvoice ? (
@@ -207,6 +268,7 @@ export default function SalesHistoryScreen() {
               </View>
 
               <Text style={styles.totalLine}>Tax: {fmtMoney(activeInvoice.tax_amt)}</Text>
+              <Text style={styles.totalLine}>Service Charge: {fmtMoney(getServiceChargeValue(activeInvoice))}</Text>
               <Text style={styles.totalLine}>Discount: {fmtMoney(activeInvoice.discounted_amt)}</Text>
               <Text style={styles.totalBig}>Total: {fmtMoney(activeInvoice.total_amount)}</Text>
             </ScrollView>
@@ -282,6 +344,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   modalTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  modalHeadActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  printBtn: {
+    backgroundColor: "#1d4ed8",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  printBtnDisabled: { opacity: 0.7 },
+  printBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   close: { color: "#1d4ed8", fontWeight: "700" },
   modalBody: { padding: 14, gap: 8 },
   detailLine: { color: "#334155" },

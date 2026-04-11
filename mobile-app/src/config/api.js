@@ -1,7 +1,9 @@
-const defaultApi = "http://127.0.0.1:8000";
+const defaultApi = "https://haappiibilling.in/api";
 const defaultWeb = "https://haappiibilling.in";
 
-export const API_BASE = process.env.EXPO_PUBLIC_API_BASE || defaultApi;
+const normalize = (v) => String(v || "").replace(/\/+$/, "");
+
+export const API_BASE = normalize(process.env.EXPO_PUBLIC_API_BASE || defaultApi);
 export const WEB_APP_BASE = process.env.EXPO_PUBLIC_WEB_BASE || defaultWeb;
 
 export const apiBaseHint = () => {

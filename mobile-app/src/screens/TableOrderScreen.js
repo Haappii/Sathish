@@ -18,6 +18,12 @@ import {
 } from "react-native";
 import api from "../api/client";
 
+const normalizeServiceCharge = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, n);
+};
+
 export default function TableOrderScreen({ route, navigation }) {
   const { table } = route.params;
 
@@ -33,6 +39,7 @@ export default function TableOrderScreen({ route, navigation }) {
   const [billOpen, setBillOpen]   = useState(false);
   const [billing, setBilling]     = useState(false);
   const [paymentMode, setPaymentMode] = useState("cash");
+  const [serviceCharge, setServiceCharge] = useState("0");
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTableId, setTransferTableId] = useState(null);
   const [transferBusy, setTransferBusy] = useState(false);
@@ -43,11 +50,12 @@ export default function TableOrderScreen({ route, navigation }) {
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [catRes, itemRes, orderRes, tableRes] = await Promise.all([
+      const [catRes, itemRes, orderRes, tableRes, shopRes] = await Promise.all([
         api.get("/category/"),
         api.get("/items/"),
         api.get(`/table-billing/order/by-table/${table.table_id}`),
         api.get("/table-billing/tables"),
+        api.get("/shop/details").catch(() => null),
       ]);
       const categoryRows = catRes.data?.categories ?? catRes.data ?? [];
       const itemRows = itemRes.data?.items ?? itemRes.data ?? [];
@@ -56,6 +64,8 @@ export default function TableOrderScreen({ route, navigation }) {
       setItems(itemRows);
       setOrder(orderRes.data ?? null);
       setTables(tableRes.data?.tables ?? tableRes.data ?? []);
+      const shopData = shopRes?.data || {};
+      setServiceCharge(String(normalizeServiceCharge(shopData?.service_charge ?? shopData?.default_service_charge ?? 0)));
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load");
     } finally {
@@ -204,7 +214,7 @@ export default function TableOrderScreen({ route, navigation }) {
         mobile: String(order?.mobile || ""),
         payment_mode: paymentMode,
         payment_split: null,
-        service_charge: 0,
+        service_charge: normalizeServiceCharge(serviceCharge),
       };
 
       const res = await api.post(`/table-billing/order/checkout/${order.order_id}`, payload);
@@ -273,7 +283,7 @@ export default function TableOrderScreen({ route, navigation }) {
       );
     } catch (err) {
       const status = Number(err?.response?.status || 0);
-      const shouldFallback = status === 404 || status === 405 || status === 422;
+      const shouldFallback = status === 0 || status >= 500 || status === 404 || status === 405 || status === 422;
       if (shouldFallback) {
         try {
           const sourceRes = await api.get(`/table-billing/order/by-table/${Number(table.table_id)}`);
@@ -439,6 +449,16 @@ export default function TableOrderScreen({ route, navigation }) {
             </ScrollView>
 
             <Text style={styles.modalTotal}>Total: ₹{Number(mergedBillTotal || 0).toFixed(2)}</Text>
+
+            <Text style={styles.modalSubTitle}>Service Charge</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="0"
+              keyboardType="numeric"
+              value={serviceCharge}
+              onChangeText={(v) => setServiceCharge(v.replace(/[^\d.]/g, ""))}
+              placeholderTextColor="#94a3b8"
+            />
 
             <Text style={styles.modalSubTitle}>Payment Mode</Text>
             <View style={styles.paymentRow}>

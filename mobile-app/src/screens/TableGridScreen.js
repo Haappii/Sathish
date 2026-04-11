@@ -144,6 +144,11 @@ export default function TableGridScreen({ navigation }) {
                             Order #{table.order_id}
                           </Text>
                         )}
+                        {status === "occupied" && Number(table.running_total || 0) > 0 && (
+                          <Text style={[styles.orderHint, { color: meta.text }]}> 
+                            Total ₹{Number(table.running_total || 0).toFixed(2)}
+                          </Text>
+                        )}
                       </Pressable>
                     );
                   })}

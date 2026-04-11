@@ -1,8 +1,26 @@
 import * as Print from "expo-print";
 import { Asset } from "expo-asset";
-import { Image } from "react-native";
+import { Image, Platform } from "react-native";
 import appLogo from "../../assets/app_logo.png";
 import { API_BASE, WEB_APP_BASE } from "../config/api";
+import { getPrinterSettings } from "./printerSettings";
+
+let nativePrinterModule = null;
+
+function getNativePrinterModule() {
+  if (nativePrinterModule) return nativePrinterModule;
+  try {
+    // Lazy require avoids runtime crash if native module is unavailable in a build.
+    const mod = require("react-native-esc-pos-printer");
+    if (mod?.Printer && mod?.PrinterConstants && mod?.PrinterModelLang) {
+      nativePrinterModule = mod;
+      return nativePrinterModule;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 async function toDataUri(uri) {
   if (!uri) return "";
@@ -85,6 +103,88 @@ function resolveApiUrl(path) {
 
   const base = API_BASE.endsWith("/") ? API_BASE : `${API_BASE}/`;
   return `${base}${value}`;
+}
+
+function resolvePrinterUrl(options = {}) {
+  const directOption = String(options?.printerUrl || "").trim();
+  if (directOption) return directOption;
+
+  const branch = options?.branch || {};
+  const candidates = [
+    branch?.printer_url,
+    branch?.network_printer_url,
+    branch?.bluetooth_printer_url,
+    branch?.printerUrl,
+    branch?.networkPrinterUrl,
+    branch?.bluetoothPrinterUrl,
+  ];
+
+  for (const value of candidates) {
+    const v = String(value || "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
+async function sendToPrinter(html, options = {}) {
+  const settings = await getPrinterSettings();
+  const shouldUseNative =
+    Platform.OS === "android" &&
+    Boolean(settings?.directThermalEnabled) &&
+    options?.disableNative !== true;
+  if (shouldUseNative) {
+    const nativeMod = getNativePrinterModule();
+    if (!nativeMod) {
+      throw new Error("Direct thermal module is not available in this build.");
+    }
+
+    const target = String(options?.printerTarget || settings?.target || "").trim();
+    if (!target) throw new Error("Direct thermal printing is enabled but printer target is not configured.");
+
+    const deviceName = String(
+      options?.printerDeviceName ||
+      settings?.deviceName ||
+      options?.branch?.printer_model ||
+      "TM-T88V"
+    ).trim();
+
+    const payload = String(options?.nativeText || "");
+    if (!payload) throw new Error("No printable payload available for native printer.");
+
+    const validTarget = /^((TCP|BT):|[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9A-Fa-f:]{11,})/.test(target);
+    if (!validTarget) {
+      throw new Error("Printer target is invalid for direct thermal printing.");
+    }
+
+    const printer = new nativeMod.Printer({
+      target,
+      deviceName,
+      lang: nativeMod.PrinterModelLang.MODEL_ANK,
+    });
+
+    await printer.connect();
+    try {
+      await printer.addTextAlign(nativeMod.PrinterConstants.ALIGN_LEFT);
+      await printer.addText(payload);
+      await printer.addFeedLine(3);
+      await printer.addCut(nativeMod.PrinterConstants.CUT_FEED);
+      await printer.sendData();
+    } finally {
+      await printer.disconnect().catch(() => {});
+    }
+    return;
+  }
+
+  const mergedOptions = {
+    ...options,
+    printerUrl: options?.printerUrl || settings?.printerUrl || "",
+  };
+  const printerUrl = resolvePrinterUrl(mergedOptions);
+  if (printerUrl) {
+    await Print.printAsync({ html, printerUrl });
+    return;
+  }
+  await Print.printAsync({ html });
 }
 
 function slugifyShopName(value) {
@@ -227,6 +327,38 @@ function buildReceiptText(invoice, { shop = {}, branch = {}, paperSize = "58mm",
   return t;
 }
 
+function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize = "58mm" } = {}) {
+  const is80mm = String(paperSize || "58mm") === "80mm";
+  const WIDTH = is80mm ? 48 : 32;
+  const line = "-".repeat(WIDTH);
+  const token = String(tokenData?.tokenNumber || "").trim();
+  const orderId = tokenData?.orderId;
+  const customerName = String(tokenData?.customerName || "").trim();
+  const items = Array.isArray(tokenData?.items) ? tokenData.items : [];
+
+  const headerName = branch?.branch_name
+    ? `${shop?.shop_name || "Shop Name"} - ${branch.branch_name}`
+    : shop?.shop_name || "Shop Name";
+
+  let t = "";
+  t += `${center(headerName, WIDTH)}\n`;
+  t += `${center("KOT TOKEN", WIDTH)}\n`;
+  t += `${line}\n`;
+  t += `${center(token || `#${orderId || "-"}`, WIDTH)}\n`;
+  if (customerName) t += `${center(customerName, WIDTH)}\n`;
+  if (orderId) t += `${center(`Order #${orderId}`, WIDTH)}\n`;
+  t += `${line}\n`;
+
+  for (const row of items) {
+    const itemName = String(row?.item_name || "Item");
+    const qty = Number(row?.quantity || 0);
+    t += `${itemName} x${qty}\n`;
+  }
+
+  t += `\n\n`;
+  return t;
+}
+
 function buildFeedbackQrHtml({ shopId, invoiceNo, enabled = true, webBase = WEB_APP_BASE } = {}) {
   if (!enabled || !shopId || !invoiceNo || !webBase) return "";
   const feedbackUrl = `${String(webBase).replace(/\/$/, "")}/feedback?shop_id=${encodeURIComponent(shopId)}&invoice_no=${encodeURIComponent(invoiceNo)}`;
@@ -343,7 +475,7 @@ export async function printInvoiceByData(invoice, options = {}) {
     </html>
   `;
 
-  await Print.printAsync({ html });
+  await sendToPrinter(html, { ...options, nativeText: receiptText });
 }
 
 export async function printInvoiceByNumber(api, invoiceNo, options = {}) {
@@ -436,5 +568,19 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
     </html>
   `;
 
-  await Print.printAsync({ html });
+  const nativeText = buildKotTokenText(
+    {
+      tokenNumber: token,
+      orderId,
+      customerName,
+      items,
+    },
+    {
+      shop: normalizedShop,
+      branch,
+      paperSize,
+    }
+  );
+
+  await sendToPrinter(html, { ...options, nativeText });
 }

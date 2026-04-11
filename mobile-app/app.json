@@ -33,11 +33,11 @@
     "web": {
       "bundler": "metro"
     },
+    "owner": "sk52",
     "extra": {
       "eas": {
-        "projectId": "baea398b-7c61-43b2-9622-7588b887a60a"
+        "projectId": "88644eb4-7d9b-434a-977c-2d8a73098eff"
       }
-    },
-    "owner": "sathi52"
+    }
   }
 }

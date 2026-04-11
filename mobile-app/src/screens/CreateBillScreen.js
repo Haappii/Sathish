@@ -36,6 +36,12 @@ const BILL_ACTIONS = {
   HOLD: "hold",
 };
 
+const normalizeServiceCharge = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, n);
+};
+
 const normalizeWeightGrams = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -61,6 +67,7 @@ export default function CreateBillScreen({ route }) {
   const [cart, setCart]           = useState([]);
   const [customer, setCustomer]   = useState({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
   const [paymentMode, setPaymentMode] = useState("cash");
+  const [serviceCharge, setServiceCharge] = useState("0");
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]     = useState(false);
   const [shopName, setShopName]   = useState("Haappii Billing");
@@ -107,6 +114,7 @@ export default function CreateBillScreen({ route }) {
           const nextShop = shopRes?.data || {};
           setShopName(nextShop?.shop_name || "Haappii Billing");
           setShopDetails(nextShop);
+          setServiceCharge(String(normalizeServiceCharge(nextShop?.service_charge ?? nextShop?.default_service_charge ?? 0)));
           setBranchDetails(branchRes?.data || {});
           setCategories(cats);
           setItemsData(items);
@@ -303,6 +311,7 @@ export default function CreateBillScreen({ route }) {
     setCart([]);
     setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
     setPaymentMode("cash");
+    setServiceCharge(String(normalizeServiceCharge(shopDetails?.service_charge ?? shopDetails?.default_service_charge ?? 0)));
   };
 
   // ── Save invoice variants (print both / save only / hold) ──────────────────
@@ -340,7 +349,7 @@ export default function CreateBillScreen({ route }) {
       mobile: payload.mobile,
       payment_mode: payload.payment_mode,
       payment_split: null,
-      service_charge: 0,
+      service_charge: normalizeServiceCharge(serviceCharge),
     };
 
     setSaving(true);
@@ -433,7 +442,7 @@ export default function CreateBillScreen({ route }) {
             }
             Alert.alert("Saved ✓", `Invoice: ${invoiceNo}\nPrinted KOT token and invoice.`);
           } catch {
-            Alert.alert("Saved ✓", `Invoice: ${invoiceNo}\nOpen print and select Bluetooth printer.`);
+            Alert.alert("Saved ✓", `Invoice: ${invoiceNo}\nUnable to send print command.`);
           }
         } else {
           Alert.alert("Saved ✓", invoiceNo ? `Invoice: ${invoiceNo}\nSaved without printing.` : "Invoice saved");
@@ -641,6 +650,16 @@ export default function CreateBillScreen({ route }) {
               </Pressable>
             ))}
           </View>
+
+          <Text style={styles.sectionTitle}>Service Charge</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={serviceCharge}
+            placeholderTextColor="#94a3b8"
+            onChangeText={(v) => setServiceCharge(v.replace(/[^\d.]/g, ""))}
+          />
 
           <Pressable
             style={[styles.saveBtn, saving && styles.saveBtnDisabled]}

@@ -750,7 +750,9 @@ def checkout_order(
 # ======================================================
 # CANCEL ORDER
 # ======================================================
-@router.post("/order/cancel/{order_id}")
+@router.api_route("/order/cancel/{order_id}", methods=["POST", "PUT", "DELETE"])
+@router.api_route("/orders/{order_id}/cancel", methods=["POST", "PUT", "DELETE"])
+@router.api_route("/order/{order_id}/cancel", methods=["POST", "PUT", "DELETE"])
 def cancel_order(
     order_id: int,
     db: Session = Depends(get_db),

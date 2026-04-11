@@ -79,9 +79,6 @@ export default function OrderLiveScreen() {
                 ))}
               </View>
 
-              <View style={styles.readOnlyTag}>
-                <Text style={styles.readOnlyTxt}>Status update removed</Text>
-              </View>
             </View>
           );
         })}
@@ -110,12 +107,4 @@ const styles = StyleSheet.create({
   stepDot: { width: 14, height: 14, borderRadius: 7 },
   stepDone: { backgroundColor: "#1d4ed8" },
   stepTodo: { backgroundColor: "#cbd5e1" },
-  readOnlyTag: {
-    marginTop: 8,
-    borderRadius: 10,
-    backgroundColor: "#e2e8f0",
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  readOnlyTxt: { color: "#334155", fontWeight: "700" },
 });
