@@ -133,12 +133,13 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
             .receipt {
               width: ${paperWidth};
               margin: 0;
-              padding: 0;
+              padding: 1.5mm 2.2mm 0 0;
+              box-sizing: border-box;
             }
             pre {
               margin: 0;
               box-sizing: border-box;
-              padding: 0 1.5mm;
+              padding: 1.5mm 2.2mm 0 1.5mm;
               font-family: Consolas, "Courier New", monospace;
               font-size: ${Math.max(Number(fontSize) || 9, 6)}px;
               line-height: 1.1;

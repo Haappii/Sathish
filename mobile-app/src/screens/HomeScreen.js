@@ -124,13 +124,13 @@ export default function HomeScreen({ navigation }) {
       {/* Banners */}
       {!isOnline && (
         <View style={styles.bannerOffline}>
-          <Text style={styles.bannerText}>âš¡ Offline Mode â€” bills sync when reconnected</Text>
+          <Text style={styles.bannerText}>Offline Mode - bills sync when reconnected</Text>
         </View>
       )}
       {isOnline && pendingCount > 0 && (
         <Pressable style={styles.bannerSync} onPress={handleSync} disabled={syncing}>
           <Text style={styles.bannerText}>
-            {syncing ? "â³ Syncingâ€¦" : `ðŸ“¤ ${pendingCount} pending bill(s) â€” tap to sync`}
+            {syncing ? "Syncing..." : `${pendingCount} pending bill(s) - tap to sync`}
           </Text>
         </Pressable>
       )}
@@ -181,7 +181,7 @@ export default function HomeScreen({ navigation }) {
                   onPress={() => navigation.navigate(m.route, m.params || undefined)}
                 >
                   <View style={[styles.iconWrap, { backgroundColor: accent + "1a" }]}>
-                    <Text style={styles.tileIcon}>{m.icon || "â˜°"}</Text>
+                    <Text style={styles.tileIcon}>{m.icon || "Menu"}</Text>
                   </View>
                   <Text style={styles.tileLabel}>{m.title}</Text>
                   <View style={[styles.tileAccentBar, { backgroundColor: accent }]} />
@@ -193,7 +193,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Printer Settings */}
         <Pressable style={styles.printerBtn} onPress={() => setShowPrinterSettings(true)}>
-          <Text style={styles.printerBtnText}>âš™  Printer Settings</Text>
+          <Text style={styles.printerBtnText}>Printer Settings</Text>
         </Pressable>
       </ScrollView>
 

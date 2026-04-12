@@ -107,7 +107,7 @@ export default function LoginScreen() {
             disabled={loading}
             onPress={submit}
           >
-            <Text style={styles.buttonText}>{loading ? "Signing Inâ€¦" : "Login"}</Text>
+            <Text style={styles.buttonText}>{loading ? "Signing In..." : "Login"}</Text>
           </Pressable>
         </View>
 

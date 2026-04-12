@@ -263,7 +263,10 @@ function getKotToken(invoice = {}, options = {}) {
 
 function buildReceiptText(invoice, { shop = {}, branch = {}, paperSize = "58mm", kotToken = "" } = {}) {
   const is80mm = String(paperSize || "58mm") === "80mm";
-  const WIDTH = is80mm ? 48 : 32;
+  const BASE_WIDTH = is80mm ? 48 : 32;
+  const RIGHT_MARGIN_CHARS = 1;
+  const TOP_PADDING_LINES = 1;
+  const WIDTH = BASE_WIDTH - RIGHT_MARGIN_CHARS;
   const ITEM_COL = is80mm ? 22 : 14;
   const QTY_COL = is80mm ? 5 : 4;
   const RATE_COL = is80mm ? 9 : 6;
@@ -276,7 +279,7 @@ function buildReceiptText(invoice, { shop = {}, branch = {}, paperSize = "58mm",
     0
   );
 
-  let t = "";
+  let t = "\n".repeat(TOP_PADDING_LINES);
   const headerName = branch?.branch_name
     ? `${shop?.shop_name || "Shop Name"} - ${branch.branch_name}`
     : shop?.shop_name || "Shop Name";
@@ -329,7 +332,10 @@ function buildReceiptText(invoice, { shop = {}, branch = {}, paperSize = "58mm",
 
 function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize = "58mm" } = {}) {
   const is80mm = String(paperSize || "58mm") === "80mm";
-  const WIDTH = is80mm ? 48 : 32;
+  const BASE_WIDTH = is80mm ? 48 : 32;
+  const RIGHT_MARGIN_CHARS = 1;
+  const TOP_PADDING_LINES = 1;
+  const WIDTH = BASE_WIDTH - RIGHT_MARGIN_CHARS;
   const line = "-".repeat(WIDTH);
   const token = String(tokenData?.tokenNumber || "").trim();
   const orderId = tokenData?.orderId;
@@ -340,7 +346,7 @@ function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize =
     ? `${shop?.shop_name || "Shop Name"} - ${branch.branch_name}`
     : shop?.shop_name || "Shop Name";
 
-  let t = "";
+  let t = "\n".repeat(TOP_PADDING_LINES);
   t += `${center(headerName, WIDTH)}\n`;
   t += `${center("KOT TOKEN", WIDTH)}\n`;
   t += `${line}\n`;
