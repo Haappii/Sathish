@@ -95,10 +95,13 @@ export default function TableOrderScreen({ route, navigation }) {
       setItems(itemRows);
       setOrder(orderRes.data ?? null);
       setTables(tableRes.data?.tables ?? tableRes.data ?? []);
-      const shopData = shopRes?.data || {};
-      setServiceCharge(String(normalizeServiceCharge(shopData?.service_charge ?? shopData?.default_service_charge ?? 0)));
       const nextBranch = branchRes?.data || {};
       setBranchDetails(nextBranch);
+      const shopData = shopRes?.data || {};
+      const branchServiceCharge = nextBranch?.service_charge_required
+        ? normalizeServiceCharge(nextBranch?.service_charge_amount ?? 0)
+        : normalizeServiceCharge(shopData?.service_charge ?? shopData?.default_service_charge ?? 0);
+      setServiceCharge(String(branchServiceCharge));
 
       const orderData = orderRes?.data || {};
       setCustomerName(String(orderData?.customer_name || "Walk-in"));

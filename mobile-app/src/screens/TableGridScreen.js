@@ -33,6 +33,31 @@ const normalizeStatus = (value) => {
   return status || "available";
 };
 
+const parseTableStartTime = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+  if (typeof value === "string") {
+    const fallback = new Date(value.replace(" ", "T"));
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+  return null;
+};
+
+const getTableStartTime = (table) => table?.table_start_time || table?.opened_at || null;
+
+const runningMinutes = (tableStartTime) => {
+  const start = parseTableStartTime(tableStartTime);
+  if (!start) return null;
+  return Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
+};
+
+const formatStartTime = (tableStartTime) => {
+  const d = parseTableStartTime(tableStartTime);
+  if (!d) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
 export default function TableGridScreen({ navigation }) {
   const [tables, setTables]       = useState([]);
   const [sections, setSections]   = useState([]);
@@ -122,6 +147,8 @@ export default function TableGridScreen({ navigation }) {
                   {sectionTables.map((table) => {
                     const status = normalizeStatus(table.status);
                     const meta = STATUS_META[status] || STATUS_META.default;
+                    const startTime = getTableStartTime(table);
+                    const mins = runningMinutes(startTime);
                     return (
                       <Pressable
                         key={table.table_id}
@@ -147,6 +174,11 @@ export default function TableGridScreen({ navigation }) {
                         {status === "occupied" && Number(table.running_total || 0) > 0 && (
                           <Text style={[styles.orderHint, { color: meta.text }]}> 
                             Total ₹{Number(table.running_total || 0).toFixed(2)}
+                          </Text>
+                        )}
+                        {status === "occupied" && startTime && (
+                          <Text style={[styles.orderHint, { color: meta.text }]}> 
+                            Since {formatStartTime(startTime)} {mins !== null ? `(${mins}m)` : ""}
                           </Text>
                         )}
                       </Pressable>

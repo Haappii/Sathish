@@ -66,6 +66,11 @@ const branchDiscountAmount = (subtotal, branchDetails) => {
   return Math.max(0, Math.min(subtotal, raw));
 };
 
+const toAmount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export default function CreateBillScreen({ route }) {
   const { isOnline } = useOnlineStatus();
   const { session } = useAuth();
@@ -311,6 +316,30 @@ export default function CreateBillScreen({ route }) {
     [cart]
   );
 
+  const gstEnabled = Boolean(shopDetails?.gst_enabled);
+  const gstPercent = toAmount(shopDetails?.gst_percent || 0);
+  const gstMode = String(shopDetails?.gst_mode || "inclusive").toLowerCase();
+  const gstAmount = useMemo(() => {
+    if (!gstEnabled || gstPercent <= 0) return 0;
+    if (gstMode === "exclusive") return (subtotal * gstPercent) / 100;
+    return subtotal - subtotal / (1 + gstPercent / 100);
+  }, [gstEnabled, gstPercent, gstMode, subtotal]);
+
+  const grossTotal = useMemo(
+    () => (gstEnabled && gstMode === "exclusive" ? subtotal + gstAmount : subtotal),
+    [gstEnabled, gstMode, subtotal, gstAmount]
+  );
+
+  const discountValue = useMemo(
+    () => Math.min(grossTotal, Math.max(0, toAmount(discountAmt))),
+    [grossTotal, discountAmt]
+  );
+
+  const payableTotal = useMemo(
+    () => Math.round(Math.max(0, grossTotal - discountValue)),
+    [grossTotal, discountValue]
+  );
+
   useEffect(() => {
     const auto = branchDiscountAmount(subtotal, branchDetails);
     setDiscountAmt(String(Math.round(auto)));
@@ -380,6 +409,26 @@ export default function CreateBillScreen({ route }) {
 
     const paymentSplit = Object.fromEntries(Object.entries(splitPayload).filter(([, v]) => v !== undefined));
 
+    if (paymentMode === "split") {
+      const splitTotal =
+        toAmount(splitCash) +
+        toAmount(splitCard) +
+        toAmount(splitUpi) +
+        toAmount(splitGift) +
+        toAmount(walletAmount);
+      if (Math.abs(splitTotal - payableTotal) > 0.01) {
+        return Alert.alert("Validation", "Split total must match payable amount");
+      }
+    }
+
+    if (paymentMode === "gift_card") {
+      if (!giftCardCode.trim()) return Alert.alert("Validation", "Gift card code is required");
+      if (toAmount(splitGift) <= 0) return Alert.alert("Validation", "Gift card amount is required");
+      if (Math.abs(toAmount(splitGift) - payableTotal) > 0.01) {
+        return Alert.alert("Validation", "Gift card amount must match payable amount");
+      }
+    }
+
     const payload = {
       customer_name: String(customer.name || "").trim(),
       mobile,
@@ -399,7 +448,7 @@ export default function CreateBillScreen({ route }) {
       mobile: payload.mobile,
       payment_mode: payload.payment_mode,
       payment_split: payload.payment_split,
-      service_charge: normalizeServiceCharge(serviceCharge),
+      service_charge: isTableBillingFlow ? normalizeServiceCharge(serviceCharge) : 0,
       discounted_amt: normalizedDiscount,
       customer_gst: payload.customer_gst,
       customer_email: String(customer.email || "").trim() || null,
@@ -713,15 +762,19 @@ export default function CreateBillScreen({ route }) {
             ))}
           </View>
 
-          <Text style={styles.sectionTitle}>Service Charge</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            keyboardType="numeric"
-            value={serviceCharge}
-            placeholderTextColor="#94a3b8"
-            onChangeText={(v) => setServiceCharge(v.replace(/[^\d.]/g, ""))}
-          />
+          {isTableBillingFlow && (
+            <>
+              <Text style={styles.sectionTitle}>Service Charge</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                keyboardType="numeric"
+                value={serviceCharge}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setServiceCharge(v.replace(/[^\d.]/g, ""))}
+              />
+            </>
+          )}
 
           <Text style={styles.sectionTitle}>Discount</Text>
           <TextInput
@@ -821,6 +874,11 @@ export default function CreateBillScreen({ route }) {
             </>
           )}
 
+          <Text style={styles.total}>Subtotal: {fmt(subtotal)}</Text>
+          {gstEnabled && <Text style={styles.total}>GST ({gstPercent}%): {fmt(gstAmount)}</Text>}
+          {discountValue > 0 && <Text style={styles.total}>Discount: {fmt(discountValue)}</Text>}
+          <Text style={styles.total}>Payable: {fmt(payableTotal)}</Text>
+
           <Pressable
             style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
             disabled={saving}
@@ -830,8 +888,8 @@ export default function CreateBillScreen({ route }) {
               {saving
                 ? "Saving…"
                 : isOnline
-                  ? `Print KOT + Invoice  ${fmt(subtotal)}`
-                  : `Save Offline  ${fmt(subtotal)}`}
+                  ? `Print KOT + Invoice  ${fmt(payableTotal)}`
+                  : `Save Offline  ${fmt(payableTotal)}`}
             </Text>
           </Pressable>
 
