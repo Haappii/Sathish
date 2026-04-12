@@ -145,9 +145,12 @@ def _get_or_create_takeaway_table(*, db: Session, shop_id: int, branch_id: int) 
 class CheckoutRequest(BaseModel):
     customer_name: Optional[str] = None
     mobile: Optional[str] = None
+    customer_gst: Optional[str] = None
+    customer_email: Optional[str] = None
     payment_mode: Optional[str] = "cash"
     payment_split: Optional[dict] = None
     service_charge: Optional[float] = 0
+    discounted_amt: Optional[float] = 0
 
 
 class TakeawayItemRequest(BaseModel):
@@ -671,9 +674,24 @@ def checkout_order(
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax_amt, total = calculate_gst(subtotal, shop)
-    grand_total = (total + service_charge + service_charge_gst).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    discount_amt = Decimal(str(payload.discounted_amt or 0))
+    if discount_amt < 0:
+        discount_amt = Decimal("0")
+    gross_total = (total + service_charge + service_charge_gst)
+    if discount_amt > gross_total:
+        discount_amt = gross_total
+    grand_total = (gross_total - discount_amt).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
     payment_split = payload.payment_split if isinstance(payload.payment_split, dict) else {}
+    if payload.customer_email:
+        payment_split = dict(payment_split or {})
+        payment_split["customer_email"] = str(payload.customer_email).strip()
+    if payload.customer_gst:
+        payment_split = dict(payment_split or {})
+        payment_split["customer_gst"] = str(payload.customer_gst).strip().upper()
+    if discount_amt > 0:
+        payment_split = dict(payment_split or {})
+        payment_split["discounted_amt"] = float(discount_amt)
     if service_charge > 0:
         payment_split = dict(payment_split or {})
         payment_split["service_charge"] = float(service_charge)
@@ -688,11 +706,12 @@ def checkout_order(
         created_time=business_dt,
         total_amount=grand_total,
         tax_amt=tax_amt,
-        discounted_amt=0,
+        discounted_amt=float(discount_amt),
 
         # ✅ THIS WAS MISSING
         customer_name=payload.customer_name,
         mobile=payload.mobile,
+        gst_number=(str(payload.customer_gst).strip().upper() if payload.customer_gst else None),
         payment_mode=payload.payment_mode or "cash",
         payment_split=(payment_split or None)
     )

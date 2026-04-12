@@ -31,9 +31,9 @@ export default function OrderLiveScreen() {
       const visibleRows = list.filter((row) => {
         const orderType = String(row?.order_type || "").trim().toUpperCase();
         const status = String(row?.status || "").trim().toUpperCase();
-        const isHandedOverTakeaway =
-          orderType === "TAKEAWAY" && (status === "SERVED" || status === "MOVED_TO_TABLE");
-        return !isHandedOverTakeaway;
+        const isHandedOverTakeaway = orderType === "TAKEAWAY" && status === "SERVED";
+        const isMovedToTable = status === "MOVED_TO_TABLE";
+        return !(isHandedOverTakeaway || isMovedToTable);
       });
       setRows(visibleRows);
     } catch (err) {

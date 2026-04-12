@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const normalizeServiceCharge = (value) => {
   const n = Number(value);
@@ -24,8 +25,19 @@ const normalizeServiceCharge = (value) => {
   return Math.max(0, n);
 };
 
+const branchDiscountAmount = (subtotal, branchDetails) => {
+  const enabled = Boolean(branchDetails?.discount_enabled);
+  if (!enabled) return 0;
+  const raw = Number(branchDetails?.discount_value || 0);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  const discountType = String(branchDetails?.discount_type || "flat").toLowerCase();
+  if (discountType === "percent") return Math.max(0, Math.min(subtotal, (subtotal * raw) / 100));
+  return Math.max(0, Math.min(subtotal, raw));
+};
+
 export default function TableOrderScreen({ route, navigation }) {
   const { table } = route.params;
+  const { session } = useAuth();
 
   const [order, setOrder]         = useState(null);
   const [categories, setCategories] = useState([]);
@@ -40,22 +52,41 @@ export default function TableOrderScreen({ route, navigation }) {
   const [billing, setBilling]     = useState(false);
   const [paymentMode, setPaymentMode] = useState("cash");
   const [serviceCharge, setServiceCharge] = useState("0");
+  const [discountAmt, setDiscountAmt] = useState("0");
+  const [customerName, setCustomerName] = useState("Walk-in");
+  const [customerMobile, setCustomerMobile] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerGst, setCustomerGst] = useState("");
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [splitCash, setSplitCash] = useState("");
+  const [splitCard, setSplitCard] = useState("");
+  const [splitUpi, setSplitUpi] = useState("");
+  const [splitGift, setSplitGift] = useState("");
+  const [walletMobile, setWalletMobile] = useState("");
+  const [walletAmount, setWalletAmount] = useState("");
+  const [branchDetails, setBranchDetails] = useState({});
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTableId, setTransferTableId] = useState(null);
   const [transferBusy, setTransferBusy] = useState(false);
   const [tables, setTables] = useState([]);
 
-  const PAYMENT_MODES = ["cash", "card", "upi"];
+  const PAYMENT_MODES = ["cash", "card", "upi", "credit", "gift_card", "coupon", "split", "wallet"];
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [catRes, itemRes, orderRes, tableRes, shopRes] = await Promise.all([
+      const branchPromise = session?.branch_id
+        ? api.get(`/branch/${session.branch_id}`).catch(() => null)
+        : Promise.resolve(null);
+
+      const [catRes, itemRes, orderRes, tableRes, shopRes, branchRes] = await Promise.all([
         api.get("/category/"),
         api.get("/items/"),
         api.get(`/table-billing/order/by-table/${table.table_id}`),
         api.get("/table-billing/tables"),
         api.get("/shop/details").catch(() => null),
+        branchPromise,
       ]);
       const categoryRows = catRes.data?.categories ?? catRes.data ?? [];
       const itemRows = itemRes.data?.items ?? itemRes.data ?? [];
@@ -66,13 +97,22 @@ export default function TableOrderScreen({ route, navigation }) {
       setTables(tableRes.data?.tables ?? tableRes.data ?? []);
       const shopData = shopRes?.data || {};
       setServiceCharge(String(normalizeServiceCharge(shopData?.service_charge ?? shopData?.default_service_charge ?? 0)));
+      const nextBranch = branchRes?.data || {};
+      setBranchDetails(nextBranch);
+
+      const orderData = orderRes?.data || {};
+      setCustomerName(String(orderData?.customer_name || "Walk-in"));
+      setCustomerMobile(String(orderData?.mobile || ""));
+      const existingSplit = (orderData?.payment_split && typeof orderData.payment_split === "object") ? orderData.payment_split : {};
+      setCustomerEmail(String(existingSplit?.customer_email || ""));
+      setCustomerGst(String(existingSplit?.customer_gst || ""));
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [table.table_id]);
+  }, [table.table_id, session?.branch_id]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { navigation.setOptions({ title: `Table ${table.table_name}` }); }, [table, navigation]);
@@ -160,6 +200,11 @@ export default function TableOrderScreen({ route, navigation }) {
 
   const mergedBillTotal = mergedBillItems.reduce((sum, row) => sum + Number(row?.amount || 0), 0);
 
+  useEffect(() => {
+    const auto = branchDiscountAmount(mergedBillTotal, branchDetails);
+    setDiscountAmt(String(Math.round(auto)));
+  }, [mergedBillTotal, branchDetails?.discount_enabled, branchDetails?.discount_type, branchDetails?.discount_value]);
+
   const sendKOT = async () => {
     if (cartCount === 0) return Alert.alert("Empty", "Add items first");
     if (!order?.order_id) return Alert.alert("Error", "Order is not available for this table.");
@@ -209,12 +254,29 @@ export default function TableOrderScreen({ route, navigation }) {
         });
       }
 
+      const splitPayload = {
+        gift_card_code: giftCardCode.trim() || undefined,
+        gift_card_amount: Number(splitGift || 0) || undefined,
+        coupon_code: couponCode.trim() || undefined,
+        cash: Number(splitCash || 0) || undefined,
+        card: Number(splitCard || 0) || undefined,
+        upi: Number(splitUpi || 0) || undefined,
+        wallet_mobile: walletMobile.trim() || undefined,
+        wallet_amount: Number(walletAmount || 0) || undefined,
+        customer_email: customerEmail.trim() || undefined,
+        customer_gst: customerGst.trim() || undefined,
+      };
+      const paymentSplit = Object.fromEntries(Object.entries(splitPayload).filter(([, v]) => v !== undefined));
+
       const payload = {
-        customer_name: String(order?.customer_name || "Walk-in"),
-        mobile: String(order?.mobile || ""),
+        customer_name: String(customerName || order?.customer_name || "Walk-in"),
+        mobile: String(customerMobile || order?.mobile || ""),
         payment_mode: paymentMode,
-        payment_split: null,
+        payment_split: Object.keys(paymentSplit).length ? paymentSplit : null,
         service_charge: normalizeServiceCharge(serviceCharge),
+        discounted_amt: Math.max(0, Number(discountAmt || 0)),
+        customer_gst: customerGst.trim() || null,
+        customer_email: customerEmail.trim() || null,
       };
 
       const res = await api.post(`/table-billing/order/checkout/${order.order_id}`, payload);
@@ -450,6 +512,46 @@ export default function TableOrderScreen({ route, navigation }) {
 
             <Text style={styles.modalTotal}>Total: ₹{Number(mergedBillTotal || 0).toFixed(2)}</Text>
 
+            <Text style={styles.modalSubTitle}>Customer Name</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="Walk-in"
+              value={customerName}
+              onChangeText={setCustomerName}
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.modalSubTitle}>Customer Mobile</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="10-digit mobile"
+              keyboardType="phone-pad"
+              value={customerMobile}
+              onChangeText={(v) => setCustomerMobile(v.replace(/\D/g, "").slice(0, 10))}
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.modalSubTitle}>Customer Email</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="Email"
+              value={customerEmail}
+              onChangeText={setCustomerEmail}
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <Text style={styles.modalSubTitle}>Customer GST</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="GST number"
+              value={customerGst}
+              onChangeText={setCustomerGst}
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="characters"
+            />
+
             <Text style={styles.modalSubTitle}>Service Charge</Text>
             <TextInput
               style={styles.search}
@@ -457,6 +559,16 @@ export default function TableOrderScreen({ route, navigation }) {
               keyboardType="numeric"
               value={serviceCharge}
               onChangeText={(v) => setServiceCharge(v.replace(/[^\d.]/g, ""))}
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.modalSubTitle}>Discount</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="0"
+              keyboardType="numeric"
+              value={discountAmt}
+              onChangeText={(v) => setDiscountAmt(v.replace(/[^\d.]/g, ""))}
               placeholderTextColor="#94a3b8"
             />
 
@@ -474,6 +586,94 @@ export default function TableOrderScreen({ route, navigation }) {
                 </Pressable>
               ))}
             </View>
+
+            {(paymentMode === "gift_card" || paymentMode === "split") && (
+              <>
+                <Text style={styles.modalSubTitle}>Gift Card</Text>
+                <TextInput
+                  style={styles.search}
+                  placeholder="Gift card code"
+                  value={giftCardCode}
+                  onChangeText={setGiftCardCode}
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                />
+                <TextInput
+                  style={styles.search}
+                  placeholder="Gift card amount"
+                  keyboardType="numeric"
+                  value={splitGift}
+                  onChangeText={(v) => setSplitGift(v.replace(/[^\d.]/g, ""))}
+                  placeholderTextColor="#94a3b8"
+                />
+              </>
+            )}
+
+            {(paymentMode === "coupon" || paymentMode === "split") && (
+              <>
+                <Text style={styles.modalSubTitle}>Coupon Code</Text>
+                <TextInput
+                  style={styles.search}
+                  placeholder="Coupon code"
+                  value={couponCode}
+                  onChangeText={setCouponCode}
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                />
+              </>
+            )}
+
+            {paymentMode === "split" && (
+              <>
+                <Text style={styles.modalSubTitle}>Split Payments</Text>
+                <TextInput
+                  style={styles.search}
+                  placeholder="Cash amount"
+                  keyboardType="numeric"
+                  value={splitCash}
+                  onChangeText={(v) => setSplitCash(v.replace(/[^\d.]/g, ""))}
+                  placeholderTextColor="#94a3b8"
+                />
+                <TextInput
+                  style={styles.search}
+                  placeholder="Card amount"
+                  keyboardType="numeric"
+                  value={splitCard}
+                  onChangeText={(v) => setSplitCard(v.replace(/[^\d.]/g, ""))}
+                  placeholderTextColor="#94a3b8"
+                />
+                <TextInput
+                  style={styles.search}
+                  placeholder="UPI amount"
+                  keyboardType="numeric"
+                  value={splitUpi}
+                  onChangeText={(v) => setSplitUpi(v.replace(/[^\d.]/g, ""))}
+                  placeholderTextColor="#94a3b8"
+                />
+              </>
+            )}
+
+            {(paymentMode === "wallet" || paymentMode === "split") && (
+              <>
+                <Text style={styles.modalSubTitle}>Wallet</Text>
+                <TextInput
+                  style={styles.search}
+                  placeholder="Wallet mobile"
+                  keyboardType="phone-pad"
+                  value={walletMobile}
+                  onChangeText={(v) => setWalletMobile(v.replace(/\D/g, "").slice(0, 10))}
+                  placeholderTextColor="#94a3b8"
+                />
+                <TextInput
+                  style={styles.search}
+                  placeholder="Wallet amount"
+                  keyboardType="numeric"
+                  value={walletAmount}
+                  onChangeText={(v) => setWalletAmount(v.replace(/[^\d.]/g, ""))}
+                  placeholderTextColor="#94a3b8"
+                />
+              </>
+            )}
 
             <View style={styles.modalActions}>
               <Pressable style={styles.modalCancel} onPress={() => setBillOpen(false)} disabled={billing}>

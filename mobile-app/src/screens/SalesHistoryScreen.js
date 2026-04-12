@@ -49,10 +49,14 @@ function displayDate(v) {
 }
 
 function getServiceChargeValue(inv = {}) {
+  const split = (inv?.payment_split && typeof inv.payment_split === "object") ? inv.payment_split : {};
   const candidates = [
     inv?.service_charge,
     inv?.service_charge_amt,
     inv?.service_charge_amount,
+    split?.service_charge,
+    split?.service_charge_amt,
+    split?.service_charge_amount,
   ];
   for (const value of candidates) {
     const n = Number(value);

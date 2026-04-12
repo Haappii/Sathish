@@ -28,7 +28,7 @@ import { syncOfflineQueue } from "../offline/sync";
 import { printInvoiceByNumber, printKotTokenSlip } from "../utils/printInvoice";
 
 const DEFAULT_MOBILE = "9999999999";
-const PAYMENT_MODES  = ["cash", "card", "upi", "credit"];
+const PAYMENT_MODES  = ["cash", "card", "upi", "credit", "gift_card", "coupon", "split", "wallet"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const BILL_ACTIONS = {
   PRINT_BOTH: "print_both",
@@ -54,6 +54,18 @@ const computeWeightLineAmount = (ratePerKg, grams) => {
   return Math.round(Number(ratePerKg || 0) * kg);
 };
 
+const branchDiscountAmount = (subtotal, branchDetails) => {
+  const enabled = Boolean(branchDetails?.discount_enabled);
+  if (!enabled) return 0;
+  const raw = Number(branchDetails?.discount_value || 0);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  const discountType = String(branchDetails?.discount_type || "flat").toLowerCase();
+  if (discountType === "percent") {
+    return Math.max(0, Math.min(subtotal, (subtotal * raw) / 100));
+  }
+  return Math.max(0, Math.min(subtotal, raw));
+};
+
 export default function CreateBillScreen({ route }) {
   const { isOnline } = useOnlineStatus();
   const { session } = useAuth();
@@ -65,9 +77,18 @@ export default function CreateBillScreen({ route }) {
   const [selectedCat, setSelectedCat] = useState("ALL");
   const [itemSearch, setItemSearch]   = useState("");
   const [cart, setCart]           = useState([]);
-  const [customer, setCustomer]   = useState({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
+  const [customer, setCustomer]   = useState({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "", email: "" });
   const [paymentMode, setPaymentMode] = useState("cash");
   const [serviceCharge, setServiceCharge] = useState("0");
+  const [discountAmt, setDiscountAmt] = useState("0");
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [splitCash, setSplitCash] = useState("");
+  const [splitCard, setSplitCard] = useState("");
+  const [splitUpi, setSplitUpi] = useState("");
+  const [splitGift, setSplitGift] = useState("");
+  const [walletMobile, setWalletMobile] = useState("");
+  const [walletAmount, setWalletAmount] = useState("");
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]     = useState(false);
   const [shopName, setShopName]   = useState("Haappii Billing");
@@ -290,6 +311,11 @@ export default function CreateBillScreen({ route }) {
     [cart]
   );
 
+  useEffect(() => {
+    const auto = branchDiscountAmount(subtotal, branchDetails);
+    setDiscountAmt(String(Math.round(auto)));
+  }, [subtotal, branchDetails?.discount_enabled, branchDetails?.discount_type, branchDetails?.discount_value]);
+
   // ── Customer auto-fill ─────────────────────────────────────────────────────
   const fetchCustomerByMobile = async (mobile) => {
     if (!mobile || mobile.length !== 10 || !isOnline) return;
@@ -309,9 +335,18 @@ export default function CreateBillScreen({ route }) {
 
   const resetForm = () => {
     setCart([]);
-    setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
+    setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "", email: "" });
     setPaymentMode("cash");
     setServiceCharge(String(normalizeServiceCharge(shopDetails?.service_charge ?? shopDetails?.default_service_charge ?? 0)));
+    setDiscountAmt("0");
+    setGiftCardCode("");
+    setCouponCode("");
+    setSplitCash("");
+    setSplitCard("");
+    setSplitUpi("");
+    setSplitGift("");
+    setWalletMobile("");
+    setWalletAmount("");
   };
 
   // ── Save invoice variants (print both / save only / hold) ──────────────────
@@ -330,13 +365,28 @@ export default function CreateBillScreen({ route }) {
       return Alert.alert("Offline", "Hold bill requires online connection.");
     }
 
+    const normalizedDiscount = Math.max(0, Number(discountAmt || 0));
+    const splitPayload = {
+      gift_card_code: giftCardCode.trim() || undefined,
+      gift_card_amount: Number(splitGift || 0) || undefined,
+      coupon_code: couponCode.trim() || undefined,
+      cash: Number(splitCash || 0) || undefined,
+      card: Number(splitCard || 0) || undefined,
+      upi: Number(splitUpi || 0) || undefined,
+      wallet_mobile: walletMobile.trim() || undefined,
+      wallet_amount: Number(walletAmount || 0) || undefined,
+      customer_email: String(customer.email || "").trim() || undefined,
+    };
+
+    const paymentSplit = Object.fromEntries(Object.entries(splitPayload).filter(([, v]) => v !== undefined));
+
     const payload = {
       customer_name: String(customer.name || "").trim(),
       mobile,
       customer_gst: String(customer.gst_number || "").trim() || null,
-      discounted_amt: 0,
+      discounted_amt: normalizedDiscount,
       payment_mode: paymentMode,
-      payment_split: null,
+      payment_split: Object.keys(paymentSplit).length ? paymentSplit : null,
       items: cart.map((x) => ({
         item_id: x.item_id,
         quantity: x.qty,
@@ -348,8 +398,11 @@ export default function CreateBillScreen({ route }) {
       customer_name: payload.customer_name,
       mobile: payload.mobile,
       payment_mode: payload.payment_mode,
-      payment_split: null,
+      payment_split: payload.payment_split,
       service_charge: normalizeServiceCharge(serviceCharge),
+      discounted_amt: normalizedDiscount,
+      customer_gst: payload.customer_gst,
+      customer_email: String(customer.email || "").trim() || null,
     };
 
     setSaving(true);
@@ -632,6 +685,15 @@ export default function CreateBillScreen({ route }) {
             placeholderTextColor="#94a3b8"
             onChangeText={(v) => setCustomer((p) => ({ ...p, gst_number: v }))}
           />
+          <TextInput
+            style={styles.input}
+            placeholder="Email (optional)"
+            value={customer.email}
+            placeholderTextColor="#94a3b8"
+            onChangeText={(v) => setCustomer((p) => ({ ...p, email: v }))}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
         </View>
 
         {/* Payment + Save */}
@@ -660,6 +722,104 @@ export default function CreateBillScreen({ route }) {
             placeholderTextColor="#94a3b8"
             onChangeText={(v) => setServiceCharge(v.replace(/[^\d.]/g, ""))}
           />
+
+          <Text style={styles.sectionTitle}>Discount</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={discountAmt}
+            placeholderTextColor="#94a3b8"
+            onChangeText={(v) => setDiscountAmt(v.replace(/[^\d.]/g, ""))}
+          />
+
+          {(paymentMode === "gift_card" || paymentMode === "split") && (
+            <>
+              <Text style={styles.sectionTitle}>Gift Card</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Gift card code"
+                value={giftCardCode}
+                placeholderTextColor="#94a3b8"
+                onChangeText={setGiftCardCode}
+                autoCapitalize="characters"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Gift card amount"
+                keyboardType="numeric"
+                value={splitGift}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setSplitGift(v.replace(/[^\d.]/g, ""))}
+              />
+            </>
+          )}
+
+          {(paymentMode === "coupon" || paymentMode === "split") && (
+            <>
+              <Text style={styles.sectionTitle}>Coupon</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Coupon code"
+                value={couponCode}
+                placeholderTextColor="#94a3b8"
+                onChangeText={setCouponCode}
+                autoCapitalize="characters"
+              />
+            </>
+          )}
+
+          {paymentMode === "split" && (
+            <>
+              <Text style={styles.sectionTitle}>Split Payments</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Cash amount"
+                keyboardType="numeric"
+                value={splitCash}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setSplitCash(v.replace(/[^\d.]/g, ""))}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Card amount"
+                keyboardType="numeric"
+                value={splitCard}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setSplitCard(v.replace(/[^\d.]/g, ""))}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="UPI amount"
+                keyboardType="numeric"
+                value={splitUpi}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setSplitUpi(v.replace(/[^\d.]/g, ""))}
+              />
+            </>
+          )}
+
+          {(paymentMode === "wallet" || paymentMode === "split") && (
+            <>
+              <Text style={styles.sectionTitle}>Wallet</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Wallet mobile"
+                keyboardType="phone-pad"
+                value={walletMobile}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setWalletMobile(v.replace(/\D/g, "").slice(0, 10))}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Wallet amount"
+                keyboardType="numeric"
+                value={walletAmount}
+                placeholderTextColor="#94a3b8"
+                onChangeText={(v) => setWalletAmount(v.replace(/[^\d.]/g, ""))}
+              />
+            </>
+          )}
 
           <Pressable
             style={[styles.saveBtn, saving && styles.saveBtnDisabled]}

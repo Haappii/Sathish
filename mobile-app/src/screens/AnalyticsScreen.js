@@ -57,21 +57,42 @@ export default function AnalyticsScreen() {
     try {
       const from = range.from();
       const to = range.to();
-      const [analyticsRes, dashRes] = await Promise.all([
-        api.get("/analytics/summary", { params: { from_date: from, to_date: to } }).catch(() => ({ data: null })),
-        api.get("/dashboard/stats").catch(() => ({ data: null })),
+      const [summaryRes, dashRes, topItemsRes] = await Promise.all([
+        api.get("/reports/sales/summary", { params: { from_date: from, to_date: to, group_by: "date" } }).catch(() => ({ data: [] })),
+        api.get("/dashboard/stats", { params: { date: to } }).catch(() => ({ data: null })),
+        api.get("/reports/sales/items", { params: { from_date: from, to_date: to } }).catch(() => ({ data: [] })),
       ]);
-      setData(analyticsRes?.data || null);
-      setDashStats(dashRes?.data || null);
 
-      try {
-        const topRes = await api.get("/analytics/top-items", {
-          params: { from_date: from, to_date: to, limit: 10 },
-        });
-        setTopItems(topRes?.data || []);
-      } catch {
-        setTopItems([]);
-      }
+      const summaryRows = Array.isArray(summaryRes?.data) ? summaryRes.data : [];
+      const merged = summaryRows.reduce((acc, row) => {
+        acc.invoice_count += Number(row?.bills || 0);
+        acc.total_sales += Number(row?.grand_total || 0);
+        acc.total_discount += Number(row?.discount || 0);
+        acc.total_gst += Number(row?.gst || 0);
+        acc.sub_total += Number(row?.sub_total || 0);
+        return acc;
+      }, {
+        invoice_count: 0,
+        total_sales: 0,
+        total_discount: 0,
+        total_gst: 0,
+        sub_total: 0,
+      });
+
+      const itemsRows = Array.isArray(topItemsRes?.data) ? topItemsRes.data : [];
+      const topRows = [...itemsRows]
+        .sort((a, b) => Number(b?.amount || 0) - Number(a?.amount || 0))
+        .slice(0, 10)
+        .map((r) => ({
+          item_name: r?.item || r?.item_name || "Item",
+          total_qty: Number(r?.quantity || 0),
+          total_amount: Number(r?.amount || 0),
+        }));
+
+      setData(merged);
+      setDashStats(dashRes?.data || null);
+      setTopItems(topRows);
+
     } catch (err) {
       if (!silent) Alert.alert("Error", err?.response?.data?.detail || "Failed to load analytics");
     } finally {
