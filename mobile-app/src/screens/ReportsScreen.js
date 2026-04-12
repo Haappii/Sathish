@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const fmtDate = (v) => {
@@ -21,16 +22,16 @@ const fmtDate = (v) => {
 
 const PAYMENT_MODES_FILTER = ["all", "cash", "card", "upi", "credit"];
 
-const todayISO = () => new Date().toISOString().split("T")[0];
-const thirtyAgo = () => {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return d.toISOString().split("T")[0];
-};
-
 export default function ReportsScreen() {
-  const [startDate, setStartDate] = useState(thirtyAgo());
-  const [endDate, setEndDate] = useState(todayISO());
+  const { session } = useAuth();
+  const bizDate = session?.app_date || new Date().toISOString().split("T")[0];
+  const thirtyAgoBiz = () => {
+    const d = new Date(bizDate);
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split("T")[0];
+  };
+  const [startDate, setStartDate] = useState(() => thirtyAgoBiz());
+  const [endDate, setEndDate] = useState(bizDate);
   const [modeFilter, setModeFilter] = useState("all");
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState(null);

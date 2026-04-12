@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const PAYMENT_MODES = ["cash", "card", "upi", "credit"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
@@ -51,14 +52,18 @@ const tryCancel = async (orderId) => {
 };
 
 export default function HeldInvoicesScreen() {
+  const { session } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
-  const todayLabel = new Date().toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  const toxDate = session?.app_date || new Date().toISOString().split("T")[0];
+  const todayLabel = (() => {
+    const [y, m, d] = toxDate.split("-");
+    const mNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${d} ${mNames[Number(m) - 1]} ${y}`;
+  })();
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
