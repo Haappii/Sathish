@@ -17,6 +17,19 @@ import TableOrderScreen   from "../screens/TableOrderScreen";
 import OrderLiveScreen    from "../screens/OrderLiveScreen";
 import KotManagementScreen from "../screens/KotManagementScreen";
 import QrOrdersAcceptScreen from "../screens/QrOrdersAcceptScreen";
+import HeldInvoicesScreen   from "../screens/HeldInvoicesScreen";
+import NativeModuleScreen from "../screens/NativeModuleScreen";
+import InventoryScreen          from "../screens/InventoryScreen";
+import DuesScreen               from "../screens/DuesScreen";
+import ReturnsScreen            from "../screens/ReturnsScreen";
+import EmployeesScreen          from "../screens/EmployeesScreen";
+import EmployeeAttendanceScreen from "../screens/EmployeeAttendanceScreen";
+import DayCloseScreen           from "../screens/DayCloseScreen";
+import ReportsScreen            from "../screens/ReportsScreen";
+import LoyaltyScreen            from "../screens/LoyaltyScreen";
+import OnlineOrdersScreen       from "../screens/OnlineOrdersScreen";
+import AnalyticsScreen          from "../screens/AnalyticsScreen";
+import SupplierLedgerScreen     from "../screens/SupplierLedgerScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -111,6 +124,72 @@ export default function AppNavigator() {
             component={QrOrdersAcceptScreen}
             options={{ title: "QR order accept" }}
           />
+          <Stack.Screen
+            name="HeldInvoices"
+            component={HeldInvoicesScreen}
+            options={{ title: "Held Invoices" }}
+          />
+            {/* ── New general screens ───────────────────────────────── */}
+            <Stack.Screen
+              name="Inventory"
+              component={InventoryScreen}
+              options={{ title: "Inventory" }}
+            />
+            <Stack.Screen
+              name="Dues"
+              component={DuesScreen}
+              options={{ title: "Dues & Receivables" }}
+            />
+            <Stack.Screen
+              name="Returns"
+              component={ReturnsScreen}
+              options={{ title: "Returns" }}
+            />
+            <Stack.Screen
+              name="Employees"
+              component={EmployeesScreen}
+              options={{ title: "Employees" }}
+            />
+            <Stack.Screen
+              name="EmployeeAttendance"
+              component={EmployeeAttendanceScreen}
+              options={{ title: "Attendance" }}
+            />
+            <Stack.Screen
+              name="DayClose"
+              component={DayCloseScreen}
+              options={{ title: "Day Close" }}
+            />
+            <Stack.Screen
+              name="Reports"
+              component={ReportsScreen}
+              options={{ title: "Reports" }}
+            />
+            <Stack.Screen
+              name="Loyalty"
+              component={LoyaltyScreen}
+              options={{ title: "Loyalty" }}
+            />
+            <Stack.Screen
+              name="OnlineOrders"
+              component={OnlineOrdersScreen}
+              options={{ title: "Online Orders" }}
+            />
+            <Stack.Screen
+              name="Analytics"
+              component={AnalyticsScreen}
+              options={{ title: "Analytics" }}
+            />
+            <Stack.Screen
+              name="SupplierLedger"
+              component={SupplierLedgerScreen}
+              options={{ title: "Supplier Ledger" }}
+            />
+            <Stack.Screen
+              name="NativeModule"
+              component={NativeModuleScreen}
+              options={({ route }) => ({ title: route?.params?.title || "Module" })}
+            />
         </>
       )}
     </Stack.Navigator>

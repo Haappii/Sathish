@@ -29,38 +29,14 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading]       = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]       = useState(false);
-  const [holdBills, setHoldBills]   = useState([]);
-  const [holdBusyId, setHoldBusyId] = useState(null);
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
 
   const roleLower = String(session?.role_name || session?.role || "").toLowerCase();
   const branchName = String(session?.branch_name || "").trim();
   const shopBranchLabel = branchName ? `${shopName} - ${branchName}` : shopName;
 
-  const normalizeHoldBills = (data) => {
-    const list = Array.isArray(data) ? data : [];
-    return list.filter((row) => {
-      const orderId = Number(row?.order_id || 0);
-      const itemCount = Array.isArray(row?.items) ? row.items.length : 0;
-      return Number.isFinite(orderId) && orderId > 0 && itemCount > 0;
-    });
-  };
-
   useEffect(() => {
     let mounted = true;
-    const loadHoldBills = async () => {
-      if (!isHotel) {
-        setHoldBills([]);
-        return;
-      }
-      try {
-        const res = await api.get("/table-billing/takeaway/orders");
-        setHoldBills(normalizeHoldBills(res?.data));
-      } catch {
-        setHoldBills([]);
-      }
-    };
-
     (async () => {
       setLoading(true);
       try {
@@ -82,10 +58,6 @@ export default function HomeScreen({ navigation }) {
         // Refresh offline pending count
         const count = await getPendingCount();
         setPendingCount(count);
-        if (billingType === "hotel") {
-          const holdRes = await api.get("/table-billing/takeaway/orders");
-          setHoldBills(normalizeHoldBills(holdRes?.data));
-        }
       } catch (err) {
         if (!mounted) return;
         const msg = err?.response?.data?.detail || "Failed to load home";
@@ -96,166 +68,6 @@ export default function HomeScreen({ navigation }) {
     })();
     return () => { mounted = false; };
   }, []);
-
-  const refreshHoldBills = async () => {
-    if (!isHotel) return;
-    try {
-      const res = await api.get("/table-billing/takeaway/orders");
-      setHoldBills(normalizeHoldBills(res?.data));
-    } catch {
-      setHoldBills([]);
-    }
-  };
-
-  const getHoldOrderId = (row) => {
-    const raw = row?.order_id ?? row?.source_order_id ?? row?.id ?? null;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
-
-  const completeHoldBill = (row, paymentMode = "cash") => {
-    const holdOrderId = getHoldOrderId(row);
-    if (!holdOrderId) {
-      Alert.alert("Error", "Unable to identify this hold bill. Please refresh and try again.");
-      return;
-    }
-
-    Alert.alert(
-      "Complete Hold Bill",
-      `Complete token ${row?.token_number || `#${holdOrderId}`} with ${String(paymentMode).toUpperCase()} payment?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Complete",
-          onPress: async () => {
-            try {
-              setHoldBusyId(holdOrderId);
-              const payload = {
-                customer_name: row?.customer_name || "Walk-in",
-                mobile: row?.mobile || null,
-                payment_mode: paymentMode,
-                payment_split: null,
-                service_charge: 0,
-              };
-              const res = await api.post(`/table-billing/order/checkout/${holdOrderId}`, payload);
-              const invoiceNo = String(res?.data?.invoice_number || "").trim();
-              Alert.alert("Completed", invoiceNo ? `Invoice: ${invoiceNo}` : "Hold bill completed.");
-              await refreshHoldBills();
-            } catch (err) {
-              Alert.alert("Error", err?.response?.data?.detail || "Failed to complete hold bill");
-            } finally {
-              setHoldBusyId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const openCompleteOptions = (row) => {
-    Alert.alert(
-      "Select Payment",
-      "Choose payment mode to complete this hold bill.",
-      [
-        { text: "Cash", onPress: () => completeHoldBill(row, "cash") },
-        { text: "Card", onPress: () => completeHoldBill(row, "card") },
-        { text: "UPI", onPress: () => completeHoldBill(row, "upi") },
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
-  };
-
-  const clearTakeawayOrder = async (holdOrderId) => {
-    const candidates = [
-      () => api.post(`/table-billing/order/cancel/${holdOrderId}`),
-      () => api.post(`/table-billing/order/cancel/${holdOrderId}/`),
-      () => api.post(`/table-billing/order/cancel?order_id=${holdOrderId}`),
-      () => api.post(`/table-billing/orders/${holdOrderId}/cancel`),
-      () => api.put(`/table-billing/orders/${holdOrderId}/cancel`),
-      () => api.put(`/table-billing/order/cancel?order_id=${holdOrderId}`),
-      () => api.delete(`/table-billing/order/cancel?order_id=${holdOrderId}`),
-      () => api.delete(`/table-billing/orders/${holdOrderId}`),
-      () => api.post("/table-billing/order/cancel", { order_id: holdOrderId }),
-    ];
-
-    let lastErr = null;
-    for (const fn of candidates) {
-      try {
-        await fn();
-        return true;
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    throw lastErr || new Error("Order clear failed");
-  };
-
-  const cancelHoldBill = async (row) => {
-    const holdOrderId = getHoldOrderId(row);
-    if (!holdOrderId) {
-      Alert.alert("Error", "Unable to identify this hold bill. Please refresh and try again.");
-      return;
-    }
-
-    Alert.alert(
-      "Cancel Hold Bill",
-      `Cancel token ${row?.token_number || `#${holdOrderId}`}?`,
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes, Cancel",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setHoldBusyId(holdOrderId);
-              await clearTakeawayOrder(holdOrderId);
-              Alert.alert("Cancelled", "Hold bill cancelled.");
-              await refreshHoldBills();
-            } catch (err) {
-              const status = Number(err?.response?.status || 0);
-              const detail = err?.response?.data?.detail || err?.message || "Failed to cancel hold bill";
-              Alert.alert("Error", status ? `${detail} (HTTP ${status})` : String(detail));
-            } finally {
-              setHoldBusyId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const markPickedUp = async (row) => {
-    const holdOrderId = getHoldOrderId(row);
-    if (!holdOrderId) {
-      Alert.alert("Error", "Unable to identify this hold bill. Please refresh and try again.");
-      return;
-    }
-
-    Alert.alert(
-      "Picked Up",
-      `Mark token ${row?.token_number || `#${holdOrderId}`} as picked up and clear it?`,
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes, Clear",
-          onPress: async () => {
-            try {
-              setHoldBusyId(holdOrderId);
-              await clearTakeawayOrder(holdOrderId);
-              Alert.alert("Picked Up", "Takeaway order cleared.");
-              await refreshHoldBills();
-            } catch (err) {
-              const status = Number(err?.response?.status || 0);
-              const detail = err?.response?.data?.detail || err?.message || "Failed to clear takeaway order";
-              Alert.alert("Error", status ? `${detail} (HTTP ${status})` : String(detail));
-            } finally {
-              setHoldBusyId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const menus = useMemo(
     () => buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel }),
@@ -343,46 +155,6 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.printerBtnText}>Printer Settings</Text>
         </Pressable>
 
-        {isHotel && (
-          <View style={styles.holdWrap}>
-            <View style={styles.holdHeadRow}>
-              <Text style={styles.holdTitle}>Hold Bills ({holdBills.length})</Text>
-              <Pressable onPress={refreshHoldBills}>
-                <Text style={styles.refreshText}>Refresh</Text>
-              </Pressable>
-            </View>
-
-            {holdBills.length === 0 ? (
-              <Text style={styles.holdEmpty}>No hold bills.</Text>
-            ) : (
-              holdBills.map((row, idx) => {
-                const holdOrderId = getHoldOrderId(row);
-                const busy = holdBusyId === holdOrderId;
-                return (
-                  <View key={String(holdOrderId || row?.token_number || row?.invoice_number || `hold-${idx}`)} style={styles.holdCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.holdToken}>Token: {row?.token_number || row?.invoice_number || (holdOrderId ? `#${holdOrderId}` : "-")}</Text>
-                      <Text style={styles.holdMeta}>{row?.customer_name || "Walk-in"} · {row?.mobile || "-"}</Text>
-                      <Text style={styles.holdMeta}>Items: {Array.isArray(row?.items) ? row.items.length : 0} · Total: ₹{Number(row?.running_total || 0).toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.holdActions}>
-                      <Pressable style={[styles.completeBtn, busy && styles.btnDisabled]} disabled={busy} onPress={() => openCompleteOptions(row)}>
-                        <Text style={styles.completeBtnText}>{busy ? "..." : "Complete"}</Text>
-                      </Pressable>
-                      <Pressable style={[styles.pickupBtn, busy && styles.btnDisabled]} disabled={busy} onPress={() => markPickedUp(row)}>
-                        <Text style={styles.pickupBtnText}>Picked Up</Text>
-                      </Pressable>
-                      <Pressable style={[styles.cancelBtn, busy && styles.btnDisabled]} disabled={busy} onPress={() => cancelHoldBill(row)}>
-                        <Text style={styles.cancelBtnText}>Cancel</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        )}
-
       </ScrollView>
 
       <PrinterSettingsModal
@@ -468,50 +240,4 @@ const styles = StyleSheet.create({
   offlineBannerText: { color: "#fef3c7", fontWeight: "700", fontSize: 13 },
   syncBanner: { backgroundColor: "#1d4ed8", padding: 10, alignItems: "center" },
   syncBannerText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  holdWrap: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 12,
-    gap: 8,
-  },
-  holdHeadRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  holdTitle: { fontWeight: "800", color: "#0f172a", fontSize: 15 },
-  refreshText: { color: "#2563eb", fontWeight: "700" },
-  holdEmpty: { color: "#64748b", fontSize: 13 },
-  holdCard: {
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "#f8fafc",
-    flexDirection: "row",
-    gap: 10,
-  },
-  holdToken: { fontWeight: "800", color: "#0f172a" },
-  holdMeta: { color: "#475569", fontSize: 12, marginTop: 2 },
-  holdActions: { justifyContent: "center", gap: 6 },
-  completeBtn: {
-    backgroundColor: "#059669",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  completeBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  pickupBtn: {
-    backgroundColor: "#d97706",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  pickupBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  cancelBtn: {
-    backgroundColor: "#dc2626",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  cancelBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  btnDisabled: { opacity: 0.6 },
 });

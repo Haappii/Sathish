@@ -1,0 +1,13 @@
+# Ignore large/unnecessary files from EAS build archive
+android/
+ios/
+.git/
+node_modules/
+**/node_modules/
+dist/
+dist-check/
+dist-check-hold/
+dist-check-readonly-live/
+dist-check-table-bill/
+scripts/
+*.log

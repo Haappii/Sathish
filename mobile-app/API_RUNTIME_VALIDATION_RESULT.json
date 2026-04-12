@@ -1,0 +1,3257 @@
+{
+  "generated_at": "2026-04-12T06:48:34Z",
+  "base_url": "http://127.0.0.1:8000/api",
+  "summary": {
+    "total": 75,
+    "pass": 75,
+    "fail": 0
+  },
+  "context": {
+    "branch_id": 1,
+    "invoice_no": "INV-000100007",
+    "customer_id": 4,
+    "customer_mobile": "7410258693",
+    "employee_id": 1,
+    "supplier_id": 1,
+    "table_id": 1,
+    "online_order_id": 1,
+    "qr_order_id": 0,
+    "po_id": 0
+  },
+  "results": [
+    {
+      "name": "auth_login",
+      "method": "POST",
+      "path": "/auth/login",
+      "request": {
+        "params": null,
+        "json": {
+          "shop_id": 1,
+          "username": "admin",
+          "password": "admin123"
+        }
+      },
+      "response": {
+        "status_code": 409,
+        "content_type": "application/json",
+        "body": {
+          "detail": "User is already logged in. Please logout from the active session and try again."
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "shop_details",
+      "method": "GET",
+      "path": "/shop/details",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "shop_id": 1,
+          "shop_name": "Sathish Kumar Store",
+          "address_line1": "No.12 Market Street",
+          "address_line2": null,
+          "address_line3": null,
+          "state": "Tamil Nadu",
+          "city": "Chennai",
+          "pincode": "600003",
+          "gst_number": "33ABCDE1234F1Z5",
+          "fssai_number": null,
+          "owner_name": "Sathish",
+          "mobile": "9876543210",
+          "mailid": "smartmart@example.com",
+          "logo_url": "logo_sathish_kumar_store_1.png?v=1775672561",
+          "billing_type": "hotel",
+          "gst_enabled": true,
+          "gst_percent": 12.0,
+          "gst_mode": "inclusive",
+          "app_date": "2026-02-11",
+          "head_office_branch_id": 1,
+          "is_demo": false,
+          "expires_on": null,
+          "plan": "3 MONTH",
+          "paid_until": "2027-03-23",
+          "last_payment_on": "2026-02-26",
+          "total_paid": 27000.0,
+          "upi_id": "sheternal@ybl",
+          "reservation_advance": 100.0,
+          "max_branches": null,
+          "max_users": null,
+          "head_office_branch_name": "Head Office",
+          "inventory_enabled": true,
+          "inventory_cost_method": "FIFO",
+          "items_branch_wise": false,
+          "cash_denominations": [
+            2000,
+            500,
+            200,
+            100,
+            50,
+            20,
+            10,
+            5,
+            2,
+            1
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "permissions_my",
+      "method": "GET",
+      "path": "/permissions/my",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "enabled": true,
+          "role_id": 1,
+          "role_name": "Admin",
+          "modules": [
+            {
+              "key": "billing",
+              "label": "Billing / Invoices",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "qr_orders",
+              "label": "QR Table Orders",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "online_orders",
+              "label": "Online Orders",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "categories",
+              "label": "Categories",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "items",
+              "label": "Items",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "pricing",
+              "label": "Item Pricing / Price Levels",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "drafts",
+              "label": "Draft Bills",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "returns",
+              "label": "Sales Returns",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "dues",
+              "label": "Customer Dues / Collections",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "customers",
+              "label": "Customers",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "employees",
+              "label": "Employee Management",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "loyalty",
+              "label": "Loyalty Points",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "coupons",
+              "label": "Coupons / Offers",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "gift_cards",
+              "label": "Gift Cards",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "feedback",
+              "label": "Customer Feedback",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "cash_drawer",
+              "label": "Cash Drawer / Shifts",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "stock_transfers",
+              "label": "Stock Transfers",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "inventory",
+              "label": "Inventory",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "stock_audit",
+              "label": "Stock Audit / Cycle Count",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "item_lots",
+              "label": "Batch / Expiry / Serial Lots",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "suppliers",
+              "label": "Suppliers",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "supplier_ledger",
+              "label": "Supplier Ledger",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "purchase_orders",
+              "label": "Purchase Orders",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "expenses",
+              "label": "Expenses",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "reports",
+              "label": "Reports",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "analytics",
+              "label": "Analytics",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "alerts",
+              "label": "Alerts / Notifications",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "day_close",
+              "label": "Day Close",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "users",
+              "label": "User Management",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "roles",
+              "label": "Role Management",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "setup",
+              "label": "Setup / Admin",
+              "can_read": true,
+              "can_write": true
+            },
+            {
+              "key": "support_tickets",
+              "label": "Support Tickets",
+              "can_read": true,
+              "can_write": true
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/health",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "status": "ok"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "dashboard_stats",
+      "method": "GET",
+      "path": "/dashboard/stats",
+      "request": {
+        "params": {
+          "date": "2026-04-12"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "branch_id": 1,
+          "today_sales": 10350.0,
+          "today_bills": 7,
+          "total_bills": 27
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "branch_active",
+      "method": "GET",
+      "path": "/branch/active",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "branch_name": "Head Office",
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "country": null,
+            "pincode": null,
+            "type": "Head Office",
+            "status": "ACTIVE",
+            "discount_enabled": false,
+            "discount_type": "flat",
+            "discount_value": 0.0,
+            "kot_required": true,
+            "receipt_required": true,
+            "feedback_qr_enabled": true,
+            "print_logo_enabled": true,
+            "order_live_tracking_enabled": true,
+            "paper_size": "58mm",
+            "fssai_number": "",
+            "service_charge_required": false,
+            "service_charge_amount": 0.0,
+            "service_charge_gst_required": false,
+            "service_charge_gst_percent": 0.0,
+            "loyalty_points_percentage": 0.0,
+            "swiggy_enabled": false,
+            "zomato_enabled": false,
+            "swiggy_partner_id": "",
+            "zomato_partner_id": "",
+            "online_orders_auto_accept": true,
+            "online_orders_webhook_token": "",
+            "online_orders_signature_required": false,
+            "swiggy_webhook_secret": "",
+            "zomato_webhook_secret": "",
+            "online_orders_status_sync_enabled": true,
+            "online_orders_status_sync_strict": false,
+            "online_orders_status_sync_timeout_sec": 8,
+            "swiggy_status_sync_url": "",
+            "zomato_status_sync_url": "",
+            "swiggy_status_sync_token": "",
+            "zomato_status_sync_token": "",
+            "swiggy_status_sync_secret": "",
+            "zomato_status_sync_secret": "",
+            "branch_id": 1
+          },
+          {
+            "branch_name": "HI-TECH",
+            "address_line1": "New",
+            "address_line2": "Old",
+            "city": "Tirupati",
+            "state": "AP",
+            "country": "India",
+            "pincode": "517505",
+            "type": "Branch",
+            "status": "ACTIVE",
+            "discount_enabled": false,
+            "discount_type": "flat",
+            "discount_value": 0.0,
+            "kot_required": true,
+            "receipt_required": true,
+            "feedback_qr_enabled": true,
+            "print_logo_enabled": true,
+            "order_live_tracking_enabled": true,
+            "paper_size": "58mm",
+            "fssai_number": "",
+            "service_charge_required": false,
+            "service_charge_amount": 0.0,
+            "service_charge_gst_required": false,
+            "service_charge_gst_percent": 0.0,
+            "loyalty_points_percentage": 0.0,
+            "swiggy_enabled": false,
+            "zomato_enabled": false,
+            "swiggy_partner_id": "",
+            "zomato_partner_id": "",
+            "online_orders_auto_accept": true,
+            "online_orders_webhook_token": "",
+            "online_orders_signature_required": false,
+            "swiggy_webhook_secret": "",
+            "zomato_webhook_secret": "",
+            "online_orders_status_sync_enabled": true,
+            "online_orders_status_sync_strict": false,
+            "online_orders_status_sync_timeout_sec": 8,
+            "swiggy_status_sync_url": "",
+            "zomato_status_sync_url": "",
+            "swiggy_status_sync_token": "",
+            "zomato_status_sync_token": "",
+            "swiggy_status_sync_secret": "",
+            "zomato_status_sync_secret": "",
+            "branch_id": 3
+          },
+          {
+            "branch_name": "Main Branch",
+            "address_line1": "Cherlopalli",
+            "address_line2": "Tirupati Rural",
+            "city": "tirupati",
+            "state": "AP",
+            "country": "india",
+            "pincode": "517505",
+            "type": "Branch",
+            "status": "ACTIVE",
+            "discount_enabled": false,
+            "discount_type": "flat",
+            "discount_value": 0.0,
+            "kot_required": true,
+            "receipt_required": true,
+            "feedback_qr_enabled": true,
+            "print_logo_enabled": true,
+            "order_live_tracking_enabled": true,
+            "paper_size": "58mm",
+            "fssai_number": "",
+            "service_charge_required": true,
+            "service_charge_amount": 100.0,
+            "service_charge_gst_required": false,
+            "service_charge_gst_percent": 0.0,
+            "loyalty_points_percentage": 0.0,
+            "swiggy_enabled": false,
+            "zomato_enabled": false,
+            "swiggy_partner_id": "",
+            "zomato_partner_id": "",
+            "online_orders_auto_accept": true,
+            "online_orders_webhook_token": "",
+            "online_orders_signature_required": false,
+            "swiggy_webhook_secret": "",
+            "zomato_webhook_secret": "",
+            "online_orders_status_sync_enabled": true,
+            "online_orders_status_sync_strict": false,
+            "online_orders_status_sync_timeout_sec": 8,
+            "swiggy_status_sync_url": "",
+            "zomato_status_sync_url": "",
+            "swiggy_status_sync_token": "",
+            "zomato_status_sync_token": "",
+            "swiggy_status_sync_secret": "",
+            "zomato_status_sync_secret": "",
+            "branch_id": 2
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "branch_by_id",
+      "method": "GET",
+      "path": "/branch/1",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "branch_name": "Head Office",
+          "address_line1": null,
+          "address_line2": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "pincode": null,
+          "type": "Head Office",
+          "status": "ACTIVE",
+          "discount_enabled": false,
+          "discount_type": "flat",
+          "discount_value": 0.0,
+          "kot_required": true,
+          "receipt_required": true,
+          "feedback_qr_enabled": true,
+          "print_logo_enabled": true,
+          "order_live_tracking_enabled": true,
+          "paper_size": "58mm",
+          "fssai_number": "",
+          "service_charge_required": false,
+          "service_charge_amount": 0.0,
+          "service_charge_gst_required": false,
+          "service_charge_gst_percent": 0.0,
+          "loyalty_points_percentage": 0.0,
+          "swiggy_enabled": false,
+          "zomato_enabled": false,
+          "swiggy_partner_id": "",
+          "zomato_partner_id": "",
+          "online_orders_auto_accept": true,
+          "online_orders_webhook_token": "",
+          "online_orders_signature_required": false,
+          "swiggy_webhook_secret": "",
+          "zomato_webhook_secret": "",
+          "online_orders_status_sync_enabled": true,
+          "online_orders_status_sync_strict": false,
+          "online_orders_status_sync_timeout_sec": 8,
+          "swiggy_status_sync_url": "",
+          "zomato_status_sync_url": "",
+          "swiggy_status_sync_token": "",
+          "zomato_status_sync_token": "",
+          "swiggy_status_sync_secret": "",
+          "zomato_status_sync_secret": "",
+          "branch_id": 1
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "invoice_list",
+      "method": "GET",
+      "path": "/invoice/list",
+      "request": {
+        "params": {
+          "range": "today"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 20.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100007",
+            "customer_name": "NA",
+            "invoice_id": 122,
+            "tax_amt": 2.14,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T09:18:08.570477+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 100.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100006",
+            "customer_name": "NA",
+            "invoice_id": 121,
+            "tax_amt": 10.71,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T09:12:02.650059+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 20.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100005",
+            "customer_name": "NA",
+            "invoice_id": 120,
+            "tax_amt": 2.14,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T00:23:32.972761+05:30",
+            "place_of_supply": null
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 10040.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100004",
+            "customer_name": "NA",
+            "invoice_id": 119,
+            "tax_amt": 1075.71,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T00:11:42.685843+05:30",
+            "place_of_supply": null
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 70.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100003",
+            "customer_name": "NA",
+            "invoice_id": 118,
+            "tax_amt": 7.5,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T23:19:06.533463+05:30",
+            "place_of_supply": null
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 50.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100002",
+            "customer_name": "NA",
+            "invoice_id": 117,
+            "tax_amt": 5.36,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T22:38:08.229953+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 50.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-000100001",
+            "customer_name": "NA",
+            "invoice_id": 116,
+            "tax_amt": 5.36,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-02-11T22:20:39.263354+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 100.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001065",
+            "customer_name": "Sathish",
+            "invoice_id": 85,
+            "tax_amt": 10.71,
+            "mobile": "7904263246",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": "qwertyhj",
+            "payment_mode": "cash",
+            "created_time": "2026-02-07T22:20:41.478601+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 310.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001064",
+            "customer_name": "NA",
+            "invoice_id": 84,
+            "tax_amt": 33.21,
+            "mobile": "9999999999",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": "dfghjk.,mn",
+            "payment_mode": "cash",
+            "created_time": "2026-02-07T22:17:26.949723+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 310.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001063",
+            "customer_name": "Sathish",
+            "invoice_id": 83,
+            "tax_amt": 33.21,
+            "mobile": "7904263246",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": "qwertyhj",
+            "payment_mode": "upi",
+            "created_time": "2026-02-07T20:01:18.383794+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 23.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001018",
+            "customer_name": "sdfghnb",
+            "invoice_id": 23,
+            "tax_amt": 2.14,
+            "mobile": "78632",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-02T04:20:42.813929+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 23.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001017",
+            "customer_name": "fghjmnbv",
+            "invoice_id": 22,
+            "tax_amt": 2.14,
+            "mobile": "0987654345",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-02T04:19:53.217049+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 23.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001016",
+            "customer_name": "fghjmnbv",
+            "invoice_id": 21,
+            "tax_amt": 2.14,
+            "mobile": "0987654345",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-02T04:17:22.910799+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 23.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001015",
+            "customer_name": "njln",
+            "invoice_id": 20,
+            "tax_amt": 2.14,
+            "mobile": "1852",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-02T00:54:47.146269+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 23.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001014",
+            "customer_name": "azxc",
+            "invoice_id": 19,
+            "tax_amt": 2.14,
+            "mobile": "7418520",
+            "discounted_amt": 0.0,
+            "created_user": 1,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-02T00:53:31.838804+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 45.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001012",
+            "customer_name": "fvb",
+            "invoice_id": 16,
+            "tax_amt": 4.29,
+            "mobile": "12",
+            "discounted_amt": 0.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-01T03:07:53.814915+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 45.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001011",
+            "customer_name": "Sathish",
+            "invoice_id": 15,
+            "tax_amt": 4.29,
+            "mobile": "9010153158",
+            "discounted_amt": 0.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2026-01-01T03:07:19.253601+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 30.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001010",
+            "customer_name": "dfghjnm",
+            "invoice_id": 12,
+            "tax_amt": 0.0,
+            "mobile": "741258",
+            "discounted_amt": 0.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 40.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001009",
+            "customer_name": "bbbb",
+            "invoice_id": 11,
+            "tax_amt": 0.0,
+            "mobile": "7410",
+            "discounted_amt": 0.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 72.6,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001008",
+            "customer_name": "Sathish",
+            "invoice_id": 8,
+            "tax_amt": 12.6,
+            "mobile": "9010153158",
+            "discounted_amt": 10.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 39.2,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001007",
+            "customer_name": "Priya Sharma",
+            "invoice_id": 7,
+            "tax_amt": 7.2,
+            "mobile": "8955",
+            "discounted_amt": 8.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 64.8,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001006",
+            "customer_name": "Priya Sharma",
+            "invoice_id": 6,
+            "tax_amt": 10.8,
+            "mobile": "8955",
+            "discounted_amt": 6.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 60.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001005",
+            "customer_name": "Priya Sharma",
+            "invoice_id": 5,
+            "tax_amt": 10.8,
+            "mobile": "9797979797",
+            "discounted_amt": 10.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 60.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001004",
+            "customer_name": "dcs",
+            "invoice_id": 4,
+            "tax_amt": 10.8,
+            "mobile": "7410",
+            "discounted_amt": 0.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 70.8,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-001003",
+            "customer_name": "sath",
+            "invoice_id": 3,
+            "tax_amt": 10.8,
+            "mobile": "8955",
+            "discounted_amt": 0.0,
+            "created_user": null,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 320.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-1002",
+            "customer_name": "Priya Sharma",
+            "invoice_id": 2,
+            "tax_amt": 30.0,
+            "mobile": "9797979797",
+            "discounted_amt": 0.0,
+            "created_user": 2,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          },
+          {
+            "payment_split": null,
+            "supply_type": "B2C",
+            "total_amount": 550.0,
+            "branch_id": 1,
+            "reverse_charge": false,
+            "shop_id": 1,
+            "invoice_number": "INV-1001",
+            "customer_name": "Arun Kumar",
+            "invoice_id": 1,
+            "tax_amt": 50.0,
+            "mobile": "9898989898",
+            "discounted_amt": 20.0,
+            "created_user": 2,
+            "gst_number": null,
+            "payment_mode": "cash",
+            "created_time": "2025-12-31T00:00:00+05:30",
+            "place_of_supply": "Tamil Nadu"
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "invoice_by_number",
+      "method": "GET",
+      "path": "/invoice/by-number/INV-000100007",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "invoice_id": 122,
+          "invoice_number": "INV-000100007",
+          "customer_name": "NA",
+          "mobile": "9999999999",
+          "total_amount": 20.0,
+          "discounted_amt": 0.0,
+          "tax_amt": 2.14,
+          "created_time": "2026-02-11 09:18:08",
+          "payment_mode": "cash",
+          "payment_split": null,
+          "items": [
+            {
+              "item_id": 4,
+              "item_name": "CHOCOLATE BAR",
+              "quantity": 1,
+              "price": 20.0,
+              "amount": 20.0,
+              "tax_percent": null,
+              "tax_amount": null
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "invoice_by_mobile",
+      "method": "GET",
+      "path": "/invoice/customer/by-mobile/7410258693",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "customer_name": "Lalitha",
+          "mobile": "7410258693",
+          "gst_number": null
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "invoice_create_validation",
+      "method": "POST",
+      "path": "/invoice/",
+      "request": {
+        "params": null,
+        "json": {
+          "items": []
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "No items"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "returns_create_validation",
+      "method": "POST",
+      "path": "/returns/",
+      "request": {
+        "params": null,
+        "json": {
+          "invoice_number": "INV-000100007",
+          "return_type": "REFUND",
+          "refund_mode": "cash",
+          "reason_code": "OTHER",
+          "reason": "api validation",
+          "items": []
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Return items required"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "customers_list",
+      "method": "GET",
+      "path": "/customers/",
+      "request": {
+        "params": {
+          "search": ""
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "customer_id": 4,
+            "customer_name": "Lalitha",
+            "mobile": "7410258693",
+            "email": null,
+            "gst_number": null,
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "pincode": null,
+            "status": "ACTIVE"
+          },
+          {
+            "customer_id": 2,
+            "customer_name": "Masthan",
+            "mobile": "8563214790",
+            "email": null,
+            "gst_number": null,
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "pincode": null,
+            "status": "ACTIVE"
+          },
+          {
+            "customer_id": 8,
+            "customer_name": "NA",
+            "mobile": "9999999999",
+            "email": null,
+            "gst_number": null,
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "pincode": null,
+            "status": "ACTIVE"
+          },
+          {
+            "customer_id": 7,
+            "customer_name": "Sathish",
+            "mobile": "7904263246",
+            "email": null,
+            "gst_number": "147896523014785",
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "pincode": null,
+            "status": "ACTIVE"
+          },
+          {
+            "customer_id": 1,
+            "customer_name": "Sathish",
+            "mobile": "8745963210",
+            "email": null,
+            "gst_number": null,
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "pincode": null,
+            "status": "ACTIVE"
+          },
+          {
+            "customer_id": 3,
+            "customer_name": "Srikar",
+            "mobile": "7412589630",
+            "email": null,
+            "gst_number": null,
+            "address_line1": null,
+            "address_line2": null,
+            "city": null,
+            "state": null,
+            "pincode": null,
+            "status": "ACTIVE"
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "customer_by_id",
+      "method": "GET",
+      "path": "/customers/4",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "customer_id": 4,
+          "customer_name": "Lalitha",
+          "mobile": "7410258693",
+          "email": null,
+          "gst_number": null,
+          "address_line1": null,
+          "address_line2": null,
+          "city": null,
+          "state": null,
+          "pincode": null,
+          "status": "ACTIVE"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "customer_create_validation",
+      "method": "POST",
+      "path": "/customers/",
+      "request": {
+        "params": null,
+        "json": {
+          "customer_name": "",
+          "mobile": "123"
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Invalid mobile number"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "dues_open",
+      "method": "GET",
+      "path": "/dues/open",
+      "request": {
+        "params": {
+          "q": ""
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "dues_pay_validation",
+      "method": "POST",
+      "path": "/dues/pay",
+      "request": {
+        "params": null,
+        "json": {
+          "invoice_number": "INV-000100007",
+          "amount": 1,
+          "payment_mode": "cash",
+          "reference_no": "API-TEST"
+        }
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Open due not found for this invoice"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "cash_drawer_current",
+      "method": "GET",
+      "path": "/cash-drawer/current",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "shift": {
+            "shift_id": 4,
+            "branch_id": 1,
+            "status": "OPEN",
+            "opened_at": "2026-02-11T11:38:47.987467+05:30",
+            "opening_cash": 0.0,
+            "expected_cash": null,
+            "actual_cash": null,
+            "diff_cash": null,
+            "denomination_counts": null,
+            "closed_at": null
+          },
+          "movements": [],
+          "summary": {
+            "opening_cash": 0.0,
+            "cash_in": 0.0,
+            "cash_out": 0.0,
+            "cash_top_up": 0.0,
+            "cash_withdrawal": 0.0,
+            "cash_sales": 170.0,
+            "cash_collections": 0.0,
+            "cash_refunds": 0.0,
+            "total_cash_in": 170.0,
+            "total_cash_out": 0.0,
+            "expected_cash": 170.0
+          }
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "cash_drawer_transactions",
+      "method": "GET",
+      "path": "/cash-drawer/transactions",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "cash_drawer_open_validation",
+      "method": "POST",
+      "path": "/cash-drawer/open",
+      "request": {
+        "params": null,
+        "json": {
+          "opening_cash": 0
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "A shift is already open for this branch"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "cash_drawer_close_validation",
+      "method": "POST",
+      "path": "/cash-drawer/close",
+      "request": {
+        "params": null,
+        "json": {
+          "closing_cash": 0
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Provide actual_cash or denomination_counts"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "expenses_list",
+      "method": "GET",
+      "path": "/expenses/",
+      "request": {
+        "params": {
+          "date_from": "2026-04-12",
+          "date_to": "2026-04-12"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "expenses_create_validation",
+      "method": "POST",
+      "path": "/expenses/",
+      "request": {
+        "params": null,
+        "json": {
+          "category": "Other",
+          "description": "API runtime validation",
+          "amount": 0,
+          "expense_date": "2026-04-12"
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "expense_id": 4,
+          "branch_id": 1,
+          "expense_date": "2026-02-11",
+          "amount": 0.0,
+          "category": "Other",
+          "payment_mode": "cash",
+          "note": null,
+          "created_by": 1
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "categories",
+      "method": "GET",
+      "path": "/category/",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "category_id": 10,
+            "category_name": "ATTA & RICE",
+            "category_status": true
+          },
+          {
+            "category_id": 1,
+            "category_name": "Beverages",
+            "category_status": true
+          },
+          {
+            "category_id": 26,
+            "category_name": "BEVERAGES",
+            "category_status": true
+          },
+          {
+            "category_id": 8,
+            "category_name": "DAIRY",
+            "category_status": true
+          },
+          {
+            "category_id": 11,
+            "category_name": "DALS AND GRAINS",
+            "category_status": true
+          },
+          {
+            "category_id": 5,
+            "category_name": "Drinks",
+            "category_status": true
+          },
+          {
+            "category_id": 6,
+            "category_name": "Food",
+            "category_status": true
+          },
+          {
+            "category_id": 15,
+            "category_name": "FOOD",
+            "category_status": true
+          },
+          {
+            "category_id": 3,
+            "category_name": "Groceries",
+            "category_status": true
+          },
+          {
+            "category_id": 13,
+            "category_name": "JEWEL",
+            "category_status": true
+          },
+          {
+            "category_id": 14,
+            "category_name": "MOBILES",
+            "category_status": true
+          },
+          {
+            "category_id": 9,
+            "category_name": "OILS",
+            "category_status": true
+          },
+          {
+            "category_id": 7,
+            "category_name": "Sath",
+            "category_status": true
+          },
+          {
+            "category_id": 2,
+            "category_name": "Snacks",
+            "category_status": true
+          },
+          {
+            "category_id": 27,
+            "category_name": "SNACKS",
+            "category_status": false
+          },
+          {
+            "category_id": 12,
+            "category_name": "VEGETABLES",
+            "category_status": true
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "items",
+      "method": "GET",
+      "path": "/items/",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "item_id": 6,
+            "item_name": "ATTA / WHEAT FLOUR 1 KG",
+            "category_id": 10,
+            "supplier_id": null,
+            "price": 40.0,
+            "buy_price": 25.0,
+            "mrp_price": 50.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 13,
+            "item_name": "CHAIN",
+            "category_id": 13,
+            "supplier_id": null,
+            "price": 100.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 15,
+            "item_name": "CHIPS",
+            "category_id": 6,
+            "supplier_id": null,
+            "price": 50.0,
+            "buy_price": 30.0,
+            "mrp_price": 70.0,
+            "image_filename": "15.jpg",
+            "min_stock": 10,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 4,
+            "item_name": "CHOCOLATE BAR",
+            "category_id": 2,
+            "supplier_id": null,
+            "price": 20.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": "4.png",
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 1,
+            "item_name": "COCA COLA ",
+            "category_id": 1,
+            "supplier_id": null,
+            "price": 20.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": "1.png",
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 11,
+            "item_name": "CURD 1 L",
+            "category_id": 8,
+            "supplier_id": null,
+            "price": 99.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 12,
+            "item_name": "CURD 125 ML",
+            "category_id": 8,
+            "supplier_id": null,
+            "price": 10.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 10,
+            "item_name": "CURD 500 ML",
+            "category_id": 8,
+            "supplier_id": null,
+            "price": 50.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 8,
+            "item_name": "MILK 450 ML",
+            "category_id": 8,
+            "supplier_id": null,
+            "price": 45.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 9,
+            "item_name": "MILK 500 ML",
+            "category_id": 8,
+            "supplier_id": null,
+            "price": 50.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 2,
+            "item_name": "Orange Juice 500ml",
+            "category_id": 1,
+            "supplier_id": null,
+            "price": 40.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 3,
+            "item_name": "POTATO CHIPS",
+            "category_id": 2,
+            "supplier_id": null,
+            "price": 20.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": "3.jpg",
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 5,
+            "item_name": "RICE 5KG",
+            "category_id": 3,
+            "supplier_id": null,
+            "price": 250.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": "5.jpg",
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          },
+          {
+            "item_id": 14,
+            "item_name": "SAMSUNG",
+            "category_id": 14,
+            "supplier_id": null,
+            "price": 10000.0,
+            "buy_price": 0.0,
+            "mrp_price": 0.0,
+            "image_filename": null,
+            "min_stock": 50,
+            "is_raw_material": false,
+            "sold_by_weight": false,
+            "item_status": true
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "inventory_list",
+      "method": "GET",
+      "path": "/inventory/list",
+      "request": {
+        "params": {
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "inventory_params",
+      "method": "GET",
+      "path": "/parameters/inventory",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "enabled": true,
+          "value": "YES"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "inventory_add_validation",
+      "method": "POST",
+      "path": "/inventory/add",
+      "request": {
+        "params": {
+          "item_id": 99999999,
+          "qty": 1,
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Item not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "inventory_subtract_validation",
+      "method": "POST",
+      "path": "/inventory/subtract",
+      "request": {
+        "params": {
+          "item_id": 99999999,
+          "qty": 1,
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 405,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Method Not Allowed"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "employees_list",
+      "method": "GET",
+      "path": "/employees",
+      "request": {
+        "params": {
+          "status": "ACTIVE"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "employees_create_validation",
+      "method": "POST",
+      "path": "/employees",
+      "request": {
+        "params": null,
+        "json": {
+          "employee_name": "",
+          "mobile": "123",
+          "designation": "Staff",
+          "wage_type": "DAILY",
+          "daily_wage": 0
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "daily_wage must be > 0 for DAILY wage type"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "attendance_get",
+      "method": "GET",
+      "path": "/employees/attendance",
+      "request": {
+        "params": {
+          "date": "2026-04-12"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 422,
+        "content_type": "application/json",
+        "body": {
+          "detail": [
+            {
+              "type": "int_parsing",
+              "loc": [
+                "path",
+                "employee_id"
+              ],
+              "msg": "Input should be a valid integer, unable to parse string as an integer",
+              "input": "attendance"
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "attendance_bulk_validation",
+      "method": "POST",
+      "path": "/employees/attendance/bulk",
+      "request": {
+        "params": null,
+        "json": {
+          "date": "2026-04-12",
+          "records": [
+            {
+              "employee_id": 1,
+              "status": "PRESENT",
+              "worked_units": 1
+            }
+          ]
+        }
+      },
+      "response": {
+        "status_code": 422,
+        "content_type": "application/json",
+        "body": {
+          "detail": [
+            {
+              "type": "missing",
+              "loc": [
+                "body",
+                "items"
+              ],
+              "msg": "Field required",
+              "input": {
+                "date": "2026-04-12",
+                "records": [
+                  {
+                    "employee_id": 1,
+                    "status": "PRESENT",
+                    "worked_units": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "day_close_status",
+      "method": "GET",
+      "path": "/day-close/status",
+      "request": {
+        "params": {
+          "date_str": "2026-04-12"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "branch_id": 1,
+            "branch_name": "Head Office",
+            "closed": false
+          },
+          {
+            "branch_id": 3,
+            "branch_name": "HI-TECH",
+            "closed": false
+          },
+          {
+            "branch_id": 2,
+            "branch_name": "Main Branch",
+            "closed": false
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "day_close_summary",
+      "method": "GET",
+      "path": "/day-close/summary",
+      "request": {
+        "params": {
+          "date_str": "2026-04-12",
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "day_close_close_validation",
+      "method": "POST",
+      "path": "/day-close/close",
+      "request": {
+        "params": null,
+        "json": {
+          "date_str": "2026-04-12",
+          "branch_id": 1
+        }
+      },
+      "response": {
+        "status_code": 405,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Method Not Allowed"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "reports_sales",
+      "method": "GET",
+      "path": "/reports/sales",
+      "request": {
+        "params": {
+          "start": "2026-04-12",
+          "end": "2026-04-12",
+          "payment_mode": ""
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "analytics_summary",
+      "method": "GET",
+      "path": "/analytics/summary",
+      "request": {
+        "params": {
+          "from_date": "2026-04-12",
+          "to_date": "2026-04-12"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "from_date": "2026-04-12",
+          "to_date": "2026-04-12",
+          "branch_id": null,
+          "financials": {
+            "invoice_sales_ex_tax": 0.0,
+            "invoice_gst": 0.0,
+            "invoice_discount": 0.0,
+            "invoice_discount_ex_tax": 0.0,
+            "invoice_cogs": 0.0,
+            "returns_sales_ex_tax": 0.0,
+            "returns_tax": 0.0,
+            "returns_discount": 0.0,
+            "returns_discount_ex_tax": 0.0,
+            "returns_refund": 0.0,
+            "returns_cogs": 0.0,
+            "sales_ex_tax": 0.0,
+            "gst": 0.0,
+            "discount": 0.0,
+            "discount_ex_tax": 0.0,
+            "expense": 0.0,
+            "wages_expense": 0.0,
+            "cogs_net": 0.0,
+            "gross_profit": 0.0,
+            "net_profit": 0.0,
+            "profit": 0.0
+          },
+          "collections": {
+            "amount": 0.0
+          },
+          "open_dues": {
+            "count": 0,
+            "outstanding": 0.0
+          },
+          "stock": {
+            "valuation": 2075.0
+          }
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "analytics_top_items",
+      "method": "GET",
+      "path": "/analytics/top-items",
+      "request": {
+        "params": {
+          "from_date": "2026-04-12",
+          "to_date": "2026-04-12",
+          "limit": 10
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "loyalty_by_mobile",
+      "method": "GET",
+      "path": "/loyalty/account/by-mobile/7410258693",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "customer_id": 4,
+          "customer_name": "Lalitha",
+          "mobile": "7410258693",
+          "points_balance": 0,
+          "tier": null,
+          "updated_at": "2026-04-12T12:13:27.448005+05:30"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "loyalty_transactions",
+      "method": "GET",
+      "path": "/loyalty/transactions/4",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "loyalty_adjust_validation",
+      "method": "POST",
+      "path": "/loyalty/adjust",
+      "request": {
+        "params": null,
+        "json": {
+          "customer_id": 4,
+          "points": 1,
+          "notes": "api validation"
+        }
+      },
+      "response": {
+        "status_code": 422,
+        "content_type": "application/json",
+        "body": {
+          "detail": [
+            {
+              "type": "missing",
+              "loc": [
+                "body",
+                "mobile"
+              ],
+              "msg": "Field required",
+              "input": {
+                "customer_id": 4,
+                "points": 1,
+                "notes": "api validation"
+              }
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "loyalty_redeem_validation",
+      "method": "POST",
+      "path": "/loyalty/redeem",
+      "request": {
+        "params": null,
+        "json": {
+          "customer_id": 4,
+          "points": 1,
+          "notes": "api validation"
+        }
+      },
+      "response": {
+        "status_code": 422,
+        "content_type": "application/json",
+        "body": {
+          "detail": [
+            {
+              "type": "missing",
+              "loc": [
+                "body",
+                "mobile"
+              ],
+              "msg": "Field required",
+              "input": {
+                "customer_id": 4,
+                "points": 1,
+                "notes": "api validation"
+              }
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "suppliers",
+      "method": "GET",
+      "path": "/suppliers/",
+      "request": {
+        "params": {
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "supplier_id": 1,
+            "supplier_name": "Sathish",
+            "branch_id": 1,
+            "phone": "7904263246",
+            "email": "sathish@gmail.com",
+            "gstin": "",
+            "address_line1": "",
+            "address_line2": "",
+            "address_line3": "",
+            "city": "",
+            "state": "",
+            "pincode": "",
+            "contact_person": "",
+            "credit_terms_days": 0,
+            "status": "ACTIVE"
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "supplier_aging",
+      "method": "GET",
+      "path": "/supplier-ledger/aging",
+      "request": {
+        "params": {
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "supplier_open_pos",
+      "method": "GET",
+      "path": "/supplier-ledger/supplier/1/open-pos",
+      "request": {
+        "params": {
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "supplier_statement",
+      "method": "GET",
+      "path": "/supplier-ledger/supplier/1/statement",
+      "request": {
+        "params": {
+          "branch_id": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "entry_id": 1,
+            "entry_type": "PAYMENT",
+            "reference_no": null,
+            "po_id": null,
+            "debit": 0.0,
+            "credit": 520.0,
+            "notes": "Mode: cash",
+            "entry_time": "2026-02-08T01:55:32.018371+05:30"
+          },
+          {
+            "entry_id": 2,
+            "entry_type": "PAYMENT",
+            "reference_no": "PO-20260206070349-PAY",
+            "po_id": 1,
+            "debit": 0.0,
+            "credit": 520.0,
+            "notes": "Mode: cash",
+            "entry_time": "2026-02-08T01:56:01.946785+05:30"
+          },
+          {
+            "entry_id": 3,
+            "entry_type": "PAYMENT",
+            "reference_no": "API-TEST",
+            "po_id": null,
+            "debit": 0.0,
+            "credit": 1.0,
+            "notes": "runtime validation",
+            "entry_time": "2026-02-11T12:13:27.747351+05:30"
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "supplier_payment_validation",
+      "method": "POST",
+      "path": "/supplier-ledger/payment",
+      "request": {
+        "params": null,
+        "json": {
+          "supplier_id": 1,
+          "branch_id": 1,
+          "po_id": null,
+          "amount": 1,
+          "payment_mode": "cash",
+          "reference_no": "API-TEST",
+          "notes": "runtime validation"
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "entry_id": 4,
+          "entry_type": "PAYMENT",
+          "reference_no": "API-TEST",
+          "po_id": null,
+          "debit": 0.0,
+          "credit": 1.0,
+          "notes": "runtime validation",
+          "entry_time": "2026-02-11T12:18:33.526321+05:30"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "online_orders",
+      "method": "GET",
+      "path": "/online-orders/",
+      "request": {
+        "params": {
+          "provider": "ALL",
+          "status": "ALL"
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "provider must be SWIGGY or ZOMATO"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "online_order_status_validation",
+      "method": "PATCH",
+      "path": "/online-orders/1/status",
+      "request": {
+        "params": null,
+        "json": {
+          "status": "CONFIRMED"
+        }
+      },
+      "response": {
+        "status_code": 405,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Method Not Allowed"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "qr_pending",
+      "method": "GET",
+      "path": "/qr-orders/pending",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "qr_accept_validation",
+      "method": "POST",
+      "path": "/qr-orders/0/accept",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "QR order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "qr_reject_validation",
+      "method": "POST",
+      "path": "/qr-orders/0/reject",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "QR order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "tables",
+      "method": "GET",
+      "path": "/table-billing/tables",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "table_id": 1,
+            "table_name": "Table 1",
+            "capacity": 4,
+            "category_id": null,
+            "category_name": null,
+            "status": "PAID",
+            "table_start_time": null,
+            "opened_at": null,
+            "running_total": 0.0,
+            "order_id": null,
+            "order_type": null,
+            "customer_name": null,
+            "mobile": null,
+            "notes": null,
+            "token_number": null
+          },
+          {
+            "table_id": 2,
+            "table_name": "Table 2",
+            "capacity": 4,
+            "category_id": null,
+            "category_name": null,
+            "status": "FREE",
+            "table_start_time": null,
+            "opened_at": null,
+            "running_total": 0.0,
+            "order_id": null,
+            "order_type": null,
+            "customer_name": null,
+            "mobile": null,
+            "notes": null,
+            "token_number": null
+          },
+          {
+            "table_id": 3,
+            "table_name": "Table 3",
+            "capacity": 6,
+            "category_id": null,
+            "category_name": null,
+            "status": "FREE",
+            "table_start_time": null,
+            "opened_at": null,
+            "running_total": 0.0,
+            "order_id": null,
+            "order_type": null,
+            "customer_name": null,
+            "mobile": null,
+            "notes": null,
+            "token_number": null
+          },
+          {
+            "table_id": 4,
+            "table_name": "VIP Table",
+            "capacity": 8,
+            "category_id": null,
+            "category_name": null,
+            "status": "FREE",
+            "table_start_time": null,
+            "opened_at": null,
+            "running_total": 0.0,
+            "order_id": null,
+            "order_type": null,
+            "customer_name": null,
+            "mobile": null,
+            "notes": null,
+            "token_number": null
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_order_by_table",
+      "method": "GET",
+      "path": "/table-billing/order/by-table/1",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "order_id": 80,
+          "table_id": 1,
+          "table_name": "Table 1",
+          "status": "OPEN",
+          "items": [],
+          "service_charge": 0.0,
+          "service_charge_gst": 0.0
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_order_item_add_validation",
+      "method": "POST",
+      "path": "/table-billing/order/item/add",
+      "request": {
+        "params": {
+          "order_id": 99999999,
+          "item_id": 99999999,
+          "quantity": 1
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 422,
+        "content_type": "application/json",
+        "body": {
+          "detail": [
+            {
+              "type": "missing",
+              "loc": [
+                "query",
+                "qty"
+              ],
+              "msg": "Field required",
+              "input": null
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_order_checkout_validation",
+      "method": "POST",
+      "path": "/table-billing/order/checkout/99999999",
+      "request": {
+        "params": null,
+        "json": {
+          "customer_name": "API",
+          "mobile": "9999999999",
+          "payment_mode": "cash"
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Invalid or empty order"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_takeaway_validation",
+      "method": "POST",
+      "path": "/table-billing/takeaway",
+      "request": {
+        "params": null,
+        "json": {
+          "customer_name": "API",
+          "mobile": "9999999999",
+          "items": []
+        }
+      },
+      "response": {
+        "status_code": 400,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Add at least one item"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_takeaway_orders",
+      "method": "GET",
+      "path": "/table-billing/takeaway/orders",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "order_id": 79,
+            "table_id": 31,
+            "order_type": "TAKEAWAY",
+            "customer_name": "NA",
+            "mobile": "9999999999",
+            "notes": "Sales billing invoice INV-000100007",
+            "token_number": "INV-000100007",
+            "status": "OPEN",
+            "opened_at": "2026-04-10T03:48:08.646812",
+            "running_total": 20.0,
+            "items": [
+              {
+                "order_item_id": 82,
+                "item_id": 4,
+                "item_name": "CHOCOLATE BAR",
+                "price": 20.0,
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "order_id": 78,
+            "table_id": 31,
+            "order_type": "TAKEAWAY",
+            "customer_name": "NA",
+            "mobile": "9999999999",
+            "notes": "Sales billing invoice INV-000100006",
+            "token_number": "INV-000100006",
+            "status": "OPEN",
+            "opened_at": "2026-04-10T03:42:02.786844",
+            "running_total": 100.0,
+            "items": [
+              {
+                "order_item_id": 81,
+                "item_id": 13,
+                "item_name": "CHAIN",
+                "price": 100.0,
+                "quantity": 1
+              }
+            ]
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_transfer_validation",
+      "method": "POST",
+      "path": "/table-billing/order/transfer",
+      "request": {
+        "params": null,
+        "json": {
+          "source_order_id": 99999999,
+          "dest_order_id": 99999998
+        }
+      },
+      "response": {
+        "status_code": 422,
+        "content_type": "application/json",
+        "body": {
+          "detail": [
+            {
+              "type": "missing",
+              "loc": [
+                "body",
+                "from_table_id"
+              ],
+              "msg": "Field required",
+              "input": {
+                "source_order_id": 99999999,
+                "dest_order_id": 99999998
+              }
+            },
+            {
+              "type": "missing",
+              "loc": [
+                "body",
+                "to_table_id"
+              ],
+              "msg": "Field required",
+              "input": {
+                "source_order_id": 99999999,
+                "dest_order_id": 99999998
+              }
+            }
+          ]
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_1",
+      "method": "POST",
+      "path": "/table-billing/order/cancel/99999999",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_2",
+      "method": "POST",
+      "path": "/table-billing/order/cancel/99999999/",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 405,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Method Not Allowed"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_3",
+      "method": "POST",
+      "path": "/table-billing/order/cancel",
+      "request": {
+        "params": {
+          "order_id": 99999999
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_4",
+      "method": "POST",
+      "path": "/table-billing/orders/99999999/cancel",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_5",
+      "method": "PUT",
+      "path": "/table-billing/orders/99999999/cancel",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_6",
+      "method": "PUT",
+      "path": "/table-billing/order/cancel",
+      "request": {
+        "params": {
+          "order_id": 99999999
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_7",
+      "method": "DELETE",
+      "path": "/table-billing/order/cancel",
+      "request": {
+        "params": {
+          "order_id": 99999999
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_8",
+      "method": "DELETE",
+      "path": "/table-billing/orders/99999999",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 405,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Method Not Allowed"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "table_cancel_variant_9",
+      "method": "POST",
+      "path": "/table-billing/order/cancel",
+      "request": {
+        "params": null,
+        "json": {
+          "order_id": 99999999
+        }
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "kot_order",
+      "method": "GET",
+      "path": "/kot/order/99999999",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "kot_create_validation",
+      "method": "POST",
+      "path": "/kot/create/99999999",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "Order not found or already closed"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "kot_pending",
+      "method": "GET",
+      "path": "/kot/pending",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "kot_id": 3,
+            "kot_number": "KOT-1-0003",
+            "table_id": 1,
+            "status": "PENDING",
+            "printed_at": "2026-04-09T18:41:31.759348",
+            "items": [
+              {
+                "item_name": "Orange Juice 500ml",
+                "quantity": 1,
+                "notes": null,
+                "status": "PENDING"
+              },
+              {
+                "item_name": "SAMSUNG",
+                "quantity": 1,
+                "notes": null,
+                "status": "PENDING"
+              }
+            ]
+          },
+          {
+            "kot_id": 4,
+            "kot_number": "KOT-1-0004",
+            "table_id": 1,
+            "status": "PENDING",
+            "printed_at": "2026-04-09T18:53:25.463601",
+            "items": [
+              {
+                "item_name": "COCA COLA ",
+                "quantity": 1,
+                "notes": null,
+                "status": "PENDING"
+              }
+            ]
+          },
+          {
+            "kot_id": 5,
+            "kot_number": "KOT-1-0005",
+            "table_id": 31,
+            "status": "PENDING",
+            "printed_at": "2026-04-10T03:42:02.843601",
+            "items": [
+              {
+                "item_name": "CHAIN",
+                "quantity": 1,
+                "notes": null,
+                "status": "PENDING"
+              }
+            ]
+          },
+          {
+            "kot_id": 6,
+            "kot_number": "KOT-1-0006",
+            "table_id": 31,
+            "status": "PENDING",
+            "printed_at": "2026-04-10T03:48:08.674636",
+            "items": [
+              {
+                "item_name": "CHOCOLATE BAR",
+                "quantity": 1,
+                "notes": null,
+                "status": "PENDING"
+              }
+            ]
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "kot_status_validation",
+      "method": "PUT",
+      "path": "/kot/99999999/status",
+      "request": {
+        "params": null,
+        "json": {
+          "status": "READY"
+        }
+      },
+      "response": {
+        "status_code": 404,
+        "content_type": "application/json",
+        "body": {
+          "detail": "KOT not found"
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "kot_tracking",
+      "method": "GET",
+      "path": "/kot/tracking/orders",
+      "request": {
+        "params": {
+          "include_without_kot": false
+        },
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": [
+          {
+            "order_id": 78,
+            "table_id": 31,
+            "table_name": "__TAKEAWAY__",
+            "branch_id": 1,
+            "order_type": "TAKEAWAY",
+            "customer_name": "NA",
+            "mobile": "9999999999",
+            "notes": "Sales billing invoice INV-000100006",
+            "token_number": "INV-000100006",
+            "opened_at": "2026-04-10T03:42:02.786844",
+            "status": "ORDER_PLACED",
+            "status_label": "Order Placed",
+            "step_index": 0,
+            "next_status": "ORDER_PREPARING",
+            "has_kot": true,
+            "kot_count": 1,
+            "item_count": 1,
+            "total_qty": 1,
+            "items": [
+              {
+                "order_item_id": 81,
+                "item_id": 13,
+                "item_name": "CHAIN",
+                "quantity": 1,
+                "price": 100.0,
+                "kot_sent": true,
+                "kot_sent_at": "2026-04-10T03:42:02.850956"
+              }
+            ],
+            "kots": [
+              {
+                "kot_id": 5,
+                "kot_number": "KOT-1-0005",
+                "status": "PENDING",
+                "status_label": "Order Placed",
+                "printed_at": "2026-04-10T03:42:02.843601",
+                "completed_at": null,
+                "item_count": 1,
+                "items": [
+                  {
+                    "id": 6,
+                    "order_item_id": 81,
+                    "item_id": 13,
+                    "item_name": "CHAIN",
+                    "quantity": 1,
+                    "notes": null,
+                    "status": "PENDING"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "order_id": 79,
+            "table_id": 31,
+            "table_name": "__TAKEAWAY__",
+            "branch_id": 1,
+            "order_type": "TAKEAWAY",
+            "customer_name": "NA",
+            "mobile": "9999999999",
+            "notes": "Sales billing invoice INV-000100007",
+            "token_number": "INV-000100007",
+            "opened_at": "2026-04-10T03:48:08.646812",
+            "status": "ORDER_PLACED",
+            "status_label": "Order Placed",
+            "step_index": 0,
+            "next_status": "ORDER_PREPARING",
+            "has_kot": true,
+            "kot_count": 1,
+            "item_count": 1,
+            "total_qty": 1,
+            "items": [
+              {
+                "order_item_id": 82,
+                "item_id": 4,
+                "item_name": "CHOCOLATE BAR",
+                "quantity": 1,
+                "price": 20.0,
+                "kot_sent": true,
+                "kot_sent_at": "2026-04-10T03:48:08.677797"
+              }
+            ],
+            "kots": [
+              {
+                "kot_id": 6,
+                "kot_number": "KOT-1-0006",
+                "status": "PENDING",
+                "status_label": "Order Placed",
+                "printed_at": "2026-04-10T03:48:08.674636",
+                "completed_at": null,
+                "item_count": 1,
+                "items": [
+                  {
+                    "id": 7,
+                    "order_item_id": 82,
+                    "item_id": 4,
+                    "item_name": "CHOCOLATE BAR",
+                    "quantity": 1,
+                    "notes": null,
+                    "status": "PENDING"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "auth_logout",
+      "method": "POST",
+      "path": "/auth/logout",
+      "request": {
+        "params": null,
+        "json": null
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "message": "Logged out"
+        }
+      },
+      "result": "PASS"
+    }
+  ]
+}
