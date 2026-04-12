@@ -83,6 +83,7 @@ export default function HomeScreen({ navigation }) {
         setPendingCount(count);
       } catch (err) {
         if (!mounted) return;
+        setPermMap({});
         Alert.alert("Error", String(err?.response?.data?.detail || "Failed to load home"));
       } finally {
         if (mounted) setLoading(false);

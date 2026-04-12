@@ -68,7 +68,7 @@ export const mobileMenuCatalog = [
     title: "Held Invoices",
     icon: "🔖",
     route: "HeldInvoices",
-    perm: { module: "billing", action: "read" },
+    perm: { module: "drafts", action: "read" },
     fallbackRoles: ALL_ROLES,
     hotelOnly: true,
   },
@@ -78,7 +78,7 @@ export const mobileMenuCatalog = [
     title: "Inventory",
     icon: "📦",
     route: "Inventory",
-    perm: { module: "billing", action: "read" },
+    perm: { module: "inventory", action: "read" },
     fallbackRoles: ALL_ROLES,
   },
   {
@@ -86,7 +86,7 @@ export const mobileMenuCatalog = [
     title: "Dues & Receivables",
     icon: "💰",
     route: "Dues",
-    perm: { module: "billing", action: "read" },
+    perm: { module: "dues", action: "read" },
     fallbackRoles: ALL_ROLES,
   },
   {
@@ -94,7 +94,7 @@ export const mobileMenuCatalog = [
     title: "Returns",
     icon: "↩️",
     route: "Returns",
-    perm: { module: "billing", action: "write" },
+    perm: { module: "returns", action: "write" },
     fallbackRoles: ALL_ROLES,
   },
   {
@@ -119,7 +119,7 @@ export const mobileMenuCatalog = [
     title: "Employees",
     icon: "👤",
     route: "Employees",
-    perm: { module: "billing", action: "read" },
+    perm: { module: "employees", action: "read" },
     fallbackRoles: new Set(["admin", "manager"]),
   },
   {
@@ -127,7 +127,7 @@ export const mobileMenuCatalog = [
     title: "Attendance",
     icon: "📋",
     route: "EmployeeAttendance",
-    perm: { module: "billing", action: "write" },
+    perm: { module: "employees", action: "write" },
     fallbackRoles: new Set(["admin", "manager"]),
   },
   {
@@ -135,7 +135,7 @@ export const mobileMenuCatalog = [
     title: "Analytics",
     icon: "📈",
     route: "Analytics",
-    perm: { module: "billing", action: "read" },
+    perm: { module: "analytics", action: "read" },
     fallbackRoles: new Set(["admin", "manager"]),
   },
   {
@@ -183,8 +183,9 @@ export function buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel = fa
     catalog = catalog.filter((m) => !m.hotelOnly);
   }
 
-  if (permMap) {
-    return catalog.filter((m) => canAccess(permMap, m.perm));
+  if (!permMap || typeof permMap !== "object") {
+    return [];
   }
-  return catalog.filter((m) => m.fallbackRoles.has(roleLower));
+
+  return catalog.filter((m) => canAccess(permMap, m.perm));
 }
