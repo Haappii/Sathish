@@ -116,21 +116,14 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.head}>
           <View style={styles.headTopRow}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.shop}>{shopBranchLabel}</Text>
-              <Text style={styles.meta}>
-                {session?.user_name || "User"} · {session?.role_name || session?.role || "role"}
-              </Text>
-            </View>
+            <Text style={styles.shop} numberOfLines={1}>{shopBranchLabel}</Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {session?.user_name || "User"}.{session?.role_name || session?.role || ""}
+            </Text>
             <Pressable style={styles.logoutTopBtn} onPress={logout}>
               <Text style={styles.logoutTopBtnText}>Logout</Text>
             </Pressable>
           </View>
-          {isHotel && (
-            <View style={styles.hotelBadge}>
-              <Text style={styles.hotelBadgeText}>Hotel Mode</Text>
-            </View>
-          )}
         </View>
 
         {/* Menu Grid */}
@@ -183,9 +176,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
-  shop:  { color: "#fff", fontSize: 20, fontWeight: "800" },
-  meta:  { color: "#bfdbfe" },
+  shop:  { color: "#fff", fontSize: 15, fontWeight: "800", flex: 1 },
+  meta:  { color: "#bfdbfe", fontSize: 13, flex: 1, textAlign: "center" },
   logoutTopBtn: {
     backgroundColor: "#fff",
     borderRadius: 8,

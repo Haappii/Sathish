@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LEAVE"];
 
@@ -22,10 +23,10 @@ const STATUS_COLOR = {
   LEAVE: "#7c3aed",
 };
 
-const todayISO = () => new Date().toISOString().split("T")[0];
-
 export default function EmployeeAttendanceScreen() {
-  const [attendanceDate, setAttendanceDate] = useState(todayISO());
+  const { session } = useAuth();
+  const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
+  const [attendanceDate, setAttendanceDate] = useState(businessDate);
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState({}); // employee_id -> {status, worked_units}
   const [search, setSearch] = useState("");

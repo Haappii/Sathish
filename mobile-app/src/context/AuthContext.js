@@ -52,6 +52,9 @@ export function AuthProvider({ children }) {
       branch_name: data.branch_name,
       branch_close: data.branch_close,
       branch_type: data.branch_type,
+      app_date: data.app_date
+        ? String(data.app_date).split("T")[0]
+        : new Date().toISOString().split("T")[0],
     };
 
     await setStoredSession(nextSession);

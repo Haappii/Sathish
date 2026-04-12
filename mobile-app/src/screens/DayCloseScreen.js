@@ -15,14 +15,14 @@ import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
-const todayISO = () => new Date().toISOString().split("T")[0];
 
 export default function DayCloseScreen() {
   const { session } = useAuth();
   const branchId = session?.branch_id ?? null;
   const branchName = session?.branch_name || "";
+  const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
 
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(businessDate);
   const [status, setStatus] = useState([]);
   const [dayReport, setDayReport] = useState(null);
   const [loading, setLoading] = useState(true);

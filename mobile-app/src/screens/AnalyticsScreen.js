@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,22 +12,10 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const fmtCount = (n) => String(Number(n || 0));
-const todayISO = () => new Date().toISOString().split("T")[0];
-const nDaysAgo = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split("T")[0];
-};
-
-const RANGES = [
-  { label: "Today", from: () => todayISO(), to: () => todayISO() },
-  { label: "7 Days", from: () => nDaysAgo(6), to: () => todayISO() },
-  { label: "30 Days", from: () => nDaysAgo(29), to: () => todayISO() },
-  { label: "90 Days", from: () => nDaysAgo(89), to: () => todayISO() },
-];
 
 function KpiCard({ label, value, sub, accent }) {
   return (
@@ -40,6 +28,20 @@ function KpiCard({ label, value, sub, accent }) {
 }
 
 export default function AnalyticsScreen() {
+  const { session } = useAuth();
+  const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
+  const nDaysBeforeBiz = useCallback((n) => {
+    const d = new Date(businessDate);
+    d.setDate(d.getDate() - n);
+    return d.toISOString().split("T")[0];
+  }, [businessDate]);
+  const RANGES = useMemo(() => [
+    { label: "Today", from: () => businessDate, to: () => businessDate },
+    { label: "7 Days", from: () => nDaysBeforeBiz(6), to: () => businessDate },
+    { label: "30 Days", from: () => nDaysBeforeBiz(29), to: () => businessDate },
+    { label: "90 Days", from: () => nDaysBeforeBiz(89), to: () => businessDate },
+  ], [businessDate, nDaysBeforeBiz]);
+
   const [rangeIdx, setRangeIdx] = useState(0);
   const [data, setData] = useState(null);
   const [dashStats, setDashStats] = useState(null);
