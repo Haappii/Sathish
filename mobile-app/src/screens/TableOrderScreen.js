@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -18,6 +19,8 @@ import {
 } from "react-native";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { WEB_APP_BASE } from "../config/api";
 
 const normalizeServiceCharge = (value) => {
   const n = Number(value);
@@ -35,9 +38,22 @@ const branchDiscountAmount = (subtotal, branchDetails) => {
   return Math.max(0, Math.min(subtotal, raw));
 };
 
+const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
+
+const resolveItemImageUrl = (item) => {
+  const raw = String(
+    item?.image_url || item?.image || item?.item_image || item?.image_path || item?.photo || item?.thumbnail || ""
+  ).trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:") || isAbsoluteUrl(raw)) return raw;
+  if (raw.startsWith("/")) return `${WEB_APP_BASE}${raw}`;
+  return `${WEB_APP_BASE}/${raw}`;
+};
+
 export default function TableOrderScreen({ route, navigation }) {
   const { table } = route.params;
   const { session } = useAuth();
+  const { theme } = useTheme();
 
   const [order, setOrder]         = useState(null);
   const [categories, setCategories] = useState([]);
@@ -455,7 +471,7 @@ export default function TableOrderScreen({ route, navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       {/* Current Order Summary */}
       {order && (
         <View style={styles.orderBanner}>
@@ -488,11 +504,11 @@ export default function TableOrderScreen({ route, navigation }) {
       >
         {/* Search */}
         <TextInput
-          style={styles.search}
+          style={[styles.search, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
           placeholder="Search items…"
           value={search}
           onChangeText={setSearch}
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={theme.textMuted}
         />
 
         {/* Category Filter */}
@@ -515,6 +531,9 @@ export default function TableOrderScreen({ route, navigation }) {
           const qty = cart[item.item_id] ?? 0;
           return (
             <View key={item.item_id} style={styles.itemCard}>
+              {resolveItemImageUrl(item) ? (
+                <Image source={{ uri: resolveItemImageUrl(item) }} style={styles.itemThumb} resizeMode="cover" />
+              ) : null}
               <View style={{ flex: 1 }}>
                 <Text style={styles.itemName} numberOfLines={1}>{item.item_name}</Text>
                 <Text style={styles.itemPrice}>₹{fmt(item.selling_price ?? item.price)}</Text>
@@ -842,6 +861,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: "#d9e3ff",
+  },
+  itemThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: "#e2e8f0",
   },
   itemName:  { fontWeight: "600", color: "#0b1220" },
   itemPrice: { color: "#475569", marginTop: 2 },

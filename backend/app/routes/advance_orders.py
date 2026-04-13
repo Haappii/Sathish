@@ -30,6 +30,26 @@ class AdvanceOrderPayload(BaseModel):
     branch_id: int | None = None
 
 
+class DueCollectionPayload(BaseModel):
+    amount: float
+    payment_mode: str | None = None
+    mark_completed: bool = False
+
+
+def _normalize_amount(value: Any, field_name: str) -> float:
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"{field_name} must be a valid number")
+    if amount < 0:
+        raise HTTPException(400, f"{field_name} cannot be negative")
+    return round(amount, 2)
+
+
+def _compute_due(total_amount: float, paid_amount: float) -> float:
+    return round(max(0.0, total_amount - paid_amount), 2)
+
+
 def _parse_expected_date(raw_value: Any) -> date:
     raw = str(raw_value or "").strip()
     if not raw:
@@ -59,6 +79,9 @@ def _resolve_branch_id(payload_branch_id: int | None, user_branch_id: Any) -> in
 
 
 def _to_out(o: AdvanceOrder) -> dict:
+    total_amount = float(o.total_amount or 0)
+    amount_paid = float(o.advance_amount or 0)
+    due_amount = _compute_due(total_amount, amount_paid)
     return {
         "order_id": o.order_id,
         "customer_name": o.customer_name,
@@ -67,8 +90,12 @@ def _to_out(o: AdvanceOrder) -> dict:
         "expected_date": str(o.expected_date) if o.expected_date else None,
         "expected_time": o.expected_time,
         "notes": o.notes,
-        "total_amount": float(o.total_amount or 0),
-        "advance_amount": float(o.advance_amount or 0),
+        "total_amount": total_amount,
+        "advance_amount": amount_paid,
+        "amount_paid": amount_paid,
+        "due_amount": due_amount,
+        "payment_status": "PAID" if due_amount <= 0 else ("PARTIAL" if amount_paid > 0 else "UNPAID"),
+        "can_mark_completed": due_amount <= 0,
         "advance_payment_mode": o.advance_payment_mode,
         "status": o.status,
         "cancel_reason": o.cancel_reason,
@@ -119,6 +146,11 @@ def create_advance_order(
     exp_date = _parse_expected_date(payload.expected_date)
     branch_id = _resolve_branch_id(payload.branch_id, getattr(user, "branch_id", None))
 
+    total_amount = _normalize_amount(payload.total_amount, "total_amount")
+    advance_amount = _normalize_amount(payload.advance_amount, "advance_amount")
+    if advance_amount > total_amount:
+        raise HTTPException(400, "advance_amount cannot be greater than total_amount")
+
     order = AdvanceOrder(
         shop_id=user.shop_id,
         branch_id=branch_id,
@@ -128,8 +160,8 @@ def create_advance_order(
         expected_date=exp_date,
         expected_time=str(payload.expected_time or "").strip() or None,
         notes=str(payload.notes or "").strip() or None,
-        total_amount=float(payload.total_amount or 0),
-        advance_amount=float(payload.advance_amount or 0),
+        total_amount=total_amount,
+        advance_amount=advance_amount,
         advance_payment_mode=str(payload.advance_payment_mode or "").strip() or None,
         status="PENDING",
         created_by=getattr(user, "user_id", None),
@@ -195,9 +227,14 @@ def update_advance_order(
     if "notes" in payload:
         order.notes = str(payload.get("notes") or "").strip() or None
     if "total_amount" in payload:
-        order.total_amount = float(payload["total_amount"] or 0)
+        order.total_amount = _normalize_amount(payload["total_amount"], "total_amount")
     if "advance_amount" in payload:
-        order.advance_amount = float(payload["advance_amount"] or 0)
+        order.advance_amount = _normalize_amount(payload["advance_amount"], "advance_amount")
+
+    total_amount = float(order.total_amount or 0)
+    amount_paid = float(order.advance_amount or 0)
+    if amount_paid > total_amount:
+        raise HTTPException(400, "amount_paid cannot be greater than total_amount")
     if "advance_payment_mode" in payload:
         order.advance_payment_mode = str(payload.get("advance_payment_mode") or "").strip() or None
     if "status" in payload:
@@ -206,6 +243,10 @@ def update_advance_order(
             raise HTTPException(400, f"Invalid status. Must be one of: {', '.join(VALID_STATUSES)}")
         if new_status == "CANCELLED" and order.status not in ("PENDING", "CONFIRMED"):
             raise HTTPException(400, "Only PENDING or CONFIRMED orders can be cancelled")
+        if new_status == "COMPLETED":
+            due_amount = _compute_due(total_amount, amount_paid)
+            if due_amount > 0:
+                raise HTTPException(400, f"Pending due must be collected before completion (due: {due_amount:.2f})")
         order.status = new_status
         if new_status == "CANCELLED":
             order.cancel_reason = str(payload.get("cancel_reason") or "").strip() or None
@@ -219,6 +260,60 @@ def update_advance_order(
         raise HTTPException(500, "Failed to update advance order")
 
     return _to_out(order)
+
+
+@router.post("/{order_id}/collect-due")
+def collect_due_amount(
+    order_id: int,
+    payload: DueCollectionPayload,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("billing", "write")),
+):
+    order = (
+        db.query(AdvanceOrder)
+        .filter(AdvanceOrder.order_id == order_id, AdvanceOrder.shop_id == user.shop_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(404, "Advance order not found")
+    if order.status == "CANCELLED":
+        raise HTTPException(400, "Cancelled order cannot accept due collection")
+
+    amount = _normalize_amount(payload.amount, "amount")
+    if amount <= 0:
+        raise HTTPException(400, "Collection amount must be greater than zero")
+
+    total_amount = float(order.total_amount or 0)
+    amount_paid = float(order.advance_amount or 0)
+    due_amount = _compute_due(total_amount, amount_paid)
+    if due_amount <= 0:
+        raise HTTPException(400, "No pending due for this order")
+    if amount > due_amount:
+        raise HTTPException(400, f"Amount exceeds due. Max collectible due is {due_amount:.2f}")
+
+    order.advance_amount = round(amount_paid + amount, 2)
+    if payload.payment_mode is not None:
+        order.advance_payment_mode = str(payload.payment_mode or "").strip() or order.advance_payment_mode
+
+    due_after = _compute_due(total_amount, float(order.advance_amount or 0))
+    if due_after <= 0 and payload.mark_completed:
+        order.status = "COMPLETED"
+
+    order.updated_at = datetime.utcnow()
+
+    try:
+        db.commit()
+        db.refresh(order)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(500, "Failed to collect due amount")
+
+    return {
+        **_to_out(order),
+        "collected_amount": amount,
+        "due_before": due_amount,
+        "due_after": due_after,
+    }
 
 
 # ── DELETE ────────────────────────────────────────────────────────────────────

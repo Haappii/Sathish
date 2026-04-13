@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -17,6 +19,7 @@ import { useTheme } from "../context/ThemeContext";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import { getPendingCount } from "../offline/queue";
 import { syncOfflineQueue } from "../offline/sync";
+import appLogo from "../../assets/app_logo.png";
 
 const TILE_ACCENT = {
   sales_billing: "#2f6df6",
@@ -33,6 +36,7 @@ const TILE_ACCENT = {
   expenses: "#cf3b3b",
   loyalty: "#d14ea2",
   employees: "#7d4ed9",
+  employee_settlements: "#7c3aed",
   employee_attendance: "#7d4ed9",
   analytics: "#de6b1f",
   supplier_ledger: "#5058e5",
@@ -58,6 +62,7 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading]           = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   const roleLower      = String(session?.role_name || session?.role || "").toLowerCase();
   const branchName     = String(session?.branch_name || "").trim();
@@ -78,33 +83,17 @@ export default function HomeScreen({ navigation }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Pressable
-            style={[
-              styles.headerLogoutBtn,
-              { marginRight: 2, backgroundColor: theme.surface, borderColor: theme.cardBorder },
-            ]}
-            onPress={() => navigation.navigate("Settings")}
-          >
-            <Text style={[styles.headerLogoutText, { color: theme.accent }]}>Settings</Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.headerLogoutBtn,
-              { marginRight: 2, backgroundColor: theme.surface, borderColor: theme.cardBorder },
-            ]}
-            onPress={openThemePicker}
-          >
-            <Text style={[styles.headerLogoutText, { color: theme.accent }]}>{themeButtonLabel}</Text>
-          </Pressable>
-          <Pressable style={[styles.headerLogoutBtn, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]} onPress={logout}>
-            <Text style={[styles.headerLogoutText, { color: theme.accent }]}>Logout</Text>
-          </Pressable>
-        </View>
+      headerLeft: () => (
+        <Pressable
+          style={[styles.headerMenuBtn, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}
+          onPress={() => setSidebarVisible(true)}
+        >
+          <Text style={[styles.headerMenuText, { color: theme.accent }]}>☰</Text>
+        </Pressable>
       ),
+      headerRight: () => null,
     });
-  }, [navigation, logout, themeButtonLabel, theme]);
+  }, [navigation, theme]);
 
   useEffect(() => {
     let mounted = true;
@@ -235,6 +224,60 @@ export default function HomeScreen({ navigation }) {
         )}
 
       </ScrollView>
+
+      <Modal visible={sidebarVisible} animationType="fade" transparent onRequestClose={() => setSidebarVisible(false)}>
+        <View style={styles.sidebarOverlay}>
+          <Pressable style={styles.sidebarBackdrop} onPress={() => setSidebarVisible(false)} />
+          <View style={[styles.sidebarPanel, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            <View style={styles.sidebarHead}>
+              <Image source={appLogo} style={styles.sidebarLogo} resizeMode="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sidebarShopName, { color: theme.text }]} numberOfLines={1}>
+                  {shopName || "Haappii Billing"}
+                </Text>
+                <Text style={[styles.sidebarMeta, { color: theme.textSub }]} numberOfLines={1}>
+                  {session?.branch_name || "Main Branch"}
+                </Text>
+                <Text style={[styles.sidebarMeta, { color: theme.textSub }]} numberOfLines={1}>
+                  {session?.user_name || "User"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sidebarDivider} />
+
+            <Pressable
+              style={[styles.sidebarAction, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}
+              onPress={() => {
+                setSidebarVisible(false);
+                navigation.navigate("Settings");
+              }}
+            >
+              <Text style={[styles.sidebarActionText, { color: theme.text }]}>Settings</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.sidebarAction, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}
+              onPress={() => {
+                setSidebarVisible(false);
+                openThemePicker();
+              }}
+            >
+              <Text style={[styles.sidebarActionText, { color: theme.text }]}>{themeButtonLabel}</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.sidebarAction, { borderColor: "#fecaca", backgroundColor: "#fef2f2" }]}
+              onPress={() => {
+                setSidebarVisible(false);
+                logout();
+              }}
+            >
+              <Text style={[styles.sidebarActionText, { color: "#b91c1c" }]}>Logout</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -286,16 +329,15 @@ const styles = StyleSheet.create({
   userText:      { color: "#94a3b8", fontSize: 13, fontWeight: "600" },
   roleBadge:     { backgroundColor: "#1f3e66", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   roleText:      { color: "#60a5fa", fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
-  headerLogoutBtn: {
-    backgroundColor: "#edf2ff",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  headerMenuBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     borderWidth: 1,
-    borderColor: "#d3defc",
-    marginRight: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerLogoutText: { color: "#0b57d0", fontWeight: "700", fontSize: 12 },
+  headerMenuText: { fontSize: 16, fontWeight: "900" },
   headerDivider: { height: 1, backgroundColor: "#1e293b", marginVertical: 14 },
   headerFooter:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bizDateLabel:  { color: "#64748b", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
@@ -336,6 +378,30 @@ const styles = StyleSheet.create({
   tileIcon:      { fontSize: 28 },
   tileLabel:     { fontWeight: "700", color: "#0f172a", textAlign: "center", fontSize: 12.5, lineHeight: 17 },
   tileAccentBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 4 },
+
+  sidebarOverlay: { ...StyleSheet.absoluteFillObject, flexDirection: "row" },
+  sidebarBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
+  sidebarPanel: {
+    width: "78%",
+    maxWidth: 320,
+    borderLeftWidth: 1,
+    paddingHorizontal: 14,
+    paddingTop: 24,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  sidebarHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  sidebarLogo: { width: 52, height: 52, borderRadius: 12 },
+  sidebarShopName: { fontSize: 15, fontWeight: "800" },
+  sidebarMeta: { fontSize: 12, fontWeight: "600" },
+  sidebarDivider: { height: 1, backgroundColor: "#e2e8f0", marginVertical: 4 },
+  sidebarAction: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  sidebarActionText: { fontSize: 13, fontWeight: "700" },
 
   empty: { color: "#94a3b8", textAlign: "center", padding: 20 },
 });

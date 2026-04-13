@@ -13,46 +13,37 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
-const PAYMENT_MODES = ["cash", "card", "upi", "credit"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
 const normalizeHeldInvoices = (data) => {
   const list = Array.isArray(data) ? data : [];
-  return list.filter((row) => {
-    const orderId = Number(row?.order_id || 0);
+  const filtered = list.filter((row) => {
+    const orderId = Number(row?.draft_id || 0);
     const itemCount = Array.isArray(row?.items) ? row.items.length : 0;
     return Number.isFinite(orderId) && orderId > 0 && itemCount > 0;
+  });
+
+  const seen = new Set();
+  return filtered.filter((row) => {
+    const key = String(row?.draft_id || row?.source_draft_id || row?.draft_number || "");
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 };
 
 const getOrderId = (row) => {
-  const raw = row?.order_id ?? row?.source_order_id ?? row?.id ?? null;
+  const raw = row?.draft_id ?? row?.source_draft_id ?? row?.id ?? null;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-const tryCancel = async (orderId) => {
-  const attempts = [
-    () => api.post(`/table-billing/order/cancel/${orderId}`),
-    () => api.post(`/table-billing/order/cancel/${orderId}/`),
-    () => api.post(`/table-billing/order/cancel?order_id=${orderId}`),
-    () => api.post(`/table-billing/orders/${orderId}/cancel`),
-    () => api.put(`/table-billing/orders/${orderId}/cancel`),
-    () => api.put(`/table-billing/order/cancel?order_id=${orderId}`),
-    () => api.delete(`/table-billing/order/cancel?order_id=${orderId}`),
-    () => api.delete(`/table-billing/orders/${orderId}`),
-    () => api.post("/table-billing/order/cancel", { order_id: orderId }),
-  ];
-  let lastErr = null;
-  for (const fn of attempts) {
-    try { await fn(); return true; } catch (err) { lastErr = err; }
-  }
-  throw lastErr || new Error("Cancel failed");
-};
-
 export default function HeldInvoicesScreen() {
   const { session } = useAuth();
+  const { theme } = useTheme();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,7 +60,7 @@ export default function HeldInvoicesScreen() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const res = await api.get("/table-billing/takeaway/orders");
+      const res = await api.get("/invoice/draft/list");
       setInvoices(normalizeHeldInvoices(res?.data));
     } catch (err) {
       if (!silent) {
@@ -86,36 +77,25 @@ export default function HeldInvoicesScreen() {
 
   const handleProcess = (row) => {
     const orderId = getOrderId(row);
-    if (!orderId) return Alert.alert("Error", "Unable to identify this held invoice.");
+    if (!orderId) return Alert.alert("Error", "Unable to identify this held bill.");
 
-    Alert.alert(
-      "Select Payment Mode",
-      `Process held invoice for ${row?.customer_name || "Walk-in"} (Token: ${row?.token_number || `#${orderId}`})`,
-      [
-        ...PAYMENT_MODES.map((mode) => ({
-          text: mode.toUpperCase(),
-          onPress: () => confirmProcess(row, orderId, mode),
-        })),
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
+    Alert.alert("Process Held Bill", `Convert ${row?.draft_number || `#${orderId}`} to invoice?`, [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Process",
+        onPress: () => confirmProcess(row, orderId),
+      },
+    ]);
   };
 
-  const confirmProcess = async (row, orderId, paymentMode) => {
+  const confirmProcess = async (row, orderId) => {
     setBusyId(orderId);
     try {
-      const payload = {
-        customer_name: row?.customer_name || "Walk-in",
-        mobile: row?.mobile || null,
-        payment_mode: paymentMode,
-        payment_split: null,
-        service_charge: 0,
-      };
-      const res = await api.post(`/table-billing/order/checkout/${orderId}`, payload);
+      const res = await api.post(`/invoice/draft/convert/${orderId}`);
       const invoiceNo = String(res?.data?.invoice_number || "").trim();
       Alert.alert(
         "Processed",
-        invoiceNo ? `Invoice: ${invoiceNo}\nPayment: ${paymentMode.toUpperCase()}` : "Invoice processed successfully."
+        invoiceNo ? `Invoice: ${invoiceNo}` : "Invoice processed successfully."
       );
       await load(true);
     } catch (err) {
@@ -130,18 +110,18 @@ export default function HeldInvoicesScreen() {
     if (!orderId) return Alert.alert("Error", "Unable to identify this held invoice.");
 
     Alert.alert(
-      "Cancel Held Invoice",
-      `Cancel token ${row?.token_number || `#${orderId}`} for ${row?.customer_name || "Walk-in"}?`,
+      "Delete Held Bill",
+      `Delete ${row?.draft_number || `#${orderId}`} for ${row?.customer_name || "Walk-in"}?`,
       [
         { text: "No", style: "cancel" },
         {
-          text: "Yes, Cancel",
+          text: "Yes, Delete",
           style: "destructive",
           onPress: async () => {
             setBusyId(orderId);
             try {
-              await tryCancel(orderId);
-              Alert.alert("Cancelled", "Held invoice cancelled.");
+              await api.delete(`/invoice/draft/${orderId}`);
+              Alert.alert("Deleted", "Held bill deleted.");
               await load(true);
             } catch (err) {
               const status = Number(err?.response?.status || 0);
@@ -160,7 +140,7 @@ export default function HeldInvoicesScreen() {
     const orderId = getOrderId(row);
     const busy = busyId === orderId;
     const itemsList = Array.isArray(row?.items) ? row.items : [];
-    const total = Number(row?.running_total || row?.total_amount || 0);
+    const total = Number(row?.discounted_amt || row?.total_amount || 0);
 
     return (
       <View style={styles.card}>
@@ -169,7 +149,7 @@ export default function HeldInvoicesScreen() {
             <View style={styles.tokenRow}>
               <View style={styles.tokenBadge}>
                 <Text style={styles.tokenText}>
-                  {row?.token_number ? `Token ${row.token_number}` : `#${orderId || index + 1}`}
+                  {row?.draft_number ? row.draft_number : `#${orderId || index + 1}`}
                 </Text>
               </View>
               <Text style={styles.totalText}>{fmt(total)}</Text>
@@ -180,7 +160,7 @@ export default function HeldInvoicesScreen() {
             </Text>
             {itemsList.length > 0 && (
               <Text style={styles.itemsText}>
-                {itemsList.map((it) => `${it?.item_name || "Item"} ×${it?.quantity || 1}`).join(", ")}
+                {itemsList.map((it) => `${it?.item_name || `Item #${it?.item_id || "-"}`} ×${it?.quantity || 1}`).join(", ")}
               </Text>
             )}
           </View>
@@ -210,10 +190,10 @@ export default function HeldInvoicesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.accent }]}>
         <Text style={styles.headerTitle}>Held Invoices</Text>
-        <Text style={styles.headerDate}>{todayLabel}</Text>
+        <Text style={[styles.headerDate, { color: theme.textSub }]}>{todayLabel}</Text>
       </View>
 
       {loading ? (
@@ -241,8 +221,8 @@ export default function HeldInvoicesScreen() {
           }
           ListHeaderComponent={
             invoices.length > 0 ? (
-              <Text style={styles.countLabel}>
-                {invoices.length} held invoice{invoices.length !== 1 ? "s" : ""} · Pull down to refresh
+              <Text style={[styles.countLabel, { color: theme.textSub }]}>
+                {invoices.length} held bill{invoices.length !== 1 ? "s" : ""} · Pull down to refresh
               </Text>
             ) : null
           }

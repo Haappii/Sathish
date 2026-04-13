@@ -12,6 +12,69 @@ const inputClass =
 const asId = (value) => String(value || "");
 const errorDetail = (err, fallback) => err?.response?.data?.detail || fallback;
 
+const MENU_ACCESS_CATALOG = [
+  // Main app menus
+  { name: "Home", module: "setup", group: "Main" },
+  { name: "Trends", module: "billing", group: "Main" },
+  { name: "Analytics", module: "analytics", group: "Main" },
+  { name: "Cash Drawer", module: "cash_drawer", group: "Main" },
+  { name: "Sales Billing", module: "billing", group: "Billing" },
+  { name: "Take Away", module: "billing", group: "Billing" },
+  { name: "Billing History", module: "billing", group: "Billing" },
+  { name: "Table Billing", module: "billing", group: "Billing" },
+  { name: "QR Orders", module: "qr_orders", group: "Billing" },
+  { name: "Order Live", module: "billing", group: "Billing" },
+  { name: "KOT", module: "billing", group: "Billing" },
+  { name: "Delivery", module: "billing", group: "Billing" },
+  { name: "Online Orders", module: "online_orders", group: "Billing" },
+  { name: "Advance Orders", module: "billing", group: "Billing" },
+  { name: "Offline Sync", module: "billing", group: "Billing" },
+  { name: "Draft Bills", module: "drafts", group: "Billing" },
+  { name: "Held Invoices", module: "drafts", group: "Billing" },
+  { name: "Returns", module: "returns", group: "Billing" },
+  { name: "Dues", module: "dues", group: "Billing" },
+  { name: "Customers", module: "customers", group: "CRM" },
+  { name: "Employees", module: "employees", group: "HR" },
+  { name: "Employee Attendance", module: "employees", group: "HR" },
+  { name: "Onboarding Docs", module: "employees", group: "HR" },
+  { name: "Loyalty", module: "loyalty", group: "CRM" },
+  { name: "Gift Cards", module: "gift_cards", group: "CRM" },
+  { name: "Coupons", module: "coupons", group: "CRM" },
+  { name: "Supplier Ledger", module: "supplier_ledger", group: "Inventory" },
+  { name: "Inventory", module: "inventory", group: "Inventory" },
+  { name: "Raw Materials", module: "inventory", group: "Inventory" },
+  { name: "Stock Audit", module: "stock_audit", group: "Inventory" },
+  { name: "Item Lots", module: "item_lots", group: "Inventory" },
+  { name: "Labels / Barcode", module: "items", group: "Inventory" },
+  { name: "Transfers", module: "stock_transfers", group: "Inventory" },
+  { name: "Reports", module: "reports", group: "Reports" },
+  { name: "Deleted Invoice", module: "reports", group: "Reports" },
+  { name: "Feedback Review", module: "feedback", group: "Reports" },
+  { name: "Alerts", module: "alerts", group: "Reports" },
+  { name: "Support Tickets", module: "support_tickets", group: "Support" },
+
+  // Setup sub menus
+  { name: "Setup > Category Management", module: "categories", group: "Setup" },
+  { name: "Setup > Item Management", module: "items", group: "Setup" },
+  { name: "Setup > Shop Details", module: "setup", group: "Setup" },
+  { name: "Setup > User Management", module: "users", group: "Setup" },
+  { name: "Setup > Role Management", module: "roles", group: "Setup" },
+  { name: "Setup > Branch Management", module: "setup", group: "Setup" },
+  { name: "Setup > Suppliers", module: "suppliers", group: "Setup" },
+  { name: "Setup > Purchase Orders", module: "purchase_orders", group: "Setup" },
+  { name: "Setup > Excel Upload", module: "setup", group: "Setup" },
+  { name: "Setup > Mail Scheduler", module: "setup", group: "Setup" },
+  { name: "Setup > Cash Denominations", module: "cash_drawer", group: "Setup" },
+
+  // Mobile-specific entries
+  { name: "Mobile > QR Order Accept", module: "qr_orders", group: "Mobile" },
+  { name: "Mobile > KOT Management", module: "billing", group: "Mobile" },
+  { name: "Mobile > Supplier Ledger", module: "supplier_ledger", group: "Mobile" },
+  { name: "Mobile > Advance Orders", module: "billing", group: "Mobile" },
+  { name: "Mobile > Analytics", module: "analytics", group: "Mobile" },
+  { name: "Mobile > Dues & Receivables", module: "dues", group: "Mobile" },
+];
+
 export default function Permissions() {
   const { showToast } = useToast();
   const session = getSession() || {};
@@ -85,13 +148,33 @@ export default function Permissions() {
 
   const filteredModules = useMemo(() => {
     const query = String(menuSearch || "").trim().toLowerCase();
-    if (!query) return modules;
-    return modules.filter((m) => `${m.label || ""} ${m.key || ""}`.toLowerCase().includes(query));
+    const backendModules = (modules || []).map((m) => ({ name: m.label || m.key, module: m.key, group: "Module" }));
+    const byKey = new Map();
+
+    [...MENU_ACCESS_CATALOG, ...backendModules].forEach((entry) => {
+      const moduleKey = String(entry.module || "").trim().toLowerCase();
+      if (!moduleKey) return;
+      const uniqueKey = `${entry.group || "Menu"}|${entry.name}|${moduleKey}`;
+      byKey.set(uniqueKey, {
+        key: uniqueKey,
+        name: entry.name,
+        label: entry.name,
+        module: moduleKey,
+        group: entry.group || "Menu",
+      });
+    });
+
+    const rows = Array.from(byKey.values());
+    if (!query) return rows;
+    return rows.filter((m) => `${m.name || ""} ${m.module || ""} ${m.group || ""}`.toLowerCase().includes(query));
   }, [modules, menuSearch]);
 
   const mappedModules = useMemo(() =>
-    modules.filter((m) => { const p = permMap?.[asId(selectedRoleId)]?.[m.key]; return Boolean(p?.can_read || p?.can_write); }),
-    [modules, permMap, selectedRoleId]
+    filteredModules.filter((m) => {
+      const p = permMap?.[asId(selectedRoleId)]?.[m.module];
+      return Boolean(p?.can_read || p?.can_write);
+    }),
+    [filteredModules, permMap, selectedRoleId]
   );
 
   const setRoleSelection = (nextId) => {
@@ -131,7 +214,8 @@ export default function Permissions() {
     if (!roleIdNum || !filteredModules.length) return;
     try {
       setRoleBusy(true);
-      await Promise.all(filteredModules.map((m) => authAxios.post("/permissions/upsert", { role_id: roleIdNum, module: m.key, can_read: Boolean(nextAccess), can_write: Boolean(nextAccess) })));
+      const moduleKeys = [...new Set(filteredModules.map((m) => m.module))];
+      await Promise.all(moduleKeys.map((moduleKey) => authAxios.post("/permissions/upsert", { role_id: roleIdNum, module: moduleKey, can_read: Boolean(nextAccess), can_write: Boolean(nextAccess) })));
       showToast(nextAccess ? "Menus mapped" : "Menus unmapped", "success");
       await loadAll();
     } catch (err) {
@@ -287,7 +371,7 @@ export default function Permissions() {
           {mappedModules.length > 0 && (
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-1.5">
               {mappedModules.map((m) => (
-                <span key={m.key} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">{m.label}</span>
+                <span key={m.key} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">{m.name}</span>
               ))}
             </div>
           )}
@@ -313,20 +397,20 @@ export default function Permissions() {
             {loading && <div className="p-4 text-sm text-slate-500 text-center">Loading…</div>}
             {!loading && !filteredModules.length && <div className="p-4 text-sm text-slate-500 text-center">No menus found</div>}
             {!loading && filteredModules.map((m) => {
-              const p = permMap?.[asId(selectedRoleId)]?.[m.key] || {};
+              const p = permMap?.[asId(selectedRoleId)]?.[m.module] || {};
               const hasAccess = Boolean(p.can_read || p.can_write);
-              const busy = savingKey === `${selectedRoleId}:${m.key}`;
+              const busy = savingKey === `${selectedRoleId}:${m.module}`;
               return (
                 <label key={m.key} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 cursor-pointer transition">
                   <div>
-                    <div className="text-sm font-medium text-slate-800">{m.label}</div>
-                    <div className="text-xs text-slate-400">{m.key}</div>
+                    <div className="text-sm font-medium text-slate-800">{m.name}</div>
+                    <div className="text-xs text-slate-400">{m.group} · module: {m.module}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`text-xs font-medium ${hasAccess ? "text-emerald-700" : "text-slate-400"}`}>
                       {busy ? "Saving…" : hasAccess ? "Mapped" : "Not mapped"}
                     </span>
-                    <div className="relative flex-shrink-0" onClick={() => !busy && selectedRoleId && toggleAccess(m.key)}>
+                    <div className="relative flex-shrink-0" onClick={() => !busy && selectedRoleId && toggleAccess(m.module)}>
                       <div className={`w-10 h-5 rounded-full transition-colors ${hasAccess ? "bg-blue-600" : "bg-slate-200"} ${busy || !selectedRoleId ? "opacity-50" : ""}`} />
                       <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hasAccess ? "translate-x-5" : "translate-x-0.5"}`} />
                     </div>

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   SafeAreaView,
@@ -17,6 +18,7 @@ import api from "../api/client";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import { WEB_APP_BASE } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import {
   cacheCategories,
   cacheItems,
@@ -71,9 +73,22 @@ const toAmount = (value) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
+
+const resolveItemImageUrl = (item) => {
+  const raw = String(
+    item?.image_url || item?.image || item?.item_image || item?.image_path || item?.photo || item?.thumbnail || ""
+  ).trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:") || isAbsoluteUrl(raw)) return raw;
+  if (raw.startsWith("/")) return `${WEB_APP_BASE}${raw}`;
+  return `${WEB_APP_BASE}/${raw}`;
+};
+
 export default function CreateBillScreen({ route }) {
   const { isOnline } = useOnlineStatus();
   const { session } = useAuth();
+  const { theme } = useTheme();
 
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -582,7 +597,7 @@ export default function CreateBillScreen({ route }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       {/* Offline / Sync Banner */}
       {!isOnline && (
         <View style={styles.offlineBanner}>
@@ -602,13 +617,13 @@ export default function CreateBillScreen({ route }) {
       <ScrollView contentContainerStyle={styles.container}>
         {/* Item Search + Category Filter */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Items</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Items</Text>
           <TextInput
             value={itemSearch}
             onChangeText={setItemSearch}
-            style={styles.input}
+            style={[styles.input, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
             placeholder="Search item…"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={theme.textMuted}
           />
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <Pressable
@@ -641,6 +656,13 @@ export default function CreateBillScreen({ route }) {
               const inCart = cart.find((x) => x.item_id === item.item_id);
               return (
                 <Pressable style={[styles.itemCard, inCart && styles.itemCardActive]} onPress={() => addToCart(item)}>
+                  {resolveItemImageUrl(item) ? (
+                    <Image source={{ uri: resolveItemImageUrl(item) }} style={styles.itemThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.itemThumb, styles.itemThumbFallback]}>
+                      <Text style={styles.itemThumbFallbackText}>IMG</Text>
+                    </View>
+                  )}
                   <Text style={styles.itemName} numberOfLines={2}>{item.item_name}</Text>
                   <Text style={styles.itemPrice}>
                     ₹{Number(item.selling_price || item.price || 0).toFixed(2)}{isWeightItem(item) ? "/kg" : ""}
@@ -989,6 +1011,22 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     backgroundColor: "#ffffff",
+  },
+  itemThumb: {
+    width: "100%",
+    height: 72,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: "#f1f5f9",
+  },
+  itemThumbFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemThumbFallbackText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94a3b8",
   },
   itemCardActive: { borderColor: "#0b57d0", backgroundColor: "#e8f0ff" },
   itemName:    { fontWeight: "700", color: "#1e293b" },

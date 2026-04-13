@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
 
 const STATUS_META = {
   available: { label: "Available", bg: "#dcfce7", text: "#15803d", border: "#86efac" },
@@ -59,6 +60,7 @@ const formatStartTime = (tableStartTime) => {
 };
 
 export default function TableGridScreen({ navigation }) {
+  const { theme } = useTheme();
   const [tables, setTables]       = useState([]);
   const [sections, setSections]   = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -131,16 +133,16 @@ export default function TableGridScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}> 
       {/* Summary + Filter */}
-      <View style={styles.filterBar}>
+      <View style={[styles.filterBar, { backgroundColor: theme.card, borderBottomColor: theme.cardBorder }]}> 
         {["all", "available", "occupied", "reserved"].map((f) => (
           <Pressable
             key={f}
             style={[styles.filterChip, filter === f && styles.filterChipActive]}
             onPress={() => setFilter(f)}
           >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+              <Text style={[styles.filterText, { color: filter === f ? "#fff" : theme.textSub }]}>
               {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
             </Text>
           </Pressable>

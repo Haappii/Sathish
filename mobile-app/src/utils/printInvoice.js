@@ -578,3 +578,102 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
 
   await sendToPrinter(html, { ...options, nativeText });
 }
+
+function buildAdvanceReceiptText(order = {}, { shop = {}, branch = {}, paperSize = "58mm" } = {}) {
+  const is80mm = String(paperSize || "58mm") === "80mm";
+  const BASE_WIDTH = is80mm ? 48 : 32;
+  const RIGHT_MARGIN_CHARS = 1;
+  const TOP_PADDING_LINES = 1;
+  const WIDTH = BASE_WIDTH - RIGHT_MARGIN_CHARS;
+  const line = "-".repeat(WIDTH);
+
+  const total = Number(order?.total_amount || 0);
+  const paid = Number(order?.amount_paid ?? order?.advance_amount ?? 0);
+  const due = Math.max(0, Number(order?.due_amount ?? (total - paid)));
+  const status = String(order?.status || "PENDING").toUpperCase();
+  const paymentStatus = order?.payment_status || (due <= 0 ? "PAID" : paid > 0 ? "PARTIAL" : "UNPAID");
+  const expectedDate = String(order?.expected_date || "-");
+  const expectedTime = String(order?.expected_time || "").trim();
+
+  const headerName = branch?.branch_name
+    ? `${shop?.shop_name || "Shop Name"} - ${branch.branch_name}`
+    : shop?.shop_name || "Shop Name";
+
+  let t = "\n".repeat(TOP_PADDING_LINES);
+  t += `${center(headerName, WIDTH)}\n`;
+  t += `${center("ADVANCE BOOKING INVOICE", WIDTH)}\n`;
+  t += `${line}\n`;
+  t += `Order No : ${String(order?.order_id || "-")}\n`;
+  t += `Issue Dt : ${formatDateTimeLabel(order?.created_at || new Date())}\n`;
+  t += `Delivery : ${expectedDate}${expectedTime ? ` ${expectedTime}` : ""}\n`;
+  t += `Status   : ${status}\n`;
+  t += `${line}\n`;
+  t += `Customer : ${String(order?.customer_name || "NA")}\n`;
+  if (order?.customer_phone) {
+    t += `Mobile   : ${maskMobileForPrint(order?.customer_phone)}\n`;
+  }
+  t += `${line}\n`;
+  t += rightKV("Order Total", money(total), WIDTH) + "\n";
+  t += rightKV("Amount Paid", money(paid), WIDTH) + "\n";
+  t += rightKV("Due On Delivery", money(due), WIDTH) + "\n";
+  t += rightKV("Payment Status", paymentStatus, WIDTH) + "\n";
+  if (order?.notes) {
+    t += `${line}\n`;
+    t += `Notes : ${String(order.notes).slice(0, WIDTH - 8)}\n`;
+  }
+  t += `${line}\n`;
+  t += `${center("Thank You!", WIDTH)}\n\n\n`;
+  return t;
+}
+
+export async function printAdvanceOrderReceipt(order, options = {}) {
+  const {
+    shop = {},
+    branch = {},
+    shopName = "Haappii Billing",
+  } = options;
+
+  const normalizedShop = shop?.shop_name ? shop : { ...shop, shop_name: shopName };
+  const paperSize = branch?.paper_size || "58mm";
+  const paperWidth = String(paperSize) === "80mm" ? "80mm" : "58mm";
+  const nativeText = buildAdvanceReceiptText(order || {}, {
+    shop: normalizedShop,
+    branch,
+    paperSize,
+  });
+
+  const html = `
+    <html>
+      <head>
+        <style>
+          @page { size: ${paperWidth} auto; margin: 0; }
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: ${paperWidth};
+            font-family: monospace;
+            color: #000;
+          }
+          .ticket {
+            width: ${paperWidth};
+            padding: 2mm;
+            box-sizing: border-box;
+          }
+          pre {
+            margin: 0;
+            white-space: pre;
+            font-size: 9px;
+            line-height: 1.25;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <pre>${esc(nativeText)}</pre>
+        </div>
+      </body>
+    </html>
+  `;
+
+  await sendToPrinter(html, { ...options, nativeText });
+}

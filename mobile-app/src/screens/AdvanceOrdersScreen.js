@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -15,6 +16,9 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { WEB_APP_BASE } from "../config/api";
+import { printAdvanceOrderReceipt } from "../utils/printInvoice";
 
 const fmt = (v) => `₹${Number(v || 0).toFixed(2)}`;
 
@@ -27,6 +31,51 @@ const STATUS_COLORS = {
 };
 const STATUS_LIST = ["PENDING", "CONFIRMED", "READY", "COMPLETED", "CANCELLED"];
 const PAYMENT_MODES = ["CASH", "UPI", "CARD"];
+
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
+
+const resolveItemImageUrl = (item) => {
+  const raw = String(
+    item?.image_url || item?.image || item?.item_image || item?.image_path || item?.photo || item?.thumbnail || ""
+  ).trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:") || isAbsoluteUrl(raw)) return raw;
+  if (raw.startsWith("/")) return `${WEB_APP_BASE}${raw}`;
+  return `${WEB_APP_BASE}/${raw}`;
+};
+
+const normalizeOrderItems = (items) => {
+  const rows = Array.isArray(items) ? items : [];
+  return rows.map((it) => {
+    const qty = Math.max(1, toNum(it?.qty || 1));
+    const rate = Math.max(0, toNum(it?.rate ?? it?.price ?? 0));
+    return {
+      item_id: it?.item_id || null,
+      item_name: String(it?.item_name || "Item"),
+      qty,
+      rate,
+      amount: Number((qty * rate).toFixed(2)),
+    };
+  });
+};
+
+const sumOrderItems = (items) => normalizeOrderItems(items).reduce((acc, it) => acc + toNum(it.amount), 0);
+
+const toPaid = (order) => Number(order?.amount_paid ?? order?.advance_amount ?? 0);
+const toDue = (order) => Number(order?.due_amount ?? Math.max(0, Number(order?.total_amount || 0) - toPaid(order)));
+const paymentStatusFor = (order) => {
+  if (order?.payment_status) return String(order.payment_status);
+  const paid = toPaid(order);
+  const due = toDue(order);
+  if (due <= 0) return "PAID";
+  if (paid > 0) return "PARTIAL";
+  return "UNPAID";
+};
 
 function StatusBadge({ status }) {
   return (
@@ -45,10 +94,12 @@ const EMPTY_FORM = {
   advance_amount: "",
   advance_payment_mode: "CASH",
   notes: "",
+  order_items: [],
 };
 
 export default function AdvanceOrdersScreen() {
   const { session } = useAuth();
+  const { theme } = useTheme();
   const today = session?.app_date || new Date().toISOString().split("T")[0];
 
   const [orders, setOrders] = useState([]);
@@ -62,6 +113,13 @@ export default function AdvanceOrdersScreen() {
   const [saving, setSaving] = useState(false);
   const [pmPicker, setPmPicker] = useState(false);
   const [statusPicker, setStatusPicker] = useState(null); // order_id
+  const [collectDue, setCollectDue] = useState(null); // { order, amount, payment_mode, mark_completed }
+  const [collecting, setCollecting] = useState(false);
+  const [printingId, setPrintingId] = useState(null);
+  const [shopDetails, setShopDetails] = useState({});
+  const [branchDetails, setBranchDetails] = useState({});
+  const [itemCatalog, setItemCatalog] = useState([]);
+  const [itemSearchText, setItemSearchText] = useState("");
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -82,9 +140,46 @@ export default function AdvanceOrdersScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const branchPromise = session?.branch_id ? api.get(`/branch/${session.branch_id}`).catch(() => null) : Promise.resolve(null);
+        const [shopRes, branchRes] = await Promise.all([
+          api.get("/shop/details").catch(() => null),
+          branchPromise,
+        ]);
+        if (!mounted) return;
+        setShopDetails(shopRes?.data || {});
+        setBranchDetails(branchRes?.data || {});
+      } catch {
+        if (!mounted) return;
+        setShopDetails({});
+        setBranchDetails({});
+      }
+    })();
+    return () => { mounted = false; };
+  }, [session?.branch_id]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await api.get("/items/");
+        if (!mounted) return;
+        setItemCatalog(Array.isArray(res?.data) ? res.data : []);
+      } catch {
+        if (!mounted) return;
+        setItemCatalog([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const openCreate = () => {
     setEditId(null);
     setForm({ ...EMPTY_FORM, expected_date: filterDate || today });
+    setItemSearchText("");
     setShowForm(true);
   };
 
@@ -99,8 +194,46 @@ export default function AdvanceOrdersScreen() {
       advance_amount: String(order.advance_amount || ""),
       advance_payment_mode: order.advance_payment_mode || "CASH",
       notes: order.notes || "",
+      order_items: normalizeOrderItems(order.order_items || []),
     });
+    setItemSearchText("");
     setShowForm(true);
+  };
+
+  const addItemToForm = (item) => {
+    const itemId = item?.item_id;
+    const itemName = String(item?.item_name || "Item");
+    const itemRate = Math.max(0, toNum(item?.selling_price ?? item?.price ?? item?.mrp_price ?? 0));
+    const rows = normalizeOrderItems(form.order_items || []);
+    const idx = rows.findIndex((x) => String(x.item_id) === String(itemId));
+    let next;
+    if (idx >= 0) {
+      next = rows.map((x, i) => {
+        if (i !== idx) return x;
+        const qty = Math.max(1, toNum(x.qty) + 1);
+        return { ...x, qty, amount: Number((qty * toNum(x.rate)).toFixed(2)) };
+      });
+    } else {
+      next = [...rows, { item_id: itemId, item_name: itemName, qty: 1, rate: itemRate, amount: Number(itemRate.toFixed(2)) }];
+    }
+    setForm({ ...form, order_items: next, total_amount: String(sumOrderItems(next).toFixed(2)) });
+  };
+
+  const updateFormItem = (index, patch) => {
+    const rows = normalizeOrderItems(form.order_items || []);
+    const next = rows.map((row, i) => {
+      if (i !== index) return row;
+      const qty = Math.max(1, toNum(patch.qty ?? row.qty));
+      const rate = Math.max(0, toNum(patch.rate ?? row.rate));
+      return { ...row, qty, rate, amount: Number((qty * rate).toFixed(2)) };
+    });
+    setForm({ ...form, order_items: next, total_amount: String(sumOrderItems(next).toFixed(2)) });
+  };
+
+  const removeFormItem = (index) => {
+    const rows = normalizeOrderItems(form.order_items || []);
+    const next = rows.filter((_, i) => i !== index);
+    setForm({ ...form, order_items: next, total_amount: String(sumOrderItems(next).toFixed(2)) });
   };
 
   const handleSave = async () => {
@@ -110,7 +243,8 @@ export default function AdvanceOrdersScreen() {
     try {
       const payload = {
         ...form,
-        total_amount: parseFloat(form.total_amount || 0),
+        order_items: normalizeOrderItems(form.order_items || []),
+        total_amount: parseFloat((sumOrderItems(form.order_items || []) || form.total_amount || 0).toFixed(2)),
         advance_amount: parseFloat(form.advance_amount || 0),
       };
       if (editId) {
@@ -137,18 +271,69 @@ export default function AdvanceOrdersScreen() {
     }
   };
 
+  const openCollectDue = (order) => {
+    const due = toDue(order);
+    setCollectDue({
+      order,
+      amount: String(due > 0 ? due : ""),
+      payment_mode: order?.advance_payment_mode || "CASH",
+      mark_completed: due <= 0,
+    });
+  };
+
+  const submitCollectDue = async () => {
+    if (!collectDue?.order?.order_id) return;
+    const amount = Number(collectDue.amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert("Validation", "Enter valid amount to collect");
+      return;
+    }
+
+    setCollecting(true);
+    try {
+      await api.post(`/advance-orders/${collectDue.order.order_id}/collect-due`, {
+        amount,
+        payment_mode: collectDue.payment_mode,
+        mark_completed: Boolean(collectDue.mark_completed),
+      });
+      setCollectDue(null);
+      await load(true);
+      Alert.alert("Success", "Due amount collected.");
+    } catch (err) {
+      Alert.alert("Error", err?.response?.data?.detail || "Failed to collect due");
+    } finally {
+      setCollecting(false);
+    }
+  };
+
+  const handlePrintAdvance = async (order) => {
+    setPrintingId(order?.order_id || null);
+    try {
+      await printAdvanceOrderReceipt(order, {
+        shop: shopDetails,
+        branch: branchDetails,
+        shopName: shopDetails?.shop_name || "Haappii Billing",
+      });
+      Alert.alert("Printed", "Advance invoice sent to printer.");
+    } catch {
+      Alert.alert("Print Error", "Unable to print advance invoice.");
+    } finally {
+      setPrintingId(null);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       {/* Filters */}
       <View style={styles.filterBar}>
         <View style={styles.filterGroup}>
           <Text style={styles.filterLabel}>DATE</Text>
           <TextInput
-            style={styles.filterInput}
+            style={[styles.filterInput, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
             value={filterDate}
             onChangeText={setFilterDate}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={theme.textMuted}
           />
         </View>
         <View style={styles.filterGroup}>
@@ -209,6 +394,10 @@ export default function AdvanceOrdersScreen() {
                   <Text style={styles.amtLabel}>ADVANCE</Text>
                   <Text style={[styles.amtValue, { color: "#059669" }]}>{fmt(o.advance_amount)}</Text>
                 </View>
+                <View style={styles.amtBlock}>
+                  <Text style={styles.amtLabel}>DUE</Text>
+                  <Text style={[styles.amtValue, { color: "#dc2626" }]}>{fmt(toDue(o))}</Text>
+                </View>
                 {o.advance_payment_mode ? (
                   <View style={styles.amtBlock}>
                     <Text style={styles.amtLabel}>MODE</Text>
@@ -216,6 +405,7 @@ export default function AdvanceOrdersScreen() {
                   </View>
                 ) : null}
               </View>
+              <Text style={styles.paymentStatus}>Payment: {paymentStatusFor(o)}</Text>
 
               {o.notes ? <Text style={styles.cardNotes}>{o.notes}</Text> : null}
 
@@ -224,11 +414,24 @@ export default function AdvanceOrdersScreen() {
                   <Pressable style={styles.actionBtn} onPress={() => openEdit(o)}>
                     <Text style={styles.actionBtnText}>Edit</Text>
                   </Pressable>
+                  {toDue(o) > 0 ? (
+                    <Pressable style={styles.actionBtn} onPress={() => openCollectDue(o)}>
+                      <Text style={styles.actionBtnText}>Collect Due</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={() => setStatusPicker(o.order_id)}>
                     <Text style={[styles.actionBtnText, { color: "#fff" }]}>Update Status</Text>
                   </Pressable>
                 </View>
               )}
+
+              <Pressable
+                style={[styles.printBtn, printingId === o.order_id && styles.btnDisabled]}
+                onPress={() => handlePrintAdvance(o)}
+                disabled={printingId === o.order_id}
+              >
+                <Text style={styles.printBtnText}>{printingId === o.order_id ? "Printing..." : "Print Advance Invoice"}</Text>
+              </Pressable>
 
               {/* Status picker */}
               {statusPicker === o.order_id && (
@@ -311,8 +514,8 @@ export default function AdvanceOrdersScreen() {
                     placeholder="0.00"
                     placeholderTextColor="#94a3b8"
                     keyboardType="decimal-pad"
-                    value={form.total_amount}
-                    onChangeText={(v) => setForm({ ...form, total_amount: v })}
+                    value={sumOrderItems(form.order_items || []).toFixed(2)}
+                    editable={false}
                   />
                 </View>
                 <View style={{ width: 8 }} />
@@ -328,6 +531,75 @@ export default function AdvanceOrdersScreen() {
                   />
                 </View>
               </View>
+
+              <Text style={styles.fieldLabel}>Select Items</Text>
+              <TextInput
+                style={[styles.fieldInput, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
+                placeholder="Search item to add"
+                placeholderTextColor={theme.textMuted}
+                value={itemSearchText}
+                onChangeText={setItemSearchText}
+              />
+              <ScrollView style={styles.itemsPicker} nestedScrollEnabled>
+                {itemCatalog
+                  .filter((it) => String(it?.item_name || "").toLowerCase().includes(String(itemSearchText || "").toLowerCase()))
+                  .slice(0, 10)
+                  .map((it) => (
+                    <Pressable key={String(it.item_id)} style={styles.itemPickRow} onPress={() => addItemToForm(it)}>
+                      {resolveItemImageUrl(it) ? (
+                        <Image source={{ uri: resolveItemImageUrl(it) }} style={styles.itemPickThumb} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.itemPickThumb, styles.itemPickThumbFallback]}>
+                          <Text style={styles.itemPickThumbFallbackText}>IMG</Text>
+                        </View>
+                      )}
+                      <Text style={styles.itemPickName}>{it.item_name}</Text>
+                      <Text style={styles.itemPickRate}>{fmt(it?.selling_price ?? it?.price ?? 0)}</Text>
+                    </Pressable>
+                  ))}
+              </ScrollView>
+
+              {(form.order_items || []).length > 0 ? (
+                <View style={styles.selectedItemsWrap}>
+                  {(form.order_items || []).map((it, idx) => (
+                    <View key={`${it.item_id || it.item_name}-${idx}`} style={styles.selectedItemCard}>
+                      <View style={styles.selectedItemHead}>
+                        <Text style={styles.selectedItemName} numberOfLines={1}>{it.item_name || "Item"}</Text>
+                        <Pressable onPress={() => removeFormItem(idx)}>
+                          <Text style={styles.removeItemText}>Remove</Text>
+                        </Pressable>
+                      </View>
+                      <View style={styles.row2}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.fieldLabel}>Qty</Text>
+                          <TextInput
+                            style={styles.smallInput}
+                            keyboardType="numeric"
+                            value={String(it.qty || 1)}
+                            onChangeText={(v) => updateFormItem(idx, { qty: v })}
+                          />
+                        </View>
+                        <View style={{ width: 8 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.fieldLabel}>Rate</Text>
+                          <TextInput
+                            style={styles.smallInput}
+                            keyboardType="decimal-pad"
+                            value={String(it.rate ?? 0)}
+                            onChangeText={(v) => updateFormItem(idx, { rate: v })}
+                          />
+                        </View>
+                        <View style={{ width: 8 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.fieldLabel}>Amount</Text>
+                          <View style={styles.amountPill}><Text style={styles.amountPillText}>{fmt(it.amount || 0)}</Text></View>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
               <Text style={styles.fieldLabel}>Payment Mode</Text>
               <View style={styles.pmRow}>
                 {PAYMENT_MODES.map((m) => (
@@ -358,6 +630,67 @@ export default function AdvanceOrdersScreen() {
                 </Pressable>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={Boolean(collectDue)} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Collect Due Amount</Text>
+              <Pressable onPress={() => setCollectDue(null)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </Pressable>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.fieldLabel}>Order</Text>
+              <Text style={styles.readOnlyText}>#{collectDue?.order?.order_id} · {collectDue?.order?.customer_name}</Text>
+              <Text style={styles.fieldLabel}>Current Due</Text>
+              <Text style={styles.readOnlyText}>{fmt(toDue(collectDue?.order || {}))}</Text>
+
+              <Text style={styles.fieldLabel}>Amount To Collect (₹)</Text>
+              <TextInput
+                style={styles.fieldInput}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#94a3b8"
+                value={collectDue?.amount || ""}
+                onChangeText={(v) => setCollectDue((prev) => ({ ...prev, amount: v }))}
+              />
+
+              <Text style={styles.fieldLabel}>Payment Mode</Text>
+              <View style={styles.pmRow}>
+                {PAYMENT_MODES.map((m) => (
+                  <Pressable
+                    key={m}
+                    style={[styles.pmChip, collectDue?.payment_mode === m && styles.pmChipActive]}
+                    onPress={() => setCollectDue((prev) => ({ ...prev, payment_mode: m }))}
+                  >
+                    <Text style={[styles.pmChipText, collectDue?.payment_mode === m && styles.pmChipTextActive]}>{m}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Pressable
+                style={styles.checkRow}
+                onPress={() => setCollectDue((prev) => ({ ...prev, mark_completed: !prev?.mark_completed }))}
+              >
+                <View style={[styles.checkBox, collectDue?.mark_completed && styles.checkBoxActive]}>
+                  {collectDue?.mark_completed ? <Text style={styles.checkMark}>✓</Text> : null}
+                </View>
+                <Text style={styles.checkLabel}>Mark as completed if fully paid</Text>
+              </Pressable>
+
+              <View style={styles.modalActions}>
+                <Pressable style={styles.cancelBtn} onPress={() => setCollectDue(null)}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.saveBtn, collecting && styles.btnDisabled]} onPress={submitCollectDue} disabled={collecting}>
+                  <Text style={styles.saveBtnText}>{collecting ? "Saving..." : "Collect"}</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -402,10 +735,21 @@ const styles = StyleSheet.create({
   amtLabel: { fontSize: 9, fontWeight: "700", color: "#94a3b8", letterSpacing: 0.5 },
   amtValue: { fontSize: 14, fontWeight: "800", color: "#0b1220" },
   cardNotes: { fontSize: 12, color: "#64748b", fontStyle: "italic" },
+  paymentStatus: { fontSize: 11, color: "#475569", fontWeight: "700" },
   cardActions: { flexDirection: "row", gap: 8 },
   actionBtn: { flex: 1, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8, paddingVertical: 7, alignItems: "center" },
   actionBtnPrimary: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   actionBtnText: { fontSize: 12, fontWeight: "700", color: "#334155" },
+  printBtn: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: "#93c5fd",
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+    backgroundColor: "#eff6ff",
+  },
+  printBtnText: { fontSize: 12, fontWeight: "700", color: "#1d4ed8" },
   statusPickerBar: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingTop: 4 },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
@@ -426,6 +770,87 @@ const styles = StyleSheet.create({
   pmChipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   pmChipText: { fontSize: 12, fontWeight: "700", color: "#334155" },
   pmChipTextActive: { color: "#fff" },
+  itemsPicker: {
+    maxHeight: 140,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    marginTop: 2,
+  },
+  itemPickRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  itemPickThumb: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: "#f1f5f9",
+  },
+  itemPickThumbFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemPickThumbFallbackText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#94a3b8",
+  },
+  itemPickName: { fontSize: 12, color: "#1e293b", fontWeight: "600", flex: 1, paddingRight: 8 },
+  itemPickRate: { fontSize: 12, color: "#1d4ed8", fontWeight: "800" },
+  selectedItemsWrap: { marginTop: 8, gap: 8 },
+  selectedItemCard: {
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    padding: 10,
+  },
+  selectedItemHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 2 },
+  selectedItemName: { fontSize: 12, color: "#0f172a", fontWeight: "700", flex: 1, paddingRight: 8 },
+  removeItemText: { fontSize: 11, color: "#dc2626", fontWeight: "700" },
+  smallInput: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: "#0b1220",
+    backgroundColor: "#f8fafc",
+  },
+  amountPill: {
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+  },
+  amountPillText: { fontSize: 11, color: "#047857", fontWeight: "800" },
+  readOnlyText: { fontSize: 13, color: "#0b1220", fontWeight: "700", marginBottom: 2 },
+  checkRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  checkBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#94a3b8",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  checkBoxActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  checkMark: { color: "#fff", fontSize: 11, fontWeight: "900" },
+  checkLabel: { fontSize: 12, color: "#334155", fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 16 },
   cancelBtn: { flex: 1, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   cancelBtnText: { fontSize: 13, fontWeight: "700", color: "#334155" },

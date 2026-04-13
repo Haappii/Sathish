@@ -1057,7 +1057,7 @@ const [customer, setCustomer] = useState({
     }
   };
 
-  const restoreFromDraft = (draft) => {
+  const restoreFromDraft = async (draft) => {
     const restoredCart = [];
     for (const draftItem of draft.items) {
       const fullItem = itemsData.find(i => i.item_id === draftItem.item_id);
@@ -1110,7 +1110,15 @@ const [customer, setCustomer] = useState({
       else setGiftCardCode("");
     }
     setShowHeldPanel(false);
-    showToast(`Draft ${draft.draft_number} restored to cart`, "success");
+
+    try {
+      await authAxios.delete(`/invoice/draft/${draft.draft_id}`);
+      setHeldDrafts((prev) => (Array.isArray(prev) ? prev.filter((x) => x?.draft_id !== draft.draft_id) : []));
+      showToast(`Draft ${draft.draft_number} moved to cart and cleared from held list`, "success");
+    } catch (err) {
+      showToast(err?.response?.data?.detail || `Draft ${draft.draft_number} restored to cart`, "warning");
+      loadHeldDrafts();
+    }
   };
 
   return (

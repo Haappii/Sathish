@@ -71,3 +71,52 @@ def test_update_and_delete_advance_order(client, auth_headers):
     delete_resp = client.delete(f"/api/advance-orders/{order_id}", headers=auth_headers)
     assert delete_resp.status_code == 200, delete_resp.text
     assert delete_resp.json()["detail"] == "Advance order deleted"
+
+
+def test_cannot_complete_advance_order_with_pending_due(client, auth_headers):
+    payload = {
+        "customer_name": "Due Pending",
+        "expected_date": "2026-04-20",
+        "total_amount": 900,
+        "advance_amount": 200,
+        "advance_payment_mode": "CASH",
+        "branch_id": 1,
+    }
+
+    create_resp = client.post("/api/advance-orders/", json=payload, headers=auth_headers)
+    assert create_resp.status_code == 200, create_resp.text
+    order_id = create_resp.json()["order_id"]
+
+    complete_resp = client.put(
+        f"/api/advance-orders/{order_id}",
+        json={"status": "COMPLETED"},
+        headers=auth_headers,
+    )
+    assert complete_resp.status_code == 400, complete_resp.text
+    assert "due" in complete_resp.json()["detail"].lower()
+
+
+def test_collect_due_and_mark_completed(client, auth_headers):
+    payload = {
+        "customer_name": "Collect Balance",
+        "expected_date": "2026-04-21",
+        "total_amount": 1200,
+        "advance_amount": 300,
+        "advance_payment_mode": "UPI",
+        "branch_id": 1,
+    }
+
+    create_resp = client.post("/api/advance-orders/", json=payload, headers=auth_headers)
+    assert create_resp.status_code == 200, create_resp.text
+    order_id = create_resp.json()["order_id"]
+
+    collect_resp = client.post(
+        f"/api/advance-orders/{order_id}/collect-due",
+        json={"amount": 900, "payment_mode": "CASH", "mark_completed": True},
+        headers=auth_headers,
+    )
+    assert collect_resp.status_code == 200, collect_resp.text
+    data = collect_resp.json()
+    assert data["due_after"] == 0
+    assert data["status"] == "COMPLETED"
+    assert data["payment_status"] == "PAID"

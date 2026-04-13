@@ -115,6 +115,24 @@ export const mobileMenuCatalog = [
   },
   // ── Management (admin / manager only) ─────────────────────────────
   {
+    key: "employees",
+    title: "Employees",
+    icon: "👨‍💼",
+    route: "Employees",
+    params: { initialTab: "employees" },
+    perm: { module: "employees", action: "read" },
+    fallbackRoles: new Set(["admin", "manager"]),
+  },
+  {
+    key: "employee_settlements",
+    title: "Employee Settlements",
+    icon: "💵",
+    route: "Employees",
+    params: { initialTab: "settlements" },
+    perm: { module: "employees", action: "read" },
+    fallbackRoles: new Set(["admin", "manager"]),
+  },
+  {
     key: "employee_attendance",
     title: "Attendance",
     icon: "📋",
