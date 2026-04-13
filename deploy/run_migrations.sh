@@ -95,6 +95,7 @@ run_migration "${MIGRATIONS_DIR}/20260409_gift_card_email.sql"
 run_migration "${MIGRATIONS_DIR}/20260410_branch_print_logo.sql"
 run_migration "${MIGRATIONS_DIR}/20260410_feedback_schema_sync.sql"
 run_migration "${MIGRATIONS_DIR}/20260411_add_items_sold_by_weight.sql"
+run_migration "${MIGRATIONS_DIR}/20260413_add_advance_orders.sql"
 
 echo
 echo "All migrations applied successfully."

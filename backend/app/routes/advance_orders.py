@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -12,6 +15,47 @@ from app.utils.permissions import require_permission
 router = APIRouter(prefix="/advance-orders", tags=["Advance Orders"])
 
 VALID_STATUSES = {"PENDING", "CONFIRMED", "READY", "COMPLETED", "CANCELLED"}
+
+
+class AdvanceOrderPayload(BaseModel):
+    customer_name: str
+    customer_phone: str | None = None
+    order_items: list[dict[str, Any]] = Field(default_factory=list)
+    expected_date: str
+    expected_time: str | None = None
+    notes: str | None = None
+    total_amount: float = 0
+    advance_amount: float = 0
+    advance_payment_mode: str | None = None
+    branch_id: int | None = None
+
+
+def _parse_expected_date(raw_value: Any) -> date:
+    raw = str(raw_value or "").strip()
+    if not raw:
+        raise HTTPException(400, "expected_date is required")
+
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        pass
+
+    # Accept DD/MM/YYYY to avoid runtime failures from locale-formatted payloads.
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+
+    raise HTTPException(400, "expected_date must be YYYY-MM-DD")
+
+
+def _resolve_branch_id(payload_branch_id: int | None, user_branch_id: Any) -> int:
+    if payload_branch_id not in (None, ""):
+        return int(payload_branch_id)
+    if user_branch_id not in (None, ""):
+        return int(user_branch_id)
+    raise HTTPException(400, "Branch is required for advance order")
 
 
 def _to_out(o: AdvanceOrder) -> dict:
@@ -65,38 +109,40 @@ def list_advance_orders(
 # ── CREATE ────────────────────────────────────────────────────────────────────
 @router.post("/")
 def create_advance_order(
-    payload: dict,
+    payload: AdvanceOrderPayload,
     db: Session = Depends(get_db),
     user=Depends(require_permission("billing", "write")),
 ):
-    if not str(payload.get("customer_name") or "").strip():
+    if not str(payload.customer_name or "").strip():
         raise HTTPException(400, "customer_name is required")
-    if not payload.get("expected_date"):
-        raise HTTPException(400, "expected_date is required")
 
-    try:
-        exp_date = date.fromisoformat(str(payload["expected_date"]))
-    except ValueError:
-        raise HTTPException(400, "expected_date must be YYYY-MM-DD")
+    exp_date = _parse_expected_date(payload.expected_date)
+    branch_id = _resolve_branch_id(payload.branch_id, getattr(user, "branch_id", None))
 
     order = AdvanceOrder(
         shop_id=user.shop_id,
-        branch_id=int(payload.get("branch_id") or user.branch_id or 0),
-        customer_name=str(payload["customer_name"]).strip(),
-        customer_phone=str(payload.get("customer_phone") or "").strip() or None,
-        order_items=payload.get("order_items") or [],
+        branch_id=branch_id,
+        customer_name=str(payload.customer_name).strip(),
+        customer_phone=str(payload.customer_phone or "").strip() or None,
+        order_items=payload.order_items or [],
         expected_date=exp_date,
-        expected_time=str(payload.get("expected_time") or "").strip() or None,
-        notes=str(payload.get("notes") or "").strip() or None,
-        total_amount=float(payload.get("total_amount") or 0),
-        advance_amount=float(payload.get("advance_amount") or 0),
-        advance_payment_mode=str(payload.get("advance_payment_mode") or "").strip() or None,
+        expected_time=str(payload.expected_time or "").strip() or None,
+        notes=str(payload.notes or "").strip() or None,
+        total_amount=float(payload.total_amount or 0),
+        advance_amount=float(payload.advance_amount or 0),
+        advance_payment_mode=str(payload.advance_payment_mode or "").strip() or None,
         status="PENDING",
         created_by=getattr(user, "user_id", None),
     )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
+
+    try:
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(500, "Failed to create advance order")
+
     return _to_out(order)
 
 
@@ -143,10 +189,7 @@ def update_advance_order(
     if "order_items" in payload:
         order.order_items = payload["order_items"] or []
     if "expected_date" in payload:
-        try:
-            order.expected_date = date.fromisoformat(str(payload["expected_date"]))
-        except ValueError:
-            raise HTTPException(400, "expected_date must be YYYY-MM-DD")
+        order.expected_date = _parse_expected_date(payload["expected_date"])
     if "expected_time" in payload:
         order.expected_time = str(payload.get("expected_time") or "").strip() or None
     if "notes" in payload:
@@ -168,8 +211,13 @@ def update_advance_order(
             order.cancel_reason = str(payload.get("cancel_reason") or "").strip() or None
 
     order.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(order)
+    try:
+        db.commit()
+        db.refresh(order)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(500, "Failed to update advance order")
+
     return _to_out(order)
 
 
@@ -189,6 +237,11 @@ def delete_advance_order(
         raise HTTPException(404, "Advance order not found")
     if order.status == "COMPLETED":
         raise HTTPException(400, "Completed orders cannot be deleted")
-    db.delete(order)
-    db.commit()
+    try:
+        db.delete(order)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(500, "Failed to delete advance order")
+
     return {"detail": "Advance order deleted"}

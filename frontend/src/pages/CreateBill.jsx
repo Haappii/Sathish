@@ -37,6 +37,9 @@ export default function CreateBill() {
   const [categorySearch, setCategorySearch] = useState("");
 
   const [cart, setCart] = useState([]);
+  const [weightModalVisible, setWeightModalVisible] = useState(false);
+  const [pendingWeightItem, setPendingWeightItem] = useState(null);
+  const [weightInput, setWeightInput] = useState("250");
 
 const [customer, setCustomer] = useState({
   mobile: DEFAULT_MOBILE,
@@ -403,15 +406,15 @@ const [customer, setCustomer] = useState({
     return Math.round(Number(ratePerKg || 0) * weightKg);
   };
 
-  const promptWeightGrams = (itemName, initial = 250) => {
-    const entered = window.prompt(`Enter weight in grams for ${itemName}`, String(initial));
-    if (entered === null) return null;
-    const grams = normalizeWeightGrams(entered);
-    if (!grams) {
-      showToast("Enter valid weight in grams", "error");
-      return null;
-    }
-    return grams;
+  const openWeightModal = (item, initial = 250) => {
+    setPendingWeightItem(item);
+    setWeightInput(String(normalizeWeightGrams(initial)));
+    setWeightModalVisible(true);
+  };
+
+  const closeWeightModal = () => {
+    setWeightModalVisible(false);
+    setPendingWeightItem(null);
   };
 
   const getLineAmount = item => {
@@ -425,6 +428,12 @@ const [customer, setCustomer] = useState({
     if (!isWeightItem(item) && inventoryEnabled && (!isHotel || isRaw) && getEffectiveStock(item.item_id) <= 0)
       return showToast("Out of stock", "error");
 
+    if (isWeightItem(item)) {
+      const ex = cart.find(x => x.item_id === item.item_id);
+      openWeightModal(item, ex?.weight_grams || 250);
+      return;
+    }
+
     setCart(prev => {
       const ex = prev.find(x => x.item_id === item.item_id);
       if (ex && !isWeightItem(item))
@@ -433,39 +442,6 @@ const [customer, setCustomer] = useState({
         );
 
       const unitPrice = getPriceForItem(item);
-
-      if (isWeightItem(item)) {
-        const grams = promptWeightGrams(item.item_name, ex?.weight_grams || 250);
-        if (!grams) return prev;
-
-        if (ex) {
-          const nextGrams = normalizeWeightGrams(Number(ex.weight_grams || 0) + grams);
-          return prev.map(x =>
-            x.item_id === item.item_id
-              ? {
-                  ...x,
-                  qty: 1,
-                  weight_grams: nextGrams,
-                  unit_rate: unitPrice,
-                  price: computeWeightLineAmount(unitPrice, nextGrams),
-                }
-              : x
-          );
-        }
-
-        return [
-          ...prev,
-          {
-            ...item,
-            base_price: Number(item.price || 0),
-            price_level: String(priceLevel || "BASE").toUpperCase(),
-            qty: 1,
-            weight_grams: grams,
-            unit_rate: unitPrice,
-            price: computeWeightLineAmount(unitPrice, grams),
-          },
-        ];
-      }
 
       return [
         ...prev,
@@ -518,6 +494,51 @@ const [customer, setCustomer] = useState({
           : x
       )
     );
+  };
+
+  const confirmWeightAddOrUpdate = () => {
+    if (!pendingWeightItem) return;
+    const grams = normalizeWeightGrams(weightInput);
+    if (!grams) {
+      showToast("Enter valid weight in grams", "error");
+      return;
+    }
+
+    const item = pendingWeightItem;
+    const unitPrice = getPriceForItem(item);
+
+    setCart(prev => {
+      const ex = prev.find(x => x.item_id === item.item_id);
+      if (ex) {
+        const nextGrams = normalizeWeightGrams(Number(ex.weight_grams || 0) + grams);
+        return prev.map(x =>
+          x.item_id === item.item_id
+            ? {
+                ...x,
+                qty: 1,
+                weight_grams: nextGrams,
+                unit_rate: unitPrice,
+                price: computeWeightLineAmount(unitPrice, nextGrams),
+              }
+            : x
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          ...item,
+          base_price: Number(item.price || 0),
+          price_level: String(priceLevel || "BASE").toUpperCase(),
+          qty: 1,
+          weight_grams: grams,
+          unit_rate: unitPrice,
+          price: computeWeightLineAmount(unitPrice, grams),
+        },
+      ];
+    });
+
+    closeWeightModal();
   };
 
   const removeItem = id => setCart(cart.filter(x => x.item_id !== id));
@@ -1313,6 +1334,40 @@ const [customer, setCustomer] = useState({
             >
               <div className="flex items-center justify-between gap-2">
                 <div>
+
+                {weightModalVisible && (
+                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl p-4">
+                      <h3 className="text-sm font-bold text-slate-800">Enter Weight (grams)</h3>
+                      <p className="mt-1 text-xs text-slate-500">{pendingWeightItem?.item_name || ""}</p>
+                      <input
+                        type="number"
+                        autoFocus
+                        className="mt-3 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                        value={weightInput}
+                        onChange={e => setWeightInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") confirmWeightAddOrUpdate();
+                        }}
+                        placeholder="e.g. 250"
+                      />
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          onClick={closeWeightModal}
+                          className="flex-1 rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={confirmWeightAddOrUpdate}
+                          className="flex-1 rounded-lg py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                   <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Customer</p>
                   <p className="text-[10px] font-medium text-gray-600">{customerSummary}</p>
                 </div>

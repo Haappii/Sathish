@@ -105,6 +105,7 @@ export default function AdvanceOrders() {
         ...form,
         total_amount: parseFloat(form.total_amount || 0),
         advance_amount: parseFloat(form.advance_amount || 0),
+        branch_id: session?.branch_id || undefined,
       };
       if (editId) {
         await authAxios.put(`/advance-orders/${editId}`, payload);
@@ -116,7 +117,13 @@ export default function AdvanceOrders() {
       setShowForm(false);
       load();
     } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to save", "error");
+      const detail =
+        e?.response?.data?.detail ||
+        e?.response?.data?.message ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to save";
+      showToast(detail, "error");
     } finally {
       setSaving(false);
     }

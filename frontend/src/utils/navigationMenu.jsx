@@ -345,7 +345,10 @@ export const canAccess = (permMap, perm) => {
   if (!moduleKey) return true;
   const p = permMap?.[moduleKey];
   if (!p) return false;
-  return perm.action === "write" ? Boolean(p.can_write) : Boolean(p.can_read);
+  // Write permission should imply read permission for menu visibility.
+  return perm.action === "write"
+    ? Boolean(p.can_write)
+    : Boolean(p.can_read || p.can_write);
 };
 
 export const buildRbacMenu = ({
