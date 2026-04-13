@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 
-import api from "../api/client";
+import { authApi } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 function Field({ label, ...props }) {
@@ -98,7 +98,7 @@ export default function LoginScreen() {
 
     setRegistering(true);
     try {
-      const res = await api.post("/platform/onboard/requests", {
+      const res = await authApi.post("/platform/onboard/requests", {
         shop_name: regForm.shop_name,
         billing_type: regForm.billing_type,
         city: regForm.city,
@@ -129,7 +129,11 @@ export default function LoginScreen() {
         message: "",
       });
     } catch (err2) {
-      Alert.alert("Failed", String(err2?.response?.data?.detail || "Request failed"));
+      const detail = err2?.response?.data?.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((row) => String(row?.msg || "Invalid value")).join("\n")
+        : String(detail || err2?.message || "Request failed");
+      Alert.alert("Failed", message);
     } finally {
       setRegistering(false);
     }
