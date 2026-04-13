@@ -111,7 +111,13 @@ print_memory_snapshot() {
 # ── 1. Pull latest code ────────────────────────────────────────────────────────
 echo "==> Pulling latest code from git"
 cd "${ROOT_DIR}"
-git pull origin main
+
+# Stash any local changes (e.g., auto-generated package-lock.json) to allow clean merge
+if ! git pull origin main; then
+  echo "    Git pull failed; attempting to stash local changes and retry..."
+  git stash
+  git pull origin main
+fi
 
 # ── 2. Clean temp / cache files ───────────────────────────────────────────────
 echo "==> Cleaning build cache and temp files"
