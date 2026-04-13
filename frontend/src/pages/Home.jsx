@@ -63,6 +63,7 @@ const MENU_GROUPS = [
       "/order-live",
       "/kot",
       "/online-orders",
+      "/advance-orders",
       "/drafts",
       "/deleted-invoices",
     ],
