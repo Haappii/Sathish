@@ -34,6 +34,7 @@ import SupplierLedgerScreen     from "../screens/SupplierLedgerScreen";
 import AdvanceOrdersScreen      from "../screens/AdvanceOrdersScreen";
 import SettingsScreen           from "../screens/SettingsScreen";
 import UnlockScreen             from "../screens/UnlockScreen";
+import DeletedInvoicesScreen    from "../screens/DeletedInvoicesScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -208,6 +209,11 @@ export default function AppNavigator() {
               name="Settings"
               component={SettingsScreen}
               options={{ title: "Settings" }}
+            />
+            <Stack.Screen
+              name="DeletedInvoices"
+              component={DeletedInvoicesScreen}
+              options={{ title: "Deleted Invoices" }}
             />
             <Stack.Screen
               name="NativeModule"

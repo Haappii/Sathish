@@ -59,6 +59,8 @@ export default function Branches() {
       feedback_qr_enabled: true,
       print_logo_enabled: true,
       order_live_tracking_enabled: true,
+      invoice_whatsapp_enabled: false,
+      invoice_whatsapp_country_code: "91",
       paper_size: "58mm",
       fssai_number: "",
       service_charge_required: false,
@@ -108,6 +110,8 @@ export default function Branches() {
         feedback_qr_enabled: branch?.feedback_qr_enabled !== false,
         print_logo_enabled: branch?.print_logo_enabled !== false,
         order_live_tracking_enabled: branch?.order_live_tracking_enabled !== false,
+        invoice_whatsapp_enabled: Boolean(branch?.invoice_whatsapp_enabled),
+        invoice_whatsapp_country_code: String(branch?.invoice_whatsapp_country_code || "91"),
         paper_size: branch?.paper_size || "58mm",
         fssai_number: branch?.fssai_number || "",
         service_charge_required: normalizedServiceChargeRequired,
@@ -193,6 +197,14 @@ export default function Branches() {
       }
     }
 
+    if (form.invoice_whatsapp_enabled) {
+      const countryCode = String(form.invoice_whatsapp_country_code || "").replace(/\D/g, "");
+      if (!countryCode) {
+        showToast("Enter a valid WhatsApp country code", "error");
+        return;
+      }
+    }
+
     const loyaltyPointsPercentage = Number(form.loyalty_points_percentage || 0);
     if (Number.isNaN(loyaltyPointsPercentage) || loyaltyPointsPercentage < 0 || loyaltyPointsPercentage > 100) {
       showToast("Enter loyalty points percentage between 0 and 100", "error");
@@ -211,6 +223,7 @@ export default function Branches() {
         ...form,
         discount_value: Number(form.discount_value || 0),
         loyalty_points_percentage: Number(form.loyalty_points_percentage || 0),
+        invoice_whatsapp_country_code: String(form.invoice_whatsapp_country_code || "91").replace(/\D/g, "") || "91",
         online_orders_status_sync_timeout_sec: timeout,
       };
 
@@ -567,6 +580,32 @@ export default function Branches() {
                     onChange={e => setField("fssai_number", e.target.value)}
                   />
                 </div>
+              </div>
+            </FormSection>
+
+            <FormSection
+              icon={<span className="text-sm font-bold">WA</span>}
+              title="Invoice WhatsApp"
+              subtitle="Send the public invoice link to customers after successful billing"
+            >
+              <div className="grid md:grid-cols-2 gap-4">
+                <ToggleRow
+                  label="Send invoice link on WhatsApp"
+                  hint="If customer mobile is valid, send the invoice link automatically after checkout."
+                  checked={Boolean(form.invoice_whatsapp_enabled)}
+                  onChange={(checked) => setField("invoice_whatsapp_enabled", checked)}
+                />
+                <Field label="Default Country Code">
+                  <input
+                    className={inputClass}
+                    placeholder="91"
+                    value={form.invoice_whatsapp_country_code || "91"}
+                    onChange={(e) => setField("invoice_whatsapp_country_code", e.target.value.replace(/\D/g, ""))}
+                  />
+                </Field>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Provider credentials remain server-level settings. This branch setting controls whether invoice WhatsApp sending is used for this branch and which default country code is applied to 10-digit customer mobile numbers.
               </div>
             </FormSection>
 

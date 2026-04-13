@@ -193,15 +193,12 @@ export default function Analytics() {
           <>
             {/* Financial Performance */}
             <div>
-              <SectionHeader title="Financial Performance" subtitle="Revenue, profit, and cost breakdown" />
+              <SectionHeader title="Financial Performance" subtitle="Revenue, sales, and cost breakdown" />
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 <KpiCard label="Net Sales (Ex Tax)" value={fmt(fin.sales_ex_tax)} accent="blue" icon="₹" />
-                <KpiCard label="Gross Profit" value={fmt(fin.gross_profit)} accent="green" icon="📈" />
-                <KpiCard label="Net Profit" value={fmt(fin.profit)} accent="green" icon="💰" />
                 <KpiCard label="GST Collected" value={fmt(fin.gst)} accent="purple" icon="%" />
                 <KpiCard label="Discount Given" value={fmt(fin.discount)} accent="amber" icon="🏷" />
                 <KpiCard label="Returns Refund" value={fmt(fin.returns_refund)} accent="rose" icon="↩" />
-                <KpiCard label="Expenses" value={fmt(fin.expense)} accent="rose" icon="💸" />
               </div>
             </div>
 

@@ -1,9 +1,11 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, cast, Date as SQLDate, func
 from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+from collections import defaultdict
+from math import ceil
 import json
 
 from app.db import get_db
@@ -38,6 +40,8 @@ from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
 from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.utils.permissions import require_permission
+from app.models.users import User
+from sqlalchemy import Integer as SAInteger
 from app.services.gift_card_service import get_card_by_code, redeem_card, as_money, is_expired
 from app.services.item_lot_service import consume_lots_fifo
 from app.models.system_parameters import SystemParameter
@@ -49,6 +53,12 @@ from app.services.wallet_service import (
     as_money as wallet_money,
 )
 from app.utils.shop_type import get_shop_billing_type
+from app.models.recipe import Recipe
+from app.services.invoice_share_service import build_public_invoice_url, parse_invoice_share_token
+from app.services.whatsapp_service import (
+    get_branch_invoice_whatsapp_settings,
+    send_invoice_link_whatsapp_async,
+)
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -89,6 +99,158 @@ def get_business_datetime(db: Session, shop_id: int) -> datetime:
         shop.app_date if shop and shop.app_date else datetime.utcnow().date()
     )
     return datetime.combine(business_date, datetime.now().time())
+
+
+def _build_recipe_requirements(
+    db: Session,
+    shop_id: int,
+    item_qty_pairs: list[tuple[int, int]],
+) -> dict[int, int]:
+    """Return raw-material requirements (ingredient_item_id -> integer quantity)."""
+    if not item_qty_pairs:
+        return {}
+
+    sold_qty_by_item: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
+    for item_id, qty in item_qty_pairs:
+        if not item_id or not qty:
+            continue
+        sold_qty_by_item[int(item_id)] += Decimal(str(qty))
+
+    if not sold_qty_by_item:
+        return {}
+
+    recipes = (
+        db.query(Recipe)
+        .options(joinedload(Recipe.ingredients))
+        .filter(
+            Recipe.shop_id == shop_id,
+            Recipe.item_id.in_(list(sold_qty_by_item.keys())),
+        )
+        .all()
+    )
+
+    ingredient_qty: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
+    for rec in recipes:
+        sold_qty = sold_qty_by_item.get(int(rec.item_id), Decimal("0"))
+        if sold_qty <= 0:
+            continue
+        serving_size = Decimal(str(rec.serving_size or 1))
+        if serving_size <= 0:
+            serving_size = Decimal("1")
+
+        for ing in rec.ingredients:
+            per_serving = Decimal(str(ing.quantity or 0)) / serving_size
+            required = per_serving * sold_qty
+            if required > 0:
+                ingredient_qty[int(ing.ingredient_item_id)] += required
+
+    # Inventory table stores integer quantities; round up to avoid under-consumption.
+    result: dict[int, int] = {}
+    for ing_item_id, qty in ingredient_qty.items():
+        if qty > 0:
+            result[ing_item_id] = int(ceil(float(qty)))
+    return result
+
+
+def _add_raw_item_fallback(
+    requirements: dict[int, int],
+    item_qty_pairs: list[tuple[int, int]],
+    item_map: dict[int, Item],
+) -> dict[int, int]:
+    merged = dict(requirements or {})
+    for item_id, qty in item_qty_pairs:
+        itm = item_map.get(int(item_id))
+        if itm and bool(getattr(itm, "is_raw_material", False)):
+            merged[int(item_id)] = int(merged.get(int(item_id), 0) + int(qty or 0))
+    return merged
+
+
+def _serialize_invoice_full(db: Session, invoice: Invoice, shop_id: int) -> dict:
+    details = (
+        db.query(
+            InvoiceDetail.item_id,
+            InvoiceDetail.quantity,
+            InvoiceDetail.amount,
+            InvoiceDetail.buy_price,
+            InvoiceDetail.mrp_price,
+            Item.item_name,
+            Item.price,
+        )
+        .join(Item, Item.item_id == InvoiceDetail.item_id)
+        .filter(
+            InvoiceDetail.invoice_id == invoice.invoice_id,
+            InvoiceDetail.shop_id == shop_id,
+        )
+        .all()
+    )
+
+    returned_qty_rows = (
+        db.query(
+            SalesReturnItem.item_id.label("item_id"),
+            func.coalesce(func.sum(SalesReturnItem.quantity), 0).label("returned_qty"),
+        )
+        .join(SalesReturn, SalesReturn.return_id == SalesReturnItem.return_id)
+        .filter(
+            SalesReturn.shop_id == shop_id,
+            SalesReturn.invoice_id == invoice.invoice_id,
+            SalesReturn.status != "CANCELLED",
+        )
+        .group_by(SalesReturnItem.item_id)
+        .all()
+    )
+    returned_qty_map = {int(r.item_id): int(r.returned_qty or 0) for r in returned_qty_rows}
+
+    return_count = int(
+        db.query(func.count(SalesReturn.return_id))
+        .filter(
+            SalesReturn.shop_id == shop_id,
+            SalesReturn.invoice_id == invoice.invoice_id,
+            SalesReturn.status != "CANCELLED",
+        )
+        .scalar()
+        or 0
+    )
+    returned_amount = float(
+        db.query(func.coalesce(func.sum(SalesReturn.refund_amount), 0))
+        .filter(
+            SalesReturn.shop_id == shop_id,
+            SalesReturn.invoice_id == invoice.invoice_id,
+            SalesReturn.status != "CANCELLED",
+        )
+        .scalar()
+        or 0
+    )
+
+    items = [
+        InvoiceItemDetail(
+            item_id=r.item_id,
+            item_name=r.item_name,
+            quantity=r.quantity,
+            price=(float(r.amount or 0) / int(r.quantity or 1)) if int(r.quantity or 0) else float(r.price or 0),
+            amount=float(r.amount),
+            returned_qty=max(0, int(returned_qty_map.get(int(r.item_id), 0))),
+            returnable_qty=max(0, int(r.quantity or 0) - int(returned_qty_map.get(int(r.item_id), 0))),
+            already_returned=int(returned_qty_map.get(int(r.item_id), 0)) >= int(r.quantity or 0),
+        )
+        for r in details
+    ]
+
+    return {
+        "invoice_id": invoice.invoice_id,
+        "invoice_number": invoice.invoice_number,
+        "customer_name": invoice.customer_name,
+        "mobile": invoice.mobile,
+        "total_amount": float(invoice.total_amount or 0),
+        "discounted_amt": float(invoice.discounted_amt or 0),
+        "tax_amt": float(invoice.tax_amt or 0),
+        "created_time": invoice.created_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "payment_mode": invoice.payment_mode,
+        "payment_split": invoice.payment_split,
+        "items": items,
+        "has_returns": return_count > 0,
+        "return_count": return_count,
+        "returned_amount": returned_amount,
+    }
 
 
 def _extract_gift_card_payment(payload: InvoiceCreate) -> tuple[str | None, float]:
@@ -374,6 +536,16 @@ def create_invoice(
 
     shop_billing_type = get_shop_billing_type(db, int(user.shop_id))
     is_hotel = shop_billing_type == "hotel"
+    create_item_qty_pairs = [(int(it.item_id), int(it.quantity or 0)) for it in payload.items]
+    recipe_requirements = (
+        _add_raw_item_fallback(
+            _build_recipe_requirements(db, int(user.shop_id), create_item_qty_pairs),
+            create_item_qty_pairs,
+            item_map,
+        )
+        if is_hotel
+        else {}
+    )
 
     def enforce_stock(item_id: int) -> bool:
         itm = item_map.get(item_id)
@@ -382,12 +554,21 @@ def create_invoice(
         return True
 
     if inv_enabled:
-        for it in payload.items:
-            if not enforce_stock(it.item_id):
-                continue
-            available = get_stock(db, user.shop_id, it.item_id, branch_id)
-            if available < int(it.quantity or 0):
-                raise HTTPException(400, f"Insufficient stock for item {it.item_id} (available {available})")
+        if is_hotel:
+            for ing_item_id, req_qty in recipe_requirements.items():
+                available = get_stock(db, user.shop_id, ing_item_id, branch_id)
+                if available < int(req_qty or 0):
+                    raise HTTPException(
+                        400,
+                        f"Insufficient raw material stock for item {ing_item_id} (required {req_qty}, available {available})",
+                    )
+        else:
+            for it in payload.items:
+                if not enforce_stock(it.item_id):
+                    continue
+                available = get_stock(db, user.shop_id, it.item_id, branch_id)
+                if available < int(it.quantity or 0):
+                    raise HTTPException(400, f"Insufficient stock for item {it.item_id} (available {available})")
 
     gst_enabled = bool(shop and getattr(shop, "gst_enabled", False))
     gst_mode = (shop.gst_mode or "inclusive") if shop else "inclusive"
@@ -485,6 +666,21 @@ def create_invoice(
             )
             if ok is False:
                 raise HTTPException(400, f"Insufficient stock for item {it.item_id}")
+
+    if inv_enabled and is_hotel:
+        for ing_item_id, req_qty in recipe_requirements.items():
+            ok = adjust_stock(
+                db,
+                user.shop_id,
+                ing_item_id,
+                branch_id,
+                int(req_qty),
+                "REMOVE",
+                ref_no=invoice.invoice_number,
+            )
+            if ok is False:
+                raise HTTPException(400, f"Insufficient raw material stock for item {ing_item_id}")
+
     if payload.payment_mode is not None:
         invoice.payment_mode = payload.payment_mode
     if payload.payment_split is not None:
@@ -564,6 +760,25 @@ def create_invoice(
         shop_id=user.shop_id,
         user_id=user.user_id,
     )
+
+    try:
+        whatsapp_settings = get_branch_invoice_whatsapp_settings(
+            db,
+            shop_id=int(user.shop_id),
+            branch_id=branch_id,
+        )
+        if whatsapp_settings.get("enabled"):
+            send_invoice_link_whatsapp_async(
+                mobile=invoice.mobile,
+                customer_name=invoice.customer_name,
+                invoice_number=invoice.invoice_number,
+                invoice_url=build_public_invoice_url(int(user.shop_id), invoice.invoice_number),
+                shop_name=getattr(shop, "shop_name", None),
+                country_code=str(whatsapp_settings.get("country_code") or "91"),
+            )
+    except Exception:
+        # Never block invoice creation due to optional WhatsApp messaging setup/runtime issues.
+        pass
     return invoice
 
 
@@ -611,91 +826,29 @@ def get_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    details = (
-        db.query(
-            InvoiceDetail.item_id,
-            InvoiceDetail.quantity,
-            InvoiceDetail.amount,
-            InvoiceDetail.buy_price,
-            InvoiceDetail.mrp_price,
-            Item.item_name,
-            Item.price
-        )
-        .join(Item, Item.item_id == InvoiceDetail.item_id)
-        .filter(
-            InvoiceDetail.invoice_id == invoice.invoice_id,
-            InvoiceDetail.shop_id == user.shop_id
-        )
-        .all()
-    )
+    return _serialize_invoice_full(db, invoice, int(user.shop_id))
 
-    returned_qty_rows = (
-        db.query(
-            SalesReturnItem.item_id.label("item_id"),
-            func.coalesce(func.sum(SalesReturnItem.quantity), 0).label("returned_qty"),
-        )
-        .join(SalesReturn, SalesReturn.return_id == SalesReturnItem.return_id)
-        .filter(
-            SalesReturn.shop_id == user.shop_id,
-            SalesReturn.invoice_id == invoice.invoice_id,
-            SalesReturn.status != "CANCELLED",
-        )
-        .group_by(SalesReturnItem.item_id)
-        .all()
-    )
-    returned_qty_map = {int(r.item_id): int(r.returned_qty or 0) for r in returned_qty_rows}
 
-    return_count = int(
-        db.query(func.count(SalesReturn.return_id))
-        .filter(
-            SalesReturn.shop_id == user.shop_id,
-            SalesReturn.invoice_id == invoice.invoice_id,
-            SalesReturn.status != "CANCELLED",
-        )
-        .scalar()
-        or 0
-    )
-    returned_amount = float(
-        db.query(func.coalesce(func.sum(SalesReturn.refund_amount), 0))
-        .filter(
-            SalesReturn.shop_id == user.shop_id,
-            SalesReturn.invoice_id == invoice.invoice_id,
-            SalesReturn.status != "CANCELLED",
-        )
-        .scalar()
-        or 0
-    )
 
-    items = [
-        InvoiceItemDetail(
-            item_id=r.item_id,
-            item_name=r.item_name,
-            quantity=r.quantity,
-            price=(float(r.amount or 0) / int(r.quantity or 1)) if int(r.quantity or 0) else float(r.price or 0),
-            amount=float(r.amount),
-            returned_qty=max(0, int(returned_qty_map.get(int(r.item_id), 0))),
-            returnable_qty=max(0, int(r.quantity or 0) - int(returned_qty_map.get(int(r.item_id), 0))),
-            already_returned=int(returned_qty_map.get(int(r.item_id), 0)) >= int(r.quantity or 0),
-        )
-        for r in details
-    ]
+@router.get("/public/{token}", response_model=InvoiceFullResponse)
+def get_public_invoice(token: str, db: Session = Depends(get_db)):
+    parsed = parse_invoice_share_token(token)
+    if not parsed:
+        raise HTTPException(404, "Invalid invoice link")
 
-    return {
-        "invoice_id": invoice.invoice_id,
-        "invoice_number": invoice.invoice_number,
-        "customer_name": invoice.customer_name,
-        "mobile": invoice.mobile,
-        "total_amount": float(invoice.total_amount or 0),
-        "discounted_amt": float(invoice.discounted_amt or 0),
-        "tax_amt": float(invoice.tax_amt or 0),
-        "created_time": invoice.created_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "payment_mode": invoice.payment_mode,
-        "payment_split": invoice.payment_split,
-        "items": items,
-        "has_returns": return_count > 0,
-        "return_count": return_count,
-        "returned_amount": returned_amount,
-    }
+    shop_id, invoice_number = parsed
+    invoice = (
+        db.query(Invoice)
+        .filter(
+            Invoice.shop_id == shop_id,
+            Invoice.invoice_number == invoice_number,
+        )
+        .first()
+    )
+    if not invoice:
+        raise HTTPException(404, "Invoice not found")
+
+    return _serialize_invoice_full(db, invoice, int(shop_id))
 
 
 # =====================================================
@@ -743,9 +896,42 @@ def modify_invoice(
         "Modified"
     )
 
+    inv_enabled = is_inventory_enabled(db, user.shop_id)
+    is_hotel = get_shop_billing_type(db, int(user.shop_id)) == "hotel"
+
+    old_item_qty_pairs = [(int(d.item_id), int(d.quantity or 0)) for d in invoice.details]
+    old_item_ids = [p[0] for p in old_item_qty_pairs]
+    old_item_map = {
+        i.item_id: i
+        for i in db.query(Item).filter(
+            Item.item_id.in_(old_item_ids),
+            Item.shop_id == user.shop_id,
+        ).all()
+    }
+    old_recipe_requirements = (
+        _add_raw_item_fallback(
+            _build_recipe_requirements(db, int(user.shop_id), old_item_qty_pairs),
+            old_item_qty_pairs,
+            old_item_map,
+        )
+        if is_hotel
+        else {}
+    )
+
     # ­ƒö╣ Restore old stock
-    for d in invoice.details:
-        if is_inventory_enabled(db, user.shop_id):
+    if inv_enabled and is_hotel:
+        for ing_item_id, qty in old_recipe_requirements.items():
+            adjust_stock(
+                db,
+                user.shop_id,
+                ing_item_id,
+                invoice.branch_id,
+                int(qty),
+                "ADD",
+                ref_no=f"MOD-OLD-{invoice.invoice_number}",
+            )
+    elif inv_enabled:
+        for d in invoice.details:
             adjust_stock(
                 db, user.shop_id, d.item_id, invoice.branch_id,
                 d.quantity, "ADD"
@@ -768,6 +954,26 @@ def modify_invoice(
         ).all()
     }
 
+    new_item_qty_pairs = [(int(it.item_id), int(it.quantity or 0)) for it in payload.items]
+    new_recipe_requirements = (
+        _add_raw_item_fallback(
+            _build_recipe_requirements(db, int(user.shop_id), new_item_qty_pairs),
+            new_item_qty_pairs,
+            item_map,
+        )
+        if is_hotel
+        else {}
+    )
+
+    if inv_enabled and is_hotel:
+        for ing_item_id, req_qty in new_recipe_requirements.items():
+            available = get_stock(db, user.shop_id, ing_item_id, invoice.branch_id)
+            if available < int(req_qty or 0):
+                raise HTTPException(
+                    400,
+                    f"Insufficient raw material stock for item {ing_item_id} (required {req_qty}, available {available})",
+                )
+
     for it in payload.items:
         subtotal += Decimal(it.amount)
         item = item_map.get(it.item_id)
@@ -783,11 +989,25 @@ def modify_invoice(
             mrp_price=(item.mrp_price if item else 0)
         ))
 
-        if is_inventory_enabled(db, user.shop_id):
+        if inv_enabled and not is_hotel:
             adjust_stock(
                 db, user.shop_id, it.item_id, invoice.branch_id,
                 it.quantity, "REMOVE"
             )
+
+    if inv_enabled and is_hotel:
+        for ing_item_id, qty in new_recipe_requirements.items():
+            ok = adjust_stock(
+                db,
+                user.shop_id,
+                ing_item_id,
+                invoice.branch_id,
+                int(qty),
+                "REMOVE",
+                ref_no=f"MOD-NEW-{invoice.invoice_number}",
+            )
+            if ok is False:
+                raise HTTPException(400, f"Insufficient raw material stock for item {ing_item_id}")
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax, total = calculate_gst(subtotal, shop)
@@ -958,9 +1178,41 @@ def delete_invoice(
         "Deleted"
     )
 
+    inv_enabled = is_inventory_enabled(db, user.shop_id)
+    is_hotel = get_shop_billing_type(db, int(user.shop_id)) == "hotel"
+    old_item_qty_pairs = [(int(d.item_id), int(d.quantity or 0)) for d in invoice.details]
+    old_item_ids = [p[0] for p in old_item_qty_pairs]
+    old_item_map = {
+        i.item_id: i
+        for i in db.query(Item).filter(
+            Item.item_id.in_(old_item_ids),
+            Item.shop_id == user.shop_id,
+        ).all()
+    }
+    old_recipe_requirements = (
+        _add_raw_item_fallback(
+            _build_recipe_requirements(db, int(user.shop_id), old_item_qty_pairs),
+            old_item_qty_pairs,
+            old_item_map,
+        )
+        if is_hotel
+        else {}
+    )
+
     # ­ƒö╣ Restore stock
-    for d in invoice.details:
-        if is_inventory_enabled(db, user.shop_id):
+    if inv_enabled and is_hotel:
+        for ing_item_id, qty in old_recipe_requirements.items():
+            adjust_stock(
+                db,
+                user.shop_id,
+                ing_item_id,
+                invoice.branch_id,
+                int(qty),
+                "ADD",
+                ref_no=f"DEL-{invoice.invoice_id}"
+            )
+    elif inv_enabled:
+        for d in invoice.details:
             adjust_stock(
                 db,
                 user.shop_id,
@@ -1009,16 +1261,24 @@ def list_archived_invoices(
 ):
     branch_id = resolve_branch(user, request.headers.get("x-branch-id"))
 
-    return (
-        db.query(InvoiceArchive)
+    rows = (
+        db.query(InvoiceArchive, User.user_name)
+        .outerjoin(User, User.user_id == cast(InvoiceArchive.deleted_by, SAInteger))
         .filter(
             InvoiceArchive.branch_id == branch_id,
             InvoiceArchive.delete_reason == "Deleted",
-            InvoiceArchive.shop_id == user.shop_id   # ­ƒö┤ THIS LINE IS THE FIX
+            InvoiceArchive.shop_id == user.shop_id,
         )
         .order_by(InvoiceArchive.deleted_time.desc())
         .all()
     )
+
+    result = []
+    for arch, uname in rows:
+        d = {c.name: getattr(arch, c.name) for c in arch.__table__.columns}
+        d["deleted_by"] = uname or arch.deleted_by
+        result.append(d)
+    return result
 
 # =====================================================
 # LATEST CUSTOMER BY MOBILE  Ô£à (AUTO-FILL SUPPORT)

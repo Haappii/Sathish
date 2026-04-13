@@ -47,6 +47,8 @@ def _print_param_keys(branch_id: int) -> dict[str, str]:
         "order_live_tracking_enabled": f"branch:{branch_id}:order_live_tracking_enabled",
         "paper_size": f"branch:{branch_id}:paper_size",
         "fssai_number": f"branch:{branch_id}:fssai_number",
+        "invoice_whatsapp_enabled": f"branch:{branch_id}:invoice_whatsapp_enabled",
+        "invoice_whatsapp_country_code": f"branch:{branch_id}:invoice_whatsapp_country_code",
     }
 
 
@@ -86,12 +88,20 @@ def _read_branch_print_from_params(pmap: dict[str, str], branch_id: int) -> dict
     if paper_size not in ("58mm", "80mm"):
         paper_size = "58mm"
     fssai_number = str(pmap.get(keys["fssai_number"], "") or "").strip()
+    invoice_whatsapp_enabled = str(
+        pmap.get(keys["invoice_whatsapp_enabled"], "NO") or "NO"
+    ).strip().upper() == "YES"
+    invoice_whatsapp_country_code = str(
+        pmap.get(keys["invoice_whatsapp_country_code"], "91") or "91"
+    ).strip()
     return {
         "kot_required": bool(kot),
         "receipt_required": bool(receipt),
         "order_live_tracking_enabled": bool(order_live_tracking),
         "paper_size": paper_size,
         "fssai_number": fssai_number,
+        "invoice_whatsapp_enabled": bool(invoice_whatsapp_enabled),
+        "invoice_whatsapp_country_code": invoice_whatsapp_country_code or "91",
     }
 
 
@@ -160,6 +170,8 @@ def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, pa
             "order_live_tracking_enabled",
             "paper_size",
             "fssai_number",
+            "invoice_whatsapp_enabled",
+            "invoice_whatsapp_country_code",
         )
     )
     if not has_any:
@@ -172,6 +184,10 @@ def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, pa
     if paper_size not in ("58mm", "80mm"):
         paper_size = "58mm"
     fssai_number = str(getattr(payload, "fssai_number", "") or "").strip()
+    invoice_whatsapp_enabled = bool(getattr(payload, "invoice_whatsapp_enabled", False))
+    invoice_whatsapp_country_code = "".join(
+        ch for ch in str(getattr(payload, "invoice_whatsapp_country_code", "91") or "91") if ch.isdigit()
+    ) or "91"
 
     keys = _print_param_keys(branch_id)
     _upsert_param(db, shop_id=shop_id, key=keys["kot_required"], value=("YES" if kot_required else "NO"))
@@ -184,6 +200,18 @@ def _save_branch_print_settings(db: Session, *, shop_id: int, branch_id: int, pa
     )
     _upsert_param(db, shop_id=shop_id, key=keys["paper_size"], value=paper_size)
     _upsert_param(db, shop_id=shop_id, key=keys["fssai_number"], value=fssai_number)
+    _upsert_param(
+        db,
+        shop_id=shop_id,
+        key=keys["invoice_whatsapp_enabled"],
+        value=("YES" if invoice_whatsapp_enabled else "NO"),
+    )
+    _upsert_param(
+        db,
+        shop_id=shop_id,
+        key=keys["invoice_whatsapp_country_code"],
+        value=invoice_whatsapp_country_code,
+    )
     db.commit()
 
 

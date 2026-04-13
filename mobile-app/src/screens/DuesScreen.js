@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -34,6 +35,7 @@ export default function DuesScreen() {
   const [payMode, setPayMode] = useState("cash");
   const [payRef, setPayRef] = useState("");
   const [saving, setSaving] = useState(false);
+  const [viewingDue, setViewingDue] = useState(null); // due being viewed with items
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -85,14 +87,14 @@ export default function DuesScreen() {
   const totalDue = rows.reduce((s, r) => s + getDueAmount(r), 0);
 
   const renderRow = ({ item: row }) => (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={() => setViewingDue(row)}>
       <View style={styles.cardTop}>
         <View style={{ flex: 1 }}>
           <Text style={styles.invNo}>{row.invoice_number}</Text>
           <Text style={styles.customer}>{row.customer_name || "Walk-in"}</Text>
           {row.mobile && <Text style={styles.meta}>📞 {row.mobile}</Text>}
-          {row.invoice_date && (
-            <Text style={styles.meta}>📅 {String(row.invoice_date).split("T")[0]}</Text>
+          {row.created_time && (
+            <Text style={styles.meta}>📅 {String(row.created_time).split("T")[0]}</Text>
           )}
         </View>
         <View style={styles.amtWrap}>
@@ -103,7 +105,7 @@ export default function DuesScreen() {
       <Pressable style={styles.payBtn} onPress={() => openPay(row)}>
         <Text style={styles.payBtnText}>Record Payment</Text>
       </Pressable>
-    </View>
+    </Pressable>
   );
 
   return (
@@ -208,6 +210,101 @@ export default function DuesScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Invoice Details Modal */}
+      <Modal transparent visible={!!viewingDue} animationType="slide" onRequestClose={() => setViewingDue(null)}>
+        <SafeAreaView style={styles.detailsModalSafe}>
+          <View style={styles.detailsModalHeader}>
+            <Text style={styles.detailsModalTitle}>Invoice Details</Text>
+            <Pressable onPress={() => setViewingDue(null)}>
+              <Text style={styles.detailsModalClose}>✕ Close</Text>
+            </Pressable>
+          </View>
+          {viewingDue && (
+            <ScrollView contentContainerStyle={styles.detailsModalBody} showsVerticalScrollIndicator={true}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Invoice Information</Text>
+                <Text style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Invoice:</Text> {viewingDue.invoice_number}
+                </Text>
+                <Text style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Customer:</Text> {viewingDue.customer_name || "Walk-in"}
+                </Text>
+                {viewingDue.mobile && (
+                  <Text style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Mobile:</Text> {viewingDue.mobile}
+                  </Text>
+                )}
+                {viewingDue.created_time && (
+                  <Text style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date:</Text>{" "}
+                    {String(viewingDue.created_time).split("T")[0]}
+                  </Text>
+                )}
+                <Text style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Payment Mode:</Text>{" "}
+                  {String(viewingDue.payment_mode || "N/A").toUpperCase()}
+                </Text>
+              </View>
+
+              {viewingDue.items && viewingDue.items.length > 0 && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Items ({viewingDue.items.length})</Text>
+                  {viewingDue.items.map((item, idx) => (
+                    <View key={idx} style={styles.itemCard}>
+                      <View style={styles.itemHeader}>
+                        <Text style={styles.itemName}>{item.item_name}</Text>
+                        <Text style={styles.itemAmount}>{fmt(item.amount)}</Text>
+                      </View>
+                      <View style={styles.itemDetails}>
+                        <Text style={styles.itemQty}>Qty: {item.quantity}</Text>
+                        <Text style={styles.itemPrice}>₹{Number(item.price).toFixed(2)} each</Text>
+                        {item.tax_amount && (
+                          <Text style={styles.itemTax}>Tax: {fmt(item.tax_amount)}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Amounts</Text>
+                <View style={styles.amountRow}>
+                  <Text style={styles.amountLabel}>Original Amount:</Text>
+                  <Text style={styles.amountValue}>{fmt(viewingDue.original_amount)}</Text>
+                </View>
+                {Number(viewingDue.tax_amt) > 0 && (
+                  <View style={styles.amountRow}>
+                    <Text style={styles.amountLabel}>Tax:</Text>
+                    <Text style={styles.amountValue}>{fmt(viewingDue.tax_amt)}</Text>
+                  </View>
+                )}
+                {Number(viewingDue.discounted_amt) > 0 && (
+                  <View style={styles.amountRow}>
+                    <Text style={styles.amountLabel}>Discount:</Text>
+                    <Text style={styles.amountValue}>-{fmt(viewingDue.discounted_amt)}</Text>
+                  </View>
+                )}
+                <View style={styles.amountRow}>
+                  <Text style={styles.amountLabel}>Paid Amount:</Text>
+                  <Text style={styles.amountValue}>{fmt(viewingDue.paid_amount)}</Text>
+                </View>
+                {Number(viewingDue.returns_amount) > 0 && (
+                  <View style={styles.amountRow}>
+                    <Text style={styles.amountLabel}>Returns:</Text>
+                    <Text style={styles.amountValue}>-{fmt(viewingDue.returns_amount)}</Text>
+                  </View>
+                )}
+                <View style={[styles.amountRow, styles.outstandingRow]}>
+                  <Text style={styles.outstandingLabel}>Outstanding Amount:</Text>
+                  <Text style={styles.outstandingValue}>{fmt(viewingDue.outstanding_amount)}</Text>
+                </View>
+              </View>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -274,4 +371,67 @@ const styles = StyleSheet.create({
   },
   confirmBtnTxt: { color: "#fff", fontWeight: "800" },
   btnDisabled: { opacity: 0.5 },
+  detailsModalSafe: { flex: 1, backgroundColor: "#f3f6ff" },
+  detailsModalHeader: {
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  detailsModalTitle: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
+  detailsModalClose: { fontSize: 14, fontWeight: "700", color: "#0b57d0" },
+  detailsModalBody: { padding: 16, gap: 12, paddingBottom: 24 },
+  detailSection: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#d9e3ff",
+    padding: 12,
+    gap: 8,
+  },
+  detailSectionTitle: { fontSize: 13, fontWeight: "800", color: "#0b1220" },
+  detailRow: { fontSize: 12, color: "#334155", marginVertical: 2 },
+  detailLabel: { fontWeight: "700", color: "#1e293b" },
+  itemCard: {
+    backgroundColor: "#f9fafb",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 10,
+    marginVertical: 4,
+  },
+  itemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  itemName: { fontSize: 12, fontWeight: "700", color: "#1e293b", flex: 1 },
+  itemAmount: { fontSize: 12, fontWeight: "700", color: "#0b57d0" },
+  itemDetails: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  itemQty: { fontSize: 11, color: "#64748b" },
+  itemPrice: { fontSize: 11, color: "#64748b" },
+  itemTax: { fontSize: 11, color: "#64748b" },
+  amountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e2e8f0",
+  },
+  amountLabel: { fontSize: 12, color: "#334155", fontWeight: "600" },
+  amountValue: { fontSize: 12, color: "#1e293b", fontWeight: "700" },
+  outstandingRow: {
+    borderBottomWidth: 0,
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  outstandingLabel: { fontSize: 13, fontWeight: "800", color: "#857e00" },
+  outstandingValue: { fontSize: 13, fontWeight: "800", color: "#92400e" },
 });

@@ -4,6 +4,8 @@ from sqlalchemy import func, desc
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Optional
+from collections import defaultdict
+from math import ceil
 
 from pydantic import BaseModel
 
@@ -18,12 +20,18 @@ from app.models.invoice_details import InvoiceDetail
 from app.models.shop_details import ShopDetails
 from app.models.table_qr import TableQrSession
 from app.models.branch import Branch
+from app.models.recipe import Recipe
 from app.services.gst_service import calculate_gst
 
-from app.services.inventory_service import adjust_stock, is_inventory_enabled
+from app.services.inventory_service import adjust_stock, is_inventory_enabled, get_stock
 from app.services.invoice_service import generate_invoice_number
 from app.services.day_close_service import is_branch_day_closed
 from app.utils.shop_type import ensure_hotel_billing_type
+from app.services.invoice_share_service import build_public_invoice_url
+from app.services.whatsapp_service import (
+    get_branch_invoice_whatsapp_settings,
+    send_invoice_link_whatsapp_async,
+)
 
 router = APIRouter(
     prefix="/table-billing",
@@ -57,6 +65,51 @@ def get_business_datetime(db: Session, shop_id: int) -> datetime:
         shop.app_date if shop and shop.app_date else datetime.utcnow().date()
     )
     return datetime.combine(business_date, datetime.now().time())
+
+
+def _build_recipe_requirements(
+    db: Session,
+    shop_id: int,
+    item_qty_pairs: list[tuple[int, int]],
+) -> dict[int, int]:
+    if not item_qty_pairs:
+        return {}
+
+    sold_qty_by_item: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
+    for item_id, qty in item_qty_pairs:
+        if not item_id or not qty:
+            continue
+        sold_qty_by_item[int(item_id)] += Decimal(str(qty))
+
+    if not sold_qty_by_item:
+        return {}
+
+    recipes = (
+        db.query(Recipe)
+        .options(joinedload(Recipe.ingredients))
+        .filter(
+            Recipe.shop_id == shop_id,
+            Recipe.item_id.in_(list(sold_qty_by_item.keys())),
+        )
+        .all()
+    )
+
+    ingredient_qty: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
+    for rec in recipes:
+        sold_qty = sold_qty_by_item.get(int(rec.item_id), Decimal("0"))
+        if sold_qty <= 0:
+            continue
+        serving_size = Decimal(str(rec.serving_size or 1))
+        if serving_size <= 0:
+            serving_size = Decimal("1")
+
+        for ing in rec.ingredients:
+            per_serving = Decimal(str(ing.quantity or 0)) / serving_size
+            required = per_serving * sold_qty
+            if required > 0:
+                ingredient_qty[int(ing.ingredient_item_id)] += required
+
+    return {k: int(ceil(float(v))) for k, v in ingredient_qty.items() if v > 0}
 
 
 def _running_total_for_order(db: Session, order_id: int) -> Decimal:
@@ -747,6 +800,26 @@ def checkout_order(
         ).all()
     }
 
+    inv_enabled = is_inventory_enabled(db, user.shop_id)
+    recipe_requirements = _build_recipe_requirements(
+        db,
+        int(user.shop_id),
+        [(int(it.item_id), int(it.quantity or 0)) for it in order.items],
+    )
+    for it in order.items:
+        item = item_map.get(int(it.item_id))
+        if item and bool(getattr(item, "is_raw_material", False)):
+            recipe_requirements[int(it.item_id)] = int(recipe_requirements.get(int(it.item_id), 0) + int(it.quantity or 0))
+
+    if inv_enabled:
+        for ing_item_id, req_qty in recipe_requirements.items():
+            available = get_stock(db, user.shop_id, ing_item_id, order.branch_id)
+            if available < int(req_qty or 0):
+                raise HTTPException(
+                    400,
+                    f"Insufficient raw material stock for item {ing_item_id} (required {req_qty}, available {available})",
+                )
+
     for it in order.items:
         item = item_map.get(it.item_id)
         db.add(InvoiceDetail(
@@ -759,16 +832,19 @@ def checkout_order(
             mrp_price=(item.mrp_price if item else 0)
         ))
 
-        if is_inventory_enabled(db, user.shop_id):
-            adjust_stock(
+    if inv_enabled:
+        for ing_item_id, req_qty in recipe_requirements.items():
+            ok = adjust_stock(
                 db,
                 user.shop_id,
-                it.item_id,
+                ing_item_id,
                 order.branch_id,
-                it.quantity,
+                int(req_qty),
                 "REMOVE",
                 ref_no=f"TBL-{order.order_id}"
             )
+            if ok is False:
+                raise HTTPException(400, f"Insufficient raw material stock for item {ing_item_id}")
 
     order.status = "CLOSED"
     order.closed_at = datetime.now()
@@ -777,6 +853,25 @@ def checkout_order(
     _end_active_qr_session(db=db, shop_id=int(user.shop_id), table_id=int(order.table_id))
 
     db.commit()
+
+    try:
+        whatsapp_settings = get_branch_invoice_whatsapp_settings(
+            db,
+            shop_id=int(user.shop_id),
+            branch_id=order.branch_id,
+        )
+        if whatsapp_settings.get("enabled"):
+            send_invoice_link_whatsapp_async(
+                mobile=invoice.mobile,
+                customer_name=invoice.customer_name,
+                invoice_number=invoice.invoice_number,
+                invoice_url=build_public_invoice_url(int(user.shop_id), invoice.invoice_number),
+                shop_name=getattr(shop, "shop_name", None),
+                country_code=str(whatsapp_settings.get("country_code") or "91"),
+            )
+    except Exception:
+        # Never block checkout due to optional WhatsApp messaging setup/runtime issues.
+        pass
 
     return {
         "success": True,

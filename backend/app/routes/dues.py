@@ -8,7 +8,7 @@ from app.models.customer import Customer
 from app.models.invoice_due import InvoiceDue
 from app.models.invoice import Invoice
 from app.models.invoice_payment import InvoicePayment
-from app.schemas.dues import DuePaymentCreate, DueSummary
+from app.schemas.dues import DuePaymentCreate, DueSummary, InvoiceItemSmall
 from app.utils.auth_user import get_current_user
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
@@ -19,6 +19,9 @@ from app.services.credit_service import (
     get_outstanding_amount,
     refresh_due_status,
 )
+from app.models.invoice_details import InvoiceDetail
+from app.models.items import Item
+from sqlalchemy.orm import joinedload
 
 router = APIRouter(prefix="/dues", tags=["Customer Dues"])
 
@@ -50,6 +53,35 @@ def _build_due_summary(db: Session, due: InvoiceDue) -> DueSummary:
     returns = get_returns_amount(db, shop_id=due.shop_id, invoice_id=due.invoice_id)
     outstanding = get_outstanding_amount(db, due)
 
+    # Fetch invoice details to get items, tax, discount, etc.
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.invoice_id == due.invoice_id, Invoice.shop_id == due.shop_id)
+        .first()
+    )
+
+    # Build invoice items list
+    items = []
+    if invoice:
+        details = (
+            db.query(InvoiceDetail)
+            .options(joinedload(InvoiceDetail.item))
+            .filter(InvoiceDetail.invoice_id == invoice.invoice_id)
+            .all()
+        )
+        items = [
+            InvoiceItemSmall(
+                item_id=d.item_id,
+                item_name=d.item.item_name if d.item else "",
+                quantity=d.quantity,
+                price=float(as_decimal(d.mrp_price)),
+                amount=float(as_decimal(d.amount)),
+                tax_percent=float(as_decimal(d.tax_rate)) if d.tax_rate else None,
+                tax_amount=float(as_decimal((d.cgst_amt or 0) + (d.sgst_amt or 0) + (d.igst_amt or 0) + (d.cess_amt or 0))),
+            )
+            for d in details
+        ]
+
     return DueSummary(
         due_id=due.due_id,
         invoice_id=due.invoice_id,
@@ -63,6 +95,11 @@ def _build_due_summary(db: Session, due: InvoiceDue) -> DueSummary:
         returns_amount=float(returns),
         outstanding_amount=float(outstanding),
         status=due.status,
+        tax_amt=float(as_decimal(invoice.tax_amt)) if invoice else 0.0,
+        discounted_amt=float(as_decimal(invoice.discounted_amt)) if invoice else 0.0,
+        created_time=str(invoice.created_time) if invoice else None,
+        payment_mode=invoice.payment_mode if invoice else None,
+        items=items,
     )
 
 

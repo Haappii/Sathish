@@ -17,13 +17,10 @@ import { saveAs } from "file-saver";
 const METRICS = [
   { key: "sales",        label: "Sales Amount",   type: "currency", icon: "₹" },
   { key: "bills",        label: "Bills Count",    type: "number",   icon: "#" },
-  { key: "gross_profit", label: "Gross Profit",   type: "currency", icon: "%" },
-  { key: "profit",       label: "Net Profit",     type: "currency", icon: "%" },
   { key: "gst",          label: "GST Collected",  type: "currency", icon: "%" },
   { key: "discount",     label: "Discount Given", type: "currency", icon: "₹" },
   { key: "avg_bill",     label: "Avg Bill Value", type: "currency", icon: "₹" },
   { key: "items",        label: "Items Sold",     type: "number",   icon: "#" },
-  { key: "expense",      label: "Expenses",       type: "currency", icon: "₹" },
 ];
 
 const BLUE = "#0B3C8C";

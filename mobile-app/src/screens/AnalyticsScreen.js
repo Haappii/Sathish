@@ -139,16 +139,6 @@ export default function AnalyticsScreen() {
                 accent="#059669"
               />
               <KpiCard
-                label="Gross Profit"
-                value={fmt(fin.gross_profit)}
-                accent="#0b57d0"
-              />
-              <KpiCard
-                label="Net Profit"
-                value={fmt(fin.profit)}
-                accent="#d97706"
-              />
-              <KpiCard
                 label="GST Collected"
                 value={fmt(fin.gst)}
                 accent="#7c3aed"
@@ -164,11 +154,6 @@ export default function AnalyticsScreen() {
                 accent="#dc2626"
               />
               <KpiCard
-                label="Expenses"
-                value={fmt(fin.expense)}
-                accent="#b91c1c"
-              />
-              <KpiCard
                 label="Due Collections"
                 value={fmt(collections.amount)}
                 accent="#0b57d0"
@@ -178,11 +163,6 @@ export default function AnalyticsScreen() {
                 value={fmt(openDues.outstanding)}
                 sub={`${fmtCount(openDues.count)} invoices`}
                 accent="#991b1b"
-              />
-              <KpiCard
-                label={stock.raw_materials_only ? "Raw Material Stock" : "Stock Valuation"}
-                value={fmt(stock.valuation)}
-                accent="#1e40af"
               />
             </View>
           </View>

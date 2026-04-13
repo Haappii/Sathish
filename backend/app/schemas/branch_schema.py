@@ -27,6 +27,8 @@ class BranchBase(BaseModel):
     order_live_tracking_enabled: Optional[bool] = True
     paper_size: Optional[str] = "58mm"  # 58mm | 80mm
     fssai_number: Optional[str] = ""   # branch-level FSSAI (overrides shop-level)
+    invoice_whatsapp_enabled: Optional[bool] = False
+    invoice_whatsapp_country_code: Optional[str] = "91"
 
     # Optional: service charge (stored directly on branch row)
     service_charge_required: Optional[bool] = False

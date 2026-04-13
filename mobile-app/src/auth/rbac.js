@@ -164,6 +164,14 @@ export const mobileMenuCatalog = [
     perm: { module: "supplier_ledger", action: "read" },
     fallbackRoles: ALL_ROLES,
   },
+  {
+    key: "deleted_invoices",
+    title: "Deleted Invoices",
+    icon: "🗑️",
+    route: "DeletedInvoices",
+    perm: { module: "billing", action: "read" },
+    fallbackRoles: new Set(["admin", "manager"]),
+  },
 ];
 
 export function modulesToPermMap(modules) {

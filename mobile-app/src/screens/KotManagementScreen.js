@@ -51,6 +51,8 @@ export default function KotManagementScreen() {
 
   useEffect(() => {
     load();
+    const interval = setInterval(() => load(true), 30000); // Auto-refresh every 30s
+    return () => clearInterval(interval);
   }, [load]);
 
   const updateStatus = async (row) => {
@@ -97,16 +99,33 @@ export default function KotManagementScreen() {
                 <Text style={styles.title}>{row.kot_number || `KOT ${row.kot_id}`}</Text>
                 <Text style={[styles.badge, { color: STATUS_COLORS[status] || "#475569" }]}>{status}</Text>
               </View>
-              <Text style={styles.sub}>Table ID: {row.table_id || "-"}</Text>
+        <View style={styles.section}>
+          {/* Table/Order Info */}
+          <View style={styles.infoRow}>
+            <Text style={styles.sub}>
+              {row.table_name ? `Table: ${row.table_name}` : (row.table_id ? `Table ID: ${row.table_id}` : "No Table")}
+            </Text>
+            {row.order_type && (
+              <Text style={styles.orderTypeBadge}>{row.order_type}</Text>
+            )}
+          </View>
+          {row.customer_name && (
+            <Text style={styles.sub}>Customer: {row.customer_name}</Text>
+          )}
+          {row.token_number && (
+            <Text style={styles.sub}>Token: #{row.token_number}</Text>
+          )}
 
               <View style={styles.itemsWrap}>
                 {(row.items || []).map((it, idx) => (
                   <View key={`${row.kot_id}-${idx}`} style={styles.itemRow}>
                     <Text style={styles.itemName}>{it.item_name}</Text>
+                    {it.notes ? <Text style={styles.itemNotes}>{it.notes}</Text> : null}
                     <Text style={styles.itemQty}>x{it.quantity}</Text>
                   </View>
                 ))}
               </View>
+        </View>
 
               <Pressable
                 style={[styles.btn, !next && styles.btnDisabled]}
@@ -148,6 +167,18 @@ const styles = StyleSheet.create({
   badge: { fontWeight: "700", fontSize: 12 },
   sub: { color: "#334155", fontSize: 12 },
   itemsWrap: { gap: 5 },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  section: { gap: 4 },
+  orderTypeBadge: {
+    backgroundColor: "#e8f0ff",
+    color: "#0b57d0",
+    fontSize: 10,
+    fontWeight: "700",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  itemNotes: { color: "#7c8ba1", fontSize: 10, fontStyle: "italic", flex: 1 },
   itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   itemName: { color: "#0b1220", flex: 1, paddingRight: 8 },
   itemQty: { color: "#334155", fontWeight: "700" },

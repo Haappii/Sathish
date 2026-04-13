@@ -42,10 +42,6 @@ const REPORTS = [
   { key: "sales/category", label: "Category-wise Sales", group: "Sales" },
   { key: "sales/user", label: "User-wise Sales", group: "Sales" },
 
-  // Profit & Expenses
-  { key: "profit", label: "Profit Report", group: "Profit" },
-  { key: "expenses", label: "Expense Report", group: "Profit" },
-
   // Purchases & Suppliers
   { key: "suppliers", label: "Supplier Report", group: "Purchases" },
   { key: "po-aging", label: "PO Aging", group: "Purchases" },
@@ -100,7 +96,6 @@ const REPORTS = [
   { key: "accounting/day-book", label: "Day Book", group: "Accounting" },
   { key: "day-close/report", label: "Day Closing Report", group: "Accounting" },
   { key: "accounting/trial-balance", label: "Trial Balance", group: "Accounting", requiresDateRange: false },
-  { key: "accounting/pnl", label: "Profit & Loss", group: "Accounting" },
   { key: "accounting/balance-sheet", label: "Balance Sheet", group: "Accounting", requiresDateRange: false },
 
   // Reconciliation
@@ -129,8 +124,6 @@ const REPORTS = [
 ];
 
 const NO_USER_FILTER_KEYS = new Set([
-  "profit",
-  "expenses",
   "suppliers",
   "po-aging",
   "payables-summary",
@@ -160,7 +153,6 @@ const NO_USER_FILTER_KEYS = new Set([
   "accounting/day-book",
   "day-close/report",
   "accounting/trial-balance",
-  "accounting/pnl",
   "accounting/balance-sheet",
   "recon/payments-gateway",
   "recon/stock-valuation",
@@ -172,7 +164,6 @@ const NO_USER_FILTER_KEYS = new Set([
 
 const REPORT_GROUP_ORDER = [
   "Sales",
-  "Profit",
   "Receivables",
   "Returns",
   "Inventory",
@@ -238,7 +229,6 @@ export default function Reports() {
   const [userId, setUserId] = useState("");
   const [branchId, setBranchId] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
-  const [profitType, setProfitType] = useState("date");
   const [customerNumber, setCustomerNumber] = useState("");
 
   const [users, setUsers] = useState([]);
@@ -254,8 +244,10 @@ export default function Reports() {
   const [bulkLogs, setBulkLogs] = useState([]);
   const [selectedBulkLogId, setSelectedBulkLogId] = useState(null);
 
+  const isAdminOrManager = String(session?.role || "").toLowerCase() === "admin" || String(session?.role || "").toLowerCase() === "manager";
+
   const reportOptions = REPORTS.filter(
-    r => hotelShop || r.key !== "table/usage"
+    r => (hotelShop || r.key !== "table/usage") && (!r.adminOnly || isAdminOrManager)
   );
 
   const requiresDateRange = activeReport?.requiresDateRange !== false;
@@ -503,9 +495,7 @@ export default function Reports() {
         params.customer_number = customerNumber.trim();
       }
 
-      const reportKey = activeReport.key === "profit"
-        ? `profit/${profitType}`
-        : activeReport.key;
+      const reportKey = activeReport.key;
 
       let rows = [];
 
@@ -774,7 +764,6 @@ export default function Reports() {
   if (!activeReport) {
     const GROUP_META = {
       Sales:            { icon: <FaChartBar />,       color: "bg-blue-600" },
-      Profit:           { icon: <FaMoneyBillWave />,  color: "bg-emerald-600" },
       Receivables:      { icon: <FaMoneyBillWave />,  color: "bg-amber-500" },
       Returns:          { icon: <FaUndo />,            color: "bg-rose-500" },
       Inventory:        { icon: <FaBoxes />,           color: "bg-violet-600" },
@@ -1109,17 +1098,6 @@ export default function Reports() {
               placeholder="Customer number"
               className={`${inputCls} w-40`}
             />
-          </div>
-        )}
-
-        {activeReport?.key === "profit" && (
-          <div className="flex flex-col gap-0.5">
-            <label className="text-[10px] text-gray-500 font-medium">Profit By</label>
-            <select value={profitType} onChange={e => setProfitType(e.target.value)} className={inputCls}>
-              <option value="date">Date-wise</option>
-              <option value="items">Item-wise</option>
-              <option value="category">Category-wise</option>
-            </select>
           </div>
         )}
 

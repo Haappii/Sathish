@@ -10,6 +10,8 @@ _PRINT_FIELDS = {
     "paper_size",
     "fssai_number",
     "order_live_tracking_enabled",
+    "invoice_whatsapp_enabled",
+    "invoice_whatsapp_country_code",
 }
 _LOYALTY_FIELDS = {"loyalty_points_percentage"}
 _PARAM_ONLY_FIELDS = _DISCOUNT_FIELDS | _PRINT_FIELDS | _LOYALTY_FIELDS | set(BRANCH_ONLINE_ORDER_FIELDS)

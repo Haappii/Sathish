@@ -19,6 +19,7 @@ from app.models.users import User
 from app.models.branch import Branch
 from app.models.customer import Customer
 from app.models.branch_item_price import BranchItemPrice
+from app.models.item_price import ItemPrice
 from app.models.invoice_archive import InvoiceArchive
 from app.models.stock import Inventory
 from app.models.stock_ledger import StockLedger
@@ -718,6 +719,8 @@ def profit_item_wise(
     db: Session = Depends(get_db),
     user=Depends(require_permission("reports", "read")),
 ):
+    raise HTTPException(410, "Profit reports are disabled")
+    
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
     sales_expr = func.coalesce(
@@ -788,6 +791,8 @@ def profit_category_wise(
     db: Session = Depends(get_db),
     user=Depends(require_permission("reports", "read")),
 ):
+    raise HTTPException(410, "Profit reports are disabled")
+    
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
     sales_expr = func.coalesce(
@@ -856,6 +861,8 @@ def profit_date_wise(
     db: Session = Depends(get_db),
     user=Depends(require_permission("reports", "read")),
 ):
+    raise HTTPException(410, "Profit reports are disabled")
+    
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
 
@@ -3542,6 +3549,7 @@ def accounting_pnl(
     if not from_date or not to_date:
         raise HTTPException(400, "from_date and to_date are required")
 
+    raise HTTPException(410, "Profit reports are disabled")
     f, t = parse_dates(from_date, to_date)
     branch_id = _force_branch(branch_id, user)
     fin = calc_period_financials(

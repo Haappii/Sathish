@@ -577,12 +577,26 @@ export default function CreateBillScreen({ route }) {
       // Reset form
       resetForm();
     } catch (err) {
-      // API call failed even though we thought we were online — queue it
-      await enqueueInvoice(payload);
-      const count = await getPendingCount();
-      setPendingCount(count);
-      Alert.alert("Network Error", "Bill saved locally and will sync when reconnected.");
-      resetForm();
+      const serverMessage = String(err?.response?.data?.detail || "").trim();
+      const isNetworkFailure = !err?.response;
+
+      // Queue only when request truly could not reach server.
+      if (isNetworkFailure) {
+        if (isHotelFlow || isTableBillingFlow) {
+          Alert.alert(
+            "Network Error",
+            "Table/QR billing requires online checkout. Please reconnect and try again."
+          );
+          return;
+        }
+        await enqueueInvoice(payload);
+        const count = await getPendingCount();
+        setPendingCount(count);
+        Alert.alert("Network Error", "Bill saved locally and will sync when reconnected.");
+        resetForm();
+      } else {
+        Alert.alert("Unable to Save", serverMessage || "Failed to save invoice.");
+      }
     } finally {
       setSaving(false);
     }

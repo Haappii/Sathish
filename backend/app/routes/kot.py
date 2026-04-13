@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
 from app.models.kot import KOT, KOTItem
-from app.models.table_billing import Order, OrderItem
+from app.models.table_billing import Order, OrderItem, TableMaster
 from app.models.items import Item
 from app.routes.invoice import resolve_branch_optional
 from app.utils.permissions import require_permission
@@ -422,20 +422,42 @@ def list_pending_kots(
         q = q.filter(KOT.branch_id == bid)
     kots = q.order_by(KOT.printed_at).all()
 
-    return [
-        {
+    # Bulk-load order and table info to avoid N+1
+    order_ids = list({k.order_id for k in kots if k.order_id})
+    table_ids = list({k.table_id for k in kots if k.table_id})
+
+    orders_map = {}
+    if order_ids:
+        orders = db.query(Order).filter(Order.order_id.in_(order_ids)).all()
+        orders_map = {o.order_id: o for o in orders}
+
+    tables_map = {}
+    if table_ids:
+        tables = db.query(TableMaster).filter(TableMaster.table_id.in_(table_ids)).all()
+        tables_map = {t.table_id: t for t in tables}
+
+    result = []
+    for k in kots:
+        order = orders_map.get(k.order_id)
+        table = tables_map.get(k.table_id)
+        result.append({
             "kot_id": k.kot_id,
             "kot_number": k.kot_number,
+            "order_id": k.order_id,
             "table_id": k.table_id,
+            "table_name": table.table_name if table else None,
+            "order_type": order.order_type if order else None,
+            "customer_name": order.customer_name if order else None,
+            "mobile": order.mobile if order else None,
+            "token_number": order.token_number if order else None,
             "status": k.status,
             "printed_at": k.printed_at,
             "items": [
                 {"item_name": ki.item_name, "quantity": ki.quantity, "notes": ki.notes, "status": ki.status}
                 for ki in k.items
             ],
-        }
-        for k in kots
-    ]
+        })
+    return result
 
 
 # ── UPDATE KOT STATUS ─────────────────────────────────────────────────────────

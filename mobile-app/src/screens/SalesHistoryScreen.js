@@ -78,6 +78,7 @@ export default function SalesHistoryScreen() {
 
   const [rows, setRows] = useState([]);
   const [activeInvoice, setActiveInvoice] = useState(null);
+  const [items, setItems] = useState([]);    // editable items when editing
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editCustomerName, setEditCustomerName] = useState("");
@@ -134,6 +135,7 @@ export default function SalesHistoryScreen() {
       const res = await api.get(`/invoice/by-number/${invoiceNo}`);
       const inv = res?.data || null;
       setActiveInvoice(inv);
+        setItems(inv?.items || []);      // initialize editable items
       setEditCustomerName(String(inv?.customer_name || "Walk-in"));
       setEditCustomerMobile(String(inv?.mobile || ""));
       setEditDiscount(String(Number(inv?.discounted_amt || 0)));

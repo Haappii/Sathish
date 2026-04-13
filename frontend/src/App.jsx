@@ -125,6 +125,7 @@ import PublicPayment from "./pages/PublicPayment";
 
 import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
 import PublicFeedback from "./pages/PublicFeedback";
+import PublicInvoice from "./pages/PublicInvoice";
 import FeedbackReview from "./pages/FeedbackReview";
 
 import AdvanceOrders from "./pages/AdvanceOrders";
@@ -164,6 +165,7 @@ export default function App() {
           <Route path="/book" element={<PublicReservation />} />
           <Route path="/pay" element={<PublicPayment />} />
           <Route path="/feedback" element={<PublicFeedback />} />
+          <Route path="/invoice-view/:token" element={<PublicInvoice />} />
 
           {/* MAIN LAYOUT */}
           <Route element={<MainLayout />}>
