@@ -99,6 +99,17 @@ export default function About() {
     import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
   const androidAppUrl =
     import.meta.env.VITE_ANDROID_APP_URL || "/downloads/haappii-billing.apk";
+  const contactDetails = {
+    name: import.meta.env.VITE_ABOUT_CONTACT_NAME || "Haappii Billing Support",
+    mobile: import.meta.env.VITE_ABOUT_CONTACT_MOBILE || "+91 90000 00000",
+    email: import.meta.env.VITE_ABOUT_CONTACT_EMAIL || "support@haappiibilling.in",
+    insta: import.meta.env.VITE_ABOUT_CONTACT_INSTAGRAM || "@haappiibilling",
+  };
+  const contactMobileHref = `tel:${(contactDetails.mobile || "").replace(/[^+\d]/g, "")}`;
+  const contactWhatsAppHref = `https://wa.me/${(contactDetails.mobile || "").replace(/[^\d]/g, "")}`;
+  const contactEmailHref = `mailto:${contactDetails.email}`;
+  const instaHandle = (contactDetails.insta || "").replace(/^@/, "");
+  const contactInstaHref = `https://instagram.com/${instaHandle}`;
   const isWindows =
     typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
   const desktopAppProtocolUrl = `poss://open?path=${encodeURIComponent("/home")}`;
@@ -273,6 +284,15 @@ export default function About() {
         .ab-dl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
         .ab-dl-card{padding:24px;display:flex;flex-direction:column;gap:12px}
         .ab-dl-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto;padding-top:8px}
+        .ab-contact-card{padding:26px;border-radius:24px;background:rgba(255,255,255,.82);border:1px solid rgba(20,36,62,.1);box-shadow:0 22px 40px rgba(20,36,62,.08)}
+        .ab-contact-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
+        .ab-contact-item{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:#fff}
+        .ab-contact-label{display:block;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+        .ab-contact-value{display:block;margin-top:6px;color:var(--ink);font-weight:600;word-break:break-word}
+        .ab-contact-value a{color:var(--ink);text-decoration:none;border-bottom:1px dashed rgba(20,36,62,.3)}
+        .ab-contact-value a:hover{border-bottom-color:rgba(20,36,62,.75)}
+        .ab-contact-note{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+        .ab-contact-note a{color:var(--accent);font-weight:700;text-decoration:none}
         .ab-cta{padding:34px;border-radius:32px;background:radial-gradient(circle at top right,rgba(255,177,93,.34),transparent 30%),linear-gradient(135deg,#152744 0%,#10203a 52%,#0b4c46 100%);color:#fff;box-shadow:0 30px 70px rgba(20,36,62,.24);display:flex;align-items:center;justify-content:space-between;gap:24px}
         .ab-cta h3{margin:0 0 12px;font-size:clamp(2rem,4vw,3rem);line-height:1.02;max-width:12ch}
         .ab-cta p{max-width:560px;color:rgba(241,245,249,.78);font-size:16px}
@@ -288,7 +308,7 @@ export default function About() {
         .ab-field::placeholder,.ab-field-wide::placeholder{color:rgba(98,112,136,.72)}
         .ab-field-wide{grid-column:1/-1;min-height:112px;resize:vertical}
         .ab-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
-        @media (max-width:1080px){.ab-hero,.ab-dl-grid,.ab-features{grid-template-columns:1fr}.ab-section-head,.ab-cta{align-items:flex-start;flex-direction:column}}
+        @media (max-width:1080px){.ab-hero,.ab-dl-grid,.ab-features,.ab-contact-list{grid-template-columns:1fr}.ab-section-head,.ab-cta{align-items:flex-start;flex-direction:column}}
         @media (max-width:760px){.ab-nav{padding:14px 18px}.ab-main{width:min(1200px,calc(100% - 24px))}.ab-proof-grid,.ab-stage-grid{grid-template-columns:1fr}}
         @media (max-width:560px){.ab-actions,.ab-dl-actions,.ab-modal-actions,.ab-nav-links{flex-direction:column;align-items:stretch}.btn{width:100%}.ab-form-grid{grid-template-columns:1fr}}
       `}</style>
@@ -477,6 +497,57 @@ export default function About() {
                 </button>
               </div>
             </article>
+          </div>
+        </section>
+
+        <section className="ab-section ab-section--tight">
+          <div className="ab-section-head">
+            <div>
+              <p className="ab-sec-label">Contact details</p>
+              <h2 className="ab-sec-title">Reach the Haappii Billing team directly.</h2>
+            </div>
+            <p className="ab-sec-sub">
+              Use the details below for quick support and product communication.
+            </p>
+          </div>
+
+          <div className="ab-contact-card">
+            <div className="ab-contact-list">
+              <div className="ab-contact-item">
+                <span className="ab-contact-label">Name</span>
+                <span className="ab-contact-value">{contactDetails.name}</span>
+              </div>
+              <div className="ab-contact-item">
+                <span className="ab-contact-label">Mobile number / WhatsApp</span>
+                <span className="ab-contact-value">
+                  <a href={contactMobileHref}>{contactDetails.mobile}</a>
+                  {" | "}
+                  <a href={contactWhatsAppHref} target="_blank" rel="noreferrer">
+                    WhatsApp chat
+                  </a>
+                </span>
+              </div>
+              <div className="ab-contact-item">
+                <span className="ab-contact-label">Mail</span>
+                <span className="ab-contact-value">
+                  <a href={contactEmailHref}>{contactDetails.email}</a>
+                </span>
+              </div>
+              <div className="ab-contact-item">
+                <span className="ab-contact-label">Insta ID</span>
+                <span className="ab-contact-value">
+                  <a href={contactInstaHref} target="_blank" rel="noreferrer">
+                    {contactDetails.insta}
+                  </a>
+                </span>
+              </div>
+            </div>
+            <p className="ab-contact-note">
+              These details can be added or modified through platform dashboard: {" "}
+              <a href="https://haappiibilling.in/platform/dashboard" target="_blank" rel="noreferrer">
+                haappiibilling.in/platform/dashboard
+              </a>
+            </p>
           </div>
         </section>
 
