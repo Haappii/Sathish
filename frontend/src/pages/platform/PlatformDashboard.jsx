@@ -44,6 +44,15 @@ export default function PlatformDashboard() {
   const [demoDays, setDemoDays] = useState(7);
   const [shopTypes, setShopTypes] = useState({});
   const [monthlyAmounts, setMonthlyAmounts] = useState({});
+  const [aboutContact, setAboutContact] = useState({
+    name: "",
+    mobile: "",
+    email: "",
+    insta: "",
+    photo_url: "",
+  });
+  const [aboutPhotoFile, setAboutPhotoFile] = useState(null);
+  const [aboutSaving, setAboutSaving] = useState(false);
 
   const token = getPlatformToken();
 
@@ -54,13 +63,14 @@ export default function PlatformDashboard() {
   const load = async () => {
     try {
       setLoading(true);
-      const [shopRes, revenueRes, revSeriesRes, planRes, onboardRes, ticketRes] = await Promise.all([
+      const [shopRes, revenueRes, revSeriesRes, planRes, onboardRes, ticketRes, aboutRes] = await Promise.all([
         platformAxios.get("/platform/shops"),
         platformAxios.get("/platform/revenue", { params: { days: 30 } }),
         platformAxios.get("/platform/revenue/daily", { params: { days: 30 } }),
         platformAxios.get("/platform/plans", { params: { include_inactive: true } }),
         platformAxios.get("/platform/onboard/requests", { params: { limit: 200 } }),
         platformAxios.get("/platform/support/tickets", { params: { limit: 200 } }),
+        platformAxios.get("/platform/about-contact"),
       ]);
       setShops(Array.isArray(shopRes.data) ? shopRes.data : []);
       setRevenue(revenueRes.data || { days: 30, total: 0 });
@@ -68,6 +78,13 @@ export default function PlatformDashboard() {
       setPlans(Array.isArray(planRes.data) ? planRes.data : []);
       setOnboardReqs(Array.isArray(onboardRes.data) ? onboardRes.data : []);
       setTickets(Array.isArray(ticketRes.data) ? ticketRes.data : []);
+      setAboutContact({
+        name: aboutRes?.data?.name || "",
+        mobile: aboutRes?.data?.mobile || "",
+        email: aboutRes?.data?.email || "",
+        insta: aboutRes?.data?.insta || "",
+        photo_url: aboutRes?.data?.photo_url || "",
+      });
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to load platform data", "error");
     } finally {
@@ -385,10 +402,40 @@ export default function PlatformDashboard() {
     }
   };
 
+  const saveAboutContact = async () => {
+    setAboutSaving(true);
+    try {
+      const payload = new FormData();
+      payload.append("name", aboutContact.name || "");
+      payload.append("mobile", aboutContact.mobile || "");
+      payload.append("email", aboutContact.email || "");
+      payload.append("insta", aboutContact.insta || "");
+      if (aboutPhotoFile) payload.append("photo", aboutPhotoFile);
+
+      const res = await platformAxios.post("/platform/about-contact", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setAboutContact({
+        name: res?.data?.name || "",
+        mobile: res?.data?.mobile || "",
+        email: res?.data?.email || "",
+        insta: res?.data?.insta || "",
+        photo_url: res?.data?.photo_url || "",
+      });
+      setAboutPhotoFile(null);
+      showToast("Website contact details updated", "success");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to update website contact", "error");
+    } finally {
+      setAboutSaving(false);
+    }
+  };
+
   const TABS = [
     { id: "OVERVIEW", label: "Overview",  icon: "📊", badge: null },
     { id: "SHOPS",    label: "Shops",     icon: "🏪", badge: shops.length || null },
     { id: "PLANS",    label: "Plans",     icon: "📋", badge: null },
+    { id: "WEBSITE",  label: "Website",   icon: "🌐", badge: null },
     { id: "ONBOARD",  label: "Onboard",   icon: "📥", badge: pendingOnboard.length || null },
     { id: "DEMO",     label: "Demo",      icon: "🎬", badge: openDemoTickets.length || null },
     { id: "SUPPORT",  label: "Support",   icon: "🎧", badge: openSupportTickets.length || null },
@@ -753,6 +800,103 @@ export default function PlatformDashboard() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        ) : tab === "WEBSITE" ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+              <h3 className="text-base font-semibold">About Page Contact</h3>
+              <p className="text-xs text-slate-400">Edit details shown in the public About page.</p>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium">Name</label>
+                <input
+                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
+                  value={aboutContact.name}
+                  onChange={(e) => setAboutContact((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Support name"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium">Mobile / WhatsApp</label>
+                <input
+                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
+                  value={aboutContact.mobile}
+                  onChange={(e) => setAboutContact((p) => ({ ...p, mobile: e.target.value }))}
+                  placeholder="+91 ..."
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium">Email</label>
+                <input
+                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
+                  value={aboutContact.email}
+                  onChange={(e) => setAboutContact((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="support@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium">Instagram ID</label>
+                <input
+                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
+                  value={aboutContact.insta}
+                  onChange={(e) => setAboutContact((p) => ({ ...p, insta: e.target.value }))}
+                  placeholder="@haappiibilling"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium">Photo</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-1 block w-full text-xs text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-blue-600/80 file:text-white hover:file:bg-blue-600"
+                  onChange={(e) => setAboutPhotoFile(e.target.files?.[0] || null)}
+                />
+                <p className="mt-1 text-[11px] text-slate-500">Upload to replace current About photo.</p>
+              </div>
+
+              <button
+                onClick={saveAboutContact}
+                disabled={aboutSaving}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition disabled:opacity-60"
+              >
+                {aboutSaving ? "Saving..." : "Save Contact Details"}
+              </button>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+              <h3 className="text-base font-semibold">Preview</h3>
+              <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  {aboutPhotoFile ? (
+                    <img
+                      src={URL.createObjectURL(aboutPhotoFile)}
+                      alt="Contact preview"
+                      className="w-16 h-16 rounded-xl object-cover"
+                    />
+                  ) : aboutContact.photo_url ? (
+                    <img
+                      src={aboutContact.photo_url}
+                      alt="Contact"
+                      className="w-16 h-16 rounded-xl object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-blue-600/60 flex items-center justify-center font-bold text-xl">
+                      {(aboutContact.name || "H").trim().charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-sm font-semibold text-white">{aboutContact.name || "Name"}</div>
+                    <div className="text-xs text-slate-400">{aboutContact.mobile || "Mobile / WhatsApp"}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-300">Email: {aboutContact.email || "-"}</div>
+                <div className="text-xs text-slate-300">Instagram: {aboutContact.insta || "-"}</div>
+              </div>
             </div>
           </div>
         ) : tab === "ONBOARD" ? (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import shutil
 from datetime import date, datetime
 from email.message import EmailMessage
 from mimetypes import guess_type
@@ -24,6 +25,7 @@ from app.models.platform_user import PlatformUser
 from app.models.roles import Role
 from app.models.shop_details import ShopDetails
 from app.models.support_ticket import SupportTicket
+from app.models.system_parameters import SystemParameters
 from app.models.users import User
 from app.models.invoice import Invoice
 from app.models.subscription_plan import SubscriptionPlan
@@ -36,6 +38,17 @@ router = APIRouter(prefix="/platform", tags=["Platform Owner"])
 
 SUPPORT_UPLOADS_DIR = Path("uploads") / "support"
 SUPPORT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+PLATFORM_UPLOADS_DIR = Path("uploads") / "platform"
+PLATFORM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+ABOUT_CONTACT_SETTING_KEYS = {
+    "name": "about_contact_name",
+    "mobile": "about_contact_mobile",
+    "email": "about_contact_email",
+    "insta": "about_contact_insta",
+    "photo_url": "about_contact_photo_url",
+}
+PLATFORM_SETTINGS_SHOP_ID = 1
 
 SUPPORT_EMAIL_ENABLED = (os.getenv("SUPPORT_EMAIL_ENABLED") or "").strip().lower() in {
     "1",
@@ -112,6 +125,96 @@ def platform_login(payload: PlatformLoginIn, db: Session = Depends(get_db)):
         }
     )
     return {"access_token": token, "token_type": "bearer"}
+
+
+def _get_param_value(db: Session, shop_id: int, key: str) -> str:
+    row = (
+        db.query(SystemParameters)
+        .filter(SystemParameters.shop_id == shop_id, SystemParameters.param_key == key)
+        .first()
+    )
+    return (row.param_value or "").strip() if row else ""
+
+
+def _set_param_value(db: Session, shop_id: int, key: str, value: str) -> None:
+    row = (
+        db.query(SystemParameters)
+        .filter(SystemParameters.shop_id == shop_id, SystemParameters.param_key == key)
+        .first()
+    )
+    if row:
+        row.param_value = value
+    else:
+        db.add(SystemParameters(shop_id=shop_id, param_key=key, param_value=value))
+
+
+def _get_about_contact_payload(db: Session) -> dict:
+    return {
+        "name": _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["name"]),
+        "mobile": _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["mobile"]),
+        "email": _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["email"]),
+        "insta": _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["insta"]),
+        "photo_url": _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["photo_url"]),
+    }
+
+
+@router.get("/public/about-contact")
+def public_about_contact(db: Session = Depends(get_db)):
+    return _get_about_contact_payload(db)
+
+
+@router.get("/about-contact")
+def get_about_contact(
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    return _get_about_contact_payload(db)
+
+
+@router.post("/about-contact")
+def update_about_contact(
+    name: str = Form(""),
+    mobile: str = Form(""),
+    email: str = Form(""),
+    insta: str = Form(""),
+    photo: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["name"], (name or "").strip())
+    _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["mobile"], (mobile or "").strip())
+    _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["email"], (email or "").strip())
+    _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["insta"], (insta or "").strip())
+
+    if photo and (photo.filename or "").strip():
+        content_type = (photo.content_type or "").lower()
+        if not content_type.startswith("image/"):
+            raise HTTPException(400, "Photo must be an image")
+
+        ext = Path(photo.filename).suffix.lower() if photo.filename else ""
+        if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            ext = ".jpg"
+
+        old_photo_url = _get_param_value(
+            db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["photo_url"]
+        )
+        if old_photo_url.startswith("/api/uploads/platform/"):
+            old_file = PLATFORM_UPLOADS_DIR / old_photo_url.split("/api/uploads/platform/")[-1]
+            if old_file.exists():
+                try:
+                    old_file.unlink()
+                except Exception:
+                    pass
+
+        filename = f"about_contact_{secrets.token_hex(8)}{ext}"
+        filepath = PLATFORM_UPLOADS_DIR / filename
+        with filepath.open("wb") as out:
+            shutil.copyfileobj(photo.file, out)
+        photo_url = f"/api/uploads/platform/{filename}"
+        _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["photo_url"], photo_url)
+
+    db.commit()
+    return _get_about_contact_payload(db)
 
 
 def _can_send_mail() -> bool:

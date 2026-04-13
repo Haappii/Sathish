@@ -46,6 +46,13 @@ export default function About() {
   const { showToast } = useToast();
   const [demoOpen, setDemoOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [contactDetails, setContactDetails] = useState({
+    name: import.meta.env.VITE_ABOUT_CONTACT_NAME || "Haappii Billing Support",
+    mobile: import.meta.env.VITE_ABOUT_CONTACT_MOBILE || "+91 90000 00000",
+    email: import.meta.env.VITE_ABOUT_CONTACT_EMAIL || "support@haappiibilling.in",
+    insta: import.meta.env.VITE_ABOUT_CONTACT_INSTAGRAM || "@haappiibilling",
+    photo: import.meta.env.VITE_ABOUT_CONTACT_PHOTO_URL || "",
+  });
   const [demoForm, setDemoForm] = useState({
     name: "",
     email: "",
@@ -60,6 +67,30 @@ export default function About() {
       document.body.style.overflow = "";
     };
   }, [demoOpen]);
+
+  useEffect(() => {
+    let alive = true;
+    const loadPublicContact = async () => {
+      try {
+        const res = await api.get("/platform/public/about-contact");
+        if (!alive) return;
+        setContactDetails((prev) => ({
+          ...prev,
+          name: res?.data?.name ?? prev.name,
+          mobile: res?.data?.mobile ?? prev.mobile,
+          email: res?.data?.email ?? prev.email,
+          insta: res?.data?.insta ?? prev.insta,
+          photo: res?.data?.photo_url ?? prev.photo,
+        }));
+      } catch {
+        // Keep env/default fallback values when API data is unavailable.
+      }
+    };
+    loadPublicContact();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const updateDemo = (key, value) => {
     setDemoForm((prev) => ({ ...prev, [key]: value }));
@@ -99,12 +130,7 @@ export default function About() {
     import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
   const androidAppUrl =
     import.meta.env.VITE_ANDROID_APP_URL || "/downloads/haappii-billing.apk";
-  const contactDetails = {
-    name: import.meta.env.VITE_ABOUT_CONTACT_NAME || "Haappii Billing Support",
-    mobile: import.meta.env.VITE_ABOUT_CONTACT_MOBILE || "+91 90000 00000",
-    email: import.meta.env.VITE_ABOUT_CONTACT_EMAIL || "support@haappiibilling.in",
-    insta: import.meta.env.VITE_ABOUT_CONTACT_INSTAGRAM || "@haappiibilling",
-  };
+  const contactInitial = (contactDetails.name || "H").trim().charAt(0).toUpperCase();
   const contactMobileHref = `tel:${(contactDetails.mobile || "").replace(/[^+\d]/g, "")}`;
   const contactWhatsAppHref = `https://wa.me/${(contactDetails.mobile || "").replace(/[^\d]/g, "")}`;
   const contactEmailHref = `mailto:${contactDetails.email}`;
@@ -287,12 +313,13 @@ export default function About() {
         .ab-contact-card{padding:26px;border-radius:24px;background:rgba(255,255,255,.82);border:1px solid rgba(20,36,62,.1);box-shadow:0 22px 40px rgba(20,36,62,.08)}
         .ab-contact-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
         .ab-contact-item{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:#fff}
+        .ab-contact-item--photo{grid-column:1/-1;display:flex;align-items:center;gap:14px}
+        .ab-contact-photo{width:84px;height:84px;border-radius:18px;object-fit:cover;box-shadow:0 10px 24px rgba(20,36,62,.16)}
+        .ab-contact-photo-fallback{display:inline-flex;align-items:center;justify-content:center;width:84px;height:84px;border-radius:18px;background:linear-gradient(135deg,var(--accent),#ffb15d);color:#fff;font-size:28px;font-weight:800;box-shadow:0 10px 24px rgba(20,36,62,.16)}
         .ab-contact-label{display:block;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
         .ab-contact-value{display:block;margin-top:6px;color:var(--ink);font-weight:600;word-break:break-word}
         .ab-contact-value a{color:var(--ink);text-decoration:none;border-bottom:1px dashed rgba(20,36,62,.3)}
         .ab-contact-value a:hover{border-bottom-color:rgba(20,36,62,.75)}
-        .ab-contact-note{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
-        .ab-contact-note a{color:var(--accent);font-weight:700;text-decoration:none}
         .ab-cta{padding:34px;border-radius:32px;background:radial-gradient(circle at top right,rgba(255,177,93,.34),transparent 30%),linear-gradient(135deg,#152744 0%,#10203a 52%,#0b4c46 100%);color:#fff;box-shadow:0 30px 70px rgba(20,36,62,.24);display:flex;align-items:center;justify-content:space-between;gap:24px}
         .ab-cta h3{margin:0 0 12px;font-size:clamp(2rem,4vw,3rem);line-height:1.02;max-width:12ch}
         .ab-cta p{max-width:560px;color:rgba(241,245,249,.78);font-size:16px}
@@ -513,6 +540,19 @@ export default function About() {
 
           <div className="ab-contact-card">
             <div className="ab-contact-list">
+              <div className="ab-contact-item ab-contact-item--photo">
+                {contactDetails.photo ? (
+                  <img className="ab-contact-photo" src={contactDetails.photo} alt="Contact" loading="lazy" />
+                ) : (
+                  <span className="ab-contact-photo-fallback" aria-hidden="true">{contactInitial}</span>
+                )}
+                <div>
+                  <span className="ab-contact-label">Photo</span>
+                  <span className="ab-contact-value">
+                    {contactDetails.photo ? "Contact photo configured" : "Set VITE_ABOUT_CONTACT_PHOTO_URL to show photo"}
+                  </span>
+                </div>
+              </div>
               <div className="ab-contact-item">
                 <span className="ab-contact-label">Name</span>
                 <span className="ab-contact-value">{contactDetails.name}</span>
@@ -542,12 +582,6 @@ export default function About() {
                 </span>
               </div>
             </div>
-            <p className="ab-contact-note">
-              These details can be added or modified through platform dashboard: {" "}
-              <a href="https://haappiibilling.in/platform/dashboard" target="_blank" rel="noreferrer">
-                haappiibilling.in/platform/dashboard
-              </a>
-            </p>
           </div>
         </section>
 
