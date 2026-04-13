@@ -131,9 +131,6 @@ export default function About() {
   const androidAppUrl =
     import.meta.env.VITE_ANDROID_APP_URL || "/downloads/haappii-billing.apk";
   const contactInitial = (contactDetails.name || "H").trim().charAt(0).toUpperCase();
-  const contactMobileHref = `tel:${(contactDetails.mobile || "").replace(/[^+\d]/g, "")}`;
-  const contactWhatsAppHref = `https://wa.me/${(contactDetails.mobile || "").replace(/[^\d]/g, "")}`;
-  const contactEmailHref = `mailto:${contactDetails.email}`;
   const instaHandle = (contactDetails.insta || "").replace(/^@/, "");
   const contactInstaHref = `https://instagram.com/${instaHandle}`;
   const isWindows =
@@ -557,17 +554,13 @@ export default function About() {
               <div className="ab-contact-item">
                 <span className="ab-contact-label">Mobile number / WhatsApp</span>
                 <span className="ab-contact-value">
-                  <a href={contactMobileHref}>{contactDetails.mobile}</a>
-                  {" | "}
-                  <a href={contactWhatsAppHref} target="_blank" rel="noreferrer">
-                    WhatsApp chat
-                  </a>
+                  {contactDetails.mobile}
                 </span>
               </div>
               <div className="ab-contact-item">
                 <span className="ab-contact-label">Mail</span>
                 <span className="ab-contact-value">
-                  <a href={contactEmailHref}>{contactDetails.email}</a>
+                  {contactDetails.email}
                 </span>
               </div>
               <div className="ab-contact-item">
