@@ -62,4 +62,25 @@ if ! npm run build; then
 fi
 cd ..
 
+echo "==> Restarting services"
+if command -v systemctl >/dev/null 2>&1; then
+  sudo systemctl restart pos-backend
+  sudo systemctl restart nginx
+else
+  echo "⚠️ systemctl not found; please restart pos-backend and nginx manually."
+fi
+
+echo "==> Health and endpoint checks"
+sleep 3
+if command -v curl >/dev/null 2>&1; then
+  echo "Backend health:"
+  curl -s http://127.0.0.1:8000/api/health || true
+  echo
+
+  echo "About-contact method check (expect POST/PUT support when latest backend is active):"
+  curl -sk -i -X OPTIONS https://haappiibilling.in/api/platform/about-contact | sed -n '1,20p'
+else
+  echo "⚠️ curl not found; skip health checks."
+fi
+
 echo "==> All done! ✅"
