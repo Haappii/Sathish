@@ -80,7 +80,7 @@ export default function PlatformDashboard() {
 
       // Keep dashboard functional even when this newer endpoint is not deployed yet.
       try {
-        const aboutRes = await platformAxios.get("/platform/about-contact");
+        const aboutRes = await platformAxios.get(`/platform/about-contact?_=${Date.now()}`);
         setAboutContact({
           name: aboutRes?.data?.name || "",
           mobile: aboutRes?.data?.mobile || "",
@@ -418,9 +418,14 @@ export default function PlatformDashboard() {
       payload.append("insta", aboutContact.insta || "");
       if (aboutPhotoFile) payload.append("photo", aboutPhotoFile);
 
-      const res = await platformAxios.post("/platform/about-contact", payload, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      let res;
+      try {
+        res = await platformAxios.post("/platform/about-contact", payload);
+      } catch (postError) {
+        if (postError?.response?.status !== 405) throw postError;
+        // Some deployments/proxies may expose this endpoint with PUT.
+        res = await platformAxios.put("/platform/about-contact", payload);
+      }
       setAboutContact({
         name: res?.data?.name || "",
         mobile: res?.data?.mobile || "",
@@ -431,7 +436,11 @@ export default function PlatformDashboard() {
       setAboutPhotoFile(null);
       showToast("Website contact details updated", "success");
     } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to update website contact", "error");
+      if (e?.response?.status === 404 || e?.response?.status === 405) {
+        showToast("About-contact API not active on backend. Restart/redeploy backend and hard refresh browser.", "error");
+      } else {
+        showToast(e?.response?.data?.detail || "Failed to update website contact", "error");
+      }
     } finally {
       setAboutSaving(false);
     }

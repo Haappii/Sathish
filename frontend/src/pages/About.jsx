@@ -72,7 +72,7 @@ export default function About() {
     let alive = true;
     const loadPublicContact = async () => {
       try {
-        const res = await api.get("/platform/public/about-contact");
+        const res = await api.get(`/platform/public/about-contact?_=${Date.now()}`);
         if (!alive) return;
         setContactDetails((prev) => ({
           ...prev,

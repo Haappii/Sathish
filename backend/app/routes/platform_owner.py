@@ -217,6 +217,27 @@ def update_about_contact(
     return _get_about_contact_payload(db)
 
 
+@router.put("/about-contact")
+def update_about_contact_put(
+    name: str = Form(""),
+    mobile: str = Form(""),
+    email: str = Form(""),
+    insta: str = Form(""),
+    photo: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    return update_about_contact(
+        name=name,
+        mobile=mobile,
+        email=email,
+        insta=insta,
+        photo=photo,
+        db=db,
+        owner=owner,
+    )
+
+
 def _can_send_mail() -> bool:
     # Fall back to sending when SMTP creds exist even if SUPPORT_EMAIL_ENABLED flag is missing.
     return bool(SENDER_EMAIL and SENDER_PASSWORD and SMTP_HOST and SMTP_PORT)
