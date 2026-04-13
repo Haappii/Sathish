@@ -1,1 +1,2 @@
 downloads/poss-desktop-setup.exe filter=lfs diff=lfs merge=lfs -text
+downloads/haappii-billing.apk filter=lfs diff=lfs merge=lfs -text
