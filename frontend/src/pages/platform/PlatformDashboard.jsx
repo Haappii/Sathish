@@ -63,14 +63,13 @@ export default function PlatformDashboard() {
   const load = async () => {
     try {
       setLoading(true);
-      const [shopRes, revenueRes, revSeriesRes, planRes, onboardRes, ticketRes, aboutRes] = await Promise.all([
+      const [shopRes, revenueRes, revSeriesRes, planRes, onboardRes, ticketRes] = await Promise.all([
         platformAxios.get("/platform/shops"),
         platformAxios.get("/platform/revenue", { params: { days: 30 } }),
         platformAxios.get("/platform/revenue/daily", { params: { days: 30 } }),
         platformAxios.get("/platform/plans", { params: { include_inactive: true } }),
         platformAxios.get("/platform/onboard/requests", { params: { limit: 200 } }),
         platformAxios.get("/platform/support/tickets", { params: { limit: 200 } }),
-        platformAxios.get("/platform/about-contact"),
       ]);
       setShops(Array.isArray(shopRes.data) ? shopRes.data : []);
       setRevenue(revenueRes.data || { days: 30, total: 0 });
@@ -78,13 +77,20 @@ export default function PlatformDashboard() {
       setPlans(Array.isArray(planRes.data) ? planRes.data : []);
       setOnboardReqs(Array.isArray(onboardRes.data) ? onboardRes.data : []);
       setTickets(Array.isArray(ticketRes.data) ? ticketRes.data : []);
-      setAboutContact({
-        name: aboutRes?.data?.name || "",
-        mobile: aboutRes?.data?.mobile || "",
-        email: aboutRes?.data?.email || "",
-        insta: aboutRes?.data?.insta || "",
-        photo_url: aboutRes?.data?.photo_url || "",
-      });
+
+      // Keep dashboard functional even when this newer endpoint is not deployed yet.
+      try {
+        const aboutRes = await platformAxios.get("/platform/about-contact");
+        setAboutContact({
+          name: aboutRes?.data?.name || "",
+          mobile: aboutRes?.data?.mobile || "",
+          email: aboutRes?.data?.email || "",
+          insta: aboutRes?.data?.insta || "",
+          photo_url: aboutRes?.data?.photo_url || "",
+        });
+      } catch {
+        // Ignore optional endpoint failure (404/old backend) and keep defaults.
+      }
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to load platform data", "error");
     } finally {
