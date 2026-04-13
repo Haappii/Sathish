@@ -310,10 +310,10 @@ export default function About() {
         .ab-dl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
         .ab-dl-card{padding:24px;display:flex;flex-direction:column;gap:12px}
         .ab-dl-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto;padding-top:8px}
-        .ab-contact-card{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr);gap:18px;padding:26px;border-radius:24px;background:rgba(255,255,255,.82);border:1px solid rgba(20,36,62,.1);box-shadow:0 22px 40px rgba(20,36,62,.08)}
+        .ab-contact-card{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr);gap:18px;align-items:stretch;padding:26px;border-radius:24px;background:rgba(255,255,255,.82);border:1px solid rgba(20,36,62,.1);box-shadow:0 22px 40px rgba(20,36,62,.08)}
         .ab-contact-media{position:relative;min-height:100%;height:100%;border-radius:20px;overflow:hidden;background:linear-gradient(135deg,#14243e,#0b6257);box-shadow:0 18px 36px rgba(20,36,62,.12)}
         .ab-contact-media-frame{height:100%;min-height:320px}
-        .ab-contact-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-content:start}
+        .ab-contact-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-content:center;align-self:center;min-height:100%;height:100%}
         .ab-contact-item{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:#fff}
         .ab-contact-photo{display:block;width:100%;height:100%;min-height:320px;object-fit:cover}
         .ab-contact-photo-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:320px;background:linear-gradient(135deg,var(--accent),#ffb15d);color:#fff;font-size:96px;font-weight:800}
