@@ -64,8 +64,8 @@ export default function DashboardScreen() {
 
         {/* Summary Cards */}
         <View style={styles.cardRow}>
-          <StatCard label="Today's Sales" value={`₹${fmt(sales)}`} color="#1d4ed8" />
-          <StatCard label="Invoices"       value={String(invoices)}  color="#0f766e" />
+          <StatCard label="Today's Sales" value={`₹${fmt(sales)}`} color="#0b57d0" />
+          <StatCard label="Invoices"       value={String(invoices)}  color="#0b57d0" />
         </View>
         <View style={styles.cardRow}>
           <StatCard label="Expenses" value={`₹${fmt(expense)}`} color="#b45309" />
@@ -126,7 +126,7 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: "#f1f5f9" },
+  safe:  { flex: 1, backgroundColor: "#f3f6ff" },
   scroll: { padding: 14, gap: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   dateLabel: { color: "#64748b", fontWeight: "600", marginBottom: 2 },
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
   },
   cardValue: { fontSize: 22, fontWeight: "800" },
   cardLabel: { color: "#64748b", marginTop: 2, fontSize: 12 },
@@ -146,17 +146,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     gap: 10,
   },
-  sectionTitle: { fontWeight: "700", fontSize: 15, color: "#0f172a" },
+  sectionTitle: { fontWeight: "700", fontSize: 15, color: "#0b1220" },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#f3f6ff",
   },
   rowLabel: { fontWeight: "600", color: "#1e293b", maxWidth: "60%" },
   rowSub:   { color: "#94a3b8", fontSize: 12 },

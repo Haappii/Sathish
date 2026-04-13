@@ -36,7 +36,7 @@ export default function ExpensesScreen() {
       const appDate = shopRes?.data?.app_date || null;
       setBusinessDate(appDate);
       const ymd = toBusinessYmd(appDate);
-      const res = await api.get("/expenses/", { params: { date_from: ymd, date_to: ymd } });
+      const res = await api.get("/expenses/list", { params: { from_date: ymd, to_date: ymd } });
       const list = res.data?.expenses ?? res.data ?? [];
       setExpenses(list);
       setTotal(list.reduce((s, e) => s + Number(e.amount || 0), 0));
@@ -58,7 +58,7 @@ export default function ExpensesScreen() {
     try {
       await api.post("/expenses/", {
         category: form.category,
-        description: form.description.trim(),
+        note: form.description.trim(),
         amount,
         expense_date: toBusinessYmd(businessDate),
       });
@@ -105,7 +105,7 @@ export default function ExpensesScreen() {
                     <Text style={styles.catText}>{exp.category || "Other"}</Text>
                   </View>
                   <View>
-                    <Text style={styles.description} numberOfLines={2}>{exp.description}</Text>
+                    <Text style={styles.description} numberOfLines={2}>{exp.note || exp.description}</Text>
                     <Text style={styles.meta}>{exp.expense_date || toBusinessYmd(businessDate)}</Text>
                   </View>
                 </View>
@@ -159,7 +159,7 @@ export default function ExpensesScreen() {
             />
 
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-              <Pressable style={[styles.btn, { backgroundColor: "#e2e8f0", flex: 1 }]} onPress={() => setAddModal(false)}>
+              <Pressable style={[styles.btn, { backgroundColor: "#d9e3ff", flex: 1 }]} onPress={() => setAddModal(false)}>
                 <Text style={[styles.btnText, { color: "#475569" }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.btn, { flex: 1 }]} onPress={saveExpense} disabled={saving}>
@@ -178,13 +178,13 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: "#f1f5f9" },
+  safe:     { flex: 1, backgroundColor: "#f3f6ff" },
   center:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
-  topBar:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
+  topBar:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#d9e3ff" },
   topLabel: { color: "#64748b", fontSize: 12 },
-  bizDate: { color: "#1d4ed8", fontSize: 11, fontWeight: "700" },
+  bizDate: { color: "#0b57d0", fontSize: 11, fontWeight: "700" },
   topTotal: { fontSize: 22, fontWeight: "800", color: "#b45309" },
-  addBtn:   { backgroundColor: "#1d4ed8", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  addBtn:   { backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   addBtnText: { color: "#fff", fontWeight: "700" },
   card: {
     flexDirection: "row",
@@ -194,12 +194,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
   },
   cardLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   catBadge: { backgroundColor: "#fef3c7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   catText:  { color: "#b45309", fontWeight: "600", fontSize: 12 },
-  description: { fontWeight: "600", color: "#0f172a", maxWidth: 200 },
+  description: { fontWeight: "600", color: "#0b1220", maxWidth: 200 },
   meta:     { color: "#94a3b8", fontSize: 12, marginTop: 2 },
   amount:   { fontWeight: "800", color: "#b91c1c", fontSize: 16 },
   overlay:  { flex: 1, justifyContent: "flex-end" },
@@ -211,30 +211,30 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a", marginBottom: 14 },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220", marginBottom: 14 },
   fieldLabel: { color: "#64748b", fontSize: 12, marginBottom: 6, fontWeight: "600" },
   input: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 8,
     padding: 10,
-    backgroundColor: "#f8fafc",
-    color: "#0f172a",
+    backgroundColor: "#ffffff",
+    color: "#0b1220",
     marginBottom: 12,
   },
   catChip: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginRight: 8,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
   },
-  catChipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  catChipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   catChipText:  { color: "#475569", fontWeight: "600" },
   catChipTextActive: { color: "#fff" },
-  btn:     { backgroundColor: "#1d4ed8", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  btn:     { backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   btnText: { color: "#fff", fontWeight: "700" },
   empty:   { color: "#94a3b8" },
 });

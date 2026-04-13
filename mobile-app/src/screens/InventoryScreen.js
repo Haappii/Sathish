@@ -151,7 +151,7 @@ export default function InventoryScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#1d4ed8" />
+          <ActivityIndicator size="large" color="#0b57d0" />
         </View>
       </SafeAreaView>
     );
@@ -197,7 +197,7 @@ export default function InventoryScreen() {
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#1d4ed8"]} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
         }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
@@ -211,7 +211,7 @@ export default function InventoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   searchBar: { padding: 12, paddingBottom: 0 },
   searchInput: {
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#0f172a",
+    color: "#0b1220",
   },
   catBar: { paddingHorizontal: 12, paddingVertical: 8, flexGrow: 0 },
   chip: {
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     backgroundColor: "#fff",
   },
-  chipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   chipText: { color: "#334155", fontSize: 12, fontWeight: "600" },
   chipTextActive: { color: "#fff" },
   warningBanner: { backgroundColor: "#fef3c7", padding: 10, marginHorizontal: 12, borderRadius: 8, marginBottom: 4 },
@@ -243,12 +243,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 12,
     gap: 8,
   },
   cardTop: { flexDirection: "row", alignItems: "flex-start" },
-  itemName: { fontWeight: "700", color: "#0f172a", fontSize: 14 },
+  itemName: { fontWeight: "700", color: "#0b1220", fontSize: 14 },
   itemMeta: { color: "#64748b", fontSize: 12, marginTop: 2 },
   stockBadge: { alignItems: "flex-end" },
   stockText: { fontSize: 20, fontWeight: "800", color: "#059669" },
@@ -262,8 +262,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    color: "#0f172a",
-    backgroundColor: "#f8fafc",
+    color: "#0b1220",
+    backgroundColor: "#ffffff",
   },
   addBtn: {
     backgroundColor: "#059669",

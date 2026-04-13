@@ -91,7 +91,7 @@ export default function DayCloseScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}><ActivityIndicator size="large" color="#1d4ed8" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
       </SafeAreaView>
     );
   }
@@ -100,7 +100,7 @@ export default function DayCloseScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} colors={["#1d4ed8"]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} colors={["#0b57d0"]} />}
       >
         {/* Date + Status */}
         <View style={[styles.section, styles.headerSection]}>
@@ -124,7 +124,7 @@ export default function DayCloseScreen() {
             <View style={styles.statsGrid}>
               {[
                 { label: "Total Sales", value: fmt(report.total_sales ?? report.total_invoice_amount), accent: "#059669" },
-                { label: "Invoices", value: String(report.invoice_count ?? report.total_invoices ?? 0), accent: "#1d4ed8" },
+                { label: "Invoices", value: String(report.invoice_count ?? report.total_invoices ?? 0), accent: "#0b57d0" },
                 { label: "Cash", value: fmt(report.cash ?? report.cash_sales), accent: "#d97706" },
                 { label: "UPI", value: fmt(report.upi ?? report.upi_sales), accent: "#7c3aed" },
                 { label: "Card", value: fmt(report.card ?? report.card_sales), accent: "#0891b2" },
@@ -192,14 +192,14 @@ export default function DayCloseScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 32 },
   section: {
     backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 14, gap: 10,
+    borderColor: "#d9e3ff", padding: 14, gap: 10,
   },
-  headerSection: { backgroundColor: "#1d4ed8" },
+  headerSection: { backgroundColor: "#0b57d0" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   dateLabel: { color: "#fff", fontSize: 20, fontWeight: "800" },
   branchLabel: { color: "#bfdbfe", fontSize: 13 },
@@ -209,15 +209,15 @@ const styles = StyleSheet.create({
   statusBadgeText: { fontWeight: "800", fontSize: 13 },
   badgeOpenText: { color: "#166534" },
   badgeClosedText: { color: "#991b1b" },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0f172a" },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0b1220" },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   kpiCard: {
-    width: "48%", backgroundColor: "#f8fafc", borderRadius: 10,
-    borderWidth: 1, borderColor: "#e2e8f0", padding: 10, gap: 2,
+    width: "48%", backgroundColor: "#ffffff", borderRadius: 10,
+    borderWidth: 1, borderColor: "#d9e3ff", padding: 10, gap: 2,
   },
   kpiLabel: { fontSize: 11, color: "#64748b", fontWeight: "600" },
   kpiValue: { fontSize: 16, fontWeight: "800" },
-  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 6, borderTopWidth: 1, borderTopColor: "#e2e8f0" },
+  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 6, borderTopWidth: 1, borderTopColor: "#d9e3ff" },
   expenseLabel: { color: "#dc2626", fontWeight: "700" },
   expenseValue: { color: "#dc2626", fontWeight: "800" },
   netRow: { flexDirection: "row", justifyContent: "space-between" },

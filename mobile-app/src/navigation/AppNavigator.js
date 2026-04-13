@@ -30,13 +30,15 @@ import LoyaltyScreen            from "../screens/LoyaltyScreen";
 import OnlineOrdersScreen       from "../screens/OnlineOrdersScreen";
 import AnalyticsScreen          from "../screens/AnalyticsScreen";
 import SupplierLedgerScreen     from "../screens/SupplierLedgerScreen";
+import AdvanceOrdersScreen      from "../screens/AdvanceOrdersScreen";
+import SettingsScreen           from "../screens/SettingsScreen";
 
 const Stack = createNativeStackNavigator();
 
 function Loader() {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc" }}>
-      <ActivityIndicator size="large" />
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f3f6ff" }}>
+      <ActivityIndicator size="large" color="#0b57d0" />
     </View>
   );
 }
@@ -50,9 +52,12 @@ export default function AppNavigator() {
     <Stack.Navigator
       key={isLoggedIn ? "logged-in" : "logged-out"}
       screenOptions={{
-        headerTitleStyle: { fontWeight: "700" },
-        contentStyle:     { backgroundColor: "#f1f5f9" },
-        headerStyle:      { backgroundColor: "#fff" },
+        animation: "slide_from_right",
+        headerTitleStyle: { fontWeight: "800", color: "#0b1220" },
+        headerTintColor: "#0b57d0",
+        contentStyle:     { backgroundColor: "#f3f6ff" },
+        headerStyle:      { backgroundColor: "#ffffff" },
+        headerShadowVisible: false,
       }}
     >
       {!isLoggedIn ? (
@@ -186,9 +191,19 @@ export default function AppNavigator() {
               options={{ title: "Supplier Ledger" }}
             />
             <Stack.Screen
+              name="AdvanceOrders"
+              component={AdvanceOrdersScreen}
+              options={{ title: "Advance Orders" }}
+            />
+            <Stack.Screen
               name="NativeModule"
               component={NativeModuleScreen}
               options={({ route }) => ({ title: route?.params?.title || "Module" })}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{ title: "Settings" }}
             />
         </>
       )}

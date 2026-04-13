@@ -115,14 +115,6 @@ export const mobileMenuCatalog = [
   },
   // ── Management (admin / manager only) ─────────────────────────────
   {
-    key: "employees",
-    title: "Employees",
-    icon: "👤",
-    route: "Employees",
-    perm: { module: "employees", action: "read" },
-    fallbackRoles: new Set(["admin", "manager"]),
-  },
-  {
     key: "employee_attendance",
     title: "Attendance",
     icon: "📋",
@@ -137,6 +129,14 @@ export const mobileMenuCatalog = [
     route: "Analytics",
     perm: { module: "analytics", action: "read" },
     fallbackRoles: new Set(["admin", "manager"]),
+  },
+  {
+    key: "advance_orders",
+    title: "Advance Orders",
+    icon: "📋",
+    route: "AdvanceOrders",
+    perm: { module: "billing", action: "read" },
+    fallbackRoles: ALL_ROLES,
   },
   {
     key: "supplier_ledger",

@@ -26,7 +26,7 @@ const NEXT_STATUS = {
 
 const STATUS_COLOR = {
   NEW: "#d97706",
-  ACCEPTED: "#1d4ed8",
+  ACCEPTED: "#0b57d0",
   PREPARING: "#7c3aed",
   READY: "#0891b2",
   DISPATCHED: "#9333ea",
@@ -185,7 +185,7 @@ export default function OnlineOrdersScreen() {
       />
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#1d4ed8" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
       ) : (
         <FlatList
           data={orders}
@@ -193,7 +193,7 @@ export default function OnlineOrdersScreen() {
           renderItem={renderOrder}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#1d4ed8"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -209,7 +209,7 @@ export default function OnlineOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   filterBar: { flexDirection: "row", padding: 12, paddingBottom: 4, gap: 8 },
   statusBar: { paddingHorizontal: 12, paddingBottom: 8, flexGrow: 0 },
@@ -217,17 +217,17 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
     paddingHorizontal: 12, paddingVertical: 6, marginRight: 6, backgroundColor: "#fff",
   },
-  chipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   chipText: { fontSize: 11, fontWeight: "600", color: "#334155" },
   chipTextActive: { color: "#fff" },
   list: { padding: 12, paddingTop: 0, gap: 8, paddingBottom: 24 },
   card: {
     backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 12, gap: 8,
+    borderColor: "#d9e3ff", padding: 12, gap: 8,
   },
   cardTop: { flexDirection: "row", gap: 8 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  orderId: { fontWeight: "800", color: "#0f172a", fontSize: 13 },
+  orderId: { fontWeight: "800", color: "#0b1220", fontSize: 13 },
   providerBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   providerText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   orderMeta: { color: "#64748b", fontSize: 12, marginTop: 1 },
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontSize: 10, fontWeight: "700" },
   nextBtn: {
-    backgroundColor: "#1d4ed8", borderRadius: 10, paddingVertical: 10,
+    backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 10,
     alignItems: "center", justifyContent: "center",
   },
   nextBtnText: { color: "#fff", fontWeight: "700" },

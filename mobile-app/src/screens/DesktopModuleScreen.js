@@ -54,22 +54,22 @@ export default function DesktopModuleScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", padding: 16 },
+  safe: { flex: 1, backgroundColor: "#f3f6ff", alignItems: "center", justifyContent: "center", padding: 16 },
   card: {
     width: "100%",
     backgroundColor: "#fff",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 14,
     gap: 10,
   },
-  title: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  title: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   sub: { color: "#334155" },
-  url: { color: "#1d4ed8", fontSize: 12 },
+  url: { color: "#0b57d0", fontSize: 12 },
   btn: {
     marginTop: 6,
-    backgroundColor: "#1d4ed8",
+    backgroundColor: "#0b57d0",
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: "center",

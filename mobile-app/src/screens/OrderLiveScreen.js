@@ -96,23 +96,23 @@ export default function OrderLiveScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 12, gap: 10, paddingBottom: 20 },
-  header: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  header: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   empty: { color: "#64748b" },
   card: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 12,
     padding: 12,
     gap: 6,
   },
-  title: { fontWeight: "800", color: "#0f172a" },
+  title: { fontWeight: "800", color: "#0b1220" },
   sub: { color: "#334155", fontSize: 12 },
   stepsRow: { flexDirection: "row", gap: 8, marginTop: 4 },
   stepDot: { width: 14, height: 14, borderRadius: 7 },
-  stepDone: { backgroundColor: "#1d4ed8" },
+  stepDone: { backgroundColor: "#0b57d0" },
   stepTodo: { backgroundColor: "#cbd5e1" },
 });

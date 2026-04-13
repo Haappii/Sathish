@@ -128,7 +128,7 @@ export default function ReportsScreen() {
       {loaded && summary && (
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <SumItem label="Invoices" value={String(summary.invoice_count ?? rows.length)} color="#1d4ed8" />
+            <SumItem label="Invoices" value={String(summary.invoice_count ?? rows.length)} color="#0b57d0" />
             <SumItem label="Total Sales" value={fmt(summary.total_amount ?? summary.total_sales)} color="#059669" />
             <SumItem label="Avg Ticket" value={fmt(summary.avg_ticket ?? summary.average_invoice)} color="#d97706" />
           </View>
@@ -167,34 +167,34 @@ function SumItem({ label, value, color }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   filterCard: {
     backgroundColor: "#fff", margin: 12, borderRadius: 14,
-    borderWidth: 1, borderColor: "#e2e8f0", padding: 12, gap: 10,
+    borderWidth: 1, borderColor: "#d9e3ff", padding: 12, gap: 10,
   },
   dateRow: { flexDirection: "row", gap: 10 },
   label: { fontSize: 11, fontWeight: "700", color: "#64748b", marginBottom: 4 },
   dateInput: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#f8fafc", paddingHorizontal: 10, paddingVertical: 9, color: "#0f172a",
+    backgroundColor: "#ffffff", paddingHorizontal: 10, paddingVertical: 9, color: "#0b1220",
   },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   chip: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#fff",
   },
-  chipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   chipText: { fontSize: 11, fontWeight: "600", color: "#334155" },
   chipTextActive: { color: "#fff" },
   runBtn: {
-    backgroundColor: "#1d4ed8", borderRadius: 10, paddingVertical: 12,
+    backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12,
     alignItems: "center", justifyContent: "center", minHeight: 44,
   },
   runBtnText: { color: "#fff", fontWeight: "800" },
   btnDisabled: { opacity: 0.5 },
   summaryCard: {
     backgroundColor: "#fff", marginHorizontal: 12, borderRadius: 12,
-    borderWidth: 1, borderColor: "#e2e8f0", padding: 12, gap: 6,
+    borderWidth: 1, borderColor: "#d9e3ff", padding: 12, gap: 6,
   },
   summaryRow: { flexDirection: "row", justifyContent: "space-between" },
   sumItem: { alignItems: "center", gap: 2 },
@@ -204,15 +204,15 @@ const styles = StyleSheet.create({
   list: { padding: 12, paddingTop: 8, gap: 6, paddingBottom: 24 },
   row: {
     backgroundColor: "#fff", borderRadius: 10, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 10, flexDirection: "row", alignItems: "center",
+    borderColor: "#d9e3ff", padding: 10, flexDirection: "row", alignItems: "center",
   },
-  invNo: { fontWeight: "800", color: "#0f172a" },
+  invNo: { fontWeight: "800", color: "#0b1220" },
   rowMeta: { color: "#64748b", fontSize: 12, marginTop: 2 },
   modeBadge: {
-    marginTop: 4, backgroundColor: "#eff6ff", borderRadius: 6,
+    marginTop: 4, backgroundColor: "#e8f0ff", borderRadius: 6,
     paddingHorizontal: 6, paddingVertical: 2, alignSelf: "flex-start",
   },
-  modeBadgeText: { color: "#1d4ed8", fontSize: 10, fontWeight: "700" },
+  modeBadgeText: { color: "#0b57d0", fontSize: 10, fontWeight: "700" },
   rowAmt: { fontSize: 15, fontWeight: "800", color: "#059669" },
   emptyWrap: { alignItems: "center", paddingTop: 40, gap: 8 },
   emptyIcon: { fontSize: 36 },

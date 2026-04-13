@@ -78,6 +78,7 @@ import app.models.modifier
 import app.models.reservation
 import app.models.recipe
 import app.models.delivery
+import app.models.advance_order
 import app.models.mail_scheduler
 import app.models.feedback
 
@@ -721,7 +722,52 @@ def _auto_migrate_items_supplier() -> None:
         logger.debug("Auto-migration (items supplier - drop not null) skipped: %s", e)
 
 
-@app.on_event("startup")
+def _auto_migrate_advance_orders() -> None:
+    """
+    Create advance_orders table on existing Postgres databases that pre-date this feature.
+    Uses CREATE TABLE IF NOT EXISTS so it is idempotent.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS advance_orders (
+                      order_id          SERIAL PRIMARY KEY,
+                      shop_id           INTEGER NOT NULL REFERENCES shop_details(shop_id),
+                      branch_id         INTEGER NOT NULL,
+                      customer_name     VARCHAR(120) NOT NULL,
+                      customer_phone    VARCHAR(20),
+                      order_items       JSONB,
+                      expected_date     DATE NOT NULL,
+                      expected_time     VARCHAR(10),
+                      notes             TEXT,
+                      total_amount      NUMERIC(12,2) DEFAULT 0,
+                      advance_amount    NUMERIC(12,2) DEFAULT 0,
+                      advance_payment_mode VARCHAR(30),
+                      status            VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                      cancel_reason     VARCHAR(200),
+                      created_at        TIMESTAMPTZ DEFAULT NOW(),
+                      updated_at        TIMESTAMPTZ DEFAULT NOW(),
+                      created_by        INTEGER REFERENCES users(user_id)
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_advance_orders_shop
+                      ON advance_orders(shop_id);
+                    CREATE INDEX IF NOT EXISTS idx_advance_orders_date
+                      ON advance_orders(expected_date);
+                    CREATE INDEX IF NOT EXISTS idx_advance_orders_status
+                      ON advance_orders(status);
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (advance_orders) failed: %s", e)
+
+
+
 def _startup_db_init():
     """
     Initialize DB schema and seed defaults.
@@ -746,6 +792,7 @@ def _startup_db_init():
     _auto_migrate_user_session_tracking()
     _auto_migrate_table_name_unique_constraint()
     _auto_migrate_items_supplier()
+    _auto_migrate_advance_orders()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
@@ -835,6 +882,7 @@ from app.routes.reservation import router as reservation_router
 from app.routes.recipe import router as recipe_router
 from app.routes.delivery import router as delivery_router
 from app.routes.kds import router as kds_router
+from app.routes.advance_orders import router as advance_orders_router
 
 
 # ======================================================
@@ -909,6 +957,7 @@ app.include_router(reservation_router, prefix="/api")   # /api/reservations
 app.include_router(recipe_router,      prefix="/api")   # /api/recipes
 app.include_router(delivery_router,    prefix="/api")   # /api/delivery
 app.include_router(kds_router,         prefix="/api")   # /api/kds
+app.include_router(advance_orders_router, prefix="/api")   # /api/advance-orders
 
 
 # ======================================================

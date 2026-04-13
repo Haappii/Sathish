@@ -218,7 +218,7 @@ export default function HeldInvoicesScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#1d4ed8" />
+          <ActivityIndicator size="large" color="#0b57d0" />
           <Text style={styles.loadingText}>Loading held invoices…</Text>
         </View>
       ) : (
@@ -228,7 +228,7 @@ export default function HeldInvoicesScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#1d4ed8"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -253,12 +253,12 @@ export default function HeldInvoicesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   loadingText: { color: "#64748b", fontSize: 14 },
 
   header: {
-    backgroundColor: "#1d4ed8",
+    backgroundColor: "#0b57d0",
     paddingHorizontal: 16,
     paddingVertical: 14,
     flexDirection: "row",
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 12,
     gap: 10,
     shadowColor: "#000",
@@ -338,6 +338,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   emptyIcon: { fontSize: 48 },
-  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220" },
   emptyMsg: { color: "#64748b", textAlign: "center", fontSize: 14, lineHeight: 20 },
 });

@@ -233,25 +233,25 @@ export default function LoyaltyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   container: { padding: 12, gap: 10, paddingBottom: 32 },
   section: {
     backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 12, gap: 8,
+    borderColor: "#d9e3ff", padding: 12, gap: 8,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0f172a" },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0b1220" },
   hint: { color: "#94a3b8", fontSize: 12 },
   lookupRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#f8fafc",
-    paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#ffffff",
+    paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
   lookupBtn: {
-    backgroundColor: "#1d4ed8", borderRadius: 10, paddingHorizontal: 16,
+    backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 16,
     paddingVertical: 10, alignItems: "center", justifyContent: "center",
   },
   lookupBtnText: { color: "#fff", fontWeight: "700" },
-  accountCard: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  accountCard: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   accountName: { color: "#fff", fontSize: 18, fontWeight: "800" },
   accountMobile: { color: "#bfdbfe", fontSize: 13 },
   balanceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   txnRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: 6,
-    borderBottomWidth: 1, borderBottomColor: "#f1f5f9",
+    borderBottomWidth: 1, borderBottomColor: "#f3f6ff",
   },
   txnDesc: { fontWeight: "600", color: "#334155", fontSize: 13 },
   txnDate: { color: "#94a3b8", fontSize: 11, marginTop: 1 },

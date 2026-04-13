@@ -668,9 +668,27 @@ def checkout_order(
         for it in order.items
     )
 
-    sc_info = _branch_service_charge_info(db, shop_id=user.shop_id, branch_id=int(user.branch_id))
-    service_charge = sc_info["service_charge"]
-    service_charge_gst = sc_info["service_charge_gst"]
+    branch = (
+        db.query(Branch)
+        .filter(Branch.shop_id == user.shop_id, Branch.branch_id == user.branch_id)
+        .first()
+    )
+
+    try:
+        service_charge = Decimal(str(payload.service_charge or 0)).quantize(Decimal("0.01"))
+    except Exception:
+        service_charge = Decimal("0.00")
+    if service_charge < 0:
+        service_charge = Decimal("0.00")
+
+    service_charge_gst = Decimal("0.00")
+    if branch and getattr(branch, "service_charge_gst_required", False):
+        try:
+            gst_pct = Decimal(str(getattr(branch, "service_charge_gst_percent", 0) or 0))
+        except Exception:
+            gst_pct = Decimal("0")
+        if gst_pct > 0 and service_charge > 0:
+            service_charge_gst = (service_charge * gst_pct / Decimal("100")).quantize(Decimal("0.01"))
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax_amt, total = calculate_gst(subtotal, shop)

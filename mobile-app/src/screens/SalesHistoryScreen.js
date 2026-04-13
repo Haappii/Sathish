@@ -78,6 +78,12 @@ export default function SalesHistoryScreen() {
 
   const [rows, setRows] = useState([]);
   const [activeInvoice, setActiveInvoice] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editCustomerMobile, setEditCustomerMobile] = useState("");
+  const [editDiscount, setEditDiscount] = useState("0");
+  const [editPaymentMode, setEditPaymentMode] = useState("cash");
 
   const loadRows = async (withLoader = true) => {
     if (withLoader) setLoading(true);
@@ -126,11 +132,77 @@ export default function SalesHistoryScreen() {
   const openInvoice = async (invoiceNo) => {
     try {
       const res = await api.get(`/invoice/by-number/${invoiceNo}`);
-      setActiveInvoice(res?.data || null);
+      const inv = res?.data || null;
+      setActiveInvoice(inv);
+      setEditCustomerName(String(inv?.customer_name || "Walk-in"));
+      setEditCustomerMobile(String(inv?.mobile || ""));
+      setEditDiscount(String(Number(inv?.discounted_amt || 0)));
+      setEditPaymentMode(String(inv?.payment_mode || "cash"));
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to load invoice details";
       Alert.alert("Error", String(msg));
     }
+  };
+
+  const isBusinessDateInvoice =
+    !!activeInvoice &&
+    !!businessDate &&
+    String(activeInvoice?.created_time || "").slice(0, 10) === String(businessDate).slice(0, 10);
+
+  const saveInvoiceChanges = async () => {
+    if (!activeInvoice?.invoice_id) return;
+    const items = (activeInvoice.items || []).map((it) => ({
+      item_id: Number(it.item_id),
+      quantity: Number(it.quantity || 0),
+      amount: Number(it.amount || 0),
+    })).filter((it) => it.item_id > 0 && it.quantity > 0);
+
+    if (!items.length) {
+      Alert.alert("Error", "Invoice items missing");
+      return;
+    }
+
+    setEditing(true);
+    try {
+      await api.put(`/invoice/${activeInvoice.invoice_id}`, {
+        customer_name: editCustomerName.trim() || "Walk-in",
+        mobile: editCustomerMobile.trim() || null,
+        discounted_amt: Number(editDiscount || 0),
+        payment_mode: editPaymentMode,
+        items,
+      });
+      Alert.alert("Updated", "Invoice updated successfully.");
+      await loadRows(false);
+      await openInvoice(activeInvoice.invoice_number);
+    } catch (err) {
+      Alert.alert("Error", err?.response?.data?.detail || "Failed to update invoice");
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const deleteInvoice = async () => {
+    if (!activeInvoice?.invoice_id) return;
+    Alert.alert("Delete Invoice", `Delete ${activeInvoice.invoice_number}?`, [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Delete",
+        style: "destructive",
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await api.delete(`/invoice/${activeInvoice.invoice_id}`);
+            Alert.alert("Deleted", "Invoice deleted successfully.");
+            setActiveInvoice(null);
+            await loadRows(false);
+          } catch (err) {
+            Alert.alert("Error", err?.response?.data?.detail || "Failed to delete invoice");
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
   };
 
   const handlePrintInvoice = async () => {
@@ -275,6 +347,64 @@ export default function SalesHistoryScreen() {
               <Text style={styles.totalLine}>Service Charge: {fmtMoney(getServiceChargeValue(activeInvoice))}</Text>
               <Text style={styles.totalLine}>Discount: {fmtMoney(activeInvoice.discounted_amt)}</Text>
               <Text style={styles.totalBig}>Total: {fmtMoney(activeInvoice.total_amount)}</Text>
+
+              {isBusinessDateInvoice ? (
+                <View style={styles.editSection}>
+                  <Text style={styles.itemsTitle}>Edit (Business Date)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editCustomerName}
+                    onChangeText={setEditCustomerName}
+                    placeholder="Customer name"
+                    placeholderTextColor="#94a3b8"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={editCustomerMobile}
+                    onChangeText={setEditCustomerMobile}
+                    placeholder="Mobile"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="phone-pad"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={editDiscount}
+                    onChangeText={setEditDiscount}
+                    placeholder="Discount"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="decimal-pad"
+                  />
+                  <View style={styles.modeRow}>
+                    {["cash", "card", "upi", "credit"].map((m) => (
+                      <Pressable
+                        key={m}
+                        style={[styles.modeBtn, editPaymentMode === m && styles.modeBtnActive]}
+                        onPress={() => setEditPaymentMode(m)}
+                      >
+                        <Text style={[styles.modeText, editPaymentMode === m && styles.modeTextActive]}>
+                          {m.toUpperCase()}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <View style={styles.editActions}>
+                    <Pressable
+                      style={[styles.updateBtn, editing && styles.printBtnDisabled]}
+                      onPress={saveInvoiceChanges}
+                      disabled={editing}
+                    >
+                      <Text style={styles.updateBtnText}>{editing ? "Updating..." : "Update"}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.deleteBtn, deleting && styles.printBtnDisabled]}
+                      onPress={deleteInvoice}
+                      disabled={deleting}
+                    >
+                      <Text style={styles.deleteBtnText}>{deleting ? "Deleting..." : "Delete"}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
             </ScrollView>
           ) : null}
         </SafeAreaView>
@@ -284,19 +414,19 @@ export default function SalesHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 12, gap: 10, paddingBottom: 20 },
   section: {
     borderRadius: 12,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 12,
     gap: 8,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
-  businessDate: { color: "#1d4ed8", fontWeight: "700", fontSize: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0b1220" },
+  businessDate: { color: "#0b57d0", fontWeight: "700", fontSize: 12 },
   input: {
     borderWidth: 1,
     borderColor: "#cbd5e1",
@@ -313,7 +443,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#fff",
   },
-  rangeBtnActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  rangeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   rangeTxt: { fontSize: 12, fontWeight: "700", color: "#334155" },
   rangeTxtActive: { color: "#fff" },
   refreshBtn: {
@@ -321,7 +451,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#d9e3ff",
   },
   refreshTxt: { fontWeight: "700", color: "#334155" },
   empty: { color: "#64748b" },
@@ -329,48 +459,86 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 10,
     padding: 10,
     backgroundColor: "#fff",
   },
-  invNo: { fontWeight: "800", color: "#0f172a" },
+  invNo: { fontWeight: "800", color: "#0b1220" },
   sub: { marginTop: 2, color: "#475569", fontSize: 12 },
   amount: { marginLeft: 8, fontWeight: "800", color: "#047857" },
-  modalSafe: { flex: 1, backgroundColor: "#f8fafc" },
+  modalSafe: { flex: 1, backgroundColor: "#ffffff" },
   modalHead: {
     padding: 14,
     borderBottomWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
   },
-  modalTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  modalTitle: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   modalHeadActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   printBtn: {
-    backgroundColor: "#1d4ed8",
+    backgroundColor: "#0b57d0",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   printBtnDisabled: { opacity: 0.7 },
   printBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  close: { color: "#1d4ed8", fontWeight: "700" },
+  close: { color: "#0b57d0", fontWeight: "700" },
   modalBody: { padding: 14, gap: 8 },
   detailLine: { color: "#334155" },
   itemsBox: {
     marginTop: 6,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 10,
     padding: 10,
     gap: 8,
     backgroundColor: "#fff",
   },
-  itemsTitle: { fontWeight: "800", color: "#0f172a" },
+  itemsTitle: { fontWeight: "800", color: "#0b1220" },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   totalLine: { marginTop: 3, color: "#334155" },
   totalBig: { marginTop: 8, fontSize: 18, fontWeight: "800", color: "#047857" },
+  editSection: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#d9e3ff",
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: "#fff",
+    gap: 8,
+  },
+  modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  modeBtn: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "#fff",
+  },
+  modeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  modeText: { color: "#334155", fontWeight: "700", fontSize: 11 },
+  modeTextActive: { color: "#fff" },
+  editActions: { flexDirection: "row", gap: 8 },
+  updateBtn: {
+    flex: 1,
+    backgroundColor: "#059669",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  updateBtnText: { color: "#fff", fontWeight: "700" },
+  deleteBtn: {
+    flex: 1,
+    backgroundColor: "#dc2626",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  deleteBtnText: { color: "#fff", fontWeight: "700" },
 });

@@ -127,6 +127,8 @@ import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
 import PublicFeedback from "./pages/PublicFeedback";
 import FeedbackReview from "./pages/FeedbackReview";
 
+import AdvanceOrders from "./pages/AdvanceOrders";
+
 import { ToastProvider } from "./components/Toast";
 import api from "./utils/apiClient";
 import { getSession, startActivityTracking } from "./utils/auth";
@@ -199,6 +201,7 @@ export default function App() {
             <Route path="/offline-sync" element={<OfflineSync />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/online-orders" element={<OnlineOrders />} />
+            <Route path="/advance-orders" element={<AdvanceOrders />} />
             <Route path="/employees" element={<Employees />} />
             <Route path="/employees/attendance" element={<EmployeeAttendance />} />
             <Route path="/feedback-review" element={<FeedbackReview />} />

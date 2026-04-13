@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 
 const PAYMENT_MODES = ["cash", "card", "upi", "bank"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
+const getDueAmount = (row) => Number(row?.outstanding_amount ?? row?.pending_amount ?? row?.due_amount ?? 0);
 
 export default function DuesScreen() {
   const { session } = useAuth();
@@ -55,7 +56,7 @@ export default function DuesScreen() {
 
   const openPay = (row) => {
     setPaying(row.invoice_number);
-    setPayAmount(String(Number(row.pending_amount || row.due_amount || 0).toFixed(2)));
+    setPayAmount(String(getDueAmount(row).toFixed(2)));
     setPayMode("cash");
     setPayRef("");
   };
@@ -81,7 +82,7 @@ export default function DuesScreen() {
     }
   };
 
-  const totalDue = rows.reduce((s, r) => s + Number(r.pending_amount || r.due_amount || 0), 0);
+  const totalDue = rows.reduce((s, r) => s + getDueAmount(r), 0);
 
   const renderRow = ({ item: row }) => (
     <View style={styles.card}>
@@ -95,7 +96,7 @@ export default function DuesScreen() {
           )}
         </View>
         <View style={styles.amtWrap}>
-          <Text style={styles.dueAmt}>{fmt(row.pending_amount || row.due_amount || 0)}</Text>
+          <Text style={styles.dueAmt}>{fmt(getDueAmount(row))}</Text>
           <Text style={styles.dueLabel}>due</Text>
         </View>
       </View>
@@ -130,7 +131,7 @@ export default function DuesScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#1d4ed8" />
+          <ActivityIndicator size="large" color="#0b57d0" />
         </View>
       ) : (
         <FlatList
@@ -139,7 +140,7 @@ export default function DuesScreen() {
           renderItem={renderRow}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#1d4ed8"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -212,19 +213,19 @@ export default function DuesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   summaryBanner: { backgroundColor: "#dc2626", padding: 10, alignItems: "center" },
   summaryText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   searchBar: { padding: 12 },
   searchInput: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
   list: { padding: 12, gap: 8, paddingTop: 0, paddingBottom: 24 },
   card: {
     backgroundColor: "#fff", borderRadius: 12, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 12, gap: 8,
+    borderColor: "#d9e3ff", padding: 12, gap: 8,
   },
   cardTop: { flexDirection: "row", alignItems: "flex-start" },
   invNo: { fontWeight: "800", color: "#1e293b", fontSize: 14 },
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
   payBtnText: { color: "#fff", fontWeight: "700" },
   emptyWrap: { alignItems: "center", paddingTop: 60, gap: 8 },
   emptyIcon: { fontSize: 40 },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a" },
+  emptyTitle: { fontSize: 17, fontWeight: "800", color: "#0b1220" },
   emptyMsg: { color: "#64748b", fontSize: 14 },
   modalBackdrop: {
     flex: 1, backgroundColor: "rgba(2,6,23,0.5)", justifyContent: "flex-end",
@@ -248,24 +249,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20,
     padding: 20, gap: 10,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220" },
   modalSub: { color: "#64748b", fontSize: 13 },
   label: { fontSize: 12, fontWeight: "700", color: "#334155" },
   input: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#f8fafc",
-    paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#ffffff",
+    paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   modeBtn: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 7, backgroundColor: "#fff",
   },
-  modeBtnActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  modeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   modeTxt: { fontSize: 12, fontWeight: "700", color: "#334155" },
   modeTxtActive: { color: "#fff" },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
   cancelModalBtn: {
-    flex: 1, backgroundColor: "#e2e8f0", borderRadius: 10, paddingVertical: 12, alignItems: "center",
+    flex: 1, backgroundColor: "#d9e3ff", borderRadius: 10, paddingVertical: 12, alignItems: "center",
   },
   cancelModalTxt: { color: "#334155", fontWeight: "700" },
   confirmBtn: {

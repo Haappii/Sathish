@@ -2,7 +2,7 @@
  * TableOrderScreen — manage items for a specific table.
  * Shows existing open order + allows adding items, sending KOT, and billing.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -70,6 +70,8 @@ export default function TableOrderScreen({ route, navigation }) {
   const [transferTableId, setTransferTableId] = useState(null);
   const [transferBusy, setTransferBusy] = useState(false);
   const [tables, setTables] = useState([]);
+  const [customerLookupBusy, setCustomerLookupBusy] = useState(false);
+  const mobileLookupTimerRef = useRef(null);
 
   const PAYMENT_MODES = ["cash", "card", "upi", "credit", "gift_card", "coupon", "split", "wallet"];
 
@@ -203,10 +205,58 @@ export default function TableOrderScreen({ route, navigation }) {
 
   const mergedBillTotal = mergedBillItems.reduce((sum, row) => sum + Number(row?.amount || 0), 0);
 
+  const serviceChargeNum = normalizeServiceCharge(serviceCharge);
+  const serviceChargeGstPercent = Number(
+    branchDetails?.service_charge_gst_required ? (branchDetails?.service_charge_gst_percent || 0) : 0
+  );
+  const serviceChargeGstAmt = serviceChargeGstPercent > 0
+    ? Number(((serviceChargeNum * serviceChargeGstPercent) / 100).toFixed(2))
+    : 0;
+  const discountNum = Math.max(0, Number(discountAmt || 0));
+  const grossBillTotal = Number((mergedBillTotal + serviceChargeNum + serviceChargeGstAmt).toFixed(2));
+  const netBillTotal = Math.max(0, Number((grossBillTotal - discountNum).toFixed(2)));
+
   useEffect(() => {
     const auto = branchDiscountAmount(mergedBillTotal, branchDetails);
     setDiscountAmt(String(Math.round(auto)));
   }, [mergedBillTotal, branchDetails?.discount_enabled, branchDetails?.discount_type, branchDetails?.discount_value]);
+
+  const lookupCustomerByMobile = useCallback(async (mobile) => {
+    const mm = String(mobile || "").replace(/\D/g, "").slice(0, 10);
+    if (mm.length !== 10) return;
+    setCustomerLookupBusy(true);
+    try {
+      const res = await api.get(`/table-billing/latest-by-mobile/${mm}`);
+      const row = res?.data || {};
+      if (row?.customer_name) {
+        setCustomerName(String(row.customer_name));
+      }
+    } catch {
+      // Customer may be new; keep entered values without interrupting billing flow.
+    } finally {
+      setCustomerLookupBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!billOpen) return;
+    const mm = String(customerMobile || "").replace(/\D/g, "").slice(0, 10);
+    if (mobileLookupTimerRef.current) {
+      clearTimeout(mobileLookupTimerRef.current);
+      mobileLookupTimerRef.current = null;
+    }
+    if (mm.length !== 10) return;
+    mobileLookupTimerRef.current = setTimeout(() => {
+      lookupCustomerByMobile(mm);
+    }, 350);
+
+    return () => {
+      if (mobileLookupTimerRef.current) {
+        clearTimeout(mobileLookupTimerRef.current);
+        mobileLookupTimerRef.current = null;
+      }
+    };
+  }, [billOpen, customerMobile, lookupCustomerByMobile]);
 
   const sendKOT = async () => {
     if (cartCount === 0) return Alert.alert("Empty", "Add items first");
@@ -478,7 +528,7 @@ export default function TableOrderScreen({ route, navigation }) {
                     <Text style={styles.qtyNum}>{qty}</Text>
                   </>
                 ) : null}
-                <Pressable style={[styles.qtyBtn, { backgroundColor: "#1d4ed8" }]} onPress={() => adjust(item.item_id, 1)}>
+                <Pressable style={[styles.qtyBtn, { backgroundColor: "#0b57d0" }]} onPress={() => adjust(item.item_id, 1)}>
                   <Text style={[styles.qtyBtnText, { color: "#fff" }]}>+</Text>
                 </Pressable>
               </View>
@@ -513,16 +563,11 @@ export default function TableOrderScreen({ route, navigation }) {
               ))}
             </ScrollView>
 
-            <Text style={styles.modalTotal}>Total: ₹{Number(mergedBillTotal || 0).toFixed(2)}</Text>
-
-            <Text style={styles.modalSubTitle}>Customer Name</Text>
-            <TextInput
-              style={styles.search}
-              placeholder="Walk-in"
-              value={customerName}
-              onChangeText={setCustomerName}
-              placeholderTextColor="#94a3b8"
-            />
+            <Text style={styles.modalTotal}>Items Total: ₹{Number(mergedBillTotal || 0).toFixed(2)}</Text>
+            <Text style={styles.modalBreakdown}>Service Charge: ₹{serviceChargeNum.toFixed(2)}</Text>
+            <Text style={styles.modalBreakdown}>Service Charge GST: ₹{serviceChargeGstAmt.toFixed(2)}</Text>
+            <Text style={styles.modalBreakdown}>Discount: ₹{discountNum.toFixed(2)}</Text>
+            <Text style={styles.modalGrandTotal}>Payable: ₹{netBillTotal.toFixed(2)}</Text>
 
             <Text style={styles.modalSubTitle}>Customer Mobile</Text>
             <TextInput
@@ -531,6 +576,16 @@ export default function TableOrderScreen({ route, navigation }) {
               keyboardType="phone-pad"
               value={customerMobile}
               onChangeText={(v) => setCustomerMobile(v.replace(/\D/g, "").slice(0, 10))}
+              placeholderTextColor="#94a3b8"
+            />
+            {customerLookupBusy ? <Text style={styles.lookupHint}>Fetching customer…</Text> : null}
+
+            <Text style={styles.modalSubTitle}>Customer Name</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="Walk-in"
+              value={customerName}
+              onChangeText={setCustomerName}
               placeholderTextColor="#94a3b8"
             />
 
@@ -741,10 +796,10 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f1f5f9" },
+  safe:   { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   orderBanner: {
-    backgroundColor: "#1d4ed8",
+    backgroundColor: "#0b57d0",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -753,7 +808,7 @@ const styles = StyleSheet.create({
   orderBannerText: { color: "#bfdbfe", fontWeight: "600", flex: 1 },
   bannerActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   billBtn:     { backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  billBtnText: { color: "#1d4ed8", fontWeight: "800" },
+  billBtnText: { color: "#0b57d0", fontWeight: "800" },
   transferBtn: { backgroundColor: "#e0e7ff", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   transferBtnText: { color: "#3730a3", fontWeight: "800" },
   cancelTableBtn: { backgroundColor: "#fee2e2", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
@@ -763,19 +818,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    color: "#0f172a",
+    borderColor: "#d9e3ff",
+    color: "#0b1220",
   },
   catChip: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginRight: 8,
     backgroundColor: "#fff",
   },
-  catChipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  catChipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   catText:       { color: "#475569", fontWeight: "600", fontSize: 13 },
   catTextActive: { color: "#fff" },
   itemCard: {
@@ -786,16 +841,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
   },
-  itemName:  { fontWeight: "600", color: "#0f172a" },
+  itemName:  { fontWeight: "600", color: "#0b1220" },
   itemPrice: { color: "#475569", marginTop: 2 },
   qtyRow:    { flexDirection: "row", alignItems: "center", gap: 8 },
-  qtyBtn:    { width: 32, height: 32, borderRadius: 8, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#e2e8f0" },
+  qtyBtn:    { width: 32, height: 32, borderRadius: 8, backgroundColor: "#f3f6ff", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#d9e3ff" },
   qtyBtnText: { fontWeight: "800", fontSize: 18 },
   qtyNum:    { fontWeight: "700", fontSize: 16, minWidth: 20, textAlign: "center" },
   cartFooter: {
-    backgroundColor: "#1d4ed8",
+    backgroundColor: "#0b57d0",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -804,7 +859,7 @@ const styles = StyleSheet.create({
   cartItems: { color: "#bfdbfe", fontSize: 12 },
   cartTotal: { color: "#fff", fontWeight: "800", fontSize: 18 },
   kotBtn:    { backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
-  kotBtnText: { color: "#1d4ed8", fontWeight: "800" },
+  kotBtnText: { color: "#0b57d0", fontWeight: "800" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(2,6,23,0.45)",
@@ -816,24 +871,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     gap: 10,
   },
-  modalTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  modalTitle: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   modalSubTitle: { fontSize: 13, fontWeight: "700", color: "#334155" },
   modalItemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#f3f6ff",
     paddingVertical: 6,
   },
-  modalItemName: { color: "#0f172a", flex: 1, paddingRight: 8 },
-  modalItemAmt: { color: "#0f172a", fontWeight: "700" },
+  modalItemName: { color: "#0b1220", flex: 1, paddingRight: 8 },
+  modalItemAmt: { color: "#0b1220", fontWeight: "700" },
   modalTotal: { textAlign: "right", fontWeight: "800", fontSize: 16, color: "#047857" },
+  modalBreakdown: { textAlign: "right", color: "#334155", fontWeight: "600" },
+  modalGrandTotal: { textAlign: "right", fontWeight: "900", fontSize: 18, color: "#047857" },
+  lookupHint: { color: "#0b57d0", fontSize: 12, fontWeight: "600" },
   transferRow: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -844,7 +902,7 @@ const styles = StyleSheet.create({
     borderColor: "#4f46e5",
     backgroundColor: "#eef2ff",
   },
-  transferRowText: { color: "#0f172a", fontWeight: "700" },
+  transferRowText: { color: "#0b1220", fontWeight: "700" },
   transferRowTextActive: { color: "#3730a3" },
   emptyTransferText: { color: "#94a3b8", paddingVertical: 6 },
   paymentRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -856,7 +914,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     backgroundColor: "#fff",
   },
-  paymentBtnActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  paymentBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   paymentBtnText: { color: "#334155", fontWeight: "700", fontSize: 12 },
   paymentBtnTextActive: { color: "#fff" },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 4 },

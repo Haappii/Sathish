@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
 from app.models.items import Item
+from app.models.kot import KOT, KOTItem
+from app.models.system_parameters import SystemParameter
 from app.models.table_billing import TableMaster, Order, OrderItem
 from app.models.table_qr import QrOrder
 from app.utils.permissions import require_permission
@@ -96,6 +98,88 @@ def _get_or_create_open_table_order(
     db.commit()
     db.refresh(order)
     return order
+
+
+def _next_kot_number(db: Session, shop_id: int, branch_id: int) -> str:
+    count = db.query(KOT).filter(
+        KOT.shop_id == shop_id,
+        KOT.branch_id == branch_id,
+    ).count()
+    return f"KOT-{branch_id}-{count + 1:04d}"
+
+
+def _is_kot_required(db: Session, *, shop_id: int, branch_id: int) -> bool:
+    key = f"branch:{branch_id}:kot_required"
+    row = (
+        db.query(SystemParameter)
+        .filter(SystemParameter.shop_id == shop_id, SystemParameter.param_key == key)
+        .first()
+    )
+    value = str(getattr(row, "param_value", "YES") or "YES").strip().upper()
+    return value != "NO"
+
+
+def _create_kot_for_order_if_needed(
+    *,
+    db: Session,
+    shop_id: int,
+    branch_id: int,
+    order_id: int,
+    table_id: int,
+    user_id: int | None,
+) -> KOT | None:
+    pending_items = (
+        db.query(OrderItem)
+        .filter(
+            OrderItem.shop_id == shop_id,
+            OrderItem.order_id == order_id,
+            OrderItem.kot_sent == False,
+        )
+        .all()
+    )
+    if not pending_items:
+        return None
+
+    kot = KOT(
+        shop_id=shop_id,
+        branch_id=branch_id,
+        order_id=order_id,
+        table_id=table_id,
+        kot_number=_next_kot_number(db, shop_id, branch_id),
+        status="PENDING",
+        printed_by=user_id,
+    )
+    db.add(kot)
+    db.flush()
+
+    item_ids = list({int(it.item_id) for it in pending_items})
+    item_map = {
+        int(i.item_id): i
+        for i in (
+            db.query(Item)
+            .filter(Item.shop_id == shop_id, Item.item_id.in_(item_ids))
+            .all()
+        )
+    } if item_ids else {}
+
+    for oi in pending_items:
+        item = item_map.get(int(oi.item_id))
+        db.add(
+            KOTItem(
+                shop_id=shop_id,
+                kot_id=kot.kot_id,
+                order_item_id=oi.order_item_id,
+                item_id=oi.item_id,
+                item_name=item.item_name if item else str(oi.item_id),
+                quantity=oi.quantity,
+                notes=oi.notes,
+                status="PENDING",
+            )
+        )
+        oi.kot_sent = True
+        oi.kot_sent_at = datetime.utcnow()
+
+    return kot
 
 
 @router.get("/pending")
@@ -234,6 +318,16 @@ def accept_qr_order(
     qr.accepted_at = datetime.utcnow()
     qr.accepted_by = int(getattr(user, "user_id", None) or 0) or None
     qr.linked_table_order_id = order.order_id
+
+    if _is_kot_required(db, shop_id=int(user.shop_id), branch_id=int(qr.branch_id)):
+        _create_kot_for_order_if_needed(
+            db=db,
+            shop_id=int(user.shop_id),
+            branch_id=int(qr.branch_id),
+            order_id=int(order.order_id),
+            table_id=int(qr.table_id),
+            user_id=int(getattr(user, "user_id", None) or 0) or None,
+        )
 
     db.commit()
 

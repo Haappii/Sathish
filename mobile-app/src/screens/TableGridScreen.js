@@ -22,9 +22,9 @@ const STATUS_META = {
   available: { label: "Available", bg: "#dcfce7", text: "#15803d", border: "#86efac" },
   occupied:  { label: "Occupied",  bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" },
   reserved:  { label: "Reserved",  bg: "#fef3c7", text: "#b45309", border: "#fcd34d" },
-  paid:      { label: "Paid",      bg: "#dbeafe", text: "#1d4ed8", border: "#93c5fd" },
+  paid:      { label: "Paid",      bg: "#d7e4ff", text: "#0b57d0", border: "#93c5fd" },
   free:      { label: "Available", bg: "#dcfce7", text: "#15803d", border: "#86efac" },
-  default:   { label: "Unknown",   bg: "#f1f5f9", text: "#475569", border: "#e2e8f0" },
+  default:   { label: "Unknown",   bg: "#f3f6ff", text: "#475569", border: "#d9e3ff" },
 };
 
 const normalizeStatus = (value) => {
@@ -46,10 +46,10 @@ const parseTableStartTime = (value) => {
 
 const getTableStartTime = (table) => table?.table_start_time || table?.opened_at || null;
 
-const runningMinutes = (tableStartTime) => {
+const runningMinutes = (tableStartTime, nowTs = Date.now()) => {
   const start = parseTableStartTime(tableStartTime);
   if (!start) return null;
-  return Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
+  return Math.max(0, Math.floor((nowTs - start.getTime()) / 60000));
 };
 
 const formatStartTime = (tableStartTime) => {
@@ -64,6 +64,7 @@ export default function TableGridScreen({ navigation }) {
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter]       = useState("all");
+  const [clockTick, setClockTick] = useState(0);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -75,7 +76,7 @@ export default function TableGridScreen({ navigation }) {
       // Build section list
       const sectionMap = {};
       for (const t of raw) {
-        const sname = t.section_name || "Main Area";
+        const sname = t.category_name || "Uncategorized";
         if (!sectionMap[sname]) sectionMap[sname] = [];
         sectionMap[sname].push(t);
       }
@@ -95,7 +96,25 @@ export default function TableGridScreen({ navigation }) {
     }, [load])
   );
 
-  const openTable = (table) => {
+  useEffect(() => {
+    const id = setInterval(() => {
+      setClockTick((v) => v + 1);
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const openTable = async (table) => {
+    const status = normalizeStatus(table?.status);
+    if (status === "paid") {
+      try {
+        await api.patch(`/tables/${table.table_id}/status`, { status: "FREE" });
+        Alert.alert("Table Freed", `${table.table_name} is now available.`);
+        load(true);
+      } catch (err) {
+        Alert.alert("Error", err?.response?.data?.detail || "Failed to free table");
+      }
+      return;
+    }
     navigation.navigate("TableOrder", { table });
   };
 
@@ -148,7 +167,7 @@ export default function TableGridScreen({ navigation }) {
                     const status = normalizeStatus(table.status);
                     const meta = STATUS_META[status] || STATUS_META.default;
                     const startTime = getTableStartTime(table);
-                    const mins = runningMinutes(startTime);
+                    const mins = runningMinutes(startTime, Date.now() + clockTick);
                     return (
                       <Pressable
                         key={table.table_id}
@@ -195,7 +214,7 @@ export default function TableGridScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f1f5f9" },
+  safe:   { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   filterBar: {
     flexDirection: "row",
@@ -204,17 +223,17 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#d9e3ff",
   },
   filterChip: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
   },
-  filterChipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  filterChipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   filterText:       { color: "#475569", fontSize: 12, fontWeight: "600" },
   filterTextActive: { color: "#fff" },
   sectionHeader: { fontWeight: "700", fontSize: 14, color: "#64748b", marginBottom: 8 },

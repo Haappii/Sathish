@@ -194,7 +194,7 @@ export default function SupplierLedgerScreen() {
   if (loading || allowed === null) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}><ActivityIndicator size="large" color="#1d4ed8" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
       </SafeAreaView>
     );
   }
@@ -214,7 +214,7 @@ export default function SupplierLedgerScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} colors={["#1d4ed8"]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} colors={["#0b57d0"]} />}
       >
         <View style={styles.card}>
           <View style={styles.headRow}>
@@ -412,29 +412,29 @@ export default function SupplierLedgerScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 12, gap: 10, paddingBottom: 26 },
   card: {
     backgroundColor: "#fff",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 12,
     gap: 8,
   },
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  title: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   totalDue: { color: "#dc2626", fontWeight: "700", fontSize: 13 },
   refreshBtn: {
     borderWidth: 1,
     borderColor: "#bfdbfe",
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#e8f0ff",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  refreshTxt: { color: "#1d4ed8", fontWeight: "700", fontSize: 12 },
+  refreshTxt: { color: "#0b57d0", fontWeight: "700", fontSize: 12 },
   section: { fontSize: 13, fontWeight: "800", color: "#1e293b" },
   subSection: { fontSize: 11, fontWeight: "700", color: "#475569", marginTop: 4 },
   empty: { color: "#94a3b8", fontSize: 12, paddingVertical: 8 },
@@ -442,12 +442,12 @@ const styles = StyleSheet.create({
   chip: {
     borderWidth: 1,
     borderColor: "#cbd5e1",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  chipOn: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  chipOn: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   chipTxt: { color: "#334155", fontWeight: "700", fontSize: 11 },
   chipTxtOn: { color: "#fff" },
   row: {
@@ -455,12 +455,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#f1f5f9",
+    borderColor: "#f3f6ff",
     borderRadius: 10,
     padding: 8,
   },
-  rowActive: { borderColor: "#93c5fd", backgroundColor: "#eff6ff" },
-  rowName: { color: "#0f172a", fontWeight: "700", fontSize: 12 },
+  rowActive: { borderColor: "#93c5fd", backgroundColor: "#e8f0ff" },
+  rowName: { color: "#0b1220", fontWeight: "700", fontSize: 12 },
   rowMeta: { color: "#64748b", fontSize: 11 },
   rowDue: { color: "#dc2626", fontWeight: "800", fontSize: 12 },
   supplierNote: { color: "#475569", fontSize: 12, fontWeight: "600" },
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 9,
     fontSize: 13,
-    color: "#0f172a",
+    color: "#0b1220",
   },
   saveBtn: {
     backgroundColor: "#059669",
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#f3f6ff",
     paddingVertical: 8,
   },
   stRow: {
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#f3f6ff",
     paddingVertical: 8,
   },
   debit: { color: "#dc2626", fontSize: 11, fontWeight: "700" },

@@ -120,23 +120,23 @@ export default function NativeModuleScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 12 },
   card: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 12,
     padding: 14,
     gap: 8,
   },
-  title: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  title: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   sub: { color: "#334155" },
   meta: { color: "#475569", fontSize: 12 },
   refreshBtn: {
     marginTop: 8,
-    backgroundColor: "#1d4ed8",
+    backgroundColor: "#0b57d0",
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: "center",

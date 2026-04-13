@@ -128,20 +128,20 @@ export default function QrOrdersAcceptScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 12, gap: 10, paddingBottom: 20 },
-  header: { fontWeight: "800", fontSize: 16, color: "#0f172a" },
+  header: { fontWeight: "800", fontSize: 16, color: "#0b1220" },
   empty: { color: "#64748b" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 12,
     gap: 6,
   },
-  title: { fontWeight: "800", color: "#0f172a" },
+  title: { fontWeight: "800", color: "#0b1220" },
   meta: { color: "#475569", fontSize: 12 },
   itemBox: { marginTop: 6, gap: 4 },
   itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -150,6 +150,6 @@ const styles = StyleSheet.create({
   btnRow: { marginTop: 8, flexDirection: "row", gap: 8 },
   btn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10 },
   rejectBtn: { backgroundColor: "#b91c1c" },
-  acceptBtn: { backgroundColor: "#1d4ed8" },
+  acceptBtn: { backgroundColor: "#0b57d0" },
   btnText: { color: "#fff", fontWeight: "700" },
 });

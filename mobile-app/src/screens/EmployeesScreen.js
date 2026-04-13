@@ -140,7 +140,7 @@ export default function EmployeesScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#1d4ed8" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
       ) : (
         <FlatList
           data={filtered}
@@ -148,7 +148,7 @@ export default function EmployeesScreen() {
           renderItem={renderEmployee}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#1d4ed8"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -243,15 +243,15 @@ export default function EmployeesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerBar: { padding: 12, flexDirection: "row", gap: 8, alignItems: "center" },
   searchInput: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
   addBtn: {
-    backgroundColor: "#1d4ed8", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
   },
   addBtnText: { color: "#fff", fontWeight: "700" },
   filterRow: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
@@ -259,21 +259,21 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
     paddingHorizontal: 14, paddingVertical: 6, backgroundColor: "#fff",
   },
-  chipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   chipText: { color: "#334155", fontSize: 12, fontWeight: "600" },
   chipTextActive: { color: "#fff" },
   list: { padding: 12, gap: 8, paddingTop: 0, paddingBottom: 24 },
   card: {
     backgroundColor: "#fff", borderRadius: 12, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 12,
+    borderColor: "#d9e3ff", padding: 12,
   },
   cardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: "#dbeafe",
+    width: 44, height: 44, borderRadius: 22, backgroundColor: "#d7e4ff",
     alignItems: "center", justifyContent: "center",
   },
-  avatarText: { color: "#1d4ed8", fontSize: 18, fontWeight: "800" },
-  empName: { fontWeight: "800", color: "#0f172a", fontSize: 14 },
+  avatarText: { color: "#0b57d0", fontSize: 18, fontWeight: "800" },
+  empName: { fontWeight: "800", color: "#0b1220", fontSize: 14 },
   empMeta: { color: "#64748b", fontSize: 12, marginTop: 1 },
   wageWrap: { alignItems: "flex-end" },
   wageAmt: { fontSize: 15, fontWeight: "800", color: "#059669" },
@@ -286,20 +286,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20,
     padding: 20, gap: 8, maxHeight: "90%",
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a", marginBottom: 4 },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220", marginBottom: 4 },
   label: { fontSize: 12, fontWeight: "700", color: "#334155" },
   input: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#f8fafc",
-    paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#ffffff",
+    paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 8 },
   cancelBtn: {
-    flex: 1, backgroundColor: "#e2e8f0", borderRadius: 10, paddingVertical: 12, alignItems: "center",
+    flex: 1, backgroundColor: "#d9e3ff", borderRadius: 10, paddingVertical: 12, alignItems: "center",
   },
   cancelBtnText: { color: "#334155", fontWeight: "700" },
   saveBtn: {
-    flex: 2, backgroundColor: "#1d4ed8", borderRadius: 10, paddingVertical: 12, alignItems: "center",
+    flex: 2, backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12, alignItems: "center",
   },
   saveBtnText: { color: "#fff", fontWeight: "800" },
   btnDisabled: { opacity: 0.5 },

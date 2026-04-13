@@ -690,7 +690,7 @@ export default function CreateBillScreen({ route }) {
                         <Text style={styles.qtyTxt}>−</Text>
                       </Pressable>
                       <Text style={styles.qtyValue}>{x.qty}</Text>
-                      <Pressable style={[styles.qtyBtn, { backgroundColor: "#1d4ed8" }]} onPress={() => changeQty(x.item_id, 1)}>
+                      <Pressable style={[styles.qtyBtn, { backgroundColor: "#0b57d0" }]} onPress={() => changeQty(x.item_id, 1)}>
                         <Text style={[styles.qtyTxt, { color: "#fff" }]}>+</Text>
                       </Pressable>
                     </>
@@ -944,30 +944,30 @@ export default function CreateBillScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f1f5f9" },
+  safe:   { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   offlineBanner: { backgroundColor: "#92400e", padding: 10, alignItems: "center" },
   offlineBannerText: { color: "#fef3c7", fontWeight: "700", fontSize: 13 },
-  syncBanner: { backgroundColor: "#1d4ed8", padding: 10, alignItems: "center" },
+  syncBanner: { backgroundColor: "#0b57d0", padding: 10, alignItems: "center" },
   syncBannerText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   container: { padding: 12, gap: 10, paddingBottom: 24 },
   section: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 12,
     gap: 8,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0b1220" },
   input: {
     borderWidth: 1,
     borderColor: "#cbd5e1",
     borderRadius: 10,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
     paddingHorizontal: 11,
     paddingVertical: 10,
-    color: "#0f172a",
+    color: "#0b1220",
   },
   chip: {
     borderWidth: 1,
@@ -978,32 +978,32 @@ const styles = StyleSheet.create({
     marginRight: 8,
     backgroundColor: "#fff",
   },
-  chipActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   chipText:       { color: "#334155", fontSize: 12, fontWeight: "600" },
   chipTextActive: { color: "#fff" },
   itemCard: {
     flex: 1,
     minHeight: 88,
     borderWidth: 1,
-    borderColor: "#dbeafe",
+    borderColor: "#d7e4ff",
     borderRadius: 10,
     padding: 10,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#ffffff",
   },
-  itemCardActive: { borderColor: "#1d4ed8", backgroundColor: "#eff6ff" },
+  itemCardActive: { borderColor: "#0b57d0", backgroundColor: "#e8f0ff" },
   itemName:    { fontWeight: "700", color: "#1e293b" },
-  itemPrice:   { marginTop: 6, color: "#1d4ed8", fontWeight: "700" },
+  itemPrice:   { marginTop: 6, color: "#0b57d0", fontWeight: "700" },
   inCartBadge: { marginTop: 4, color: "#16a34a", fontSize: 11, fontWeight: "700" },
   cartRow: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 10,
     padding: 10,
     backgroundColor: "#fff",
   },
-  cartName:   { fontWeight: "700", color: "#0f172a" },
+  cartName:   { fontWeight: "700", color: "#0b1220" },
   cartAmount: { marginTop: 2, color: "#475569" },
   cartMeta: { marginTop: 2, color: "#64748b", fontSize: 11 },
   qtyWrap:    { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -1016,8 +1016,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  qtyTxt:   { fontSize: 18, color: "#0f172a", fontWeight: "700" },
-  qtyValue: { fontWeight: "700", color: "#0f172a", minWidth: 20, textAlign: "center" },
+  qtyTxt:   { fontSize: 18, color: "#0b1220", fontWeight: "700" },
+  qtyValue: { fontWeight: "700", color: "#0b1220", minWidth: 20, textAlign: "center" },
   weightInput: {
     minWidth: 54,
     borderWidth: 1,
@@ -1026,7 +1026,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     textAlign: "center",
-    color: "#0f172a",
+    color: "#0b1220",
     backgroundColor: "#fff",
   },
   gramTxt: { color: "#64748b", fontWeight: "700", fontSize: 12 },
@@ -1041,7 +1041,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#fff",
   },
-  modeBtnActive: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  modeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   modeTxt:       { fontSize: 12, fontWeight: "700", color: "#334155" },
   modeTxtActive: { color: "#fff" },
   saveBtn: {
@@ -1056,7 +1056,7 @@ const styles = StyleSheet.create({
   saveOnlyBtn: {
     marginTop: 2,
     borderRadius: 10,
-    backgroundColor: "#0f766e",
+    backgroundColor: "#0b57d0",
     paddingVertical: 12,
     alignItems: "center",
   },
@@ -1082,11 +1082,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     padding: 16,
     gap: 10,
   },
-  weightModalTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  weightModalTitle: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   weightModalItem: { color: "#334155", fontWeight: "600" },
   weightModalInput: {
     borderWidth: 1,
@@ -1094,8 +1094,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#0f172a",
-    backgroundColor: "#f8fafc",
+    color: "#0b1220",
+    backgroundColor: "#ffffff",
   },
   weightModalRow: { flexDirection: "row", gap: 10 },
   weightModalBtn: {
@@ -1104,8 +1104,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
   },
-  weightModalCancel: { backgroundColor: "#e2e8f0" },
-  weightModalConfirm: { backgroundColor: "#1d4ed8" },
+  weightModalCancel: { backgroundColor: "#d9e3ff" },
+  weightModalConfirm: { backgroundColor: "#0b57d0" },
   weightModalCancelText: { color: "#334155", fontWeight: "700" },
   weightModalConfirmText: { color: "#fff", fontWeight: "700" },
 });

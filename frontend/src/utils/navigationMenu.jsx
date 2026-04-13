@@ -23,6 +23,7 @@ import {
   FaUtensils,
   FaConciergeBell,
   FaStar,
+  FaClipboardList,
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
@@ -126,6 +127,13 @@ const MENU_CATALOG = [
     path: "/online-orders",
     icon: <FaMotorcycle />,
     perm: { module: "online_orders", action: "read" },
+  },
+  {
+    key: "advance_orders",
+    name: "Advance Orders",
+    path: "/advance-orders",
+    icon: <FaClipboardList />,
+    perm: { module: "billing", action: "read" },
   },
   {
     key: "offline_sync",

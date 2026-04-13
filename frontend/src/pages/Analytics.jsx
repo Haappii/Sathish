@@ -227,10 +227,13 @@ export default function Analytics() {
 
             {/* Inventory */}
             <div>
-              <SectionHeader title="Inventory" subtitle="Stock value and position" />
+              <SectionHeader
+                title="Inventory"
+                subtitle={data?.billing_type === "hotel" ? "Raw material stock position" : "Stock value and position"}
+              />
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 <KpiCard
-                  label="Stock Valuation"
+                  label={data?.billing_type === "hotel" ? "Raw Material Stock" : "Stock Valuation"}
                   value={fmt(data?.stock?.valuation)}
                   accent="blue"
                   icon="📦"

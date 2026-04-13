@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,23 +19,24 @@ import { getPendingCount } from "../offline/queue";
 import { syncOfflineQueue } from "../offline/sync";
 
 const TILE_ACCENT = {
-  sales_billing: "#3b82f6",
-  billing_history: "#3b82f6",
-  customers: "#0ea5e9",
-  table_billing: "#06b6d4",
-  order_live: "#06b6d4",
-  kot_management: "#06b6d4",
-  qr_order_accept: "#06b6d4",
-  held_invoices: "#0284c7",
-  inventory: "#10b981",
-  dues: "#f59e0b",
-  returns: "#f97316",
-  expenses: "#ef4444",
-  loyalty: "#ec4899",
-  employees: "#8b5cf6",
-  employee_attendance: "#8b5cf6",
-  analytics: "#f97316",
-  supplier_ledger: "#6366f1",
+  sales_billing: "#2f6df6",
+  billing_history: "#2f6df6",
+  customers: "#0f8ec8",
+  table_billing: "#0ea5a0",
+  order_live: "#0ea5a0",
+  kot_management: "#0ea5a0",
+  qr_order_accept: "#0ea5a0",
+  held_invoices: "#3568dc",
+  inventory: "#1ea672",
+  dues: "#c68a16",
+  returns: "#de6b1f",
+  expenses: "#cf3b3b",
+  loyalty: "#d14ea2",
+  employees: "#7d4ed9",
+  employee_attendance: "#7d4ed9",
+  analytics: "#de6b1f",
+  supplier_ledger: "#5058e5",
+  advance_orders: "#0891b2",
 };
 
 const formatBizDate = (dateStr) => {
@@ -62,6 +63,24 @@ export default function HomeScreen({ navigation }) {
   const branchName     = String(session?.branch_name || "").trim();
   const shopBranchLabel = branchName ? `${shopName} - ${branchName}` : shopName;
   const bizDateLabel   = formatBizDate(session?.app_date);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Pressable
+            style={[styles.headerLogoutBtn, { marginRight: 2 }]}
+            onPress={() => navigation.navigate("Settings")}
+          >
+            <Text style={styles.headerLogoutText}>⚙️</Text>
+          </Pressable>
+          <Pressable style={styles.headerLogoutBtn} onPress={logout}>
+            <Text style={styles.headerLogoutText}>Logout</Text>
+          </Pressable>
+        </View>
+      ),
+    });
+  }, [navigation, logout]);
 
   useEffect(() => {
     let mounted = true;
@@ -139,6 +158,8 @@ export default function HomeScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Card */}
         <View style={styles.header}>
+          <View style={styles.headerGlowA} />
+          <View style={styles.headerGlowB} />
           <View style={styles.headerRow}>
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={styles.shopName} numberOfLines={1}>{shopBranchLabel}</Text>
@@ -151,9 +172,6 @@ export default function HomeScreen({ navigation }) {
                 </View>
               </View>
             </View>
-            <Pressable style={styles.logoutBtn} onPress={logout}>
-              <Text style={styles.logoutText}>Logout</Text>
-            </Pressable>
           </View>
           <View style={styles.headerDivider} />
           <View style={styles.headerFooter}>
@@ -208,64 +226,88 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f0f4f8" },
+  safe:   { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   scroll: { padding: 16, gap: 16, paddingBottom: 32 },
 
   // Banners
   bannerOffline: { backgroundColor: "#92400e", paddingVertical: 10, alignItems: "center" },
-  bannerSync:    { backgroundColor: "#1d4ed8", paddingVertical: 10, alignItems: "center" },
+  bannerSync:    { backgroundColor: "#0b57d0", paddingVertical: 10, alignItems: "center" },
   bannerText:    { color: "#fff", fontWeight: "700", fontSize: 13 },
 
   // Header
   header: {
-    backgroundColor: "#0f172a",
-    borderRadius: 20,
+    backgroundColor: "#0b1220",
+    borderRadius: 24,
     padding: 18,
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowColor: "#0b1220",
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: "#1f2a3d",
+    overflow: "hidden",
+  },
+  headerGlowA: {
+    position: "absolute",
+    right: -28,
+    top: -18,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#1b2a48",
+  },
+  headerGlowB: {
+    position: "absolute",
+    left: -36,
+    bottom: -44,
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    backgroundColor: "#162640",
   },
   headerRow:     { flexDirection: "row", alignItems: "flex-start" },
-  shopName:      { color: "#f8fafc", fontSize: 17, fontWeight: "800", marginBottom: 7 },
+  shopName:      { color: "#ffffff", fontSize: 18, fontWeight: "800", marginBottom: 7 },
   userRow:       { flexDirection: "row", alignItems: "center", gap: 8 },
   userText:      { color: "#94a3b8", fontSize: 13, fontWeight: "600" },
-  roleBadge:     { backgroundColor: "#1e3a5f", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  roleBadge:     { backgroundColor: "#1f3e66", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   roleText:      { color: "#60a5fa", fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
-  logoutBtn:     {
-    backgroundColor: "#1e293b",
+  headerLogoutBtn: {
+    backgroundColor: "#edf2ff",
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#d3defc",
+    marginRight: 4,
   },
-  logoutText:    { color: "#f87171", fontWeight: "700", fontSize: 13 },
+  headerLogoutText: { color: "#0b57d0", fontWeight: "700", fontSize: 12 },
   headerDivider: { height: 1, backgroundColor: "#1e293b", marginVertical: 14 },
   headerFooter:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bizDateLabel:  { color: "#475569", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
-  bizDateValue:  { color: "#e2e8f0", fontSize: 15, fontWeight: "700", marginTop: 3 },
+  bizDateLabel:  { color: "#64748b", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  bizDateValue:  { color: "#d9e3ff", fontSize: 15, fontWeight: "700", marginTop: 3 },
   statusPill:    { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   statusOnline:  { backgroundColor: "#052e16" },
   statusOffline: { backgroundColor: "#450a0a" },
   statusDot:     { width: 7, height: 7, borderRadius: 4 },
-  statusText:    { color: "#f8fafc", fontSize: 12, fontWeight: "600" },
+  statusText:    { color: "#ffffff", fontSize: 12, fontWeight: "600" },
 
   // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   tile: {
     width: "47%",
     backgroundColor: "#ffffff",
-    borderRadius: 18,
+    borderRadius: 20,
     paddingVertical: 20,
     paddingHorizontal: 12,
     alignItems: "center",
     gap: 10,
-    shadowColor: "#0f172a",
+    borderWidth: 1,
+    borderColor: "#e4ebff",
+    shadowColor: "#172554",
     shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 5,
     overflow: "hidden",
     position: "relative",
   },
@@ -278,17 +320,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tileIcon:      { fontSize: 28 },
-  tileLabel:     { fontWeight: "700", color: "#1e293b", textAlign: "center", fontSize: 12.5, lineHeight: 17 },
-  tileAccentBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 3 },
+  tileLabel:     { fontWeight: "700", color: "#0f172a", textAlign: "center", fontSize: 12.5, lineHeight: 17 },
+  tileAccentBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 4 },
 
   // Footer
   printerBtn: {
-    borderRadius: 14,
-    backgroundColor: "#1e293b",
+    borderRadius: 16,
+    backgroundColor: "#0b57d0",
     paddingVertical: 14,
     alignItems: "center",
     marginTop: 4,
+    shadowColor: "#1d4ed8",
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  printerBtnText: { color: "#64748b", fontWeight: "700", fontSize: 14, letterSpacing: 0.3 },
+  printerBtnText: { color: "#ffffff", fontWeight: "700", fontSize: 14, letterSpacing: 0.3 },
   empty: { color: "#94a3b8", textAlign: "center", padding: 20 },
 });

@@ -86,12 +86,14 @@ export default function EmployeeAttendanceScreen() {
     try {
       const rows = employees.map((emp) => ({
         employee_id: emp.employee_id,
-        date: attendanceDate,
         status: attendance[emp.employee_id]?.status || "PRESENT",
         worked_units: Number(attendance[emp.employee_id]?.worked_units || 1),
-        wage: emp.daily_wage || 0,
+        wage_amount: Number(emp.daily_wage || 0),
       }));
-      await api.post("/employees/attendance/bulk", { date: attendanceDate, records: rows });
+      await api.post("/employees/attendance/bulk", {
+        attendance_date: attendanceDate,
+        items: rows,
+      });
       setSavedDate(attendanceDate);
       Alert.alert("Saved", `Attendance saved for ${attendanceDate}`);
     } catch (err) {
@@ -174,7 +176,7 @@ export default function EmployeeAttendanceScreen() {
       )}
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#1d4ed8" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
       ) : (
         <FlatList
           data={filtered}
@@ -207,37 +209,37 @@ export default function EmployeeAttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f1f5f9" },
+  safe: { flex: 1, backgroundColor: "#f3f6ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   topBar: { padding: 12, flexDirection: "row", gap: 8 },
   dateInput: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
     width: 130,
   },
   searchInput: {
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0f172a",
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
   savedBanner: { backgroundColor: "#dcfce7", padding: 8, alignItems: "center" },
   savedText: { color: "#166534", fontWeight: "700", fontSize: 13 },
   list: { padding: 12, gap: 8, paddingBottom: 24 },
   card: {
     backgroundColor: "#fff", borderRadius: 12, borderWidth: 1,
-    borderColor: "#e2e8f0", padding: 12, gap: 10,
+    borderColor: "#d9e3ff", padding: 12, gap: 10,
   },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   avatar: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: "#dbeafe",
+    width: 40, height: 40, borderRadius: 20, backgroundColor: "#d7e4ff",
     alignItems: "center", justifyContent: "center",
   },
-  avatarText: { color: "#1d4ed8", fontSize: 16, fontWeight: "800" },
-  empName: { fontWeight: "700", color: "#0f172a" },
+  avatarText: { color: "#0b57d0", fontSize: 16, fontWeight: "800" },
+  empName: { fontWeight: "700", color: "#0b1220" },
   empMeta: { color: "#64748b", fontSize: 12 },
   unitsInput: {
     width: 50, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 6, textAlign: "center",
-    color: "#0f172a", backgroundColor: "#f8fafc",
+    color: "#0b1220", backgroundColor: "#ffffff",
   },
   unitsLabel: { color: "#64748b", fontSize: 12, fontWeight: "600" },
   statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
@@ -247,7 +249,7 @@ const styles = StyleSheet.create({
   },
   statusTxt: { fontSize: 11, fontWeight: "700", color: "#334155" },
   saveBtn: {
-    margin: 12, backgroundColor: "#1d4ed8", borderRadius: 12,
+    margin: 12, backgroundColor: "#0b57d0", borderRadius: 12,
     paddingVertical: 14, alignItems: "center",
   },
   saveBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },

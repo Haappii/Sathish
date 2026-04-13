@@ -29,12 +29,45 @@ export default function CustomersScreen() {
 
   const debounceRef = useRef(null);
 
+  const dueAmount = (row) => Number(row?.outstanding_amount ?? row?.pending_amount ?? row?.due_amount ?? 0);
+
   const fetchCustomers = useCallback(async (q = "") => {
     setLoading(true);
     try {
-      const params = q ? { search: q } : {};
-      const res = await api.get("/customers/", { params });
-      setCustomers(res.data?.customers ?? res.data ?? []);
+      const customerReq = q
+        ? api.get("/customers/search", { params: { q } })
+        : api.get("/customers/");
+      const [custRes, duesRes] = await Promise.all([
+        customerReq,
+        api.get("/dues/open").catch(() => ({ data: [] })),
+      ]);
+
+      const baseCustomers = custRes.data?.customers ?? custRes.data ?? [];
+      const openDues = duesRes?.data || [];
+
+      const dueByCustomerId = {};
+      const dueByMobile = {};
+      for (const d of openDues) {
+        const amt = dueAmount(d);
+        if (amt <= 0) continue;
+        if (d.customer_id) {
+          dueByCustomerId[d.customer_id] = Number(dueByCustomerId[d.customer_id] || 0) + amt;
+        }
+        if (d.mobile) {
+          dueByMobile[d.mobile] = Number(dueByMobile[d.mobile] || 0) + amt;
+        }
+      }
+
+      const merged = baseCustomers.map((c) => {
+        const byId = Number(dueByCustomerId[c.customer_id] || 0);
+        const byMobile = Number(dueByMobile[c.mobile] || 0);
+        return {
+          ...c,
+          due_amount: byId > 0 ? byId : byMobile,
+        };
+      });
+
+      setCustomers(merged);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load customers");
     } finally {
@@ -53,7 +86,7 @@ export default function CustomersScreen() {
   const openDetail = async (customer) => {
     try {
       const res = await api.get(`/customers/${customer.customer_id}`);
-      setDetailModal(res.data);
+      setDetailModal({ ...res.data, due_amount: customer?.due_amount ?? 0 });
     } catch {
       setDetailModal(customer);
     }
@@ -139,7 +172,7 @@ export default function CustomersScreen() {
             <Text style={styles.modalTitle}>{detailModal?.customer_name}</Text>
             <DetailRow label="Mobile"  value={detailModal?.mobile} />
             <DetailRow label="Email"   value={detailModal?.email} />
-            <DetailRow label="Address" value={detailModal?.address} />
+            <DetailRow label="Address" value={detailModal?.address || detailModal?.address_line1} />
             <DetailRow label="Points"  value={String(detailModal?.loyalty_points ?? 0)} />
             <DetailRow label="Wallet"  value={`₹${fmt(detailModal?.wallet_balance)}`} />
             <DetailRow label="Total Due" value={`₹${fmt(detailModal?.due_amount)}`} />
@@ -161,7 +194,7 @@ export default function CustomersScreen() {
             <Field label="Email"    value={form.email}   onChangeText={(t) => setForm((f) => ({ ...f, email: t }))} keyboardType="email-address" />
             <Field label="Address"  value={form.address} onChangeText={(t) => setForm((f) => ({ ...f, address: t }))} />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-              <Pressable style={[styles.closeBtn, { flex: 1, backgroundColor: "#e2e8f0" }]} onPress={() => setAddModal(false)}>
+              <Pressable style={[styles.closeBtn, { flex: 1, backgroundColor: "#d9e3ff" }]} onPress={() => setAddModal(false)}>
                 <Text style={[styles.closeBtnText, { color: "#475569" }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.closeBtn, { flex: 1 }]} onPress={saveCustomer} disabled={saving}>
@@ -178,9 +211,9 @@ export default function CustomersScreen() {
 function DetailRow({ label, value }) {
   if (!value) return null;
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" }}>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f3f6ff" }}>
       <Text style={{ color: "#64748b" }}>{label}</Text>
-      <Text style={{ fontWeight: "600", color: "#0f172a" }}>{value}</Text>
+      <Text style={{ fontWeight: "600", color: "#0b1220" }}>{value}</Text>
     </View>
   );
 }
@@ -190,7 +223,7 @@ function Field({ label, value, onChangeText, keyboardType }) {
     <View style={{ marginBottom: 10 }}>
       <Text style={{ color: "#64748b", marginBottom: 4, fontSize: 12 }}>{label}</Text>
       <TextInput
-        style={{ borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 8, padding: 10, backgroundColor: "#f8fafc", color: "#0f172a" }}
+        style={{ borderWidth: 1, borderColor: "#d9e3ff", borderRadius: 8, padding: 10, backgroundColor: "#ffffff", color: "#0b1220" }}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType || "default"}
@@ -205,20 +238,20 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: "#f1f5f9" },
+  safe:    { flex: 1, backgroundColor: "#f3f6ff" },
   center:  { flex: 1, alignItems: "center", justifyContent: "center" },
   topBar:  { flexDirection: "row", padding: 14, gap: 10 },
   searchInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: "#fff",
-    color: "#0f172a",
+    color: "#0b1220",
   },
-  addBtn: { backgroundColor: "#1d4ed8", borderRadius: 10, paddingHorizontal: 16, justifyContent: "center" },
+  addBtn: { backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 16, justifyContent: "center" },
   addBtnText: { color: "#fff", fontWeight: "700" },
   card: {
     flexDirection: "row",
@@ -228,17 +261,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#d9e3ff",
   },
   cardLeft:  { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   cardRight: { alignItems: "flex-end", gap: 4 },
   avatar: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "#dbeafe",
+    backgroundColor: "#d7e4ff",
     alignItems: "center", justifyContent: "center",
   },
-  avatarText: { color: "#1d4ed8", fontWeight: "800", fontSize: 16 },
-  name:   { fontWeight: "700", color: "#0f172a" },
+  avatarText: { color: "#0b57d0", fontWeight: "800", fontSize: 16 },
+  name:   { fontWeight: "700", color: "#0b1220" },
   mobile: { color: "#64748b", fontSize: 13 },
   walletBadge: { backgroundColor: "#dcfce7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   walletText:  { color: "#15803d", fontWeight: "600", fontSize: 12 },
@@ -253,8 +286,8 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a", marginBottom: 14 },
-  closeBtn: { backgroundColor: "#1d4ed8", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220", marginBottom: 14 },
+  closeBtn: { backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   closeBtnText: { color: "#fff", fontWeight: "700" },
   empty: { color: "#94a3b8" },
 });

@@ -7,6 +7,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.models.invoice import Invoice
 from app.models.invoice_due import InvoiceDue
 from app.models.invoice_payment import InvoicePayment
 from app.models.items import Item
@@ -14,9 +15,32 @@ from app.models.sales_return import SalesReturn
 from app.models.stock import Inventory
 from app.services.financials_service import calc_period_financials
 from app.utils.permissions import require_permission
+from app.utils.shop_type import get_shop_billing_type
 
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
+
+
+def _normalize_payment_mode_label(mode: str | None) -> str:
+    normalized = str(mode or "").strip().lower().replace("-", "_").replace(" ", "_")
+    mapping = {
+        "cash": "CASH",
+        "upi": "UPI",
+        "card": "CARD",
+        "credit": "CREDIT",
+        "due": "CREDIT",
+        "gift_card": "GIFT CARD",
+        "giftcard": "GIFT CARD",
+        "wallet": "WALLET",
+    }
+    return mapping.get(normalized, str(mode or "cash").strip().upper() or "CASH")
+
+
+def _to_float(value) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _role(user) -> str:
@@ -117,23 +141,67 @@ def analytics_summary(
         outstanding = 0.0
     open_count = int(db.query(func.count(dues_sq.c.invoice_id)).scalar() or 0)
 
-    # Stock valuation (buy price)
+    # Stock valuation (buy price) — for hotel: raw materials only
+    billing_type = get_shop_billing_type(db, int(user.shop_id))
+    is_hotel = billing_type == "hotel"
     stock_q = (
         db.query(func.coalesce(func.sum(Inventory.quantity * func.coalesce(Item.buy_price, 0)), 0))
         .join(Item, and_(Item.shop_id == Inventory.shop_id, Item.item_id == Inventory.item_id))
         .filter(Inventory.shop_id == user.shop_id)
     )
+    if is_hotel:
+        stock_q = stock_q.filter(Item.is_raw_material == True)
     if branch_id is not None:
         stock_q = stock_q.filter(Inventory.branch_id == branch_id)
     stock_value = float(stock_q.scalar() or 0)
+
+    # Payment breakdown within selected period (invoice-level).
+    inv_q = db.query(
+        Invoice.payment_mode,
+        Invoice.payment_split,
+        Invoice.total_amount,
+        Invoice.discounted_amt,
+    ).filter(
+        Invoice.shop_id == user.shop_id,
+        func.date(Invoice.created_time).between(f, t),
+    )
+    if branch_id is not None:
+        inv_q = inv_q.filter(Invoice.branch_id == branch_id)
+    invoice_rows = inv_q.all()
+
+    payment_by_mode: dict[str, float] = {}
+
+    def add_payment(mode_key: str | None, amount: float):
+        amt = round(_to_float(amount), 2)
+        if amt <= 0:
+            return
+        label = _normalize_payment_mode_label(mode_key)
+        payment_by_mode[label] = round(payment_by_mode.get(label, 0.0) + amt, 2)
+
+    for row in invoice_rows:
+        mode = str(row.payment_mode or "cash").strip().lower()
+        net = _to_float(row.total_amount) - _to_float(row.discounted_amt)
+        if mode == "split" and isinstance(row.payment_split, dict):
+            for key, value in row.payment_split.items():
+                add_payment(key, _to_float(value))
+        else:
+            add_payment(mode, net)
+
+    payment_breakdown = {
+        key: round(_to_float(value), 2)
+        for key, value in payment_by_mode.items()
+        if round(_to_float(value), 2) > 0
+    }
 
     return {
         "from_date": from_date,
         "to_date": to_date,
         "branch_id": branch_id,
         "financials": fin,
+        "payment_breakdown": payment_breakdown,
         "collections": {"amount": collections},
         "open_dues": {"count": open_count, "outstanding": outstanding},
-        "stock": {"valuation": stock_value},
+        "stock": {"valuation": stock_value, "raw_materials_only": is_hotel},
+        "billing_type": billing_type,
     }
 
