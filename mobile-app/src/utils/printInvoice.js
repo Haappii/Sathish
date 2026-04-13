@@ -240,6 +240,19 @@ function formatInvoiceDate(input) {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+function formatDateTimeLabel(input) {
+  const d = new Date(input || Date.now());
+  if (Number.isNaN(d.getTime())) return String(input || "");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = d.getHours();
+  const h12 = hh % 12 || 12;
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hh >= 12 ? "PM" : "AM";
+  return `${dd}/${mm}/${yyyy} ${h12}:${min} ${ampm}`;
+}
+
 function getKotToken(invoice = {}, options = {}) {
   const fromOptions = String(options?.kotToken || "").trim();
   if (fromOptions) return fromOptions;
@@ -336,7 +349,10 @@ function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize =
   const RIGHT_MARGIN_CHARS = 1;
   const TOP_PADDING_LINES = 1;
   const WIDTH = BASE_WIDTH - RIGHT_MARGIN_CHARS;
+  const NAME_COL = is80mm ? 34 : 22;
+  const COUNT_COL = is80mm ? 10 : 8;
   const line = "-".repeat(WIDTH);
+  const rightCol = (txt, width) => " ".repeat(Math.max(0, width - txt.length)) + txt;
   const token = String(tokenData?.tokenNumber || "").trim();
   const orderId = tokenData?.orderId;
   const customerName = String(tokenData?.customerName || "").trim();
@@ -348,20 +364,26 @@ function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize =
 
   let t = "\n".repeat(TOP_PADDING_LINES);
   t += `${center(headerName, WIDTH)}\n`;
-  t += `${center("KOT TOKEN", WIDTH)}\n`;
+  t += `${center("Date & Time", WIDTH)}\n`;
+  t += `${center(formatDateTimeLabel(new Date()), WIDTH)}\n`;
+  t += `${center("Take Away", WIDTH)}\n`;
   t += `${line}\n`;
-  t += `${center(token || `#${orderId || "-"}`, WIDTH)}\n`;
-  if (customerName) t += `${center(customerName, WIDTH)}\n`;
-  if (orderId) t += `${center(`Order #${orderId}`, WIDTH)}\n`;
+  t += `Invoice : ${(token || orderId || "N/A")}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";
+  t += `Customer: ${(customerName || "N/A").slice(0, 22)}`.padEnd(WIDTH) + "\n";
+  t += `${line}\n`;
+  t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
   t += `${line}\n`;
 
   for (const row of items) {
-    const itemName = String(row?.item_name || "Item");
-    const qty = Number(row?.quantity || 0);
-    t += `${itemName} x${qty}\n`;
+    const itemName = String(row?.item_name || "Item").slice(0, NAME_COL).padEnd(NAME_COL);
+    const qty = String(Number(row?.quantity ?? row?.qty ?? 0));
+    t += itemName + rightCol(qty, COUNT_COL) + "\n";
   }
 
-  t += `\n\n`;
+  t += `${line}\n`;
+  const totalItems = items.reduce((sum, row) => sum + Number(row?.quantity ?? row?.qty ?? 0), 0);
+  t += `${center(`Total Count - ${totalItems}`, WIDTH)}\n`;
+  t += `${line}\n`;
   return t;
 }
 
@@ -505,21 +527,21 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
   const normalizedShop = shop?.shop_name ? shop : { ...shop, shop_name: shopName };
   const paperSize = branch?.paper_size || "58mm";
   const paperWidth = String(paperSize) === "80mm" ? "80mm" : "58mm";
-  const headerName = branch?.branch_name
-    ? `${normalizedShop?.shop_name || "Shop Name"} - ${branch.branch_name}`
-    : normalizedShop?.shop_name || "Shop Name";
   const token = String(tokenNumber || "").trim();
-  const lines = Array.isArray(items)
-    ? items.map((row) => `${row?.item_name || "Item"} x${Number(row?.quantity || 0)}`)
-    : [];
 
-  const logoUrl = await getReceiptLogoUrl();
-  const logoHtml =
-    branch?.print_logo_enabled === false
-      ? ""
-      : logoUrl
-      ? `<div class="logo-wrap"><img class="logo" src="${esc(logoUrl)}" alt="logo" /></div>`
-      : "";
+  const nativeText = buildKotTokenText(
+    {
+      tokenNumber: token,
+      orderId,
+      customerName,
+      items,
+    },
+    {
+      shop: normalizedShop,
+      branch,
+      paperSize,
+    }
+  );
 
   const html = `
     <html>
@@ -537,56 +559,22 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
             width: ${paperWidth};
             padding: 2mm;
             box-sizing: border-box;
-            text-align: center;
           }
-          .logo-wrap {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+          pre {
+            margin: 0;
+            white-space: pre;
+            font-size: 9px;
+            line-height: 1.25;
           }
-          .logo {
-            display: block;
-            margin: 0 auto 2px;
-            max-width: 100%;
-            max-height: 16mm;
-            object-fit: contain;
-          }
-          .shop { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
-          .label { font-size: 10px; margin: 2px 0; }
-          .token { font-size: 26px; font-weight: 800; margin: 6px 0; }
-          .sep { margin: 5px 0; letter-spacing: 1px; font-size: 9px; }
-          .items { text-align: left; font-size: 9px; white-space: pre-line; margin-top: 4px; }
         </style>
       </head>
       <body>
         <div class="ticket">
-          ${logoHtml}
-          <div class="shop">${esc(headerName)}</div>
-          <div class="label">KOT TOKEN</div>
-          <div class="token">${esc(token || `#${orderId || "-"}`)}</div>
-          ${customerName ? `<div class="label">${esc(customerName)}</div>` : ""}
-          ${orderId ? `<div class="label">Order #${esc(orderId)}</div>` : ""}
-          <div class="sep">- - - - - - - - - - - - - - - -</div>
-          ${lines.length ? `<div class="items">${esc(lines.join("\n"))}</div>` : ""}
+          <pre>${esc(nativeText)}</pre>
         </div>
       </body>
     </html>
   `;
-
-  const nativeText = buildKotTokenText(
-    {
-      tokenNumber: token,
-      orderId,
-      customerName,
-      items,
-    },
-    {
-      shop: normalizedShop,
-      branch,
-      paperSize,
-    }
-  );
 
   await sendToPrinter(html, { ...options, nativeText });
 }

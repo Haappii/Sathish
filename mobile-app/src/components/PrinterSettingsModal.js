@@ -17,6 +17,7 @@ import {
   getPrinterSettings,
   savePrinterSettings,
 } from "../utils/printerSettings";
+import { useTheme } from "../context/ThemeContext";
 
 const printerModule = (() => {
   try {
@@ -27,6 +28,7 @@ const printerModule = (() => {
 })();
 
 export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(DEFAULT_PRINTER_SETTINGS);
@@ -114,11 +116,11 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.head}>
-          <Text style={styles.title}>Printer Settings</Text>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+        <View style={[styles.head, { borderColor: theme.cardBorder, backgroundColor: theme.card }]}>
+          <Text style={[styles.title, { color: theme.text }]}>Printer Settings</Text>
           <Pressable onPress={onClose}>
-            <Text style={styles.close}>Close</Text>
+            <Text style={[styles.close, { color: theme.accent }]}>Close</Text>
           </Pressable>
         </View>
 
@@ -128,11 +130,11 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.body}>
-            <View style={styles.card}>
+            <View style={[styles.card, { borderColor: theme.cardBorder, backgroundColor: theme.card }]}>
               <View style={styles.rowBetween}>
                 <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={styles.label}>Direct Thermal Printing</Text>
-                  <Text style={styles.help}>Enable native no-preview printing on Android.</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>Direct Thermal Printing</Text>
+                  <Text style={[styles.help, { color: theme.textSub }]}>Enable native no-preview printing on Android.</Text>
                 </View>
                 <Switch
                   value={Boolean(form.directThermalEnabled)}
@@ -140,72 +142,75 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
                 />
               </View>
 
-              <Text style={styles.label}>Printer Target</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Printer Target</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
                 placeholder="Example: TCP:192.168.1.120 or BT:01:23:45:67:89:AB"
+                placeholderTextColor={theme.textSub}
                 value={form.target}
                 onChangeText={(v) => update("target", v)}
                 autoCapitalize="none"
               />
-              <Text style={styles.help}>Use discovered target for best results.</Text>
+              <Text style={[styles.help, { color: theme.textSub }]}>Use discovered target for best results.</Text>
 
-              <Text style={styles.label}>Printer Model Name</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Printer Model Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
                 placeholder="TM-T88V"
+                placeholderTextColor={theme.textSub}
                 value={form.deviceName}
                 onChangeText={(v) => update("deviceName", v)}
                 autoCapitalize="none"
               />
 
-              <Text style={styles.label}>Fallback Printer URL (Optional)</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Fallback Printer URL (Optional)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
                 placeholder="ipp://... (used by system print fallback)"
+                placeholderTextColor={theme.textSub}
                 value={form.printerUrl}
                 onChangeText={(v) => update("printerUrl", v)}
                 autoCapitalize="none"
               />
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.label}>Discover Printers</Text>
+            <View style={[styles.card, { borderColor: theme.cardBorder, backgroundColor: theme.card }]}>
+              <Text style={[styles.label, { color: theme.text }]}>Discover Printers</Text>
               <View style={styles.actionsRow}>
-                <Pressable style={styles.scanBtn} onPress={scanBluetooth} disabled={!printerModule || isDiscovering}>
+                <Pressable style={[styles.scanBtn, { backgroundColor: theme.accent }]} onPress={scanBluetooth} disabled={!printerModule || isDiscovering}>
                   <Text style={styles.scanBtnText}>Scan Bluetooth</Text>
                 </Pressable>
-                <Pressable style={styles.scanBtn} onPress={scanLan} disabled={!printerModule || isDiscovering}>
+                <Pressable style={[styles.scanBtn, { backgroundColor: theme.accent }]} onPress={scanLan} disabled={!printerModule || isDiscovering}>
                   <Text style={styles.scanBtnText}>Scan LAN</Text>
                 </Pressable>
-                <Pressable style={styles.stopBtn} onPress={stop}>
-                  <Text style={styles.stopBtnText}>Stop</Text>
+                <Pressable style={[styles.stopBtn, { backgroundColor: theme.surface }]} onPress={stop}>
+                  <Text style={[styles.stopBtnText, { color: theme.textSub }]}>Stop</Text>
                 </Pressable>
               </View>
 
-              {isDiscovering ? <Text style={styles.help}>Scanning...</Text> : null}
+              {isDiscovering ? <Text style={[styles.help, { color: theme.textSub }]}>Scanning...</Text> : null}
               {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
 
               {(printers || []).map((printer) => (
                 <Pressable
                   key={`${printer.target}-${printer.deviceName}`}
-                  style={styles.deviceRow}
+                  style={[styles.deviceRow, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}
                   onPress={() => {
                     update("target", String(printer.target || ""));
                     update("deviceName", String(printer.deviceName || form.deviceName || "TM-T88V"));
                   }}
                 >
-                  <Text style={styles.deviceName}>{printer.deviceName || "Printer"}</Text>
-                  <Text style={styles.deviceMeta}>{printer.target}</Text>
-                  {!!printer.ipAddress && <Text style={styles.deviceMeta}>IP: {printer.ipAddress}</Text>}
-                  {!!printer.bdAddress && <Text style={styles.deviceMeta}>BT: {printer.bdAddress}</Text>}
+                  <Text style={[styles.deviceName, { color: theme.text }]}>{printer.deviceName || "Printer"}</Text>
+                  <Text style={[styles.deviceMeta, { color: theme.textSub }]}>{printer.target}</Text>
+                  {!!printer.ipAddress && <Text style={[styles.deviceMeta, { color: theme.textSub }]}>IP: {printer.ipAddress}</Text>}
+                  {!!printer.bdAddress && <Text style={[styles.deviceMeta, { color: theme.textSub }]}>BT: {printer.bdAddress}</Text>}
                 </Pressable>
               ))}
 
-              <Text style={styles.help}>If discovery does not find your printer, enter target manually (for example: TCP:192.168.1.120 or BT:01:23:45:67:89:AB).</Text>
+              <Text style={[styles.help, { color: theme.textSub }]}>If discovery does not find your printer, enter target manually (for example: TCP:192.168.1.120 or BT:01:23:45:67:89:AB).</Text>
             </View>
 
-            <Pressable style={[styles.saveBtn, saving && styles.disabled]} disabled={saving} onPress={save}>
+            <Pressable style={[styles.saveBtn, { backgroundColor: theme.success }, saving && styles.disabled]} disabled={saving} onPress={save}>
               <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save Printer Settings"}</Text>
             </Pressable>
           </ScrollView>

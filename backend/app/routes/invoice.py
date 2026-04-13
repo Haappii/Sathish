@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+﻿from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, cast, Date as SQLDate
+from sqlalchemy import and_, or_, cast, Date as SQLDate, func
 from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+import json
 
 from app.db import get_db
 from app.models.invoice import Invoice
@@ -35,6 +36,7 @@ from app.services.day_close_service import is_branch_day_closed
 from app.services.audit_service import log_action
 from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
+from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.utils.permissions import require_permission
 from app.services.gift_card_service import get_card_by_code, redeem_card, as_money, is_expired
 from app.services.item_lot_service import consume_lots_fifo
@@ -627,13 +629,53 @@ def get_invoice(
         .all()
     )
 
+    returned_qty_rows = (
+        db.query(
+            SalesReturnItem.item_id.label("item_id"),
+            func.coalesce(func.sum(SalesReturnItem.quantity), 0).label("returned_qty"),
+        )
+        .join(SalesReturn, SalesReturn.return_id == SalesReturnItem.return_id)
+        .filter(
+            SalesReturn.shop_id == user.shop_id,
+            SalesReturn.invoice_id == invoice.invoice_id,
+            SalesReturn.status != "CANCELLED",
+        )
+        .group_by(SalesReturnItem.item_id)
+        .all()
+    )
+    returned_qty_map = {int(r.item_id): int(r.returned_qty or 0) for r in returned_qty_rows}
+
+    return_count = int(
+        db.query(func.count(SalesReturn.return_id))
+        .filter(
+            SalesReturn.shop_id == user.shop_id,
+            SalesReturn.invoice_id == invoice.invoice_id,
+            SalesReturn.status != "CANCELLED",
+        )
+        .scalar()
+        or 0
+    )
+    returned_amount = float(
+        db.query(func.coalesce(func.sum(SalesReturn.refund_amount), 0))
+        .filter(
+            SalesReturn.shop_id == user.shop_id,
+            SalesReturn.invoice_id == invoice.invoice_id,
+            SalesReturn.status != "CANCELLED",
+        )
+        .scalar()
+        or 0
+    )
+
     items = [
         InvoiceItemDetail(
             item_id=r.item_id,
             item_name=r.item_name,
             quantity=r.quantity,
             price=(float(r.amount or 0) / int(r.quantity or 1)) if int(r.quantity or 0) else float(r.price or 0),
-            amount=float(r.amount)
+            amount=float(r.amount),
+            returned_qty=max(0, int(returned_qty_map.get(int(r.item_id), 0))),
+            returnable_qty=max(0, int(r.quantity or 0) - int(returned_qty_map.get(int(r.item_id), 0))),
+            already_returned=int(returned_qty_map.get(int(r.item_id), 0)) >= int(r.quantity or 0),
         )
         for r in details
     ]
@@ -649,7 +691,10 @@ def get_invoice(
         "created_time": invoice.created_time.strftime("%Y-%m-%d %H:%M:%S"),
         "payment_mode": invoice.payment_mode,
         "payment_split": invoice.payment_split,
-        "items": items
+        "items": items,
+        "has_returns": return_count > 0,
+        "return_count": return_count,
+        "returned_amount": returned_amount,
     }
 
 
@@ -690,7 +735,7 @@ def modify_invoice(
         "payment_split": invoice.payment_split,
     }
 
-    # 🔹 Archive old invoice
+    # ­ƒö╣ Archive old invoice
     archive_invoice(
         db,
         invoice,
@@ -698,7 +743,7 @@ def modify_invoice(
         "Modified"
     )
 
-    # 🔹 Restore old stock
+    # ­ƒö╣ Restore old stock
     for d in invoice.details:
         if is_inventory_enabled(db, user.shop_id):
             adjust_stock(
@@ -706,7 +751,7 @@ def modify_invoice(
                 d.quantity, "ADD"
             )
 
-    # 🔹 Remove old details
+    # ­ƒö╣ Remove old details
     db.query(InvoiceDetail).filter(
         InvoiceDetail.invoice_id == invoice_id,
         InvoiceDetail.shop_id == user.shop_id
@@ -817,10 +862,26 @@ def remove_service_charge(
     if is_branch_day_closed(db, user.shop_id, invoice.branch_id, invoice.created_time):
         raise HTTPException(403, "Day closed for this branch")
 
-    split = dict(invoice.payment_split or {})
+    split_raw = invoice.payment_split or {}
+    if isinstance(split_raw, str):
+        try:
+            split_raw = json.loads(split_raw)
+        except Exception:
+            split_raw = {}
+    split = dict(split_raw) if isinstance(split_raw, dict) else {}
+
+    def _pop_decimal(d: dict, *keys: str) -> Decimal:
+        for k in keys:
+            if k in d:
+                try:
+                    return Decimal(str(d.pop(k) or 0))
+                except Exception:
+                    return Decimal("0")
+        return Decimal("0")
+
     try:
-        sc = Decimal(str(split.pop("service_charge", 0) or 0))
-        sc_gst = Decimal(str(split.pop("service_charge_gst", 0) or 0))
+        sc = _pop_decimal(split, "service_charge", "serviceCharge", "service_charge_amount")
+        sc_gst = _pop_decimal(split, "service_charge_gst", "serviceChargeGst", "service_charge_gst_amount")
     except Exception:
         sc = Decimal("0")
         sc_gst = Decimal("0")
@@ -889,7 +950,7 @@ def delete_invoice(
         "payment_split": invoice.payment_split,
     }
 
-    # 🔹 Archive invoice
+    # ­ƒö╣ Archive invoice
     archive_invoice(
         db,
         invoice,
@@ -897,7 +958,7 @@ def delete_invoice(
         "Deleted"
     )
 
-    # 🔹 Restore stock
+    # ­ƒö╣ Restore stock
     for d in invoice.details:
         if is_inventory_enabled(db, user.shop_id):
             adjust_stock(
@@ -938,7 +999,7 @@ def delete_invoice(
     return {"message": "Invoice deleted"}
 
 # =====================================================
-# LIST ONLY DELETED INVOICES (❌ NO MODIFIED)
+# LIST ONLY DELETED INVOICES (ÔØî NO MODIFIED)
 # =====================================================
 @router.get("/archive/list")
 def list_archived_invoices(
@@ -953,14 +1014,14 @@ def list_archived_invoices(
         .filter(
             InvoiceArchive.branch_id == branch_id,
             InvoiceArchive.delete_reason == "Deleted",
-            InvoiceArchive.shop_id == user.shop_id   # 🔴 THIS LINE IS THE FIX
+            InvoiceArchive.shop_id == user.shop_id   # ­ƒö┤ THIS LINE IS THE FIX
         )
         .order_by(InvoiceArchive.deleted_time.desc())
         .all()
     )
 
 # =====================================================
-# LATEST CUSTOMER BY MOBILE  ✅ (AUTO-FILL SUPPORT)
+# LATEST CUSTOMER BY MOBILE  Ô£à (AUTO-FILL SUPPORT)
 # =====================================================
 @router.get("/customer/by-mobile/{mobile}")
 def get_latest_customer_by_mobile(
@@ -994,7 +1055,7 @@ def get_latest_customer_by_mobile(
     )
 
     if not latest_invoice:
-        # No invoice yet – try master customer table first.
+        # No invoice yet ÔÇô try master customer table first.
         cust = get_customer_by_mobile(
             db, shop_id=user.shop_id, mobile=mobile_clean
         )
@@ -1077,7 +1138,7 @@ def restore_archived_invoice(
         "discounted_amt": archive.discounted_amt,
     }
 
-    # 🔹 Recreate invoice
+    # ­ƒö╣ Recreate invoice
     invoice = Invoice(
         invoice_number=archive.invoice_number,
         shop_id=archive.shop_id,
@@ -1094,7 +1155,7 @@ def restore_archived_invoice(
     db.add(invoice)
     db.flush()
 
-    # 🔹 Restore details & adjust stock
+    # ­ƒö╣ Restore details & adjust stock
     for d in archive.details:
         db.add(InvoiceDetail(
             invoice_id=invoice.invoice_id,

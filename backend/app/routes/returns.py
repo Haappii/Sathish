@@ -11,6 +11,7 @@ from sqlalchemy import func
 from app.db import get_db
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
+from app.models.items import Item
 from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.models.sales_return_meta import SalesReturnMeta, SalesReturnItemMeta
 from app.models.shop_details import ShopDetails
@@ -245,6 +246,7 @@ def create_return(
         raise HTTPException(400, "Invoice has no items")
 
     sold_map: dict[int, dict[str, Decimal]] = {}
+    item_name_map: dict[int, str] = {}
     cost_map: dict[int, Decimal] = {}
     for d in details:
         item_id = int(d.item_id)
@@ -253,6 +255,16 @@ def create_return(
         sold_map[item_id]["amount"] += as_decimal(d.amount)
         if item_id not in cost_map:
             cost_map[item_id] = as_decimal(getattr(d, "buy_price", 0))
+
+    # Resolve item names once for user-friendly validation messages.
+    if sold_map:
+        item_rows = (
+            db.query(Item.item_id, Item.item_name)
+            .filter(Item.shop_id == user.shop_id, Item.item_id.in_(list(sold_map.keys())))
+            .all()
+        )
+        for r in item_rows:
+            item_name_map[int(r.item_id)] = str(r.item_name or f"Item {int(r.item_id)}")
 
     invoice_subtotal = sum(v["amount"] for v in sold_map.values())
     if invoice_subtotal <= 0:
@@ -311,9 +323,10 @@ def create_return(
         prev_ret = int(already_returned_qty.get(int(it.item_id), 0))
         available = sold_qty - prev_ret
         if int(it.quantity) > available:
+            item_label = item_name_map.get(int(it.item_id), f"Item {int(it.item_id)}")
             raise HTTPException(
                 400,
-                f"Return qty exceeds available for item {it.item_id} (available {available})",
+                f"Return qty exceeds available for {item_label} (available {available})",
             )
 
         unit_price = (sold_amt / Decimal(sold_qty)) if sold_qty else Decimal("0")

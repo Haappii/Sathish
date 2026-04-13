@@ -12,8 +12,8 @@ import {
 
 import api from "../api/client";
 import { buildMobileMenu, modulesToPermMap } from "../auth/rbac";
-import PrinterSettingsModal from "../components/PrinterSettingsModal";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import { getPendingCount } from "../offline/queue";
 import { syncOfflineQueue } from "../offline/sync";
@@ -48,6 +48,7 @@ const formatBizDate = (dateStr) => {
 
 export default function HomeScreen({ navigation }) {
   const { session, logout } = useAuth();
+  const { theme, preference, setPreference } = useTheme();
   const { isOnline } = useOnlineStatus();
 
   const [shopName, setShopName]         = useState("Haappii Billing");
@@ -57,30 +58,53 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading]           = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
-  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
 
   const roleLower      = String(session?.role_name || session?.role || "").toLowerCase();
   const branchName     = String(session?.branch_name || "").trim();
   const shopBranchLabel = branchName ? `${shopName} - ${branchName}` : shopName;
   const bizDateLabel   = formatBizDate(session?.app_date);
 
+  const themeButtonLabel =
+    preference === "light" ? "Theme: Light" : preference === "dark" ? "Theme: Dark" : "Theme: System";
+
+  const openThemePicker = () => {
+    Alert.alert("Select Theme", "Choose app appearance", [
+      { text: "Light", onPress: () => setPreference("light") },
+      { text: "Dark", onPress: () => setPreference("dark") },
+      { text: "System", onPress: () => setPreference("system") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Pressable
-            style={[styles.headerLogoutBtn, { marginRight: 2 }]}
+            style={[
+              styles.headerLogoutBtn,
+              { marginRight: 2, backgroundColor: theme.surface, borderColor: theme.cardBorder },
+            ]}
             onPress={() => navigation.navigate("Settings")}
           >
-            <Text style={styles.headerLogoutText}>⚙️</Text>
+            <Text style={[styles.headerLogoutText, { color: theme.accent }]}>Settings</Text>
           </Pressable>
-          <Pressable style={styles.headerLogoutBtn} onPress={logout}>
-            <Text style={styles.headerLogoutText}>Logout</Text>
+          <Pressable
+            style={[
+              styles.headerLogoutBtn,
+              { marginRight: 2, backgroundColor: theme.surface, borderColor: theme.cardBorder },
+            ]}
+            onPress={openThemePicker}
+          >
+            <Text style={[styles.headerLogoutText, { color: theme.accent }]}>{themeButtonLabel}</Text>
+          </Pressable>
+          <Pressable style={[styles.headerLogoutBtn, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]} onPress={logout}>
+            <Text style={[styles.headerLogoutText, { color: theme.accent }]}>Logout</Text>
           </Pressable>
         </View>
       ),
     });
-  }, [navigation, logout]);
+  }, [navigation, logout, themeButtonLabel, theme]);
 
   useEffect(() => {
     let mounted = true;
@@ -133,14 +157,14 @@ export default function HomeScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={theme.accent} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       {/* Banners */}
       {!isOnline && (
         <View style={styles.bannerOffline}>
@@ -210,17 +234,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {/* Printer Settings */}
-        <Pressable style={styles.printerBtn} onPress={() => setShowPrinterSettings(true)}>
-          <Text style={styles.printerBtnText}>Printer Settings</Text>
-        </Pressable>
       </ScrollView>
-
-      <PrinterSettingsModal
-        visible={showPrinterSettings}
-        onClose={() => setShowPrinterSettings(false)}
-        onSaved={() => Alert.alert("Saved", "Printer settings updated.")}
-      />
     </SafeAreaView>
   );
 }
@@ -323,18 +337,5 @@ const styles = StyleSheet.create({
   tileLabel:     { fontWeight: "700", color: "#0f172a", textAlign: "center", fontSize: 12.5, lineHeight: 17 },
   tileAccentBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 4 },
 
-  // Footer
-  printerBtn: {
-    borderRadius: 16,
-    backgroundColor: "#0b57d0",
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 4,
-    shadowColor: "#1d4ed8",
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  printerBtnText: { color: "#ffffff", fontWeight: "700", fontSize: 14, letterSpacing: 0.3 },
   empty: { color: "#94a3b8", textAlign: "center", padding: 20 },
 });

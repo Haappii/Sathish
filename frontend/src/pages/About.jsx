@@ -97,6 +97,8 @@ export default function About() {
 
   const windowsAppUrl =
     import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
+  const androidAppUrl =
+    import.meta.env.VITE_ANDROID_APP_URL || "/downloads/haappii-billing.apk";
   const isWindows =
     typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
   const desktopAppProtocolUrl = `poss://open?path=${encodeURIComponent("/home")}`;
@@ -178,6 +180,40 @@ export default function About() {
     }, 1800);
 
     showToast("Trying to open the desktop app...", "info");
+  };
+
+  const startAndroidDownload = async () => {
+    if (!androidAppUrl) {
+      showToast("Android app not configured", "error");
+      return;
+    }
+
+    try {
+      const resolved = new URL(androidAppUrl, window.location.href);
+      if (resolved.origin === window.location.origin) {
+        const head = await fetch(resolved.href, { method: "HEAD" });
+        const contentType = (head.headers.get("content-type") || "").toLowerCase();
+        if (!head.ok || contentType.includes("text/html")) {
+          showToast("Android APK is not yet available on the server.", "error");
+          return;
+        }
+      }
+
+      const anchor = document.createElement("a");
+      anchor.href = resolved.href;
+      anchor.rel = "noopener noreferrer";
+      if (resolved.origin === window.location.origin) {
+        anchor.download = "haappii-billing.apk";
+      } else {
+        anchor.target = "_blank";
+      }
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      showToast("Android APK download started.", "success");
+    } catch {
+      showToast("Unable to start APK download", "error");
+    }
   };
 
   return (
@@ -432,12 +468,12 @@ export default function About() {
               <span className="ab-dl-chip">APK</span>
               <h3 className="ab-dl-title">Android app</h3>
               <p className="ab-dl-sub">
-                Mobile support is still on the way, but the layout now reserves a clear
-                place for it in the platform story.
+                Download the Android APK and install it on your mobile device for
+                billing, printing, and daily operations on the go.
               </p>
               <div className="ab-dl-actions">
-                <button type="button" className="btn btn-dark" disabled>
-                  Coming Soon
+                <button type="button" className="btn btn-dark" onClick={startAndroidDownload}>
+                  Download APK
                 </button>
               </div>
             </article>

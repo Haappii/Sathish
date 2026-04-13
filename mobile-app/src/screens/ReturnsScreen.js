@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const RETURN_TYPES = ["REFUND", "EXCHANGE", "STORE_CREDIT"];
 const REFUND_MODES = ["CASH", "UPI", "CARD", "BANK"];
@@ -19,6 +20,8 @@ const REASON_CODES = ["DAMAGED", "WRONG_ITEM", "QUALITY", "CUSTOMER_CHANGE", "OT
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
 export default function ReturnsScreen() {
+  const { session } = useAuth();
+  const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoice, setInvoice] = useState(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
@@ -30,6 +33,28 @@ export default function ReturnsScreen() {
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [qty, setQty] = useState({});
+  const [recentReturns, setRecentReturns] = useState([]);
+
+  const loadRecentReturns = async () => {
+    try {
+      const to = new Date(businessDate);
+      const from = new Date(businessDate);
+      from.setDate(from.getDate() - 30);
+      const res = await api.get("/returns/list", {
+        params: {
+          from_date: from.toISOString().split("T")[0],
+          to_date: to.toISOString().split("T")[0],
+        },
+      });
+      setRecentReturns(Array.isArray(res?.data) ? res.data.slice(0, 10) : []);
+    } catch {
+      setRecentReturns([]);
+    }
+  };
+
+  useEffect(() => {
+    loadRecentReturns();
+  }, [businessDate]);
 
   const loadInvoice = async () => {
     if (!invoiceNumber.trim()) return Alert.alert("Validation", "Enter invoice number");
@@ -73,6 +98,7 @@ export default function ReturnsScreen() {
       };
       await api.post("/returns/", payload);
       Alert.alert("Success", "Return processed successfully.");
+      loadRecentReturns();
       setInvoice(null);
       setInvoiceNumber("");
       setQty({});
@@ -126,17 +152,27 @@ export default function ReturnsScreen() {
               {(invoice.items || []).map((item) => (
                 <View key={String(item.item_id)} style={styles.itemRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.itemName}>{item.item_name}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={styles.itemName}>{item.item_name}</Text>
+                      {item.already_returned ? (
+                        <View style={styles.returnedPill}>
+                          <Text style={styles.returnedPillText}>Returned</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text style={styles.meta}>Sold: {item.quantity} · {fmt(item.amount)}</Text>
+                    <Text style={styles.meta}>Available: {Number(item.returnable_qty ?? item.quantity ?? 0)}</Text>
                   </View>
                   <TextInput
                     style={styles.qtyInput}
                     keyboardType="numeric"
                     placeholder="0"
                     placeholderTextColor="#94a3b8"
+                    editable={Number(item.returnable_qty ?? item.quantity ?? 0) > 0}
                     value={qty[item.item_id] || ""}
                     onChangeText={(v) => {
-                      const n = Math.min(Number(v || 0), Number(item.quantity));
+                      const maxQty = Number(item.returnable_qty ?? item.quantity ?? 0);
+                      const n = Math.min(Number(v || 0), maxQty);
                       setQty((p) => ({ ...p, [item.item_id]: String(n) }));
                     }}
                   />
@@ -216,6 +252,24 @@ export default function ReturnsScreen() {
                 <Text style={styles.submitBtnText}>{saving ? "Processing…" : "Process Return"}</Text>
               </Pressable>
             </View>
+
+            {/* Recent Returns */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recent Returns (30 days)</Text>
+              {recentReturns.length === 0 ? (
+                <Text style={styles.meta}>No returns found</Text>
+              ) : (
+                recentReturns.map((r) => (
+                  <View key={String(r.return_id)} style={styles.recentRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.recentTitle}>{r.return_number}</Text>
+                      <Text style={styles.meta}>{r.invoice_number} · {r.return_type || "REFUND"} · {r.refund_mode || "CASH"}</Text>
+                    </View>
+                    <Text style={styles.recentAmt}>{fmt(r.refund_amount)}</Text>
+                  </View>
+                ))
+              )}
+            </View>
           </>
         )}
       </ScrollView>
@@ -248,6 +302,15 @@ const styles = StyleSheet.create({
     borderColor: "#d9e3ff", borderRadius: 10, padding: 10, gap: 8,
   },
   itemName: { fontWeight: "700", color: "#0b1220" },
+  returnedPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "#fee2e2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+  returnedPillText: { fontSize: 10, fontWeight: "700", color: "#b91c1c" },
   qtyInput: {
     width: 60, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8,
     paddingHorizontal: 8, paddingVertical: 8, textAlign: "center", color: "#0b1220",
@@ -265,5 +328,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#dc2626", borderRadius: 10, paddingVertical: 13, alignItems: "center",
   },
   submitBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  recentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#d9e3ff",
+    borderRadius: 10,
+    padding: 10,
+  },
+  recentTitle: { fontWeight: "700", color: "#0b1220", fontSize: 12 },
+  recentAmt: { fontWeight: "800", color: "#059669" },
   btnDisabled: { opacity: 0.5 },
 });

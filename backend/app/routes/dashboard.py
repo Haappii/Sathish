@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, date
 from app.db import get_db
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
+from app.models.sales_return import SalesReturn
 from app.models.shop_details import ShopDetails
 from app.utils.auth_user import get_current_user
 from app.utils.business_date import get_business_date
@@ -53,16 +54,44 @@ def get_dashboard_stats(
         .filter(Invoice.branch_id == branch_id) \
         .scalar() or 0
 
+    today_returns_count = db.query(func.count(SalesReturn.return_id)) \
+        .filter(func.date(SalesReturn.created_on) == today) \
+        .filter(SalesReturn.shop_id == user.shop_id) \
+        .filter(SalesReturn.branch_id == branch_id) \
+        .filter(SalesReturn.status != "CANCELLED") \
+        .scalar() or 0
+
+    today_returns_amount = db.query(func.sum(SalesReturn.refund_amount)) \
+        .filter(func.date(SalesReturn.created_on) == today) \
+        .filter(SalesReturn.shop_id == user.shop_id) \
+        .filter(SalesReturn.branch_id == branch_id) \
+        .filter(SalesReturn.status != "CANCELLED") \
+        .scalar() or 0
+
     total_bills = db.query(func.count(Invoice.invoice_id)) \
         .filter(Invoice.shop_id == user.shop_id) \
         .filter(Invoice.branch_id == branch_id) \
         .scalar()
 
+    total_returns_count = db.query(func.count(SalesReturn.return_id)) \
+        .filter(SalesReturn.shop_id == user.shop_id) \
+        .filter(SalesReturn.branch_id == branch_id) \
+        .filter(SalesReturn.status != "CANCELLED") \
+        .scalar() or 0
+
+    net_today_bills = max(0, int(today_bills_count or 0) - int(today_returns_count or 0))
+    net_today_sales = float(today_sales or 0) - float(today_returns_amount or 0)
+    if net_today_sales < 0:
+        net_today_sales = 0.0
+    net_total_bills = max(0, int(total_bills or 0) - int(total_returns_count or 0))
+
     return {
         "branch_id": branch_id,
-        "today_sales": float(today_sales),
-        "today_bills": int(today_bills_count),
-        "total_bills": int(total_bills)
+        "today_sales": net_today_sales,
+        "today_bills": net_today_bills,
+        "total_bills": net_total_bills,
+        "today_returns": float(today_returns_amount or 0),
+        "today_return_bills": int(today_returns_count or 0),
     }
 
 

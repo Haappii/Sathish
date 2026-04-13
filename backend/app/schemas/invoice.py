@@ -53,6 +53,9 @@ class InvoiceItemDetail(BaseModel):
     amount: float
     tax_percent: float | None = None
     tax_amount: float | None = None
+    returned_qty: int = 0
+    returnable_qty: int = 0
+    already_returned: bool = False
 
     class Config:
         from_attributes = True
@@ -71,6 +74,9 @@ class InvoiceFullResponse(BaseModel):
     payment_mode: Optional[str] = None
     payment_split: Optional[dict] = None
     items: List[InvoiceItemDetail]
+    has_returns: bool = False
+    return_count: int = 0
+    returned_amount: float = 0.0
 
     class Config:
         from_attributes = True

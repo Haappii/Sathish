@@ -212,8 +212,12 @@ export default function SalesHistory() {
 
   const totals = calculateTotals();
   const paymentSplit = activeBill?.payment_split || {};
-  const serviceChargeAmount = Number(paymentSplit.service_charge || 0);
-  const serviceChargeGstAmount = Number(paymentSplit.service_charge_gst || 0);
+  const serviceChargeAmount = Number(
+    paymentSplit.service_charge ?? paymentSplit.serviceCharge ?? paymentSplit.service_charge_amount ?? 0
+  );
+  const serviceChargeGstAmount = Number(
+    paymentSplit.service_charge_gst ?? paymentSplit.serviceChargeGst ?? paymentSplit.service_charge_gst_amount ?? 0
+  );
   const discountedAmt = Number(activeBill?.discounted_amt || 0);
   const billingTotal = totals.total - discountedAmt + serviceChargeAmount + serviceChargeGstAmount;
   const hasServiceCharge = serviceChargeAmount > 0 || serviceChargeGstAmount > 0;

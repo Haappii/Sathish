@@ -26,6 +26,23 @@ export default function Returns() {
   const [condition, setCondition] = useState({});
 
   const [lastReturn, setLastReturn] = useState(null);
+  const [recentReturns, setRecentReturns] = useState([]);
+
+  const loadRecentReturns = async () => {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const toYmd = to.toISOString().split("T")[0];
+    const fromYmd = from.toISOString().split("T")[0];
+    try {
+      const res = await authAxios.get("/returns/list", {
+        params: { from_date: fromYmd, to_date: toYmd },
+      });
+      setRecentReturns(Array.isArray(res?.data) ? res.data.slice(0, 12) : []);
+    } catch {
+      setRecentReturns([]);
+    }
+  };
 
   const loadInvoice = async () => {
     if (!invoiceNumber) return showToast("Enter invoice number", "error");
@@ -80,6 +97,7 @@ export default function Returns() {
       });
       setLastReturn(res.data);
       showToast("Return created", "success");
+      loadRecentReturns();
       setReasonCode("");
       setReason("");
       setNote("");
@@ -97,6 +115,10 @@ export default function Returns() {
     window.addEventListener("keydown", onEnter);
     return () => window.removeEventListener("keydown", onEnter);
   }, [invoiceNumber]);
+
+  useEffect(() => {
+    loadRecentReturns();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -229,7 +251,14 @@ export default function Returns() {
                   <tbody className="divide-y divide-gray-50">
                     {(invoice.items || []).map((i, idx) => (
                       <tr key={i.item_id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}>
-                        <td className="px-4 py-2.5 font-semibold text-gray-800">{i.item_name}</td>
+                        <td className="px-4 py-2.5 font-semibold text-gray-800">
+                          {i.item_name}
+                          {i.already_returned && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-rose-100 text-rose-700 border border-rose-200">
+                              Returned
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 text-right text-gray-600">{i.quantity}</td>
                         <td className="px-4 py-2.5 text-right text-gray-600">₹{Number(i.amount || 0).toFixed(2)}</td>
                         <td className="px-4 py-2.5">
@@ -255,11 +284,20 @@ export default function Returns() {
                           <input
                             type="number"
                             min="0"
+                            max={Number(i.returnable_qty ?? i.quantity ?? 0)}
+                            disabled={Number(i.returnable_qty ?? i.quantity ?? 0) <= 0}
                             className="w-20 border border-gray-200 rounded-xl px-2 py-1 text-[12px] text-right bg-gray-50 focus:outline-none"
                             value={qty[i.item_id] || ""}
-                            onChange={e => setQty(prev => ({ ...prev, [i.item_id]: e.target.value }))}
+                            onChange={e => {
+                              const maxQty = Number(i.returnable_qty ?? i.quantity ?? 0);
+                              const next = Math.min(Math.max(Number(e.target.value || 0), 0), maxQty);
+                              setQty(prev => ({ ...prev, [i.item_id]: String(next) }));
+                            }}
                             placeholder="0"
                           />
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            Available: {Number(i.returnable_qty ?? i.quantity ?? 0)}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -281,6 +319,41 @@ export default function Returns() {
                 </div>
               </div>
             )}
+
+            {/* Recent Returns */}
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Recent Returns (Last 30 Days)</p>
+              </div>
+              <div className="overflow-x-auto">
+                {recentReturns.length === 0 ? (
+                  <p className="px-4 py-4 text-[12px] text-gray-400">No returns found</p>
+                ) : (
+                  <table className="min-w-[620px] w-full text-[12px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-4 py-2 text-left text-[10px] uppercase text-gray-500">Return No</th>
+                        <th className="px-4 py-2 text-left text-[10px] uppercase text-gray-500">Invoice</th>
+                        <th className="px-4 py-2 text-left text-[10px] uppercase text-gray-500">Type</th>
+                        <th className="px-4 py-2 text-left text-[10px] uppercase text-gray-500">Mode</th>
+                        <th className="px-4 py-2 text-right text-[10px] uppercase text-gray-500">Refund</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {recentReturns.map((r) => (
+                        <tr key={r.return_id}>
+                          <td className="px-4 py-2.5 font-semibold text-gray-700">{r.return_number}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{r.invoice_number}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{r.return_type || "REFUND"}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{r.refund_mode || "CASH"}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">₹{Number(r.refund_amount || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>

@@ -33,6 +33,7 @@ export default function EmployeeAttendanceScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedDate, setSavedDate] = useState(null);
+  const [markedEmployeeMap, setMarkedEmployeeMap] = useState({}); // employee_id -> true
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,7 +54,9 @@ export default function EmployeeAttendanceScreen() {
           params: { date: attendanceDate },
         });
         const existing = attRes?.data || [];
+        const marked = {};
         existing.forEach((a) => {
+          marked[a.employee_id] = true;
           if (init[a.employee_id]) {
             init[a.employee_id] = {
               status: a.status || "PRESENT",
@@ -61,8 +64,10 @@ export default function EmployeeAttendanceScreen() {
             };
           }
         });
+        setMarkedEmployeeMap(marked);
       } catch {
         /* No existing attendance — use defaults */
+        setMarkedEmployeeMap({});
       }
       setAttendance(init);
     } catch (err) {
@@ -94,6 +99,9 @@ export default function EmployeeAttendanceScreen() {
         attendance_date: attendanceDate,
         items: rows,
       });
+      const marked = {};
+      rows.forEach((r) => { marked[r.employee_id] = true; });
+      setMarkedEmployeeMap(marked);
       setSavedDate(attendanceDate);
       Alert.alert("Saved", `Attendance saved for ${attendanceDate}`);
     } catch (err) {
@@ -105,9 +113,10 @@ export default function EmployeeAttendanceScreen() {
 
   const filtered = useMemo(
     () => employees.filter((e) =>
+      !markedEmployeeMap[e.employee_id] &&
       String(e.employee_name || "").toLowerCase().includes(search.toLowerCase())
     ),
-    [employees, search]
+    [employees, search, markedEmployeeMap]
   );
 
   const renderEmployee = ({ item: emp }) => {

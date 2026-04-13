@@ -2,6 +2,7 @@ import { ActivityIndicator, View } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 // Screens
 import LoginScreen        from "../screens/LoginScreen";
@@ -32,38 +33,46 @@ import AnalyticsScreen          from "../screens/AnalyticsScreen";
 import SupplierLedgerScreen     from "../screens/SupplierLedgerScreen";
 import AdvanceOrdersScreen      from "../screens/AdvanceOrdersScreen";
 import SettingsScreen           from "../screens/SettingsScreen";
+import UnlockScreen             from "../screens/UnlockScreen";
 
 const Stack = createNativeStackNavigator();
 
-function Loader() {
+function Loader({ theme }) {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f3f6ff" }}>
-      <ActivityIndicator size="large" color="#0b57d0" />
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.background }}>
+      <ActivityIndicator size="large" color={theme.accent} />
     </View>
   );
 }
 
 export default function AppNavigator() {
-  const { booting, isLoggedIn } = useAuth();
+  const { booting, isAuthenticated, isLoggedIn } = useAuth();
+  const { theme } = useTheme();
 
-  if (booting) return <Loader />;
+  if (booting) return <Loader theme={theme} />;
 
   return (
     <Stack.Navigator
-      key={isLoggedIn ? "logged-in" : "logged-out"}
+      key={isLoggedIn ? "logged-in" : isAuthenticated ? "locked" : "logged-out"}
       screenOptions={{
         animation: "slide_from_right",
-        headerTitleStyle: { fontWeight: "800", color: "#0b1220" },
-        headerTintColor: "#0b57d0",
-        contentStyle:     { backgroundColor: "#f3f6ff" },
-        headerStyle:      { backgroundColor: "#ffffff" },
+        headerTitleStyle: { fontWeight: "800", color: theme.headerText },
+        headerTintColor: theme.accent,
+        contentStyle:     { backgroundColor: theme.background },
+        headerStyle:      { backgroundColor: theme.headerBg },
         headerShadowVisible: false,
       }}
     >
-      {!isLoggedIn ? (
+      {!isAuthenticated ? (
         <Stack.Screen
           name="Login"
           component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+      ) : !isLoggedIn ? (
+        <Stack.Screen
+          name="Unlock"
+          component={UnlockScreen}
           options={{ headerShown: false }}
         />
       ) : (
@@ -196,14 +205,14 @@ export default function AppNavigator() {
               options={{ title: "Advance Orders" }}
             />
             <Stack.Screen
-              name="NativeModule"
-              component={NativeModuleScreen}
-              options={({ route }) => ({ title: route?.params?.title || "Module" })}
-            />
-            <Stack.Screen
               name="Settings"
               component={SettingsScreen}
               options={{ title: "Settings" }}
+            />
+            <Stack.Screen
+              name="NativeModule"
+              component={NativeModuleScreen}
+              options={({ route }) => ({ title: route?.params?.title || "Module" })}
             />
         </>
       )}

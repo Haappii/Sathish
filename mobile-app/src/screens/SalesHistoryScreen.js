@@ -151,13 +151,13 @@ export default function SalesHistoryScreen() {
 
   const saveInvoiceChanges = async () => {
     if (!activeInvoice?.invoice_id) return;
-    const items = (activeInvoice.items || []).map((it) => ({
+    const payloadItems = (items || []).map((it) => ({
       item_id: Number(it.item_id),
       quantity: Number(it.quantity || 0),
-      amount: Number(it.amount || 0),
+      amount: Number((Number(it.price || 0) * Number(it.quantity || 0)) || it.amount || 0),
     })).filter((it) => it.item_id > 0 && it.quantity > 0);
 
-    if (!items.length) {
+    if (!payloadItems.length) {
       Alert.alert("Error", "Invoice items missing");
       return;
     }
@@ -169,7 +169,7 @@ export default function SalesHistoryScreen() {
         mobile: editCustomerMobile.trim() || null,
         discounted_amt: Number(editDiscount || 0),
         payment_mode: editPaymentMode,
-        items,
+        items: payloadItems,
       });
       Alert.alert("Updated", "Invoice updated successfully.");
       await loadRows(false);
@@ -178,6 +178,30 @@ export default function SalesHistoryScreen() {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to update invoice");
     } finally {
       setEditing(false);
+    }
+  };
+
+  const removeServiceCharge = async () => {
+    if (!activeInvoice?.invoice_id) return;
+    try {
+      const res = await api.patch(`/invoice/${activeInvoice.invoice_id}/remove-service-charge`);
+      Alert.alert("Updated", "Service charge removed successfully.");
+      setActiveInvoice((prev) => {
+        if (!prev) return prev;
+        const split = { ...(prev.payment_split || {}) };
+        delete split.service_charge;
+        delete split.service_charge_gst;
+        delete split.serviceCharge;
+        delete split.serviceChargeGst;
+        return {
+          ...prev,
+          payment_split: Object.keys(split).length ? split : null,
+          total_amount: Number(res?.data?.new_total ?? prev.total_amount ?? 0),
+        };
+      });
+      await loadRows(false);
+    } catch (err) {
+      Alert.alert("Error", err?.response?.data?.detail || "Could not remove service charge");
     }
   };
 
@@ -335,10 +359,33 @@ export default function SalesHistoryScreen() {
                 <Text style={styles.itemsTitle}>Items</Text>
                 {(activeInvoice.items || []).map((it, idx) => (
                   <View key={`${it.item_id}-${idx}`} style={styles.itemRow}>
-                    <Text style={{ flex: 1 }}>
-                      {it.item_name} x {it.quantity}
-                    </Text>
-                    <Text>{fmtMoney(it.amount)}</Text>
+                    <Text style={{ flex: 1 }}>{it.item_name}</Text>
+                    {isBusinessDateInvoice ? (
+                      <View style={styles.itemEditRow}>
+                        <TextInput
+                          style={styles.qtyEditInput}
+                          keyboardType="numeric"
+                          value={String(items[idx]?.quantity ?? it.quantity ?? 1)}
+                          onChangeText={(v) => {
+                            const nextQty = Math.max(1, Number(v.replace(/[^\d]/g, "") || 1));
+                            setItems((prev) => {
+                              const clone = [...prev];
+                              const price = Number(clone[idx]?.price || 0);
+                              clone[idx] = {
+                                ...clone[idx],
+                                quantity: nextQty,
+                                amount: price * nextQty,
+                              };
+                              return clone;
+                            });
+                          }}
+                        />
+                        <Text style={styles.qtyLabel}>qty</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.qtyStatic}>x {it.quantity}</Text>
+                    )}
+                    <Text>{fmtMoney(items[idx]?.amount ?? it.amount)}</Text>
                   </View>
                 ))}
               </View>
@@ -394,6 +441,12 @@ export default function SalesHistoryScreen() {
                       disabled={editing}
                     >
                       <Text style={styles.updateBtnText}>{editing ? "Updating..." : "Update"}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.removeScBtn}
+                      onPress={removeServiceCharge}
+                    >
+                      <Text style={styles.removeScBtnText}>Remove Service Charge</Text>
                     </Pressable>
                     <Pressable
                       style={[styles.deleteBtn, deleting && styles.printBtnDisabled]}
@@ -501,6 +554,20 @@ const styles = StyleSheet.create({
   },
   itemsTitle: { fontWeight: "800", color: "#0b1220" },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  itemEditRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  qtyEditInput: {
+    width: 46,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    textAlign: "center",
+    color: "#0b1220",
+    backgroundColor: "#fff",
+  },
+  qtyLabel: { fontSize: 11, color: "#64748b" },
+  qtyStatic: { fontSize: 13, color: "#334155", fontWeight: "600" },
   totalLine: { marginTop: 3, color: "#334155" },
   totalBig: { marginTop: 8, fontSize: 18, fontWeight: "800", color: "#047857" },
   editSection: {
@@ -541,4 +608,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteBtnText: { color: "#fff", fontWeight: "700" },
+  removeScBtn: {
+    flex: 1,
+    backgroundColor: "#fef3c7",
+    borderColor: "#f59e0b",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  removeScBtnText: { color: "#92400e", fontWeight: "700", fontSize: 12, textAlign: "center" },
 });

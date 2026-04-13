@@ -1,17 +1,21 @@
 ﻿import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 
+import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 function Field({ label, ...props }) {
@@ -42,6 +46,21 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [form, setForm] = useState({ shop_id: "", username: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerStep, setRegisterStep] = useState(0);
+  const [registering, setRegistering] = useState(false);
+  const [regForm, setRegForm] = useState({
+    shop_name: "",
+    billing_type: "store",
+    city: "",
+    state: "",
+    name: "",
+    email: "",
+    phone: "",
+    message: "",
+  });
+
+  const setReg = (k, v) => setRegForm((p) => ({ ...p, [k]: v }));
 
   const submit = async () => {
     if (!form.shop_id.trim()) { Alert.alert("Validation", "Enter Shop ID"); return; }
@@ -53,6 +72,66 @@ export default function LoginScreen() {
       Alert.alert("Login Failed", String(err?.response?.data?.detail || err?.message || "Login failed"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const validateRegisterStep = () => {
+    if (registerStep === 0) {
+      if (!regForm.shop_name.trim()) return "Shop name is required";
+      if (!["store", "hotel"].includes(regForm.billing_type)) return "Business type is required";
+      return null;
+    }
+    if (!regForm.name.trim()) return "Your name is required";
+    if (!regForm.email.includes("@")) return "Valid email is required";
+    return null;
+  };
+
+  const nextRegisterStep = () => {
+    const err = validateRegisterStep();
+    if (err) return Alert.alert("Validation", err);
+    setRegisterStep(1);
+  };
+
+  const submitRegistration = async () => {
+    const err = validateRegisterStep();
+    if (err) return Alert.alert("Validation", err);
+
+    setRegistering(true);
+    try {
+      const res = await api.post("/platform/onboard/requests", {
+        shop_name: regForm.shop_name,
+        billing_type: regForm.billing_type,
+        city: regForm.city,
+        state: regForm.state,
+        branch_name: regForm.shop_name,
+        branch_city: regForm.city,
+        branch_state: regForm.state,
+        owner_name: regForm.name,
+        mailid: regForm.email,
+        mobile: regForm.phone,
+        requester_name: regForm.name,
+        requester_email: regForm.email,
+        requester_phone: regForm.phone,
+        business: regForm.billing_type === "store" ? "Store / Retail" : "Hotel / Restaurant",
+        message: regForm.message,
+      });
+      Alert.alert("Request Sent", `Registration request submitted. Request ID: ${res?.data?.request_id || "-"}`);
+      setRegisterOpen(false);
+      setRegisterStep(0);
+      setRegForm({
+        shop_name: "",
+        billing_type: "store",
+        city: "",
+        state: "",
+        name: "",
+        email: "",
+        phone: "",
+        message: "",
+      });
+    } catch (err2) {
+      Alert.alert("Failed", String(err2?.response?.data?.detail || "Request failed"));
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -109,10 +188,139 @@ export default function LoginScreen() {
           >
             <Text style={styles.buttonText}>{loading ? "Signing In..." : "Login"}</Text>
           </Pressable>
+
+          <Pressable
+            style={styles.registerBtn}
+            onPress={() => {
+              setRegisterStep(0);
+              setRegisterOpen(true);
+            }}
+          >
+            <Text style={styles.registerBtnText}>Register Business</Text>
+          </Pressable>
         </View>
 
         <Text style={styles.version}>v2.0.0</Text>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={registerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRegisterOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHead}>
+              <Text style={styles.modalTitle}>Business Registration</Text>
+              <Pressable onPress={() => setRegisterOpen(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.stepWrap}>
+              <View style={[styles.stepPill, registerStep === 0 && styles.stepPillActive]}>
+                <Text style={[styles.stepPillText, registerStep === 0 && styles.stepPillTextActive]}>1. Business</Text>
+              </View>
+              <View style={[styles.stepPill, registerStep === 1 && styles.stepPillActive]}>
+                <Text style={[styles.stepPillText, registerStep === 1 && styles.stepPillTextActive]}>2. Contact</Text>
+              </View>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalBody}>
+              {registerStep === 0 ? (
+                <>
+                  <Field
+                    label="Shop Name"
+                    placeholder="Enter shop name"
+                    value={regForm.shop_name}
+                    onChangeText={(v) => setReg("shop_name", v)}
+                  />
+
+                  <Text style={styles.choiceLabel}>Business Type</Text>
+                  <View style={styles.choiceRow}>
+                    <Pressable
+                      style={[styles.choiceBtn, regForm.billing_type === "store" && styles.choiceBtnActive]}
+                      onPress={() => setReg("billing_type", "store")}
+                    >
+                      <Text style={[styles.choiceBtnText, regForm.billing_type === "store" && styles.choiceBtnTextActive]}>Store / Retail</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.choiceBtn, regForm.billing_type === "hotel" && styles.choiceBtnActive]}
+                      onPress={() => setReg("billing_type", "hotel")}
+                    >
+                      <Text style={[styles.choiceBtnText, regForm.billing_type === "hotel" && styles.choiceBtnTextActive]}>Hotel / Restaurant</Text>
+                    </Pressable>
+                  </View>
+
+                  <Field
+                    label="City"
+                    placeholder="Enter city"
+                    value={regForm.city}
+                    onChangeText={(v) => setReg("city", v)}
+                  />
+                  <Field
+                    label="State"
+                    placeholder="Enter state"
+                    value={regForm.state}
+                    onChangeText={(v) => setReg("state", v)}
+                  />
+
+                  <Pressable style={styles.modalPrimaryBtn} onPress={nextRegisterStep}>
+                    <Text style={styles.modalPrimaryBtnText}>Continue</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Field
+                    label="Your Name"
+                    placeholder="Enter your name"
+                    value={regForm.name}
+                    onChangeText={(v) => setReg("name", v)}
+                  />
+                  <Field
+                    label="Email"
+                    placeholder="Enter email"
+                    value={regForm.email}
+                    onChangeText={(v) => setReg("email", v)}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <Field
+                    label="Phone"
+                    placeholder="Enter phone"
+                    value={regForm.phone}
+                    onChangeText={(v) => setReg("phone", v)}
+                    keyboardType="phone-pad"
+                  />
+
+                  <View style={fieldStyles.wrap}>
+                    <Text style={fieldStyles.label}>Message (optional)</Text>
+                    <TextInput
+                      style={[fieldStyles.input, styles.messageInput]}
+                      placeholderTextColor="#475569"
+                      value={regForm.message}
+                      onChangeText={(v) => setReg("message", v)}
+                      multiline
+                      textAlignVertical="top"
+                      placeholder="Tell us your setup needs"
+                    />
+                  </View>
+
+                  <View style={styles.modalActionRow}>
+                    <Pressable style={styles.modalGhostBtn} onPress={() => setRegisterStep(0)}>
+                      <Text style={styles.modalGhostBtnText}>Back</Text>
+                    </Pressable>
+                    <Pressable style={[styles.modalPrimaryBtn, registering && styles.buttonDisabled]} onPress={submitRegistration} disabled={registering}>
+                      {registering ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalPrimaryBtnText}>Submit</Text>}
+                    </Pressable>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -173,6 +381,91 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: "#fff", fontWeight: "800", fontSize: 16, letterSpacing: 0.3 },
+  registerBtn: {
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#334155",
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#111b2f",
+  },
+  registerBtnText: { color: "#bfdbfe", fontWeight: "700", fontSize: 14 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#0f172a",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    maxHeight: "92%",
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  modalHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b",
+  },
+  modalTitle: { color: "#f8fafc", fontWeight: "800", fontSize: 17 },
+  modalClose: { color: "#94a3b8", fontSize: 18, fontWeight: "700" },
+  stepWrap: { flexDirection: "row", gap: 8, paddingHorizontal: 18, paddingTop: 12 },
+  stepPill: {
+    borderWidth: 1,
+    borderColor: "#334155",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#0b1220",
+  },
+  stepPillActive: { borderColor: "#2563eb", backgroundColor: "#1e3a8a" },
+  stepPillText: { color: "#64748b", fontSize: 12, fontWeight: "700" },
+  stepPillTextActive: { color: "#dbeafe" },
+  modalBody: { padding: 18, paddingBottom: 28 },
+  choiceLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 6, textTransform: "uppercase" },
+  choiceRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  choiceBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#334155",
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#111b2f",
+  },
+  choiceBtnActive: { borderColor: "#2563eb", backgroundColor: "#1e3a8a" },
+  choiceBtnText: { color: "#94a3b8", fontWeight: "700", fontSize: 12 },
+  choiceBtnTextActive: { color: "#dbeafe" },
+  messageInput: { minHeight: 80 },
+  modalActionRow: { flexDirection: "row", gap: 10 },
+  modalPrimaryBtn: {
+    marginTop: 4,
+    flex: 1,
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  modalPrimaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  modalGhostBtn: {
+    marginTop: 4,
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#334155",
+    paddingVertical: 13,
+    alignItems: "center",
+    backgroundColor: "#111b2f",
+  },
+  modalGhostBtnText: { color: "#bfdbfe", fontWeight: "700", fontSize: 14 },
 
   version: { textAlign: "center", color: "#1e293b", fontWeight: "700", marginTop: 28 },
 });
