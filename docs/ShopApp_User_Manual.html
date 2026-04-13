@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopApp User Manual</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@600;700&display=swap');
+
+    :root {
+      --ink: #17263c;
+      --muted: #5d6c84;
+      --line: #d8e1ee;
+      --brand: #e15d3f;
+      --panel: #f6f9fd;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: linear-gradient(180deg, #f7faff 0%, #eef4fb 100%);
+      color: var(--ink);
+      line-height: 1.55;
+      padding: 26px;
+    }
+
+    .sheet {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 20px 42px rgba(23, 38, 60, 0.1);
+    }
+
+    .header {
+      padding: 28px;
+      color: #fff;
+      background: radial-gradient(circle at 86% 0%, rgba(225,93,63,0.2), transparent 34%), linear-gradient(135deg, #13243a 0%, #1f3b60 60%, #247c71 100%);
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      opacity: .9;
+    }
+
+    h1 {
+      margin: 8px 0 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.08;
+      letter-spacing: -.02em;
+    }
+
+    .sub {
+      margin: 10px 0 0;
+      max-width: 740px;
+      font-size: 14px;
+      color: rgba(244, 248, 253, .95);
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      border-radius: 10px;
+      padding: 0 14px;
+      color: #fff;
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,.12);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .btn:hover { background: rgba(255,255,255,.2); }
+
+    .content { padding: 24px 28px 30px; }
+
+    h2 {
+      margin: 18px 0 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      letter-spacing: -.01em;
+    }
+
+    p { margin: 0 0 10px; color: var(--muted); }
+
+    ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    th {
+      background: var(--panel);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #2b425f;
+    }
+
+    .note {
+      margin-top: 16px;
+      background: #fff7f4;
+      border: 1px solid #f4d4cb;
+      border-radius: 12px;
+      padding: 12px;
+      color: #6d3f32;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      body { padding: 10px; }
+      .header, .content { padding: 16px; }
+      table { font-size: 12px; }
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { border: none; box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+  <article class="sheet">
+    <header class="header">
+      <p class="eyebrow">Haappii Billing</p>
+      <h1>User Manual: Menus and Navigation</h1>
+      <p class="sub">Simple, readable guide for billing staff, managers, and admins to navigate the application quickly.</p>
+      <div class="actions">
+        <a class="btn" href="./ShopApp_User_Manual.pdf" download>Download User Manual PDF</a>
+        <a class="btn" href="./ShopApp_Menu_Navigation_Brochure.pdf" download>Download Brochure PDF</a>
+      </div>
+    </header>
+
+    <main class="content">
+      <h2>1. Start Here</h2>
+      <ol>
+        <li>Login and open Home (`/home`).</li>
+        <li>Use the left sidebar for all navigation.</li>
+        <li>Menus shown depend on role and permissions.</li>
+      </ol>
+
+      <h2>2. Core Menus</h2>
+      <table>
+        <thead>
+          <tr><th>Menu</th><th>Route</th><th>Use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Home</td><td>/home</td><td>Dashboard and quick actions.</td></tr>
+          <tr><td>Billing / Take Away</td><td>/sales/create</td><td>Create bills and checkout flow.</td></tr>
+          <tr><td>Billing History</td><td>/sales/history</td><td>Review old invoices and edits.</td></tr>
+          <tr><td>Inventory</td><td>/inventory</td><td>Track stock and quantities.</td></tr>
+          <tr><td>Customers</td><td>/customers</td><td>Customer records and due tracking.</td></tr>
+          <tr><td>Expenses</td><td>/expenses</td><td>Daily expense entry.</td></tr>
+          <tr><td>Reports</td><td>/reports</td><td>Sales and business reporting.</td></tr>
+          <tr><td>Admin / Setup</td><td>/setup</td><td>Configuration and management modules.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>3. Setup Section</h2>
+      <ol>
+        <li>Categories: `/setup/categories`</li>
+        <li>Items: `/setup/items`</li>
+        <li>Shop Details: `/setup/shop`</li>
+        <li>Users and Permissions: `/setup/users`, `/setup/permissions`</li>
+        <li>Branches and Suppliers: `/setup/branches`, `/setup/suppliers`</li>
+        <li>Purchase Orders and utilities: `/setup/purchase-orders`, `/setup/excel-upload`, `/setup/mail-scheduler`</li>
+      </ol>
+
+      <h2>4. Hotel Mode Menus (If Enabled)</h2>
+      <ol>
+        <li>Table Billing: `/table-billing`</li>
+        <li>QR Orders: `/qr-orders`</li>
+        <li>Order Live and KOT: `/order-live`, `/kot`</li>
+        <li>Reservations, Delivery, Recipes: `/reservations`, `/delivery`, `/recipes`</li>
+      </ol>
+
+      <h2>5. Daily Navigation Routine</h2>
+      <ol>
+        <li>Home check -> alerts, quick stats, reminders.</li>
+        <li>Billing/Order flow during operations.</li>
+        <li>Inventory and dues checks mid-day.</li>
+        <li>Reports and day close at end of shift.</li>
+      </ol>
+
+      <div class="note">
+        Tip: If a menu is not visible, check the logged-in role and permissions first.
+      </div>
+    </main>
+  </article>
+</body>
+</html>

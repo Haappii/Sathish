@@ -314,25 +314,20 @@ sep_y = FY + 128
 h_grad(W//2-300, sep_y, W//2+300, sep_y+2, (0,0,0), PURPLE)
 h_grad(W//2-300, sep_y, W//2+300, sep_y+2, PURPLE, (0,0,0))
 
-# Website
-ct(FY+150, "haappiibilling.in", bahn(40), CYAN)
-# underline
-bb = draw.textbbox((0,0), "haappiibilling.in", font=bahn(40))
-uw = bb[2]-bb[0]
-ux = (W-uw)//2
-draw.line([(ux, FY+197),(ux+uw, FY+197)], fill=CYAN, width=2)
-
-# Phone
-ct(FY+220, "+91  79042 63246", bahn(34), WHITE)
+# Contact block
+ct(FY+146, "Sathish", bahn(44), GOLD2)
+ct(FY+198, "+91 79042 63246", bahn(32), WHITE)
+ct(FY+238, "haappiibilling@gmail.com", fnt(30, True), CYAN)
+ct(FY+274, "Instagram: @sathish_sk52", fnt(28, True), WHITE)
+ct(FY+308, "www.haappiibilling.in", bahn(34), CYAN)
 
 # Small divider dots
 for i,dc in enumerate(ACCENTS):
     dx = W//2 - 50 + i*20
-    draw.ellipse([dx-4, FY+276, dx+4, FY+284], fill=dc)
+    draw.ellipse([dx-4, FY+352, dx+4, FY+360], fill=dc)
 
 # Tagline
-ct(FY+300, "Haappii Billing  —  Simple. Fast. Smart.", fnt(18), GREY2)
-ct(FY+332, "© 2026 Haappii Billing. All rights reserved.", fnt(14), (70,75,100))
+ct(FY+368, "Haappii Billing  -  Simple. Fast. Smart.", fnt(18), GREY2)
 
 # ── CORNER DECORATIONS ───────────────────────────────────────────────────────
 for i, c in enumerate([(130,60,255),(0,200,255),(40,220,130)]):
@@ -344,6 +339,6 @@ for i, c in enumerate([(130,60,255),(0,200,255),(40,220,130)]):
 from PIL import ImageEnhance
 img = ImageEnhance.Sharpness(img).enhance(1.15)
 
-out = "C:/Users/sathi/Desktop/ShopApp/shop-billing-app/docs/HaappiiBilling_Poster.png"
+out = "C:/Users/sathi/Desktop/ShopApp/shop-billing-app/docs/HaappiiBilling_Social_Poster.png"
 img.save(out, "PNG")
 print(f"Saved -> {out}  ({W}x{H})")

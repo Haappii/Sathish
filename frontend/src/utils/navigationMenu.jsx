@@ -400,6 +400,7 @@ export const buildRoleMenu = ({
         : []),
       { name: "Reservations", path: "/reservations", icon: <FaCalendarAlt /> },
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
+      { name: "Advance Orders", path: "/advance-orders", icon: <FaClipboardList /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Loyalty", path: "/loyalty", icon: <FaGift /> },
       { name: "Gift Cards", path: "/gift-cards", icon: <FaGift /> },
@@ -448,6 +449,7 @@ export const buildRoleMenu = ({
           ]
         : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
+      { name: "Advance Orders", path: "/advance-orders", icon: <FaClipboardList /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },
@@ -500,6 +502,7 @@ export const buildRoleMenu = ({
           ]
         : []),
       { name: "Online Orders", path: "/online-orders", icon: <FaMotorcycle /> },
+      { name: "Advance Orders", path: "/advance-orders", icon: <FaClipboardList /> },
       { name: "Offline Sync", path: "/offline-sync", icon: <FaCloudUploadAlt /> },
       { name: "Draft Bills", path: "/drafts", icon: <FaFileInvoice /> },
       { name: "Returns", path: "/returns", icon: <FaFileInvoice /> },

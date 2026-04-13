@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Haappii Billing - Menu and Navigation Brochure</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+    :root {
+      --ink: #13243a;
+      --muted: #5f6f86;
+      --line: #d8e2ef;
+      --brand: #e85d3f;
+      --brand-deep: #b83f27;
+      --mint: #1f8d7b;
+      --paper: #f7f9fc;
+      --card: #ffffff;
+      --sky: #eaf2fb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, #fff3e8 0%, transparent 28%),
+        radial-gradient(circle at 95% 5%, #e7f7f3 0%, transparent 24%),
+        linear-gradient(180deg, #f9fbff 0%, #f4f8fd 100%);
+      line-height: 1.55;
+      padding: 28px;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 24px 50px rgba(18, 36, 58, 0.12);
+    }
+
+    .hero {
+      padding: 34px 34px 26px;
+      background:
+        radial-gradient(circle at 85% 0%, rgba(232, 93, 63, 0.22), transparent 30%),
+        linear-gradient(140deg, #13243a 0%, #1d3554 62%, #1f8d7b 100%);
+      color: #fff;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      margin: 0;
+      font-size: clamp(28px, 4.4vw, 44px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      margin: 12px 0 0;
+      max-width: 760px;
+      color: rgba(242, 246, 252, 0.95);
+      font-size: 15px;
+    }
+
+    .hero-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hero-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      color: #fff;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .hero-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .content {
+      padding: 26px 30px 30px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    }
+
+    .section + .section { margin-top: 22px; }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .grid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--paper);
+      padding: 13px 14px;
+    }
+
+    .card h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      color: var(--ink);
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .menu-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .menu-table th,
+    .menu-table td {
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .menu-table th {
+      background: var(--sky);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #2d4664;
+    }
+
+    .menu-table tr:last-child td { border-bottom: none; }
+
+    .flow {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--mint);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      font-size: 13px;
+    }
+
+    .foot {
+      margin-top: 22px;
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+      font-size: 12px;
+      color: #66778f;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 900px) {
+      body { padding: 12px; }
+      .hero { padding: 22px 18px; }
+      .content { padding: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      .menu-table { font-size: 12px; }
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .page { border: none; box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+  <article class="page">
+    <header class="hero">
+      <div class="badge">Haappii Billing</div>
+      <h1>Application Brochure:<br />Menus and Navigation</h1>
+      <p>
+        A clean and easy reference for staff and managers to understand where each feature is,
+        how to move between screens, and what each menu section is used for.
+      </p>
+      <div class="hero-actions">
+        <a class="hero-btn" href="./ShopApp_Menu_Navigation_Brochure.pdf" download>Download Brochure PDF</a>
+        <a class="hero-btn" href="./ShopApp_User_Manual.pdf" download>Download User Manual PDF</a>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="section">
+        <h2>Quick Navigation Map</h2>
+        <p class="lead">After login, users land on <strong>Home</strong>. The left sidebar (role-based) is the primary navigation menu.</p>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Home</h3>
+            <p>Main dashboard, shortcuts, sales snapshots, and daily business highlights.</p>
+          </div>
+          <div class="card">
+            <h3>Sales</h3>
+            <p>Billing, billing history, edits, table billing, QR orders, and KOT (hotel mode).</p>
+          </div>
+          <div class="card">
+            <h3>Inventory and Stock</h3>
+            <p>Inventory, stock audit, transfers, item lots, labels/barcodes, and reorder tracking.</p>
+          </div>
+          <div class="card">
+            <h3>Operations</h3>
+            <p>Dues, returns, expenses, customers, online orders, support tickets, and offline sync.</p>
+          </div>
+          <div class="card">
+            <h3>People and Loyalty</h3>
+            <p>Employees, attendance, loyalty, gift cards, and coupons.</p>
+          </div>
+          <div class="card">
+            <h3>Reports and Setup</h3>
+            <p>Reports, deleted invoices, and full setup/admin configuration pages.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Core Menu List (Common)</h2>
+        <table class="menu-table">
+          <thead>
+            <tr>
+              <th>Menu</th>
+              <th>Route</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Home</td><td>/home</td><td>Dashboard and shortcuts.</td></tr>
+            <tr><td>Billing / Take Away</td><td>/sales/create</td><td>Create new bill quickly.</td></tr>
+            <tr><td>Billing History</td><td>/sales/history</td><td>Review and manage previous bills.</td></tr>
+            <tr><td>Inventory (or Raw Materials)</td><td>/inventory</td><td>Stock tracking and quantity monitoring.</td></tr>
+            <tr><td>Customers</td><td>/customers</td><td>Customer records and due follow-up.</td></tr>
+            <tr><td>Expenses</td><td>/expenses</td><td>Record and track daily expenses.</td></tr>
+            <tr><td>Reports</td><td>/reports</td><td>Business and sales reports.</td></tr>
+            <tr><td>Admin</td><td>/setup</td><td>Configuration, users, branches, suppliers, permissions.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>Hotel/Restaurant Navigation (When Enabled)</h2>
+        <table class="menu-table">
+          <thead>
+            <tr>
+              <th>Menu</th>
+              <th>Route</th>
+              <th>Use</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Table Billing</td><td>/table-billing</td><td>Manage dine-in tables and orders.</td></tr>
+            <tr><td>QR Orders</td><td>/qr-orders</td><td>Handle customer QR-based orders.</td></tr>
+            <tr><td>Order Live</td><td>/order-live</td><td>Live order stream view.</td></tr>
+            <tr><td>KOT</td><td>/kot</td><td>Kitchen order ticket flow.</td></tr>
+            <tr><td>Reservations</td><td>/reservations</td><td>Manage table bookings.</td></tr>
+            <tr><td>Delivery</td><td>/delivery</td><td>Delivery order tracking.</td></tr>
+            <tr><td>Recipes</td><td>/recipes</td><td>Recipe and raw material management.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>Simple Daily Flow</h2>
+        <div class="flow">
+          <div class="step"><strong>1) Start day:</strong> Login -> Home -> check alerts and stock.</div>
+          <div class="step"><strong>2) Billing:</strong> Open Billing / Table Billing -> create bills -> print/share.</div>
+          <div class="step"><strong>3) Midday control:</strong> Monitor Dues, Expenses, Online Orders, Inventory updates.</div>
+          <div class="step"><strong>4) End of day:</strong> Use Reports + Day Close for final check.</div>
+          <div class="step"><strong>5) Admin updates:</strong> Setup module for items, users, branches, suppliers, and permissions.</div>
+        </div>
+      </section>
+
+      <div class="foot">
+        <span>Document: ShopApp Menu Navigation Brochure</span>
+        <span>Prepared for internal training and onboarding</span>
+      </div>
+    </main>
+  </article>
+</body>
+</html>
