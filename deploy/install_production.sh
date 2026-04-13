@@ -233,42 +233,99 @@ echo "    Backend service restarted."
 # ── 8. Install / update nginx ─────────────────────────────────────────────────
 echo "==> Installing nginx site"
 TMP_NGINX="$(mktemp)"
-cat > "${TMP_NGINX}" <<EOF
+HAS_EXISTING_CERT=0
+CERT_DIR="/etc/letsencrypt/live/${PUBLIC_HOST}"
+if [[ "${PUBLIC_HOST}" != "_" && "${PUBLIC_HOST}" != "" ]]; then
+  if sudo test -f "${CERT_DIR}/fullchain.pem" && sudo test -f "${CERT_DIR}/privkey.pem"; then
+  HAS_EXISTING_CERT=1
+  echo "    Existing certificate detected for ${PUBLIC_HOST}; preserving HTTPS listener."
+  fi
+fi
+
+if [[ "${HAS_EXISTING_CERT}" -eq 1 ]]; then
+  cat > "${TMP_NGINX}" <<EOF
 server {
-    listen 80;
-    server_name ${PUBLIC_HOST} _;
+  listen 80;
+  server_name ${PUBLIC_HOST} _;
+  return 301 https://\$host\$request_uri;
+}
 
-    root ${FRONTEND_DIR}/dist;
-    index index.html;
+server {
+  listen 443 ssl http2;
+  server_name ${PUBLIC_HOST} _;
 
-    location /assets/ {
-        try_files \$uri =404;
-        expires 30d;
-        add_header Cache-Control "public, max-age=2592000, immutable";
-    }
+  ssl_certificate ${CERT_DIR}/fullchain.pem;
+  ssl_certificate_key ${CERT_DIR}/privkey.pem;
 
-    location /downloads/ {
-        alias ${ROOT_DIR}/downloads/;
-        try_files \$uri =404;
-        expires 1h;
-        add_header Cache-Control "public, max-age=3600";
-    }
+  root ${FRONTEND_DIR}/dist;
+  index index.html;
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 120s;
-    }
+  location /assets/ {
+    try_files \$uri =404;
+    expires 30d;
+    add_header Cache-Control "public, max-age=2592000, immutable";
+  }
 
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
+  location /downloads/ {
+    alias ${ROOT_DIR}/downloads/;
+    try_files \$uri =404;
+    expires 1h;
+    add_header Cache-Control "public, max-age=3600";
+  }
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 120s;
+  }
+
+  location / {
+    try_files \$uri \$uri/ /index.html;
+  }
 }
 EOF
+else
+  cat > "${TMP_NGINX}" <<EOF
+server {
+  listen 80;
+  server_name ${PUBLIC_HOST} _;
+
+  root ${FRONTEND_DIR}/dist;
+  index index.html;
+
+  location /assets/ {
+    try_files \$uri =404;
+    expires 30d;
+    add_header Cache-Control "public, max-age=2592000, immutable";
+  }
+
+  location /downloads/ {
+    alias ${ROOT_DIR}/downloads/;
+    try_files \$uri =404;
+    expires 1h;
+    add_header Cache-Control "public, max-age=3600";
+  }
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 120s;
+  }
+
+  location / {
+    try_files \$uri \$uri/ /index.html;
+  }
+}
+EOF
+fi
 
 sudo apt-get update -qq
 sudo apt-get install -y nginx certbot python3-certbot-nginx
@@ -284,11 +341,16 @@ echo "    Nginx restarted."
 # ── 9. Re-apply SSL (certbot keeps HTTPS after nginx config regeneration) ─────
 if [[ "${PUBLIC_HOST}" != "_" && "${PUBLIC_HOST}" != "" ]]; then
   echo "==> Re-applying SSL certificate for ${PUBLIC_HOST}"
-  sudo certbot --nginx -d "${PUBLIC_HOST}" \
-    --non-interactive --agree-tos \
-    -m "${CERTBOT_EMAIL:-haappiigaming@gmail.com}" \
-    --redirect \
-    --keep-until-expiring 2>&1 || echo "    Certbot skipped (cert still valid or domain not reachable)."
+  if pgrep -x certbot >/dev/null 2>&1; then
+    echo "    Another certbot process is running; skipping certbot this run."
+    echo "    Existing certificate (if present) is still being used by nginx."
+  else
+    sudo certbot --nginx -d "${PUBLIC_HOST}" \
+      --non-interactive --agree-tos \
+      -m "${CERTBOT_EMAIL:-haappiigaming@gmail.com}" \
+      --redirect \
+      --keep-until-expiring 2>&1 || echo "    Certbot skipped (cert still valid or domain not reachable)."
+  fi
   sudo systemctl reload nginx
   echo "    SSL applied."
 fi
