@@ -424,7 +424,23 @@ export default function PlatformDashboard() {
       } catch (postError) {
         if (postError?.response?.status !== 405) throw postError;
         // Some deployments/proxies may expose this endpoint with PUT.
-        res = await platformAxios.put("/platform/about-contact", payload);
+        try {
+          res = await platformAxios.put("/platform/about-contact", payload);
+        } catch (putError) {
+          if (putError?.response?.status !== 405) throw putError;
+          // Legacy fallback: some runtimes allow only GET on this route.
+          res = await platformAxios.get("/platform/about-contact", {
+            params: {
+              name: aboutContact.name || "",
+              mobile: aboutContact.mobile || "",
+              email: aboutContact.email || "",
+              insta: aboutContact.insta || "",
+            },
+          });
+          if (aboutPhotoFile) {
+            showToast("Text fields saved. Photo upload needs POST/PUT support on backend.", "info");
+          }
+        }
       }
       setAboutContact({
         name: res?.data?.name || "",

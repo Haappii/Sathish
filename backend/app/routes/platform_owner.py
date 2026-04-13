@@ -165,9 +165,33 @@ def public_about_contact(db: Session = Depends(get_db)):
 
 @router.get("/about-contact")
 def get_about_contact(
+    name: str | None = Query(None),
+    mobile: str | None = Query(None),
+    email: str | None = Query(None),
+    insta: str | None = Query(None),
     db: Session = Depends(get_db),
     owner=Depends(PlatformOwnerOnly),
 ):
+    # Legacy-safe fallback: allow updating text fields via GET query params
+    # when a proxy/runtime only permits GET for this path.
+    if any(v is not None for v in (name, mobile, email, insta)):
+        if name is not None:
+            _set_param_value(
+                db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["name"], (name or "").strip()
+            )
+        if mobile is not None:
+            _set_param_value(
+                db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["mobile"], (mobile or "").strip()
+            )
+        if email is not None:
+            _set_param_value(
+                db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["email"], (email or "").strip()
+            )
+        if insta is not None:
+            _set_param_value(
+                db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["insta"], (insta or "").strip()
+            )
+        db.commit()
     return _get_about_contact_payload(db)
 
 
