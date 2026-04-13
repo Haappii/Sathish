@@ -11,9 +11,12 @@ from app.models.month_close import BranchMonthClose, ShopMonthClose
 from app.models.stock import Inventory
 from app.models.date_wise_stock import DateWiseStock
 from app.models.invoice import Invoice
+from app.models.invoice_payment import InvoicePayment
 from app.models.branch_expense import BranchExpense
 from app.models.sales_return import SalesReturn
+from app.models.sales_return_meta import SalesReturnMeta
 from app.models.cash_drawer import CashMovement, CashShift
+from app.models.advance_order import AdvanceOrder
 from app.models.employee import EmployeeWagePayment
 from app.services.financials_service import calc_day_close_totals
 from app.utils.permissions import require_permission
@@ -35,6 +38,16 @@ def _normalize_payment_mode_label(mode: str | None) -> str:
         "wallet": "WALLET",
     }
     return mapping.get(normalized, str(mode or "cash").strip().upper() or "CASH")
+
+
+def _cash_amount_from_invoice_row(payment_mode: str | None, payment_split, total_amount, discounted_amt) -> float:
+    mode = str(payment_mode or "cash").strip().lower()
+    net = float(total_amount or 0) - float(discounted_amt or 0)
+    if mode == "cash":
+        return round(net, 2)
+    if mode == "split" and isinstance(payment_split, dict):
+        return round(float(payment_split.get("cash") or 0), 2)
+    return 0.0
 
 
 def parse_date(d: str) -> date:
@@ -107,7 +120,8 @@ def day_close_cash_summary(
 ):
     """
     Returns a cash-flow summary:
-      Opening Balance + Cash In (sales) − Cash Out (expenses + wage payments + returns)
+            Opening Balance + Cash In (sales + advance payments + due collections + top-up)
+            − Cash Out (cash refunds + cash expenses + withdrawals)
     """
     d = parse_date(date_str)
     d_start = datetime.combine(d, datetime.min.time())
@@ -217,11 +231,51 @@ def day_close_cash_summary(
         .first()
     )
 
+    # ── Dues collections paid in cash ────────────────────────────────────────
+    cash_collections = float(
+        (
+            db.query(func.coalesce(func.sum(InvoicePayment.amount), 0))
+            .filter(
+                InvoicePayment.shop_id == shop_id,
+                InvoicePayment.branch_id == branch_id,
+                func.lower(InvoicePayment.payment_mode) == "cash",
+                InvoicePayment.paid_on >= d_start,
+                InvoicePayment.paid_on <= d_end,
+            )
+            .scalar()
+            or 0
+        )
+    )
+
+    # ── Advance order cash receipts ──────────────────────────────────────────
+    cash_advance_payments = float(
+        (
+            db.query(func.coalesce(func.sum(AdvanceOrder.advance_amount), 0))
+            .filter(
+                AdvanceOrder.shop_id == shop_id,
+                AdvanceOrder.branch_id == branch_id,
+                AdvanceOrder.status != "CANCELLED",
+                func.upper(func.coalesce(AdvanceOrder.advance_payment_mode, "")) == "CASH",
+                AdvanceOrder.created_at >= d_start,
+                AdvanceOrder.created_at <= d_end,
+            )
+            .scalar()
+            or 0
+        )
+    )
+
     # ── Returns ──────────────────────────────────────────────────────────────
     ret_row = (
         db.query(
             func.count(func.distinct(SalesReturn.return_id)).label("return_count"),
             func.coalesce(func.sum(SalesReturn.refund_amount), 0).label("return_amount"),
+        )
+        .outerjoin(
+            SalesReturnMeta,
+            and_(
+                SalesReturnMeta.shop_id == SalesReturn.shop_id,
+                SalesReturnMeta.return_id == SalesReturn.return_id,
+            ),
         )
         .filter(
             SalesReturn.shop_id == shop_id,
@@ -229,6 +283,10 @@ def day_close_cash_summary(
             SalesReturn.status != "CANCELLED",
             SalesReturn.created_on >= d_start,
             SalesReturn.created_on <= d_end,
+            case(
+                (SalesReturnMeta.id.is_(None), True),
+                else_=func.upper(SalesReturnMeta.refund_mode) == "CASH",
+            ),
         )
         .first()
     )
@@ -274,8 +332,8 @@ def day_close_cash_summary(
 
     # ── Final cash position ───────────────────────────────────────────────────
     sales_cash = payment_by_mode.get("CASH", 0.0)
-    operational_cash_out = round(return_cash + cash_expense + cash_wages, 2)
-    cash_in     = round(sales_cash + cash_top_up, 2)
+    operational_cash_out = round(return_cash + cash_expense, 2)
+    cash_in     = round(sales_cash + cash_collections + cash_advance_payments + cash_top_up, 2)
     cash_out    = round(operational_cash_out + cash_withdrawal, 2)
     system_cash = round(opening_balance + cash_in - cash_out, 2)
 
@@ -317,6 +375,8 @@ def day_close_cash_summary(
         # Payment mode breakdown
         "payment_modes":  payment_by_mode,
         "cash_sales":     round(sales_cash, 2),
+        "cash_collections": round(cash_collections, 2),
+        "cash_advance_payments": round(cash_advance_payments, 2),
         "cash_top_up":    round(cash_top_up, 2),
         "cash_in":        round(cash_in, 2),
         # Cash out breakdown
