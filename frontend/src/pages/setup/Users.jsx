@@ -121,6 +121,16 @@ export default function Users() {
     }
   };
 
+  const resetLoginStatus = async (u) => {
+    try {
+      await authAxios.put(`/users/${u.user_id}`, { login_status: false });
+      loadData();
+      showToast("Login status reset", "success");
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Failed to reset login status", "error");
+    }
+  };
+
   const activeCount = users.filter(u => u.status).length;
   const loggedInCount = users.filter(u => u.login_status).length;
 
@@ -214,6 +224,12 @@ export default function Users() {
                       {u.status ? "Disable" : "Enable"}
                     </button>
                   </div>
+                  <button
+                    onClick={() => resetLoginStatus(u)}
+                    className="w-full py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition"
+                  >
+                    Reset Login
+                  </button>
                 </div>
               );
             })}

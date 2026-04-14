@@ -1,6 +1,7 @@
 import json
 import time
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.utils.auth_user import get_current_user
@@ -223,3 +224,37 @@ def upload_shop_logo(
         "shop_id": shop.shop_id,
         "logo_url": shop.logo_url
     }
+
+
+# Core modules that are always visible regardless of platform configuration.
+_CORE_MODULE_KEYS = {"sales_billing", "inventory"}
+
+
+@router.get("/modules")
+def get_shop_modules(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Return which feature modules are enabled for the current shop.
+    - configured=False  → no platform restrictions set yet; frontend shows all menus.
+    - configured=True   → only the listed enabled_modules keys should appear.
+    Core modules (sales_billing, inventory) are always included when configured.
+    """
+    shop_id = user.shop_id
+    rows = db.execute(
+        text("SELECT module_key, enabled FROM shop_modules WHERE shop_id = :sid"),
+        {"sid": shop_id},
+    ).fetchall()
+
+    if not rows:
+        # No configuration saved yet → backward-compat: unrestricted.
+        return {"configured": False, "enabled_modules": []}
+
+    enabled = [r.module_key for r in rows if r.enabled]
+    # Always include core modules.
+    for core in _CORE_MODULE_KEYS:
+        if core not in enabled:
+            enabled.append(core)
+
+    return {"configured": True, "enabled_modules": enabled}

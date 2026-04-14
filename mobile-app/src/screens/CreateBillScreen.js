@@ -16,7 +16,7 @@ import {
 
 import api from "../api/client";
 import useOnlineStatus from "../hooks/useOnlineStatus";
-import { WEB_APP_BASE } from "../config/api";
+import { API_BASE, WEB_APP_BASE } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import {
@@ -76,6 +76,11 @@ const toAmount = (value) => {
 const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
 
 const resolveItemImageUrl = (item) => {
+  const imageFilename = String(item?.image_filename || "").trim();
+  if (imageFilename) {
+    return `${String(API_BASE || "").replace(/\/+$/, "")}/item-images/${encodeURIComponent(imageFilename)}`;
+  }
+
   const raw = String(
     item?.image_url || item?.image || item?.item_image || item?.image_path || item?.photo || item?.thumbnail || ""
   ).trim();

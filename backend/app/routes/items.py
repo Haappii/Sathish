@@ -10,6 +10,7 @@ from app.db import get_db
 from app.models.items import Item
 from app.models.branch_item_price import BranchItemPrice
 from app.models.category import Category
+from app.models.shop_details import ShopDetails
 from app.models.stock import Inventory
 from app.models.bulk_import_log import BulkImportLog
 from app.models.system_parameters import SystemParameter
@@ -209,6 +210,20 @@ def create_item(
         branch_id = resolve_branch_for_user(user=user, request=request)
     else:
         branch_id = None  # head-office mode: items are shared across all branches
+
+    # Enforce per-shop item limit (free tier = 20 items)
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+    if shop and shop.max_items is not None:
+        current_count = db.query(Item).filter(
+            Item.shop_id == user.shop_id,
+            Item.branch_id.is_(None),
+        ).count()
+        if current_count >= shop.max_items:
+            raise HTTPException(
+                403,
+                f"Item limit reached. Your plan allows up to {shop.max_items} items. "
+                "Upgrade your plan to add more items."
+            )
 
     shop_type = get_shop_billing_type(db, int(user.shop_id))
     is_raw = bool(getattr(request_data, "is_raw_material", False))

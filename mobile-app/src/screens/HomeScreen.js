@@ -14,6 +14,7 @@ import {
 
 import api from "../api/client";
 import { buildMobileMenu, modulesToPermMap } from "../auth/rbac";
+import { WEB_APP_BASE } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import useOnlineStatus from "../hooks/useOnlineStatus";
@@ -50,6 +51,36 @@ const formatBizDate = (dateStr) => {
   return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
 };
 
+const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
+
+const slugifyShopName = (value) => {
+  const s = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]+/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return s || "shop";
+};
+
+const resolveShopLogoUrl = (shop) => {
+  const logoUrl = String(shop?.logo_url || "").trim();
+  if (logoUrl) {
+    if (isAbsoluteUrl(logoUrl) || logoUrl.startsWith("data:")) return logoUrl;
+    const base = String(WEB_APP_BASE || "").replace(/\/+$/, "");
+    return logoUrl.startsWith("/") ? `${base}${logoUrl}` : `${base}/${logoUrl}`;
+  }
+
+  const shopId = shop?.shop_id;
+  const shopName = shop?.shop_name;
+  if (!shopId || !shopName) return "";
+
+  const filename = `logo_${slugifyShopName(shopName)}_${shopId}.png`;
+  const base = String(WEB_APP_BASE || "").replace(/\/+$/, "");
+  return `${base}/shop-logos/${filename}`;
+};
+
 export default function HomeScreen({ navigation }) {
   const { session, logout } = useAuth();
   const { theme, preference, setPreference } = useTheme();
@@ -59,10 +90,12 @@ export default function HomeScreen({ navigation }) {
   const [isHotel, setIsHotel]           = useState(false);
   const [permsEnabled, setPermsEnabled] = useState(false);
   const [permMap, setPermMap]           = useState(null);
+  const [enabledModules, setEnabledModules] = useState(null); // null = unrestricted
   const [loading, setLoading]           = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [shopLogoUri, setShopLogoUri] = useState("");
 
   const roleLower      = String(session?.role_name || session?.role || "").toLowerCase();
   const branchName     = String(session?.branch_name || "").trim();
@@ -100,17 +133,24 @@ export default function HomeScreen({ navigation }) {
     (async () => {
       setLoading(true);
       try {
-        const [shopRes, permRes] = await Promise.all([
+        const [shopRes, permRes, modulesRes] = await Promise.all([
           api.get("/shop/details"),
           api.get("/permissions/my"),
+          api.get("/shop/modules").catch(() => null),
         ]);
         if (!mounted) return;
         const shopData = shopRes?.data || {};
         setShopName(shopData.shop_name || "Haappii Billing");
+        setShopLogoUri(resolveShopLogoUrl(shopData));
         const billingType = String(shopData.billing_type || shopData.shop_type || "").toLowerCase();
         setIsHotel(billingType === "hotel");
         setPermsEnabled(Boolean(permRes?.data?.enabled));
         setPermMap(modulesToPermMap(permRes?.data?.modules));
+        if (modulesRes?.data?.configured) {
+          setEnabledModules(new Set(modulesRes.data.enabled_modules || []));
+        } else {
+          setEnabledModules(null); // unrestricted
+        }
         const count = await getPendingCount();
         setPendingCount(count);
       } catch (err) {
@@ -128,6 +168,27 @@ export default function HomeScreen({ navigation }) {
     () => buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel }),
     [roleLower, permsEnabled, permMap, isHotel]
   );
+
+  // Premium modules to advertise when shop is on free tier (modules configured but locked)
+  const PREMIUM_LOCKED_TILES = [
+    { key: "customers",       title: "Customers & Dues",      icon: "👥" },
+    { key: "loyalty",         title: "Loyalty & Coupons",     icon: "🎁" },
+    { key: "employees",       title: "Employees",             icon: "👔" },
+    { key: "expenses",        title: "Expenses",              icon: "💸" },
+    { key: "returns",         title: "Returns",               icon: "↩️" },
+    { key: "reports",         title: "Reports",               icon: "📊" },
+    { key: "analytics",       title: "Analytics",             icon: "📈" },
+    { key: "cash_drawer",     title: "Cash Drawer",           icon: "💰" },
+    { key: "table_billing",   title: "Table Billing",         icon: "🍽️" },
+    { key: "online_orders",   title: "Online Orders",         icon: "🛒" },
+    { key: "advance_orders",  title: "Advance Orders",        icon: "📋" },
+    { key: "supplier_ledger", title: "Suppliers",             icon: "🚚" },
+  ];
+
+  const lockedTiles = useMemo(() => {
+    if (!enabledModules) return []; // unrestricted — no locked tiles
+    return PREMIUM_LOCKED_TILES.filter((m) => !enabledModules.has(m.key));
+  }, [enabledModules]);
 
   const handleSync = async () => {
     if (syncing || !isOnline) return;
@@ -223,14 +284,36 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
+        {/* Locked premium tiles — upgrade CTA for free tier shops */}
+        {lockedTiles.length > 0 && (
+          <View style={styles.lockedSection}>
+            <View style={styles.lockedHeader}>
+              <Text style={styles.lockedHeaderText}>🔒  Upgrade to Unlock</Text>
+            </View>
+            <View style={styles.grid}>
+              {lockedTiles.map((m) => (
+                <View key={m.key} style={styles.lockedTile}>
+                  <View style={styles.lockedIconWrap}>
+                    <Text style={styles.tileIcon}>{m.icon}</Text>
+                  </View>
+                  <Text style={styles.lockedLabel}>{m.title}</Text>
+                  <View style={styles.lockedBadge}>
+                    <Text style={styles.lockedBadgeText}>PRO</Text>
+                  </View>
+                  <View style={[styles.tileAccentBar, { backgroundColor: "#d1d5db" }]} />
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
       </ScrollView>
 
       <Modal visible={sidebarVisible} animationType="fade" transparent onRequestClose={() => setSidebarVisible(false)}>
         <View style={styles.sidebarOverlay}>
-          <Pressable style={styles.sidebarBackdrop} onPress={() => setSidebarVisible(false)} />
           <View style={[styles.sidebarPanel, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
             <View style={styles.sidebarHead}>
-              <Image source={appLogo} style={styles.sidebarLogo} resizeMode="contain" />
+              <Image source={shopLogoUri ? { uri: shopLogoUri } : appLogo} style={styles.sidebarLogo} resizeMode="contain" />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sidebarShopName, { color: theme.text }]} numberOfLines={1}>
                   {shopName || "Haappii Billing"}
@@ -276,6 +359,7 @@ export default function HomeScreen({ navigation }) {
               <Text style={[styles.sidebarActionText, { color: "#b91c1c" }]}>Logout</Text>
             </Pressable>
           </View>
+          <Pressable style={styles.sidebarBackdrop} onPress={() => setSidebarVisible(false)} />
         </View>
       </Modal>
     </SafeAreaView>
@@ -384,7 +468,7 @@ const styles = StyleSheet.create({
   sidebarPanel: {
     width: "78%",
     maxWidth: 320,
-    borderLeftWidth: 1,
+    borderRightWidth: 1,
     paddingHorizontal: 14,
     paddingTop: 24,
     paddingBottom: 20,
@@ -402,6 +486,65 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   sidebarActionText: { fontSize: 13, fontWeight: "700" },
+
+  // Locked premium tiles
+  lockedSection: { gap: 12 },
+  lockedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  lockedHeaderText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#d97706",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  lockedTile: {
+    width: "47%",
+    backgroundColor: "#f9fafb",
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    opacity: 0.7,
+    overflow: "hidden",
+    position: "relative",
+  },
+  lockedIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f3f4f6",
+  },
+  lockedLabel: {
+    fontWeight: "700",
+    color: "#9ca3af",
+    textAlign: "center",
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
+  lockedBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#fef3c7",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  lockedBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#d97706",
+    letterSpacing: 0.5,
+  },
 
   empty: { color: "#94a3b8", textAlign: "center", padding: 20 },
 });

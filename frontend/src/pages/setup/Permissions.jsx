@@ -12,65 +12,84 @@ const inputClass =
 const asId = (value) => String(value || "");
 const errorDetail = (err, fallback) => err?.response?.data?.detail || fallback;
 
+// Module keys here MUST match the unique perm.module values in navigationMenu.jsx
+// so that toggling a menu row only affects that specific menu and nothing else.
 const MENU_ACCESS_CATALOG = [
-  // Main app menus
-  { name: "Home", module: "setup", group: "Main" },
-  { name: "Trends", module: "billing", group: "Main" },
+  // Main
+  { name: "Home", module: "home", group: "Main" },
+  { name: "Trends", module: "trends", group: "Main" },
   { name: "Analytics", module: "analytics", group: "Main" },
   { name: "Cash Drawer", module: "cash_drawer", group: "Main" },
-  { name: "Sales Billing", module: "billing", group: "Billing" },
-  { name: "Take Away", module: "billing", group: "Billing" },
-  { name: "Billing History", module: "billing", group: "Billing" },
-  { name: "Table Billing", module: "billing", group: "Billing" },
+  { name: "Day Close", module: "day_close", group: "Main" },
+
+  // Billing
+  { name: "Sales Billing / Take Away", module: "sales_billing", group: "Billing" },
+  { name: "Billing History", module: "billing_history", group: "Billing" },
+  { name: "Table Billing", module: "table_billing", group: "Billing" },
   { name: "QR Orders", module: "qr_orders", group: "Billing" },
-  { name: "Order Live", module: "billing", group: "Billing" },
-  { name: "KOT", module: "billing", group: "Billing" },
-  { name: "Delivery", module: "billing", group: "Billing" },
+  { name: "Order Live", module: "order_live", group: "Billing" },
+  { name: "KOT", module: "kot_management", group: "Billing" },
+  { name: "Delivery", module: "delivery", group: "Billing" },
+  { name: "Reservations", module: "reservations", group: "Billing" },
+  { name: "Recipes", module: "recipes", group: "Billing" },
   { name: "Online Orders", module: "online_orders", group: "Billing" },
-  { name: "Advance Orders", module: "billing", group: "Billing" },
-  { name: "Offline Sync", module: "billing", group: "Billing" },
+  { name: "Advance Orders", module: "advance_orders", group: "Billing" },
+  { name: "Offline Sync", module: "offline_sync", group: "Billing" },
   { name: "Draft Bills", module: "drafts", group: "Billing" },
-  { name: "Held Invoices", module: "drafts", group: "Billing" },
   { name: "Returns", module: "returns", group: "Billing" },
   { name: "Dues", module: "dues", group: "Billing" },
+
+  // Finance
+  { name: "Expenses", module: "expenses", group: "Finance" },
+  { name: "Supplier Ledger", module: "supplier_ledger", group: "Finance" },
+
+  // CRM
   { name: "Customers", module: "customers", group: "CRM" },
-  { name: "Employees", module: "employees", group: "HR" },
-  { name: "Employee Attendance", module: "employees", group: "HR" },
-  { name: "Onboarding Docs", module: "employees", group: "HR" },
   { name: "Loyalty", module: "loyalty", group: "CRM" },
   { name: "Gift Cards", module: "gift_cards", group: "CRM" },
   { name: "Coupons", module: "coupons", group: "CRM" },
-  { name: "Supplier Ledger", module: "supplier_ledger", group: "Inventory" },
-  { name: "Inventory", module: "inventory", group: "Inventory" },
-  { name: "Raw Materials", module: "inventory", group: "Inventory" },
+
+  // HR
+  { name: "Employees", module: "employees", group: "HR" },
+  { name: "Employee Attendance", module: "employee_attendance", group: "HR" },
+  { name: "Onboarding Docs", module: "employee_onboarding", group: "HR" },
+
+  // Inventory
+  { name: "Inventory / Raw Materials", module: "inventory", group: "Inventory" },
   { name: "Stock Audit", module: "stock_audit", group: "Inventory" },
   { name: "Item Lots", module: "item_lots", group: "Inventory" },
-  { name: "Labels / Barcode", module: "items", group: "Inventory" },
-  { name: "Transfers", module: "stock_transfers", group: "Inventory" },
+  { name: "Labels / Barcode", module: "labels", group: "Inventory" },
+  { name: "Transfers", module: "transfers", group: "Inventory" },
+
+  // Reports
   { name: "Reports", module: "reports", group: "Reports" },
-  { name: "Deleted Invoice", module: "reports", group: "Reports" },
-  { name: "Feedback Review", module: "feedback", group: "Reports" },
+  { name: "Deleted Invoice", module: "deleted_invoices", group: "Reports" },
+  { name: "Feedback Review", module: "feedback_review", group: "Reports" },
   { name: "Alerts", module: "alerts", group: "Reports" },
   { name: "Support Tickets", module: "support_tickets", group: "Support" },
 
-  // Setup sub menus
+  // Setup sub menus (use backend module names — controlled by Setup.jsx internally)
   { name: "Setup > Category Management", module: "categories", group: "Setup" },
   { name: "Setup > Item Management", module: "items", group: "Setup" },
+  { name: "Setup > Item Pricing", module: "pricing", group: "Setup" },
   { name: "Setup > Shop Details", module: "setup", group: "Setup" },
   { name: "Setup > User Management", module: "users", group: "Setup" },
   { name: "Setup > Role Management", module: "roles", group: "Setup" },
+  { name: "Setup > Permissions", module: "roles", group: "Setup" },
   { name: "Setup > Branch Management", module: "setup", group: "Setup" },
   { name: "Setup > Suppliers", module: "suppliers", group: "Setup" },
   { name: "Setup > Purchase Orders", module: "purchase_orders", group: "Setup" },
+  { name: "Setup > Online Order Setup", module: "online_orders", group: "Setup" },
   { name: "Setup > Excel Upload", module: "setup", group: "Setup" },
   { name: "Setup > Mail Scheduler", module: "setup", group: "Setup" },
   { name: "Setup > Cash Denominations", module: "cash_drawer", group: "Setup" },
+  { name: "Admin (Setup Hub)", module: "admin", group: "Setup" },
 
-  // Mobile-specific entries
+  // Mobile-specific
   { name: "Mobile > QR Order Accept", module: "qr_orders", group: "Mobile" },
-  { name: "Mobile > KOT Management", module: "billing", group: "Mobile" },
+  { name: "Mobile > KOT Management", module: "kot_management", group: "Mobile" },
   { name: "Mobile > Supplier Ledger", module: "supplier_ledger", group: "Mobile" },
-  { name: "Mobile > Advance Orders", module: "billing", group: "Mobile" },
+  { name: "Mobile > Advance Orders", module: "advance_orders", group: "Mobile" },
   { name: "Mobile > Analytics", module: "analytics", group: "Mobile" },
   { name: "Mobile > Dues & Receivables", module: "dues", group: "Mobile" },
 ];

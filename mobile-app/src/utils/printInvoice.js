@@ -198,9 +198,22 @@ function slugifyShopName(value) {
   return s || "shop";
 }
 
-async function getReceiptLogoUrl() {
+async function getReceiptLogoUrl({ shop = {}, branch = {} } = {}) {
   try {
     const candidates = [];
+
+    const branchLogo = String(
+      branch?.print_logo_url || branch?.logo_url || ""
+    ).trim();
+    if (branchLogo) candidates.push(resolveApiUrl(branchLogo));
+
+    const shopLogo = String(shop?.logo_url || "").trim();
+    if (shopLogo) candidates.push(resolveApiUrl(shopLogo));
+
+    if (shop?.shop_id && shop?.shop_name) {
+      const filename = `logo_${slugifyShopName(shop.shop_name)}_${shop.shop_id}.png`;
+      candidates.push(resolveApiUrl(`shop-logos/${filename}`));
+    }
 
     const resolved = Image.resolveAssetSource(appLogo)?.uri;
     if (resolved) candidates.push(resolved);
@@ -423,7 +436,7 @@ export async function printInvoiceByData(invoice, options = {}) {
     kotToken,
   });
 
-  const logoUrl = await getReceiptLogoUrl();
+  const logoUrl = await getReceiptLogoUrl({ shop: normalizedShop, branch });
   const logoHtml =
     branch?.print_logo_enabled === false
       ? ""

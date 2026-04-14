@@ -27,6 +27,10 @@ import {
 } from "react-icons/fa";
 import { MdTableRestaurant } from "react-icons/md";
 
+// Each entry uses its own unique `module` key (matching the item's `key`) so that
+// toggling one menu in Permissions never affects a different menu.
+// `fallback` is the original module name — checked when no per-menu row exists yet,
+// giving backward-compat with existing role_permissions data.
 const MENU_CATALOG = [
   { key: "home", name: "Home", path: "/home", icon: <FaHome /> },
   {
@@ -41,7 +45,7 @@ const MENU_CATALOG = [
     name: "Trends",
     path: "/trends",
     icon: <FaChartLine />,
-    perm: { module: "billing", action: "read" },
+    perm: { module: "trends", fallback: "billing", action: "read" },
   },
   {
     key: "analytics",
@@ -55,21 +59,21 @@ const MENU_CATALOG = [
     name: "Sales Billing",
     path: "/sales/create",
     icon: <FaShoppingCart />,
-    perm: { module: "billing", action: "write" },
+    perm: { module: "sales_billing", fallback: "billing", action: "write" },
   },
   {
     key: "billing_history",
     name: "Billing History",
     path: "/sales/history",
     icon: <FaHistory />,
-    perm: { module: "billing", action: "read" },
+    perm: { module: "billing_history", fallback: "billing", action: "read" },
   },
   {
     key: "table_billing",
     name: "Table Billing",
     path: "/table-billing",
     icon: <MdTableRestaurant />,
-    perm: { module: "billing", action: "write" },
+    perm: { module: "table_billing", fallback: "billing", action: "write" },
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
@@ -85,14 +89,14 @@ const MENU_CATALOG = [
     name: "Reservations",
     path: "/reservations",
     icon: <FaCalendarAlt />,
-    perm: { module: "billing", action: "read" },
+    perm: { module: "reservations", fallback: "billing", action: "read" },
   },
   {
     key: "delivery",
     name: "Delivery",
     path: "/delivery",
     icon: <FaMotorcycle />,
-    perm: { module: "billing", action: "write" },
+    perm: { module: "delivery", fallback: "billing", action: "write" },
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
@@ -100,7 +104,7 @@ const MENU_CATALOG = [
     name: "Recipes",
     path: "/recipes",
     icon: <FaUtensils />,
-    perm: { module: "inventory", action: "read" },
+    perm: { module: "recipes", fallback: "inventory", action: "read" },
     when: ({ showTableBilling }) => Boolean(showTableBilling),
   },
   {
@@ -108,7 +112,7 @@ const MENU_CATALOG = [
     name: "Order Live",
     path: "/order-live",
     icon: <MdTableRestaurant />,
-    perm: { module: "billing", action: "read" },
+    perm: { module: "order_live", fallback: "billing", action: "read" },
     when: ({ showTableBilling, orderLiveTrackingEnabled }) =>
       Boolean(showTableBilling) && orderLiveTrackingEnabled !== false,
   },
@@ -117,7 +121,7 @@ const MENU_CATALOG = [
     name: "KOT",
     path: "/kot",
     icon: <FaConciergeBell />,
-    perm: { module: "billing", action: "write" },
+    perm: { module: "kot_management", fallback: "billing", action: "write" },
     when: ({ showTableBilling, orderLiveTrackingEnabled }) =>
       Boolean(showTableBilling) && orderLiveTrackingEnabled !== false,
   },
@@ -133,14 +137,14 @@ const MENU_CATALOG = [
     name: "Advance Orders",
     path: "/advance-orders",
     icon: <FaClipboardList />,
-    perm: { module: "billing", action: "read" },
+    perm: { module: "advance_orders", fallback: "billing", action: "read" },
   },
   {
     key: "offline_sync",
     name: "Offline Sync",
     path: "/offline-sync",
     icon: <FaCloudUploadAlt />,
-    perm: { module: "billing", action: "write" },
+    perm: { module: "offline_sync", fallback: "billing", action: "write" },
   },
   {
     key: "drafts",
@@ -189,14 +193,14 @@ const MENU_CATALOG = [
     name: "Employee Attendance",
     path: "/employees/attendance",
     icon: <FaClipboardCheck />,
-    perm: { module: "employees", action: "read" },
+    perm: { module: "employee_attendance", fallback: "employees", action: "read" },
   },
   {
     key: "employee_onboarding",
     name: "Onboarding Docs",
     path: "/employees/onboarding",
     icon: <FaClipboardCheck />,
-    perm: { module: "employees", action: "read" },
+    perm: { module: "employee_onboarding", fallback: "employees", action: "read" },
   },
   {
     key: "loyalty",
@@ -246,7 +250,7 @@ const MENU_CATALOG = [
     name: "Labels / Barcode",
     path: "/labels",
     icon: <FaBarcode />,
-    perm: { module: "items", action: "read" },
+    perm: { module: "labels", fallback: "items", action: "read" },
     when: ({ showTableBilling }) => !Boolean(showTableBilling),
   },
   {
@@ -254,7 +258,7 @@ const MENU_CATALOG = [
     name: "Transfers",
     path: "/stock-transfers",
     icon: <FaBoxes />,
-    perm: { module: "stock_transfers", action: "read" },
+    perm: { module: "transfers", fallback: "stock_transfers", action: "read" },
   },
   {
     key: "reports",
@@ -268,14 +272,14 @@ const MENU_CATALOG = [
     name: "Feedback Review",
     path: "/feedback-review",
     icon: <FaStar />,
-    perm: { module: "feedback", action: "read" },
+    perm: { module: "feedback_review", fallback: "feedback", action: "read" },
   },
   {
     key: "deleted_invoices",
     name: "Deleted Invoice",
     path: "/deleted-invoices",
     icon: <FaFileInvoice />,
-    perm: { module: "reports", action: "read" },
+    perm: { module: "deleted_invoices", fallback: "reports", action: "read" },
   },
   {
     key: "inventory",
@@ -303,7 +307,7 @@ const MENU_CATALOG = [
     name: "Admin",
     path: "/setup",
     icon: <FaTools />,
-    perm: { module: "setup", action: "read" },
+    perm: { module: "admin", fallback: "setup", action: "read" },
   },
 ];
 
@@ -313,6 +317,9 @@ const HEAD_OFFICE_CLOSED_KEYS = new Set([
   "analytics",
   "admin",
 ]);
+
+const HOTEL_HIDDEN_PROFIT_KEYS = new Set(["trends", "analytics"]);
+const HOTEL_HIDDEN_PROFIT_PATHS = new Set(["/trends", "/analytics"]);
 
 const getSalesBillingName = (showTableBilling) =>
   showTableBilling ? "Take Away" : "Billing";
@@ -343,26 +350,56 @@ export const canAccess = (permMap, perm) => {
   if (!perm) return true;
   const moduleKey = String(perm.module || "");
   if (!moduleKey) return true;
+
+  const check = (p) =>
+    perm.action === "write"
+      ? Boolean(p?.can_write)
+      : Boolean(p?.can_read || p?.can_write);
+
+  // 1. Check per-menu unique key (set via Permissions page).
   const p = permMap?.[moduleKey];
-  if (!p) return false;
-  // Write permission should imply read permission for menu visibility.
-  return perm.action === "write"
-    ? Boolean(p.can_write)
-    : Boolean(p.can_read || p.can_write);
+  if (p) return check(p);
+
+  // 2. Backward-compat: fall back to the original module name so existing
+  //    role_permissions rows (billing, inventory, etc.) still grant access
+  //    until the admin explicitly configures per-menu permissions.
+  const fallbackKey = String(perm.fallback || "");
+  if (fallbackKey) {
+    const fp = permMap?.[fallbackKey];
+    if (fp) return check(fp);
+  }
+
+  return false;
 };
+
+// Keys that are always visible regardless of platform module restrictions.
+const MODULE_CORE_KEYS = new Set(["home", "sales_billing", "inventory"]);
 
 export const buildRbacMenu = ({
   permMap,
+  enabledModules = null,   // null = unrestricted; Set<string> = platform-configured
   showTableBilling,
   isHeadOfficeClosed,
+  isHotel = false,
   orderLiveTrackingEnabled = true,
 }) => {
   let items = MENU_CATALOG.filter((x) =>
     x.when ? x.when({ showTableBilling, orderLiveTrackingEnabled }) : true
   );
 
+  // Apply platform module restrictions when configured.
+  if (enabledModules !== null) {
+    items = items.filter(
+      (x) => MODULE_CORE_KEYS.has(x.key) || enabledModules.has(x.key)
+    );
+  }
+
   if (isHeadOfficeClosed) {
     items = items.filter((x) => HEAD_OFFICE_CLOSED_KEYS.has(x.key));
+  }
+
+  if (isHotel) {
+    items = items.filter((x) => !HOTEL_HIDDEN_PROFIT_KEYS.has(x.key));
   }
 
   return items
@@ -370,10 +407,16 @@ export const buildRbacMenu = ({
     .map((x) => applyDynamicMenuLabels(x, { showTableBilling }));
 };
 
+// Path → key map so role-based menus can also be filtered by module.
+export const MENU_PATH_TO_KEY = Object.fromEntries(
+  MENU_CATALOG.map((m) => [m.path, m.key])
+);
+
 export const buildRoleMenu = ({
   roleLower,
   showTableBilling,
   isHeadOfficeClosed,
+  isHotel = false,
   orderLiveTrackingEnabled = true,
 }) => {
   let menuItems = [];
@@ -543,6 +586,10 @@ export const buildRoleMenu = ({
       { name: "Reports", path: "/reports", icon: <FaFileInvoice /> },
       { name: "Admin", path: "/setup", icon: <FaTools /> },
     ];
+  }
+
+  if (isHotel) {
+    menuItems = menuItems.filter((item) => !HOTEL_HIDDEN_PROFIT_PATHS.has(item.path));
   }
 
   return menuItems;

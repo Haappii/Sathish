@@ -69,7 +69,11 @@ export default function SetupOnboard() {
         message: form.message,
       });
       setResult(res.data);
-      showToast("Request sent! Admin will review and activate your shop.", "success");
+      if (res.data?.status === "ACCEPTED") {
+        showToast("Shop created! Check your email for login credentials.", "success");
+      } else {
+        showToast("Request received! Admin will activate your shop shortly.", "success");
+      }
     } catch (e) {
       showToast(e?.response?.data?.detail || "Request failed", "error");
     } finally {
@@ -367,11 +371,26 @@ export default function SetupOnboard() {
           {/* SUCCESS STATE */}
           {result?.request_id && (
             <div className="ob-success">
-              <p className="ob-success-title">✓ Request submitted — #{result.request_id}</p>
-              <p className="ob-success-text">
-                The platform admin will review your request and activate your shop.
-                You'll receive your login credentials via email.
-              </p>
+              {result.status === "ACCEPTED" ? (
+                <>
+                  <p className="ob-success-title">✓ Your shop is ready!</p>
+                  <p className="ob-success-text">
+                    Login credentials have been sent to <strong>{form.email}</strong>.
+                    Check your inbox and log in to get started.
+                  </p>
+                  <p className="ob-success-text" style={{ marginTop: 8 }}>
+                    Free plan includes: Sales Billing (Take Away) + Item Management (up to 20 items).
+                    Upgrade anytime to unlock all features.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="ob-success-title">✓ Request received — #{result.request_id}</p>
+                  <p className="ob-success-text">
+                    Your request has been saved. You'll receive your login credentials via email shortly.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -486,7 +505,7 @@ export default function SetupOnboard() {
               </button>
             ) : (
               <button className="btn btn-success" onClick={submit} disabled={loading}>
-                {loading ? "Sending…" : "Submit Request"}
+                {loading ? "Setting up…" : "Create My Shop →"}
               </button>
             )}
           </div>

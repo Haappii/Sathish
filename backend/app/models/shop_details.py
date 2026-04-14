@@ -50,3 +50,4 @@ class ShopDetails(Base):
     # Platform-set limits (null = unlimited)
     max_branches = Column(Integer, nullable=True)
     max_users = Column(Integer, nullable=True)
+    max_items = Column(Integer, nullable=True)

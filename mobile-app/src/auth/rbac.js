@@ -194,19 +194,30 @@ export function canAccess(permMap, perm) {
   return perm.action === "write" ? Boolean(row.can_write) : Boolean(row.can_read);
 }
 
+// Keys always visible regardless of platform module restrictions.
+const MOBILE_CORE_KEYS = new Set(["sales_billing", "inventory"]);
+
 /**
  * Build the menu list for the current user.
  * @param {object} opts
- * @param {string} opts.roleLower       - User role in lowercase
+ * @param {string}  opts.roleLower      - User role in lowercase
  * @param {boolean} opts.permsEnabled   - Whether backend RBAC is on
- * @param {object} opts.permMap         - Module permission map
+ * @param {object}  opts.permMap        - Module permission map
  * @param {boolean} opts.isHotel        - Whether this shop is a hotel
+ * @param {Set|null} opts.enabledModules - Platform-configured module set, or null for unrestricted
  */
-export function buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel = false }) {
+export function buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel = false, enabledModules = null }) {
   let catalog = mobileMenuCatalog;
 
   if (!isHotel) {
     catalog = catalog.filter((m) => !m.hotelOnly);
+  }
+
+  // Apply platform module restrictions when configured.
+  if (enabledModules !== null) {
+    catalog = catalog.filter(
+      (m) => MOBILE_CORE_KEYS.has(m.key) || enabledModules.has(m.key)
+    );
   }
 
   if (!permMap || typeof permMap !== "object") {

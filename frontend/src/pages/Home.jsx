@@ -166,6 +166,7 @@ export default function Home() {
   const [expandedGroup, setExpandedGroup] = useState(null);
   const [branchSalesOpen, setBranchSalesOpen] = useState(true);
   const [categorySalesOpen, setCategorySalesOpen] = useState(true);
+  const [enabledModules, setEnabledModules] = useState(null); // null = unrestricted
 
   const hasValidCustomRange =
     reportMode !== "custom" || Boolean(fromDate && toDate);
@@ -203,6 +204,19 @@ export default function Home() {
         setPermsEnabled(false);
         setPermMap(null);
       });
+  }, []);
+
+  /* ------------------ LOAD MODULE CONFIG (for locked tiles) ------------------ */
+  useEffect(() => {
+    api.get("/shop/modules")
+      .then((r) => {
+        if (r?.data?.configured) {
+          setEnabledModules(new Set(r.data.enabled_modules || []));
+        } else {
+          setEnabledModules(null); // unrestricted — no locked tiles
+        }
+      })
+      .catch(() => setEnabledModules(null));
   }, []);
 
   useEffect(() => {
@@ -379,6 +393,7 @@ export default function Home() {
       roleLower,
       showTableBilling,
       isHeadOfficeClosed,
+      isHotel: showTableBilling,
       orderLiveTrackingEnabled,
     });
 
@@ -388,6 +403,7 @@ export default function Home() {
       permMap,
       showTableBilling,
       isHeadOfficeClosed,
+      isHotel: showTableBilling,
       orderLiveTrackingEnabled,
     });
 
@@ -442,6 +458,29 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [navigate, quickShortcuts]);
+
+  // Premium modules to advertise when shop has restricted access
+  const PREMIUM_MODULE_CATALOG = [
+    { key: "cash_drawer",        title: "Cash Drawer / Shift",     icon: FaCashRegister, desc: "Track cash openings, closings and shifts" },
+    { key: "analytics",          title: "Analytics & Trends",      icon: FaChartBar,     desc: "Sales trends, category insights and charts" },
+    { key: "table_billing",      title: "Table Billing",           icon: FaShoppingCart, desc: "Hotel table management and KOT" },
+    { key: "online_orders",      title: "Online Orders",           icon: FaTruck,        desc: "Manage orders from online channels" },
+    { key: "advance_orders",     title: "Advance Orders",          icon: FaFileInvoice,  desc: "Pre-book and schedule orders" },
+    { key: "customers",          title: "Customers & Dues",        icon: FaUsers,        desc: "Customer ledger and pending dues" },
+    { key: "loyalty",            title: "Loyalty & Coupons",       icon: FaGift,         desc: "Reward points, gift cards and coupons" },
+    { key: "employees",          title: "Employees",               icon: FaUserTie,      desc: "Staff management and attendance" },
+    { key: "expenses",           title: "Expenses",                icon: FaMoneyBillWave, desc: "Track daily business expenses" },
+    { key: "reports",            title: "Reports",                 icon: FaFileInvoice,  desc: "Detailed sales and business reports" },
+    { key: "returns",            title: "Returns",                 icon: FaUndo,         desc: "Bill returns and refund management" },
+    { key: "supplier_ledger",    title: "Purchase & Suppliers",    icon: FaTruck,        desc: "Supplier ledger and purchase orders" },
+    { key: "stock_audit",        title: "Stock Audit",             icon: FaBoxes,        desc: "Inventory auditing and adjustments" },
+    { key: "feedback_review",    title: "Feedback",                icon: FaStar,         desc: "Collect and review customer feedback" },
+  ];
+
+  const lockedModuleTiles = useMemo(() => {
+    if (!enabledModules) return []; // unrestricted — nothing locked
+    return PREMIUM_MODULE_CATALOG.filter((m) => !enabledModules.has(m.key));
+  }, [enabledModules]);
 
   const groupedMenus = useMemo(() => {
     const pathToGroup = new Map();
@@ -667,6 +706,42 @@ export default function Home() {
               })}
             </div>
           </section>
+
+          {/* Premium / locked module tiles — advertise when shop is on free tier */}
+          {lockedModuleTiles.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[11px] font-bold text-amber-500 uppercase tracking-widest">Upgrade to Unlock</p>
+                <div className="flex-1 h-px bg-amber-100" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+                {lockedModuleTiles.map((m) => {
+                  const Icon = m.icon;
+                  return (
+                    <div
+                      key={m.key}
+                      className="relative bg-white rounded-2xl border border-gray-100 opacity-70 cursor-not-allowed select-none overflow-hidden"
+                      title="Upgrade your plan to unlock this module"
+                    >
+                      {/* Lock badge */}
+                      <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                        🔒 Upgrade
+                      </span>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[15px] shadow-sm shrink-0 bg-gradient-to-br from-gray-300 to-gray-400 text-white">
+                          <Icon />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-gray-500 truncate">{m.title}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5 truncate">{m.desc}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* ── RIGHT sidebar ── */}

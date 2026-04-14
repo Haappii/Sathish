@@ -10,12 +10,14 @@ from datetime import timedelta
 import os
 import smtplib
 
+import logging
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
-from typing import Literal, List
+from typing import Literal, List, Dict
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import Numeric, cast, func
+from sqlalchemy import Numeric, cast, func, text
 from sqlalchemy import Date
 
 from app.db import get_db
@@ -63,6 +65,37 @@ SMTP_PORT = int((os.getenv("SUPPORT_SMTP_PORT") or "465").strip())
 
 
 ALLOWED_BILLING_TYPES = {"store", "hotel"}
+
+# ── Module catalogue ──────────────────────────────────────────────────────────
+# These keys match the `key` field in frontend MENU_CATALOG / mobileMenuCatalog.
+CORE_MODULES: set[str] = {"sales_billing", "inventory"}   # always on, never configurable
+
+ALL_OPTIONAL_MODULES: list[str] = [
+    "cash_drawer", "trends", "analytics", "billing_history",
+    "table_billing", "qr_orders", "reservations", "delivery", "recipes",
+    "order_live", "kot_management", "online_orders", "advance_orders",
+    "offline_sync", "drafts", "returns", "dues", "expenses", "customers",
+    "employees", "employee_attendance", "employee_onboarding",
+    "loyalty", "gift_cards", "coupons",
+    "supplier_ledger", "stock_audit", "item_lots", "labels", "transfers",
+    "reports", "feedback_review", "deleted_invoices",
+    "alerts", "support_tickets", "admin",
+]
+
+
+def _seed_core_modules(db: Session, shop_id: int) -> None:
+    """Seed shop_modules with only core modules enabled (used for new shops)."""
+    all_keys = list(CORE_MODULES) + ALL_OPTIONAL_MODULES
+    for key in all_keys:
+        enabled = key in CORE_MODULES
+        db.execute(
+            text("""
+                INSERT INTO shop_modules (shop_id, module_key, enabled)
+                VALUES (:sid, :key, :en)
+                ON CONFLICT (shop_id, module_key) DO NOTHING
+            """),
+            {"sid": shop_id, "key": key, "en": enabled},
+        )
 
 
 def _normalize_billing_type(raw: str | None, *, default: str = "store") -> str:
@@ -333,7 +366,14 @@ class AcceptOnboardPayload(BaseModel):
 
 @router.post("/onboard/requests")
 def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_db)):
+    """
+    Self-service registration: auto-provisions the shop immediately without admin approval.
+    Sends login credentials to the requester's email.
+    Free tier limits: 1 user, 1 branch, 20 items. Only Sales Billing + Item Management enabled.
+    """
     billing_type = _normalize_billing_type(payload.billing_type)
+
+    # Store audit record
     row = PlatformOnboardRequest(
         status="PENDING",
         created_at=datetime.utcnow(),
@@ -371,7 +411,127 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
     db.add(row)
     db.commit()
     db.refresh(row)
-    return {"success": True, "request_id": row.request_id, "status": row.status}
+
+    # --- Auto-provision immediately ---
+    try:
+        admin_role = _ensure_admin_role(db)
+        _ensure_manager_role(db)
+        admin_username = (row.admin_username or "admin").strip()
+        admin_password = _generate_password()
+
+        shop = ShopDetails(
+            shop_name=(row.shop_name or "").strip(),
+            owner_name=row.owner_name,
+            mobile=row.mobile,
+            mailid=row.mailid,
+            billing_type=billing_type,
+            gst_enabled=bool(row.gst_enabled),
+            gst_percent=row.gst_percent or 0,
+            gst_mode=row.gst_mode or "inclusive",
+            city=row.city,
+            state=row.state,
+            # Free tier limits
+            max_users=1,
+            max_branches=1,
+            max_items=20,
+            plan="FREE",
+        )
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
+        base_branch_name = (row.branch_name or "").strip() or "Head Office"
+        branch_name = base_branch_name
+        existing = db.query(Branch).filter(Branch.branch_name == branch_name).first()
+        if existing:
+            branch_name = f"{base_branch_name} #{shop.shop_id}"
+
+        branch = Branch(
+            shop_id=shop.shop_id,
+            branch_name=branch_name,
+            city=row.branch_city,
+            state=row.branch_state,
+            country=row.branch_country,
+            type="Head Office",
+            status="ACTIVE",
+            branch_close="N",
+        )
+        db.add(branch)
+        db.commit()
+        db.refresh(branch)
+
+        shop.head_office_branch_id = branch.branch_id
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
+        user = User(
+            shop_id=shop.shop_id,
+            user_name=admin_username,
+            password=encode_password(admin_password),
+            name=row.admin_name or admin_username,
+            role=admin_role.role_id,
+            status=True,
+            branch_id=branch.branch_id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        # Seed core modules only (sales_billing + inventory)
+        _seed_core_modules(db, shop.shop_id)
+
+        row.status = "ACCEPTED"
+        row.decided_at = datetime.utcnow()
+        row.decided_by = "auto"
+        row.created_shop_id = shop.shop_id
+        row.created_branch_id = branch.branch_id
+        row.created_admin_user_id = user.user_id
+        db.commit()
+        db.refresh(row)
+
+        recipient = (row.requester_email or row.mailid or "").strip()
+        email_sent = False
+        try:
+            content = (
+                "Welcome to Haappii Billing!\n\n"
+                "Your shop has been set up and is ready to use.\n\n"
+                f"Shop ID  : {shop.shop_id}\n"
+                f"Username : {admin_username}\n"
+                f"Password : {admin_password}\n\n"
+                "Login at: https://haappiibilling.in\n\n"
+                "Free plan includes:\n"
+                "  - Sales Billing (Take Away)\n"
+                "  - Item Management (up to 20 items)\n"
+                "  - 1 branch, 1 user\n\n"
+                "Upgrade anytime to unlock all features.\n"
+            )
+            email_sent = _send_credentials_email(
+                to_email=recipient,
+                subject="Your Haappii Billing shop is ready!",
+                content=content,
+            )
+        except Exception:
+            email_sent = False
+
+        return {
+            "success": True,
+            "request_id": row.request_id,
+            "status": row.status,
+            "shop_id": shop.shop_id,
+            "admin_username": admin_username,
+            "email_sent": email_sent,
+            "message": "Shop created! Check your email for login credentials.",
+        }
+    except Exception as e:
+        db.rollback()
+        # Return partial success — request was saved, provisioning failed
+        return {
+            "success": False,
+            "request_id": row.request_id,
+            "status": "PENDING",
+            "message": f"Request saved but auto-setup failed: {str(e)}. Admin will activate your shop shortly.",
+        }
 
 
 @router.get("/onboard/requests")
@@ -508,6 +668,9 @@ def accept_onboard_request(
         db.add(user)
         db.commit()
         db.refresh(user)
+
+        # Seed restricted module access for the new shop (core only).
+        _seed_core_modules(db, shop.shop_id)
 
         row.status = "ACCEPTED"
         row.decided_at = datetime.utcnow()
@@ -1184,3 +1347,196 @@ def platform_download_ticket_attachment(
         filename=(row.attachment_filename or resolved.name),
         media_type=(mime_type or "application/octet-stream"),
     )
+
+
+# ── Shop Modules management ───────────────────────────────────────────────────
+
+class ShopModulesIn(BaseModel):
+    modules: Dict[str, bool]  # {module_key: enabled}
+
+
+@router.get("/shops/{shop_id}/modules")
+def get_shop_module_config(
+    shop_id: int,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    """Return current module enable/disable state for a shop."""
+    if not db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first():
+        raise HTTPException(404, "Shop not found")
+
+    rows = db.execute(
+        text("SELECT module_key, enabled FROM shop_modules WHERE shop_id = :sid"),
+        {"sid": shop_id},
+    ).fetchall()
+
+    if not rows:
+        # Not configured yet → all optional modules default ON (backward compat)
+        modules = {m: True for m in list(CORE_MODULES) + ALL_OPTIONAL_MODULES}
+        return {"shop_id": shop_id, "configured": False, "modules": modules}
+
+    saved = {r.module_key: r.enabled for r in rows}
+    modules: Dict[str, bool] = {}
+    for m in CORE_MODULES:
+        modules[m] = True                          # core always on
+    for m in ALL_OPTIONAL_MODULES:
+        modules[m] = saved.get(m, False)           # default OFF if not seeded
+
+    return {"shop_id": shop_id, "configured": True, "modules": modules}
+
+
+@router.post("/shops/{shop_id}/modules")
+def save_shop_module_config(
+    shop_id: int,
+    payload: ShopModulesIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    """Enable or disable feature modules for a shop."""
+    if not db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first():
+        raise HTTPException(404, "Shop not found")
+
+    for key, enabled in (payload.modules or {}).items():
+        if key in CORE_MODULES:
+            continue   # core modules cannot be disabled
+        if key not in ALL_OPTIONAL_MODULES:
+            continue   # ignore unknown keys
+        db.execute(
+            text("""
+                INSERT INTO shop_modules (shop_id, module_key, enabled)
+                VALUES (:sid, :key, :en)
+                ON CONFLICT (shop_id, module_key) DO UPDATE SET enabled = EXCLUDED.enabled
+            """),
+            {"sid": shop_id, "key": key, "en": bool(enabled)},
+        )
+    db.commit()
+    return {"success": True}
+
+
+# ── Direct shop creation (no onboard request needed) ─────────────────────────
+
+class DirectCreateShopIn(BaseModel):
+    shop_name: str = Field(min_length=1, max_length=150)
+    owner_name: str | None = None
+    mobile: str | None = None
+    mailid: str | None = None
+    billing_type: str = "store"
+    branch_name: str = "Head Office"
+    admin_username: str = "admin"
+    admin_name: str | None = None
+    gst_enabled: bool = False
+    gst_percent: float = 0
+    gst_mode: str = "inclusive"
+    address_line1: str | None = None
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+
+
+@router.post("/shops/create")
+def direct_create_shop(
+    payload: DirectCreateShopIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    """
+    Create a new shop instantly (no onboarding approval flow).
+    Credentials are emailed to mailid if SMTP is configured.
+    The new shop starts with only core modules (sales_billing + inventory) enabled.
+    """
+    confirmed_billing_type = _normalize_billing_type(payload.billing_type)
+    admin_role = _ensure_admin_role(db)
+    _ensure_manager_role(db)
+    admin_username = (payload.admin_username or "admin").strip()
+    admin_password = _generate_password()
+
+    try:
+        shop = ShopDetails(
+            shop_name=payload.shop_name.strip(),
+            owner_name=(payload.owner_name or "").strip() or None,
+            mobile=(payload.mobile or "").strip() or None,
+            mailid=(payload.mailid or "").strip() or None,
+            billing_type=confirmed_billing_type,
+            gst_enabled=bool(payload.gst_enabled),
+            gst_percent=payload.gst_percent or 0,
+            gst_mode=payload.gst_mode or "inclusive",
+            address_line1=payload.address_line1,
+            city=payload.city,
+            state=payload.state,
+            pincode=payload.pincode,
+        )
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
+        base_branch_name = (payload.branch_name or "Head Office").strip()
+        branch_name = base_branch_name
+        if db.query(Branch).filter(Branch.branch_name == branch_name).first():
+            branch_name = f"{base_branch_name} #{shop.shop_id}"
+
+        branch = Branch(
+            shop_id=shop.shop_id,
+            branch_name=branch_name,
+            type="Head Office",
+            status="ACTIVE",
+            branch_close="N",
+        )
+        db.add(branch)
+        db.commit()
+        db.refresh(branch)
+
+        shop.head_office_branch_id = branch.branch_id
+        db.commit()
+
+        if db.query(User).filter(User.shop_id == shop.shop_id, User.user_name == admin_username).first():
+            raise HTTPException(400, "Admin username already exists for this shop")
+
+        user = User(
+            shop_id=shop.shop_id,
+            user_name=admin_username,
+            password=encode_password(admin_password),
+            name=payload.admin_name or admin_username,
+            role=admin_role.role_id,
+            status=True,
+            branch_id=branch.branch_id,
+        )
+        db.add(user)
+        db.commit()
+
+        # Seed restricted module access: core only.
+        _seed_core_modules(db, shop.shop_id)
+        db.commit()
+
+        recipient = (payload.mailid or "").strip()
+        email_sent = False
+        try:
+            content = (
+                "Your shop has been created on Haappii Billing.\n\n"
+                f"Shop: {shop.shop_name}\n"
+                f"Shop ID: {shop.shop_id}\n"
+                f"Username: {admin_username}\n"
+                f"Password: {admin_password}\n\n"
+                "Login and start billing right away!\n"
+            )
+            email_sent = _send_credentials_email(
+                to_email=recipient,
+                subject=f"Welcome to Haappii Billing – {shop.shop_name}",
+                content=content,
+            )
+        except Exception:
+            email_sent = False
+
+        return {
+            "success": True,
+            "shop_id": shop.shop_id,
+            "branch_id": branch.branch_id,
+            "admin_username": admin_username,
+            "admin_password": admin_password,
+            "email_sent": email_sent,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Shop creation failed: {str(e)}")

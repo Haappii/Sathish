@@ -453,9 +453,11 @@ export default function PurchaseOrders() {
                         <FaTruck size={10} /> Receive
                       </button>
                     )}
-                    <button onClick={() => openPayment(p)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
-                      <FaMoneyBillWave size={10} /> Payment
-                    </button>
+                    {payStatus !== "PAID" && (
+                      <button onClick={() => openPayment(p)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+                        <FaMoneyBillWave size={10} /> Payment
+                      </button>
+                    )}
                     <button onClick={() => openAttachments(p)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                       <FaPaperclip size={10} /> Attachments
                     </button>

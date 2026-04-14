@@ -44,8 +44,6 @@ const proofCards = [
 
 export default function About() {
   const { showToast } = useToast();
-  const [demoOpen, setDemoOpen] = useState(false);
-  const [sending, setSending] = useState(false);
   const [contactDetails, setContactDetails] = useState({
     name: import.meta.env.VITE_ABOUT_CONTACT_NAME || "Haappii Billing Support",
     mobile: import.meta.env.VITE_ABOUT_CONTACT_MOBILE || "+91 90000 00000",
@@ -53,21 +51,6 @@ export default function About() {
     insta: import.meta.env.VITE_ABOUT_CONTACT_INSTAGRAM || "@haappiibilling",
     photo: import.meta.env.VITE_ABOUT_CONTACT_PHOTO_URL || "",
   });
-  const [demoForm, setDemoForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    business: "",
-    message: "",
-  });
-
-  useEffect(() => {
-    document.body.style.overflow = demoOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [demoOpen]);
-
   useEffect(() => {
     let alive = true;
     const loadPublicContact = async () => {
@@ -91,40 +74,6 @@ export default function About() {
       alive = false;
     };
   }, []);
-
-  const updateDemo = (key, value) => {
-    setDemoForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const submitDemo = async () => {
-    if (!demoForm.name.trim() || !demoForm.email.trim()) {
-      showToast("Name and email are required", "error");
-      return;
-    }
-
-    try {
-      setSending(true);
-      const payload = new FormData();
-      Object.entries(demoForm).forEach(([key, value]) => payload.append(key, value));
-      await api.post("/support/demo", payload);
-      showToast("Demo request sent!", "success");
-      setDemoOpen(false);
-      setDemoForm({
-        name: "",
-        email: "",
-        phone: "",
-        business: "",
-        message: "",
-      });
-    } catch (error) {
-      showToast(
-        error?.response?.data?.detail || "Failed to send demo request",
-        "error"
-      );
-    } finally {
-      setSending(false);
-    }
-  };
 
   const windowsAppUrl =
     import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
@@ -370,15 +319,8 @@ export default function About() {
             </p>
 
             <div className="ab-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setDemoOpen(true)}
-              >
-                Book a Demo
-              </button>
-              <Link className="btn btn-ghost" to="/setup/onboard">
-                Start Setup
+              <Link className="btn btn-primary" to="/setup/onboard">
+                Start Free Setup
               </Link>
               <button
                 type="button"
@@ -580,21 +522,16 @@ export default function About() {
             <div>
               <h3>Ready to modernize the way your team bills and tracks daily business?</h3>
               <p>
-                Book a walkthrough, start setup, or move straight into the desktop app
-                flow from one stronger product page.
+                Start setup in minutes — get instant access with your login credentials sent to your email.
               </p>
             </div>
 
             <div className="ab-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setDemoOpen(true)}
-              >
-                Book a Demo
-              </button>
-              <Link className="btn btn-ghost" to="/setup/onboard">
-                Get Started
+              <Link className="btn btn-primary" to="/setup/onboard">
+                Get Started Free
+              </Link>
+              <Link className="btn btn-ghost" to="/login">
+                Login
               </Link>
             </div>
           </div>
@@ -605,82 +542,6 @@ export default function About() {
         Copyright {new Date().getFullYear()} Haappii Billing. All rights reserved.
       </footer>
 
-      {demoOpen && (
-        <div className="ab-modal-bg" onClick={() => !sending && setDemoOpen(false)}>
-          <div className="ab-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="ab-modal-top">
-              <div>
-                <h3>Book a live demo</h3>
-                <p>
-                  Share your details and we will get back to you with a walkthrough
-                  for your business use case.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="ab-close"
-                onClick={() => setDemoOpen(false)}
-                disabled={sending}
-              >
-                X
-              </button>
-            </div>
-
-            <div className="ab-form-grid">
-              <input
-                className="ab-field"
-                placeholder="Your name *"
-                value={demoForm.name}
-                onChange={(event) => updateDemo("name", event.target.value)}
-              />
-              <input
-                className="ab-field"
-                placeholder="Email *"
-                type="email"
-                value={demoForm.email}
-                onChange={(event) => updateDemo("email", event.target.value)}
-              />
-              <input
-                className="ab-field"
-                placeholder="Phone"
-                value={demoForm.phone}
-                onChange={(event) => updateDemo("phone", event.target.value)}
-              />
-              <input
-                className="ab-field"
-                placeholder="Business name"
-                value={demoForm.business}
-                onChange={(event) => updateDemo("business", event.target.value)}
-              />
-              <textarea
-                className="ab-field-wide"
-                placeholder="Message (optional)"
-                value={demoForm.message}
-                onChange={(event) => updateDemo("message", event.target.value)}
-              />
-            </div>
-
-            <div className="ab-modal-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setDemoOpen(false)}
-                disabled={sending}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={submitDemo}
-                disabled={sending}
-              >
-                {sending ? "Sending..." : "Send Request"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

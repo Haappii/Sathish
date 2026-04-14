@@ -40,6 +40,7 @@ import {
   buildRbacMenu,
   buildRoleMenu,
   modulesToPermMap,
+  MENU_PATH_TO_KEY,
 } from "../utils/navigationMenu";
 
 const BLUE = "#0B3C8C";
@@ -90,6 +91,8 @@ export default function MainLayout({ hideSidebar = false }) {
   };
   const [permsEnabled, setPermsEnabled] = useState(false);
   const [orderLiveTrackingEnabled, setOrderLiveTrackingEnabled] = useState(true);
+  // null = not yet loaded / unconfigured (show all); Set<string> = platform-restricted
+  const [enabledModules, setEnabledModules] = useState(null);
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -289,6 +292,21 @@ export default function MainLayout({ hideSidebar = false }) {
       .catch(() => {
         setPermsEnabled(false);
         setPermMap(null);
+      });
+  }, []);
+
+  /* ================= SHOP MODULE RESTRICTIONS ================= */
+  useEffect(() => {
+    api.get("/shop/modules")
+      .then(res => {
+        if (res?.data?.configured) {
+          setEnabledModules(new Set(res.data.enabled_modules || []));
+        } else {
+          setEnabledModules(null); // unrestricted
+        }
+      })
+      .catch(() => {
+        setEnabledModules(null); // on error: show all
       });
   }, []);
 
@@ -573,11 +591,14 @@ export default function MainLayout({ hideSidebar = false }) {
 
   const ADMIN_PATHS = new Set(["/setup"]);
 
+  const CORE_MODULE_KEYS = new Set(["home", "sales_billing", "inventory"]);
+
   const menuItems = useMemo(() => {
     const fallback = buildRoleMenu({
       roleLower,
       showTableBilling,
       isHeadOfficeClosed,
+      isHotel: showTableBilling,
       orderLiveTrackingEnabled,
     });
 
@@ -587,11 +608,21 @@ export default function MainLayout({ hideSidebar = false }) {
     } else {
       const rbac = buildRbacMenu({
         permMap,
+        enabledModules,
         showTableBilling,
         isHeadOfficeClosed,
+        isHotel: showTableBilling,
         orderLiveTrackingEnabled,
       });
       items = rbac && rbac.length ? rbac : fallback;
+    }
+
+    // Apply platform module restrictions to role-based menu too.
+    if (enabledModules !== null && (!permsEnabled || !permMap)) {
+      items = items.filter((m) => {
+        const key = MENU_PATH_TO_KEY[m.path];
+        return !key || CORE_MODULE_KEYS.has(key) || enabledModules.has(key);
+      });
     }
 
     // Hide Admin menu when offline — admin operations require server connectivity.
@@ -603,6 +634,7 @@ export default function MainLayout({ hideSidebar = false }) {
   }, [
     permsEnabled,
     permMap,
+    enabledModules,
     roleLower,
     showTableBilling,
     isHeadOfficeClosed,

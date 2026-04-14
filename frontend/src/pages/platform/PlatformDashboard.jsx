@@ -41,6 +41,21 @@ export default function PlatformDashboard() {
 
   const [busyId, setBusyId] = useState(null);
   const [acceptedInfo, setAcceptedInfo] = useState(null);
+
+  // Module management for shop detail panel
+  const [shopModules, setShopModules] = useState(null);   // null = loading
+  const [modulesConfigured, setModulesConfigured] = useState(false);
+  const [modulesSaving, setModulesSaving] = useState(false);
+
+  // Direct shop creation
+  const [directCreate, setDirectCreate] = useState({
+    shop_name: "", owner_name: "", mobile: "", mailid: "",
+    billing_type: "store", branch_name: "Head Office",
+    admin_username: "admin", admin_name: "",
+    address_line1: "", city: "", state: "", pincode: "",
+  });
+  const [directCreateBusy, setDirectCreateBusy] = useState(false);
+  const [directCreatedInfo, setDirectCreatedInfo] = useState(null);
   const [demoDays, setDemoDays] = useState(7);
   const [shopTypes, setShopTypes] = useState({});
   const [monthlyAmounts, setMonthlyAmounts] = useState({});
@@ -361,11 +376,64 @@ export default function PlatformDashboard() {
     }
   };
 
+  const loadShopModules = async (shopId) => {
+    setShopModules(null);
+    try {
+      const res = await platformAxios.get(`/platform/shops/${shopId}/modules`);
+      setModulesConfigured(Boolean(res?.data?.configured));
+      setShopModules(res?.data?.modules || {});
+    } catch {
+      setShopModules({});
+    }
+  };
+
+  const saveModules = async () => {
+    if (!selectedShopId || !shopModules) return;
+    setModulesSaving(true);
+    try {
+      await platformAxios.post(`/platform/shops/${selectedShopId}/modules`, { modules: shopModules });
+      showToast("Modules updated", "success");
+      setModulesConfigured(true);
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to save modules", "error");
+    } finally {
+      setModulesSaving(false);
+    }
+  };
+
+  const createShopDirect = async () => {
+    if (!directCreate.shop_name.trim()) return showToast("Shop name required", "error");
+    if (!directCreate.mailid.trim()) return showToast("Email required to send credentials", "error");
+    setDirectCreateBusy(true);
+    setDirectCreatedInfo(null);
+    try {
+      const res = await platformAxios.post("/platform/shops/create", {
+        ...directCreate,
+        shop_name: directCreate.shop_name.trim(),
+        admin_username: (directCreate.admin_username || "admin").trim(),
+      });
+      setDirectCreatedInfo(res.data || null);
+      showToast(res?.data?.email_sent ? "Shop created & credentials emailed" : "Shop created (email not sent)", "success");
+      setDirectCreate({
+        shop_name: "", owner_name: "", mobile: "", mailid: "",
+        billing_type: "store", branch_name: "Head Office",
+        admin_username: "admin", admin_name: "",
+        address_line1: "", city: "", state: "", pincode: "",
+      });
+      await load();
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Creation failed", "error");
+    } finally {
+      setDirectCreateBusy(false);
+    }
+  };
+
   const openShopDetail = (shopId) => {
     setSelectedShopId(shopId);
     setSelectedShopDetail(null);
     setPaymentForm({ extend_days: "", paid_until: "", amount: "" });
     loadShopDetail(shopId);
+    loadShopModules(shopId);
   };
 
   const closeShopDetail = () => {
@@ -465,6 +533,7 @@ export default function PlatformDashboard() {
   const TABS = [
     { id: "OVERVIEW", label: "Overview",  icon: "📊", badge: null },
     { id: "SHOPS",    label: "Shops",     icon: "🏪", badge: shops.length || null },
+    { id: "CREATE",   label: "Create",    icon: "➕", badge: null },
     { id: "PLANS",    label: "Plans",     icon: "📋", badge: null },
     { id: "WEBSITE",  label: "Website",   icon: "🌐", badge: null },
     { id: "ONBOARD",  label: "Onboard",   icon: "📥", badge: pendingOnboard.length || null },
@@ -1060,6 +1129,85 @@ export default function PlatformDashboard() {
               </div>
             ))}
           </div>
+        ) : tab === "CREATE" ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* ── Direct Create Form ── */}
+            <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+              <h3 className="text-base font-semibold">Create Shop Directly</h3>
+              <p className="text-xs text-slate-400">Creates the shop, admin user, and emails credentials instantly — no approval step.</p>
+
+              {[
+                { label: "Shop Name *", key: "shop_name", placeholder: "e.g. Raj Stores" },
+                { label: "Owner Name", key: "owner_name", placeholder: "e.g. Rajan K" },
+                { label: "Mobile", key: "mobile", placeholder: "+91 9876543210" },
+                { label: "Email (for credentials) *", key: "mailid", placeholder: "owner@example.com" },
+                { label: "Branch Name", key: "branch_name", placeholder: "Head Office" },
+                { label: "Admin Username", key: "admin_username", placeholder: "admin" },
+                { label: "Admin Display Name", key: "admin_name", placeholder: "Admin" },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key}>
+                  <label className="text-xs text-slate-400 font-medium">{label}</label>
+                  <input
+                    className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={directCreate[key]}
+                    onChange={(e) => setDirectCreate((p) => ({ ...p, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium block mb-1">Business Type</label>
+                <div className="flex gap-3">
+                  {[{ val: "store", label: "🏪 Store / Retail" }, { val: "hotel", label: "🍽️ Hotel / Restaurant" }].map(({ val, label }) => (
+                    <label key={val} className={`flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer text-sm transition ${directCreate.billing_type === val ? "border-blue-500/50 bg-blue-500/15 text-white" : "border-white/10 bg-white/3 text-slate-400 hover:bg-white/8"}`}>
+                      <input type="radio" value={val} checked={directCreate.billing_type === val} onChange={(e) => setDirectCreate((p) => ({ ...p, billing_type: e.target.value }))} className="sr-only" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={createShopDirect}
+                disabled={directCreateBusy}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition disabled:opacity-60"
+              >
+                {directCreateBusy ? "Creating…" : "Create Shop & Send Credentials"}
+              </button>
+            </div>
+
+            {/* ── Credentials Banner ── */}
+            <div className="space-y-4">
+              {directCreatedInfo?.admin_password ? (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🔑</span>
+                    <p className="text-sm font-semibold text-emerald-200">Shop Created — Save Credentials</p>
+                  </div>
+                  {[
+                    { label: "Shop ID", val: directCreatedInfo.shop_id },
+                    { label: "Username", val: directCreatedInfo.admin_username },
+                    { label: "Password", val: directCreatedInfo.admin_password },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex justify-between text-xs bg-white/5 rounded-lg px-3 py-2">
+                      <span className="text-slate-400">{label}</span>
+                      <span className="font-mono font-bold text-white">{val}</span>
+                    </div>
+                  ))}
+                  <div className={`text-xs mt-1 ${directCreatedInfo.email_sent ? "text-emerald-300" : "text-amber-300"}`}>
+                    {directCreatedInfo.email_sent ? "✓ Credentials emailed to owner" : "⚠ Email not sent — SMTP not configured"}
+                  </div>
+                  <p className="text-[11px] text-slate-500">This shop starts with Sales Billing + Item Management only. Enable more modules from the shop detail panel.</p>
+                </div>
+              ) : (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-3 text-center text-slate-400">
+                  <span className="text-3xl opacity-30">➕</span>
+                  <p className="text-sm">Fill the form and create a shop. Credentials will appear here.</p>
+                </div>
+              )}
+            </div>
+          </div>
         ) : tab === "SUPPORT" ? (
           <div className="space-y-3">
             {supportTickets.length === 0 ? (
@@ -1245,6 +1393,71 @@ export default function PlatformDashboard() {
                     >
                       Save Limits
                     </button>
+                  </div>
+
+                  {/* modules */}
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">Feature Modules</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {modulesConfigured ? "Custom access configured." : "Currently unrestricted (all modules visible)."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={saveModules}
+                        disabled={modulesSaving || !shopModules}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-medium transition disabled:opacity-50"
+                      >
+                        {modulesSaving ? "Saving…" : "Save Modules"}
+                      </button>
+                    </div>
+
+                    {shopModules === null ? (
+                      <div className="text-xs text-slate-400 py-2 text-center">Loading modules…</div>
+                    ) : (() => {
+                      const GROUPS = [
+                        { label: "Always On (Core)", keys: ["sales_billing", "inventory"], core: true },
+                        { label: "Main", keys: ["cash_drawer", "trends", "analytics"] },
+                        { label: "Billing", keys: ["billing_history", "table_billing", "qr_orders", "order_live", "kot_management", "reservations", "delivery", "recipes", "online_orders", "advance_orders", "offline_sync"] },
+                        { label: "Operations", keys: ["drafts", "returns", "dues", "expenses", "customers"] },
+                        { label: "HR", keys: ["employees", "employee_attendance", "employee_onboarding"] },
+                        { label: "Promotions", keys: ["loyalty", "gift_cards", "coupons"] },
+                        { label: "Inventory", keys: ["supplier_ledger", "stock_audit", "item_lots", "labels", "transfers"] },
+                        { label: "Reports", keys: ["reports", "feedback_review", "deleted_invoices"] },
+                        { label: "System", keys: ["alerts", "support_tickets", "admin"] },
+                      ];
+                      const fmt = (k) => k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+                      return (
+                        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                          {GROUPS.map(({ label, keys, core }) => (
+                            <div key={label}>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">{label}</p>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {keys.map((k) => {
+                                  const on = core ? true : Boolean(shopModules[k]);
+                                  return (
+                                    <button
+                                      key={k}
+                                      disabled={core}
+                                      onClick={() => !core && setShopModules((p) => ({ ...p, [k]: !p[k] }))}
+                                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] transition ${
+                                        on
+                                          ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-200"
+                                          : "bg-white/3 border-white/10 text-slate-500 hover:bg-white/8"
+                                      } ${core ? "opacity-60 cursor-default" : "cursor-pointer"}`}
+                                    >
+                                      <span>{fmt(k)}</span>
+                                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${on ? "bg-emerald-400" : "bg-slate-600"}`} />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* plan & renewal */}

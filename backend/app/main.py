@@ -499,13 +499,14 @@ def _auto_migrate_feedback() -> None:
     """
     Create or repair the feedback table on older Postgres databases.
 
-    The customer feedback feature was added after some deployments already had
-    a partial/manual feedback table, so startup needs to backfill any missing
-    columns required by the public submit endpoint.
+    Split into separate transactions so that a failure in a later step (e.g. the
+    sequence DO block) does not roll back the CREATE TABLE that precedes it.
     """
+    if engine.dialect.name != "postgresql":
+        return
+
+    # Step 1: create table + backfill missing columns
     try:
-        if engine.dialect.name != "postgresql":
-            return
         with engine.begin() as conn:
             conn.execute(
                 text(
@@ -520,7 +521,18 @@ def _auto_migrate_feedback() -> None:
                       comment TEXT,
                       created_at TIMESTAMPTZ DEFAULT NOW()
                     );
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (feedback - create table) failed: %s", e)
 
+    # Step 2: add any columns that may be missing (idempotent)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
                     ALTER TABLE IF EXISTS feedback
                       ADD COLUMN IF NOT EXISTS shop_id INTEGER,
                       ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(60),
@@ -529,46 +541,49 @@ def _auto_migrate_feedback() -> None:
                       ADD COLUMN IF NOT EXISTS rating INTEGER,
                       ADD COLUMN IF NOT EXISTS comment TEXT,
                       ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-
-                    UPDATE feedback
-                    SET created_at = NOW()
-                    WHERE created_at IS NULL;
-
-                    CREATE INDEX IF NOT EXISTS idx_feedback_shop_id ON feedback(shop_id);
-
-                    DO $$
-                    BEGIN
-                      IF to_regclass('public.feedback_feedback_id_seq') IS NULL THEN
-                        CREATE SEQUENCE feedback_feedback_id_seq;
-                      END IF;
-
-                      BEGIN
-                        ALTER TABLE feedback
-                          ALTER COLUMN feedback_id SET DEFAULT nextval('feedback_feedback_id_seq');
-                      EXCEPTION
-                        WHEN undefined_column THEN
-                          NULL;
-                      END;
-
-                      IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_schema = 'public'
-                          AND table_name = 'feedback'
-                          AND column_name = 'feedback_id'
-                      ) THEN
-                        PERFORM setval(
-                          'feedback_feedback_id_seq',
-                          COALESCE((SELECT MAX(feedback_id) FROM feedback), 0) + 1,
-                          false
-                        );
-                      END IF;
-                    END $$;
                     """
                 )
             )
     except Exception as e:
-        logger.exception("Auto-migration (feedback) failed: %s", e)
+        logger.exception("Auto-migration (feedback - add columns) failed: %s", e)
+
+    # Step 3: index + data backfill (separate so DDL issues don't block DML)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE feedback SET created_at = NOW() WHERE created_at IS NULL;"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_shop_id ON feedback(shop_id);"
+            ))
+    except Exception as e:
+        logger.exception("Auto-migration (feedback - index/backfill) failed: %s", e)
+
+
+def _auto_migrate_branch_feedback_qr() -> None:
+    """
+    Add feedback_qr_enabled and print_logo_enabled columns to the branch table.
+    These were introduced after initial deployment so existing databases need them
+    added at startup.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE IF EXISTS branch
+                      ADD COLUMN IF NOT EXISTS feedback_qr_enabled BOOLEAN DEFAULT TRUE,
+                      ADD COLUMN IF NOT EXISTS print_logo_enabled BOOLEAN DEFAULT TRUE;
+
+                    UPDATE branch SET feedback_qr_enabled = TRUE WHERE feedback_qr_enabled IS NULL;
+                    UPDATE branch SET print_logo_enabled = TRUE WHERE print_logo_enabled IS NULL;
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (branch feedback_qr / print_logo) failed: %s", e)
 
 
 def _auto_migrate_user_session_tracking() -> None:
@@ -722,6 +737,31 @@ def _auto_migrate_items_supplier() -> None:
         logger.debug("Auto-migration (items supplier - drop not null) skipped: %s", e)
 
 
+def _auto_migrate_shop_modules() -> None:
+    """
+    Create shop_modules table so the platform can enable/disable
+    feature modules per shop independently.
+    New shops start with only core modules (sales_billing, inventory) seeded.
+    Shops with no rows at all are treated as unrestricted (backward-compat).
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS shop_modules (
+                  id         SERIAL PRIMARY KEY,
+                  shop_id    INTEGER NOT NULL REFERENCES shop_details(shop_id) ON DELETE CASCADE,
+                  module_key VARCHAR(80) NOT NULL,
+                  enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+                  CONSTRAINT uq_shop_modules_shop_module UNIQUE (shop_id, module_key)
+                );
+                CREATE INDEX IF NOT EXISTS idx_shop_modules_shop_id ON shop_modules(shop_id);
+            """))
+    except Exception as e:
+        logger.exception("Auto-migration (shop_modules) failed: %s", e)
+
+
 def _auto_migrate_advance_orders() -> None:
     """
     Create advance_orders table on existing Postgres databases that pre-date this feature.
@@ -793,6 +833,8 @@ def _startup_db_init():
     _auto_migrate_table_name_unique_constraint()
     _auto_migrate_items_supplier()
     _auto_migrate_advance_orders()
+    _auto_migrate_shop_modules()
+    _auto_migrate_branch_feedback_qr()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
