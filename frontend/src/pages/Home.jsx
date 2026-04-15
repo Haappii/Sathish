@@ -123,6 +123,44 @@ const HEAD_OFFICE_CLOSED_SHORTCUT_PATHS = [
   "/setup",
 ];
 
+// Maps each frontend path to the module key that controls it
+const PATH_TO_MODULE = {
+  "/sales/create":         "sales_billing",
+  "/sales/history":        "billing_history",
+  "/table-billing":        "table_billing",
+  "/qr-orders":            "qr_orders",
+  "/order-live":           "order_live",
+  "/kot":                  "kot_management",
+  "/online-orders":        "online_orders",
+  "/advance-orders":       "advance_orders",
+  "/drafts":               "drafts",
+  "/deleted-invoices":     "deleted_invoices",
+  "/customers":            "customers",
+  "/dues":                 "dues",
+  "/employees":            "employees",
+  "/employees/attendance": "employees",
+  "/returns":              "returns",
+  "/expenses":             "expenses",
+  "/inventory":            "inventory",
+  "/reorder-alerts":       "inventory",
+  "/stock-transfers":      "transfers",
+  "/item-lots":            "item_lots",
+  "/labels":               "labels",
+  "/stock-audit":          "stock_audit",
+  "/supplier-ledger":      "supplier_ledger",
+  "/cash-drawer":          "cash_drawer",
+  "/loyalty":              "loyalty",
+  "/gift-cards":           "gift_cards",
+  "/coupons":              "coupons",
+  "/analytics":            "analytics",
+  "/trends":               "trends",
+  "/reports":              "reports",
+  "/feedback-review":      "feedback_review",
+  "/alerts":               "alerts",
+  "/support-tickets":      "support_tickets",
+  "/setup":                "inventory",   // Item Management lives under Admin/Setup
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -422,16 +460,25 @@ export default function Home() {
     [menus]
   );
 
+  // Filter menu cards by enabled modules (null = unrestricted)
+  const filteredMenuCards = useMemo(() => {
+    if (!enabledModules) return menuCards;
+    return menuCards.filter((m) => {
+      const mod = PATH_TO_MODULE[m.path];
+      return !mod || enabledModules.has(mod);
+    });
+  }, [menuCards, enabledModules]);
+
   const quickShortcuts = useMemo(() => {
     const shortcutPaths = isHeadOfficeClosed
       ? HEAD_OFFICE_CLOSED_SHORTCUT_PATHS
       : SHORTCUT_PATHS;
-    const byPath = new Map(menuCards.map((m) => [m.path, m]));
+    const byPath = new Map(filteredMenuCards.map((m) => [m.path, m]));
     return shortcutPaths
       .map((path) => byPath.get(path))
       .filter(Boolean)
       .slice(0, 6);
-  }, [isHeadOfficeClosed, menuCards]);
+  }, [isHeadOfficeClosed, filteredMenuCards]);
 
   useEffect(() => {
     if (!quickShortcuts.length) return;
@@ -493,7 +540,7 @@ export default function Home() {
 
     const other = [];
 
-    for (const m of menuCards) {
+    for (const m of filteredMenuCards) {
       const k = pathToGroup.get(m.path);
       if (k && bucket.has(k)) bucket.get(k).push(m);
       else other.push(m);
@@ -511,7 +558,7 @@ export default function Home() {
       out.push({ key: "other", title: "Other", items: other });
 
     return out;
-  }, [menuCards]);
+  }, [filteredMenuCards]);
 
   /* ------------------ QUICK EXPENSE ------------------ */
   const saveQuickExpense = async () => {
@@ -638,13 +685,14 @@ export default function Home() {
             </section>
           )}
 
-          {/* Module groups */}
+          {/* Module groups — enabled (clickable) + locked (greyed out) in one section */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">All Modules</p>
               <div className="flex-1 h-px bg-gray-200" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+              {/* Enabled / accessible groups */}
               {groupedMenus.map((g) => {
                 const hasTabs = g.items.length > 1;
                 const expanded = expandedGroup === g.key;
@@ -704,44 +752,33 @@ export default function Home() {
                   </div>
                 );
               })}
-            </div>
-          </section>
 
-          {/* Premium / locked module tiles — advertise when shop is on free tier */}
-          {lockedModuleTiles.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-[11px] font-bold text-amber-500 uppercase tracking-widest">Upgrade to Unlock</p>
-                <div className="flex-1 h-px bg-amber-100" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
-                {lockedModuleTiles.map((m) => {
-                  const Icon = m.icon;
-                  return (
-                    <div
-                      key={m.key}
-                      className="relative bg-white rounded-2xl border border-gray-100 opacity-70 cursor-not-allowed select-none overflow-hidden"
-                      title="Upgrade your plan to unlock this module"
-                    >
-                      {/* Lock badge */}
-                      <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                        🔒 Upgrade
-                      </span>
-                      <div className="flex items-center gap-3 px-4 py-3.5">
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[15px] shadow-sm shrink-0 bg-gradient-to-br from-gray-300 to-gray-400 text-white">
-                          <Icon />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-500 truncate">{m.title}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5 truncate">{m.desc}</p>
-                        </div>
+              {/* Locked / premium tiles — shown inline, not clickable */}
+              {lockedModuleTiles.map((m) => {
+                const Icon = m.icon;
+                return (
+                  <div
+                    key={m.key}
+                    className="relative bg-white rounded-2xl border border-gray-100 opacity-60 cursor-not-allowed select-none overflow-hidden"
+                    title="Upgrade your plan to unlock this module"
+                  >
+                    <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                      🔒 Upgrade
+                    </span>
+                    <div className="flex items-center gap-3 px-4 py-3.5">
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[15px] shadow-sm shrink-0 bg-gradient-to-br from-gray-300 to-gray-400 text-white">
+                        <Icon />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-gray-500 truncate">{m.title}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5 truncate">{m.desc}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </div>
 
         {/* ── RIGHT sidebar ── */}
