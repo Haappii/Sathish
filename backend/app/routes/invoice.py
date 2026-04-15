@@ -1237,6 +1237,11 @@ def delete_invoice(
         InvoicePayment.invoice_id == invoice.invoice_id,
     ).delete()
 
+    # Nullify loyalty_transactions FK before deleting invoice (FK constraint)
+    db.query(LoyaltyTransaction).filter(
+        LoyaltyTransaction.invoice_id == invoice.invoice_id,
+    ).update({"invoice_id": None})
+
     db.delete(invoice)
     db.commit()
 
