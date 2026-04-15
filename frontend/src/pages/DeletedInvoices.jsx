@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 
+const pad = n => String(n).padStart(2, "0");
+
 export default function DeletedInvoices() {
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -14,6 +16,23 @@ export default function DeletedInvoices() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmingRestore, setConfirmingRestore] = useState(null);
+  const [appDateYMD, setAppDateYMD] = useState("");
+
+  /* ================= LOAD APP DATE ================= */
+  useEffect(() => {
+    api.get("/shop/details").then(r => {
+      const d = r?.data?.app_date;
+      if (d) setAppDateYMD(d.slice(0, 10));
+    }).catch(() => {});
+  }, []);
+
+  const toYMD = dateValue => {
+    if (!dateValue) return "";
+    const d = new Date(dateValue);
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  };
+
+  const isToday = dateValue => !!appDateYMD && toYMD(dateValue) === appDateYMD;
 
   /* ================= LOAD ================= */
   const loadDeletedInvoices = async () => {
@@ -134,13 +153,19 @@ export default function DeletedInvoices() {
                           : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-center">
-                        <button
-                          disabled={loading}
-                          onClick={() => setConfirmingRestore(inv)}
-                          className="px-3 py-1 rounded-xl text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
-                        >
-                          Restore
-                        </button>
+                        {isToday(inv.created_time) ? (
+                          <button
+                            disabled={loading}
+                            onClick={() => setConfirmingRestore(inv)}
+                            className="px-3 py-1 rounded-xl text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
+                          >
+                            Restore
+                          </button>
+                        ) : (
+                          <span className="px-3 py-1 rounded-xl text-[11px] font-semibold text-gray-400 bg-gray-100">
+                            Past Date
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))

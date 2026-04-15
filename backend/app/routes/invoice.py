@@ -1158,6 +1158,12 @@ def delete_invoice(
     if is_branch_day_closed(db, user.shop_id, invoice.branch_id, invoice.created_time):
         raise HTTPException(403, "Day closed for this branch")
 
+    # Only allow delete for current business date invoices
+    today = get_business_date(db, user.shop_id)
+    invoice_date = invoice.created_time.date() if invoice.created_time else None
+    if invoice_date and invoice_date != today:
+        raise HTTPException(403, "Only today's invoices can be deleted")
+
     old = {
         "invoice_id": invoice.invoice_id,
         "invoice_number": invoice.invoice_number,
@@ -1395,6 +1401,22 @@ def restore_archived_invoice(
 
     if str(user.role_name).lower() not in ["admin", "manager"]:
         raise HTTPException(403, "Not allowed")
+
+    # Only allow restore if the invoice's original date is the current business date
+    today = get_business_date(db, user.shop_id)
+    invoice_date = archive.created_time.date() if archive.created_time else None
+    if invoice_date and invoice_date != today:
+        raise HTTPException(403, f"Only today's invoices can be restored. This invoice is from {invoice_date}.")
+
+    # If the invoice already exists in the live table, just clean up the archive
+    existing = db.query(Invoice).filter(
+        Invoice.invoice_number == archive.invoice_number,
+        Invoice.shop_id == archive.shop_id
+    ).first()
+    if existing:
+        db.delete(archive)
+        db.commit()
+        return {"message": "Invoice already restored"}
 
     old = {
         "invoice_number": archive.invoice_number,
