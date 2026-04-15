@@ -4082,7 +4082,7 @@ def upi_payments_report(
     to_date: str,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("reports")),
+    user=Depends(require_permission("reports", "read")),
 ):
     branch_id = _force_branch(branch_id, user)
     f, t = parse_dt_range(from_date, to_date)
