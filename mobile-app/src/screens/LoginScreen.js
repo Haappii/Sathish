@@ -115,7 +115,10 @@ export default function LoginScreen() {
         business: regForm.billing_type === "store" ? "Store / Retail" : "Hotel / Restaurant",
         message: regForm.message,
       });
-      Alert.alert("Request Sent", `Registration request submitted. Request ID: ${res?.data?.request_id || "-"}`);
+      Alert.alert(
+        "Request Received",
+        `Your request has been saved (ID: ${res?.data?.request_id || "-"}).\n\nOur team will review it and send your login credentials to ${regForm.email} shortly.`
+      );
       setRegisterOpen(false);
       setRegisterStep(0);
       setRegForm({
