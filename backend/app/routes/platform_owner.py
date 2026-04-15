@@ -70,6 +70,9 @@ ALLOWED_BILLING_TYPES = {"store", "hotel"}
 # These keys match the `key` field in frontend MENU_CATALOG / mobileMenuCatalog.
 CORE_MODULES: set[str] = {"sales_billing", "inventory"}   # always on, never configurable
 
+# Modules enabled by default for new shops (platform can still toggle them later).
+DEFAULT_ENABLED_MODULES: set[str] = {"billing_history"}
+
 ALL_OPTIONAL_MODULES: list[str] = [
     "cash_drawer", "trends", "analytics", "billing_history",
     "table_billing", "qr_orders", "reservations", "delivery", "recipes",
@@ -84,10 +87,10 @@ ALL_OPTIONAL_MODULES: list[str] = [
 
 
 def _seed_core_modules(db: Session, shop_id: int) -> None:
-    """Seed shop_modules with only core modules enabled (used for new shops)."""
+    """Seed shop_modules for new shops: core + default-enabled modules on, rest off."""
     all_keys = list(CORE_MODULES) + ALL_OPTIONAL_MODULES
     for key in all_keys:
-        enabled = key in CORE_MODULES
+        enabled = key in CORE_MODULES or key in DEFAULT_ENABLED_MODULES
         db.execute(
             text("""
                 INSERT INTO shop_modules (shop_id, module_key, enabled)

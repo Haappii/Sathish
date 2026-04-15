@@ -65,6 +65,7 @@ import app.models.gift_card
 import app.models.gift_card_txn
 import app.models.subscription_plan
 import app.models.bulk_import_log
+import app.models.feedback
 
 # ⭐ TABLE BILLING MODELS (IMPORTANT)
 import app.models.table_billing
