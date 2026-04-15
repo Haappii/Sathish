@@ -25,10 +25,14 @@ import api from "../utils/apiClient";
 import { getSession, isHeadOfficeBranch } from "../utils/auth";
 import { modulesToPermMap } from "../utils/navigationMenu";
 
+// Links always accessible on the free / restricted plan (inventory module)
+const FREE_PLAN_ALLOWED_LINKS = new Set(["/setup/items"]);
+
 export default function Setup() {
   const navigate = useNavigate();
   const session = getSession();
   const [allowed, setAllowed] = useState(null);
+  const [enabledModules, setEnabledModules] = useState(null); // null = unrestricted
   const roleLower = (session?.role || "").toString().toLowerCase();
   const isPrivileged = ["admin", "manager"].includes(roleLower);
   const isHeadOffice = isHeadOfficeBranch(session);
@@ -41,6 +45,24 @@ export default function Setup() {
       })
       .catch(() => setAllowed(false));
   }, []);
+
+  useEffect(() => {
+    api.get("/shop/modules")
+      .then((r) => {
+        if (r?.data?.configured) {
+          setEnabledModules(new Set(r.data.enabled_modules || []));
+        } else {
+          setEnabledModules(null);
+        }
+      })
+      .catch(() => setEnabledModules(null));
+  }, []);
+
+  // A setup link is locked if the shop has module restrictions AND it's not in the free plan
+  const isLocked = (link) => {
+    if (!enabledModules) return false; // unrestricted shop
+    return !FREE_PLAN_ALLOWED_LINKS.has(link);
+  };
 
   if (allowed === null) {
     return (
@@ -223,6 +245,37 @@ export default function Setup() {
       <div className="flex flex-wrap gap-3">
         {visibleMenus.map((m, i) => {
           const Icon = m.icon;
+          const locked = isLocked(m.link);
+
+          if (locked) {
+            return (
+              <div
+                key={i}
+                title="Upgrade your plan to unlock this feature"
+                className="
+                  relative w-full
+                  sm:w-[calc(50%-0.75rem)]
+                  lg:w-[calc(33.333%-0.75rem)]
+                  flex items-center gap-3
+                  rounded-lg border bg-white
+                  px-3 py-2
+                  opacity-50 cursor-not-allowed select-none
+                "
+              >
+                <span className="absolute top-1.5 right-2 text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  🔒 Upgrade
+                </span>
+                <div className="h-8 w-8 flex items-center justify-center rounded-md bg-gray-100 text-gray-400">
+                  <Icon className="text-sm" />
+                </div>
+                <div className="leading-tight">
+                  <div className="text-sm font-semibold text-gray-500">{m.title}</div>
+                  <div className="text-xs text-gray-400">{m.desc}</div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <Link
               key={i}
@@ -244,14 +297,9 @@ export default function Setup() {
               >
                 <Icon className="text-sm" />
               </div>
-
               <div className="leading-tight">
-                <div className="text-sm font-semibold text-gray-800">
-                  {m.title}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {m.desc}
-                </div>
+                <div className="text-sm font-semibold text-gray-800">{m.title}</div>
+                <div className="text-xs text-gray-500">{m.desc}</div>
               </div>
             </Link>
           );
