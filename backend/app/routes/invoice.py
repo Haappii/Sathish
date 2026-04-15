@@ -1159,7 +1159,7 @@ def delete_invoice(
         raise HTTPException(403, "Day closed for this branch")
 
     # Only allow delete for current business date invoices
-    today = get_business_date(db, user.shop_id)
+    today = get_business_datetime(db, user.shop_id).date()
     invoice_date = invoice.created_time.date() if invoice.created_time else None
     if invoice_date and invoice_date != today:
         raise HTTPException(403, "Only today's invoices can be deleted")
@@ -1403,7 +1403,7 @@ def restore_archived_invoice(
         raise HTTPException(403, "Not allowed")
 
     # Only allow restore if the invoice's original date is the current business date
-    today = get_business_date(db, user.shop_id)
+    today = get_business_datetime(db, user.shop_id).date()
     invoice_date = archive.created_time.date() if archive.created_time else None
     if invoice_date and invoice_date != today:
         raise HTTPException(403, f"Only today's invoices can be restored. This invoice is from {invoice_date}.")
