@@ -38,6 +38,7 @@ from app.services.day_close_service import is_branch_day_closed
 from app.services.audit_service import log_action
 from app.services.credit_service import upsert_customer, ensure_invoice_due
 from app.models.invoice_due import InvoiceDue
+from app.models.invoice_payment import InvoicePayment
 from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.utils.permissions import require_permission
 from app.models.users import User
@@ -1223,6 +1224,19 @@ def delete_invoice(
                 ref_no=f"DEL-{invoice.invoice_id}"
             )
 
+    # Cancel any open dues before deleting invoice (FK constraint)
+    db.query(InvoiceDue).filter(
+        InvoiceDue.shop_id == user.shop_id,
+        InvoiceDue.invoice_id == invoice.invoice_id,
+        InvoiceDue.status == "OPEN",
+    ).update({"status": "CANCELLED", "closed_on": datetime.utcnow()})
+
+    # Remove any payment records linked to this invoice (FK constraint)
+    db.query(InvoicePayment).filter(
+        InvoicePayment.shop_id == user.shop_id,
+        InvoicePayment.invoice_id == invoice.invoice_id,
+    ).delete()
+
     db.delete(invoice)
     db.commit()
 
@@ -1236,17 +1250,6 @@ def delete_invoice(
         new={"deleted": True},
         user_id=user.user_id,
     )
-
-    # cancel any open due
-    due = db.query(InvoiceDue).filter(
-        InvoiceDue.shop_id == user.shop_id,
-        InvoiceDue.invoice_id == old.get("invoice_id"),
-        InvoiceDue.status == "OPEN",
-    ).first()
-    if due:
-        due.status = "CANCELLED"
-        due.closed_on = datetime.utcnow()
-        db.commit()
 
     return {"message": "Invoice deleted"}
 
