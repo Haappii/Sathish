@@ -19,6 +19,7 @@ class ShopDetailsBase(BaseModel):
     gst_number: Optional[str] = None
     fssai_number: Optional[str] = None
     logo_url: Optional[str] = None
+    upi_id: Optional[str] = None
 
     # Billing settings
     billing_type: Optional[str] = "store"
