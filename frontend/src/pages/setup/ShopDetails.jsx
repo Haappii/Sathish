@@ -38,7 +38,7 @@ export default function ShopDetails() {
     shop_id: "", shop_name: "", owner_name: "", mobile: "", mailid: "",
     address_line1: "", address_line2: "", address_line3: "",
     city: "", state: "", pincode: "",
-    gst_number: "", logo_url: "", billing_type: "store",
+    gst_number: "", logo_url: "", billing_type: "store", upi_id: "",
     head_office_branch_id: null,
     fssai_number: "",
     gst_enabled: false, gst_percent: 0, gst_mode: "inclusive",
@@ -298,6 +298,9 @@ export default function ShopDetails() {
               </Field>
               <Field label="Email">
                 <Input value={form.mailid} onChange={e => setField("mailid", e.target.value)} placeholder="shop@example.com" />
+              </Field>
+              <Field label="UPI ID">
+                <Input value={form.upi_id || ""} onChange={e => setField("upi_id", e.target.value)} placeholder="e.g. shopname@upi" />
               </Field>
             </div>
 
