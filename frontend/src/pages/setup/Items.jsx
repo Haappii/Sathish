@@ -145,8 +145,8 @@ export default function Items() {
 
   const itemCountByCategory = useMemo(() => {
     return (items || []).reduce((acc, it) => {
-      const k = String(it?.category_id ?? "");
-      if (!k) return acc;
+      if (it.is_raw_material) return acc;
+      const k = it?.category_id != null ? String(it.category_id) : "__uncategorised__";
       acc[k] = (acc[k] || 0) + 1;
       return acc;
     }, {});
@@ -154,7 +154,8 @@ export default function Items() {
 
   const resetForm = ({ keepCategory = true } = {}) => {
     const nextCategoryId =
-      keepCategory && activeCategoryId !== "all" ? String(activeCategoryId) : "";
+      keepCategory && activeCategoryId !== "all" && activeCategoryId !== "__uncategorised__"
+        ? String(activeCategoryId) : "";
 
     setForm({
       item_name: "",
@@ -194,7 +195,6 @@ export default function Items() {
     if (form.is_raw_material) {
       if (!form.supplier_id) return showToast("Select a supplier for raw material", "error");
     } else {
-      if (!form.category_id) return showToast("Select a category", "error");
       if (!hotelShop) {
         if (!Number(form.buy_price)) return showToast("Buy price is required", "error");
         if (!Number(form.mrp_price)) return showToast("MRP is required", "error");
@@ -217,7 +217,7 @@ export default function Items() {
         }
       : {
           item_name: form.item_name.toUpperCase(),
-          category_id: Number(form.category_id),
+          category_id: form.category_id ? Number(form.category_id) : null,
           is_raw_material: false,
           supplier_id: null,
           price: Number(form.price) || 0,
@@ -325,7 +325,9 @@ export default function Items() {
       }
       const catOk =
         activeCategoryId === "all" ||
-        String(i.category_id) === String(activeCategoryId);
+        (activeCategoryId === "__uncategorised__"
+          ? i.category_id == null
+          : String(i.category_id) === String(activeCategoryId));
       return catOk && searchOk;
     });
   }, [items, activeCategoryId, activeSupplierId, search, statusFilter]);
@@ -508,6 +510,28 @@ export default function Items() {
               );
             })}
 
+            {/* Uncategorised virtual filter */}
+            {(itemCountByCategory["__uncategorised__"] || 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => { setActiveCategoryId("__uncategorised__"); setActiveSupplierId(null); }}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  !activeSupplierId && activeCategoryId === "__uncategorised__"
+                    ? "bg-gray-500 text-white"
+                    : "hover:bg-gray-100 text-gray-500"
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-[11px] truncate pr-1 italic">Uncategorised</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                    !activeSupplierId && activeCategoryId === "__uncategorised__"
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>{itemCountByCategory["__uncategorised__"]}</span>
+                </div>
+              </button>
+            )}
+
             {/* Raw Materials by Supplier */}
             {suppliers.length > 0 && (
               <>
@@ -562,7 +586,7 @@ export default function Items() {
                   : "";
                 const isSelected = editingId === item.item_id;
                 const catName =
-                  categories.find(c => c.category_id === item.category_id)?.category_name || "";
+                  categories.find(c => c.category_id === item.category_id)?.category_name || (item.category_id == null && !item.is_raw_material ? "Uncategorised" : "");
                 const supplierName = item.is_raw_material
                   ? (suppliers.find(s => String(s.supplier_id) === String(item.supplier_id))?.supplier_name || "")
                   : "";
@@ -731,7 +755,7 @@ export default function Items() {
               </div>
             ) : (
               <div>
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Category *</div>
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Category <span className="normal-case font-normal">(optional)</span></div>
                 {form.category_id ? (
                   <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
                     <span className="text-[11px] text-blue-700 font-semibold truncate">{formCategoryName}</span>
@@ -743,7 +767,7 @@ export default function Items() {
                   </div>
                 ) : (
                   <div className="px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-[11px] text-gray-400 italic">
-                    ← Select from left panel
+                    ← Select from left panel or leave blank for Uncategorised
                   </div>
                 )}
               </div>

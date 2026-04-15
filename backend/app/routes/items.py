@@ -25,7 +25,7 @@ from app.routes.invoice import resolve_branch_optional
 
 class ItemBulkRow(BaseModel):
     item_name: str
-    category_name: str
+    category_name: Optional[str] = ""
     price: float = 0
     buy_price: Optional[float] = 0
     mrp_price: Optional[float] = 0
@@ -92,6 +92,21 @@ def _resolve_image_ext(upload: UploadFile) -> str:
         return ".webp"
 
     raise HTTPException(400, "Unsupported image type. Use JPG/JPEG/PNG/WEBP")
+
+
+def _get_or_create_uncategorised(db: Session, shop_id: int) -> int:
+    """Return the category_id of the 'Uncategorised' category for this shop,
+    creating it if it doesn't already exist."""
+    cat = db.query(Category).filter(
+        Category.shop_id == shop_id,
+        Category.category_name == "UNCATEGORISED",
+    ).first()
+    if cat:
+        return cat.category_id
+    cat = Category(shop_id=shop_id, category_name="UNCATEGORISED")
+    db.add(cat)
+    db.flush()
+    return cat.category_id
 
 
 # ---------- LIST ----------
@@ -238,13 +253,14 @@ def create_item(
         request_data.mrp_price = 0
     else:
         if not request_data.category_id:
-            raise HTTPException(400, "Category is required for items")
-        category = db.query(Category).filter(
-            Category.category_id == request_data.category_id,
-            Category.shop_id == user.shop_id
-        ).first()
-        if not category:
-            raise HTTPException(400, "Category not found")
+            request_data.category_id = _get_or_create_uncategorised(db, int(user.shop_id))
+        else:
+            category = db.query(Category).filter(
+                Category.category_id == request_data.category_id,
+                Category.shop_id == user.shop_id
+            ).first()
+            if not category:
+                raise HTTPException(400, "Category not found")
 
         if shop_type == "hotel":
             if float(request_data.price or 0) <= 0:
@@ -367,8 +383,10 @@ def bulk_import_items(
             continue
         category_id = cat_map.get(cat_name)
         if not category_id:
-            errors.append({"row": i + 1, "error": f"Category '{row.category_name}' not found"})
-            continue
+            if cat_name:
+                errors.append({"row": i + 1, "error": f"Category '{row.category_name}' not found — assigned to Uncategorised"})
+            category_id = _get_or_create_uncategorised(db, int(user.shop_id))
+            cat_map["UNCATEGORISED"] = category_id
 
         price = float(row.price or 0)
         buy_price = float(row.buy_price or 0)
