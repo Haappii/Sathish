@@ -744,10 +744,11 @@ def _auto_migrate_shop_modules() -> None:
     feature modules per shop independently.
     New shops start with only core modules (sales_billing, inventory) seeded.
     Shops with no rows at all are treated as unrestricted (backward-compat).
+    Split into separate transactions — PostgreSQL requires one DDL per execute().
     """
+    if engine.dialect.name != "postgresql":
+        return
     try:
-        if engine.dialect.name != "postgresql":
-            return
         with engine.begin() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS shop_modules (
@@ -756,11 +757,17 @@ def _auto_migrate_shop_modules() -> None:
                   module_key VARCHAR(80) NOT NULL,
                   enabled    BOOLEAN NOT NULL DEFAULT TRUE,
                   CONSTRAINT uq_shop_modules_shop_module UNIQUE (shop_id, module_key)
-                );
-                CREATE INDEX IF NOT EXISTS idx_shop_modules_shop_id ON shop_modules(shop_id);
+                )
             """))
     except Exception as e:
-        logger.exception("Auto-migration (shop_modules) failed: %s", e)
+        logger.exception("Auto-migration (shop_modules - create table) failed: %s", e)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_shop_modules_shop_id ON shop_modules(shop_id)"
+            ))
+    except Exception as e:
+        logger.exception("Auto-migration (shop_modules - create index) failed: %s", e)
 
 
 def _auto_migrate_advance_orders() -> None:
