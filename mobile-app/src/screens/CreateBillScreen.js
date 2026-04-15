@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 
 import api from "../api/client";
 import useOnlineStatus from "../hooks/useOnlineStatus";
@@ -122,6 +123,9 @@ export default function CreateBillScreen({ route }) {
   const [weightModalVisible, setWeightModalVisible] = useState(false);
   const [pendingWeightItem, setPendingWeightItem] = useState(null);
   const [weightInput, setWeightInput] = useState("250");
+  const [upiConfirmOpen, setUpiConfirmOpen] = useState(false);
+  const [upiUtr, setUpiUtr] = useState("");
+  const [upiPendingAction, setUpiPendingAction] = useState(null);
   const routeOrderId = Number(route?.params?.prefillOrderId || 0) || null;
   const isTableBillingFlow = Boolean(routeOrderId);
   const isHotelFlow = String(shopDetails?.billing_type || shopDetails?.shop_type || "").toLowerCase() === "hotel";
@@ -399,7 +403,7 @@ export default function CreateBillScreen({ route }) {
   };
 
   // ── Save invoice variants (print both / save only / hold) ──────────────────
-  const saveInvoice = async (action = BILL_ACTIONS.PRINT_BOTH) => {
+  const saveInvoice = async (action = BILL_ACTIONS.PRINT_BOTH, utrCode = null) => {
     if (!cart.length) return Alert.alert("Validation", "Add at least one item");
 
     const mobile = String(customer.mobile || "").replace(/\D/g, "");
@@ -425,6 +429,7 @@ export default function CreateBillScreen({ route }) {
       wallet_mobile: walletMobile.trim() || undefined,
       wallet_amount: Number(walletAmount || 0) || undefined,
       customer_email: String(customer.email || "").trim() || undefined,
+      upi_utr: (paymentMode === "upi" && utrCode) ? utrCode : undefined,
     };
 
     const paymentSplit = Object.fromEntries(Object.entries(splitPayload).filter(([, v]) => v !== undefined));
@@ -794,7 +799,7 @@ export default function CreateBillScreen({ route }) {
               <Pressable
                 key={m}
                 style={[styles.modeBtn, paymentMode === m && styles.modeBtnActive]}
-                onPress={() => setPaymentMode(m)}
+                onPress={() => { setPaymentMode(m); setUpiUtr(""); }}
               >
                 <Text style={[styles.modeTxt, paymentMode === m && styles.modeTxtActive]}>
                   {m.toUpperCase()}
@@ -923,7 +928,15 @@ export default function CreateBillScreen({ route }) {
           <Pressable
             style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
             disabled={saving}
-            onPress={() => saveInvoice(BILL_ACTIONS.PRINT_BOTH)}
+            onPress={() => {
+              if (paymentMode === "upi") {
+                setUpiPendingAction(BILL_ACTIONS.PRINT_BOTH);
+                setUpiUtr("");
+                setUpiConfirmOpen(true);
+              } else {
+                saveInvoice(BILL_ACTIONS.PRINT_BOTH);
+              }
+            }}
           >
             <Text style={styles.saveTxt}>
               {saving
@@ -938,7 +951,15 @@ export default function CreateBillScreen({ route }) {
             <Pressable
               style={[styles.saveOnlyBtn, saving && styles.saveBtnDisabled]}
               disabled={saving}
-              onPress={() => saveInvoice(BILL_ACTIONS.SAVE_ONLY)}
+              onPress={() => {
+                if (paymentMode === "upi") {
+                  setUpiPendingAction(BILL_ACTIONS.SAVE_ONLY);
+                  setUpiUtr("");
+                  setUpiConfirmOpen(true);
+                } else {
+                  saveInvoice(BILL_ACTIONS.SAVE_ONLY);
+                }
+              }}
             >
               <Text style={styles.saveOnlyTxt}>{saving ? "Saving…" : "Save Without Printing"}</Text>
             </Pressable>
@@ -955,6 +976,89 @@ export default function CreateBillScreen({ route }) {
           )}
         </View>
       </ScrollView>
+
+      {/* UPI Payment Confirmation Modal */}
+      <Modal transparent visible={upiConfirmOpen} animationType="slide" onRequestClose={() => setUpiConfirmOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 16 }} keyboardShouldPersistTaps="handled">
+            <View style={styles.upiModal}>
+              <Text style={styles.upiModalTitle}>UPI Payment</Text>
+
+              {shopDetails?.upi_id ? (
+                <View style={styles.upiQrWrap}>
+                  <QRCode
+                    value={`upi://pay?pa=${encodeURIComponent(shopDetails.upi_id)}&pn=${encodeURIComponent(shopName)}&am=${payableTotal.toFixed(2)}&cu=INR`}
+                    size={170}
+                    backgroundColor="#ffffff"
+                    color="#0b1220"
+                  />
+                  <Text style={styles.upiIdLabel}>{shopDetails.upi_id}</Text>
+                  <Text style={styles.upiAmtLabel}>Amount: {fmt(payableTotal)}</Text>
+                </View>
+              ) : (
+                <View style={styles.upiNoId}>
+                  <Text style={styles.upiNoIdText}>No UPI ID configured in shop settings.</Text>
+                </View>
+              )}
+
+              <Text style={styles.upiFieldLabel}>Customer Name</Text>
+              <TextInput
+                style={styles.input}
+                value={customer.name}
+                onChangeText={(v) => setCustomer((p) => ({ ...p, name: v }))}
+                placeholder="Customer name"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <Text style={styles.upiFieldLabel}>Mobile Number</Text>
+              <TextInput
+                style={styles.input}
+                value={customer.mobile}
+                onChangeText={(v) => setCustomer((p) => ({ ...p, mobile: v.replace(/\D/g, "").slice(0, 10) }))}
+                placeholder="10-digit mobile"
+                keyboardType="phone-pad"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <Text style={styles.upiFieldLabel}>UTR Last 5 Digits</Text>
+              <TextInput
+                style={styles.input}
+                value={upiUtr}
+                onChangeText={(v) => setUpiUtr(v.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5))}
+                placeholder="e.g. AB123"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="characters"
+                maxLength={5}
+              />
+
+              <View style={styles.upiModalBtns}>
+                <Pressable
+                  style={styles.upiCancelBtn}
+                  onPress={() => setUpiConfirmOpen(false)}
+                >
+                  <Text style={styles.upiCancelTxt}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.upiDoneBtn, saving && { opacity: 0.6 }]}
+                  disabled={saving}
+                  onPress={() => {
+                    const name = String(customer.name || "").trim();
+                    const mobile = String(customer.mobile || "").replace(/\D/g, "");
+                    const utr = upiUtr.trim();
+                    if (!name) return Alert.alert("Validation", "Customer name is required");
+                    if (mobile.length !== 10) return Alert.alert("Validation", "Enter a valid 10-digit mobile");
+                    if (utr.length !== 5) return Alert.alert("Validation", "Enter UTR last 5 digits");
+                    setUpiConfirmOpen(false);
+                    saveInvoice(upiPendingAction, utr);
+                  }}
+                >
+                  <Text style={styles.upiDoneTxt}>{saving ? "Saving…" : "Payment Done"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
 
       <Modal transparent visible={weightModalVisible} animationType="fade" onRequestClose={() => setWeightModalVisible(false)}>
         <View style={styles.modalBackdrop}>
@@ -1101,6 +1205,56 @@ const styles = StyleSheet.create({
   modeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
   modeTxt:       { fontSize: 12, fontWeight: "700", color: "#334155" },
   modeTxtActive: { color: "#fff" },
+  upiModal: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    gap: 8,
+    shadowColor: "#0b1220",
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  upiModalTitle: { fontSize: 17, fontWeight: "800", color: "#0b1220", textAlign: "center", marginBottom: 4 },
+  upiQrWrap: {
+    alignItems: "center",
+    backgroundColor: "#f8faff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#d9e3ff",
+    padding: 16,
+    gap: 8,
+    marginBottom: 4,
+  },
+  upiIdLabel: { fontSize: 13, fontWeight: "700", color: "#334155", textAlign: "center" },
+  upiAmtLabel: { fontSize: 15, fontWeight: "800", color: "#0b57d0", textAlign: "center" },
+  upiNoId: {
+    backgroundColor: "#fef9ec",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    padding: 12,
+  },
+  upiNoIdText: { fontSize: 13, color: "#92400e", fontWeight: "600", textAlign: "center" },
+  upiFieldLabel: { fontSize: 12, fontWeight: "700", color: "#475569" },
+  upiModalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
+  upiCancelBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  upiCancelTxt: { color: "#334155", fontWeight: "700", fontSize: 14 },
+  upiDoneBtn: {
+    flex: 2,
+    backgroundColor: "#059669",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  upiDoneTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
   saveBtn: {
     marginTop: 4,
     borderRadius: 10,

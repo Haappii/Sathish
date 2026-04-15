@@ -121,6 +121,9 @@ const REPORTS = [
 
   // Reservations
   { key: "reservations/list", label: "Reservations Report", group: "Reservations" },
+
+  // UPI
+  { key: "upi-payments", label: "UPI QR Payments", group: "Sales" },
 ];
 
 const NO_USER_FILTER_KEYS = new Set([
@@ -145,6 +148,7 @@ const NO_USER_FILTER_KEYS = new Set([
   "employees/attendance-summary",
   "reservations/list",
   "bulk-import/history",
+  "upi-payments",
   "gst/gstr1",
   "gst/gstr3b",
   "gst/hsn-summary",
@@ -580,6 +584,18 @@ export default function Reports() {
           const grand = Number((sub + gst - discount).toFixed(2));
           return { ...row, grand_total: grand };
         });
+        setData(normalized);
+      } else if (activeReport?.key === "upi-payments") {
+        const normalized = rows.map(row => ({
+          "Date": row.date,
+          "Time": row.time,
+          "Invoice #": row.invoice_number,
+          "Customer": row.customer_name || "—",
+          "Mobile": row.mobile || "—",
+          "Amount (₹)": Number(row.amount || 0).toFixed(2),
+          "UTR Last 5": row.utr_last_5 || "—",
+          "Branch": row.branch || "—",
+        }));
         setData(normalized);
       } else {
         setData(rows);

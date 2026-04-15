@@ -10,6 +10,7 @@ import { getReceiptAddressLines, maskMobileForPrint } from "../utils/receipt";
 import { generateFeedbackQrHtml as buildFeedbackQrHtml } from "../utils/feedbackQr";
 import { printDirectText } from "../utils/printDirect";
 import appLogo from "../assets/app_logo.png";
+import QRCode from "qrcode";
 import {
   cacheMasterData,
   getCachedMasterData,
@@ -69,6 +70,9 @@ const [customer, setCustomer] = useState({
     wallet: "",
   });
   const [giftCardCode, setGiftCardCode] = useState("");
+  const [upiConfirmOpen, setUpiConfirmOpen] = useState(false);
+  const [upiUtr, setUpiUtr] = useState("");
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState("");
   const selectedItemIds = useMemo(() => new Set(cart.map((c) => c.item_id)), [cart]);
 
   const paymentModeLabel = m => {
@@ -643,6 +647,20 @@ const [customer, setCustomer] = useState({
     .map(k => Number(split[k] || 0))
     .reduce((a, b) => a + b, 0);
 
+  /* UPI QR generation — must be after payable is computed */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (paymentMode !== "upi" || splitEnabled || !shop?.upi_id) {
+      setUpiQrDataUrl("");
+      if (paymentMode !== "upi") setUpiConfirmOpen(false);
+      return;
+    }
+    const upiString = `upi://pay?pa=${encodeURIComponent(shop.upi_id)}&pn=${encodeURIComponent(shop.shop_name || "Shop")}&am=${payable.toFixed(2)}&cu=INR`;
+    QRCode.toDataURL(upiString, { width: 200, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } })
+      .then(url => setUpiQrDataUrl(url))
+      .catch(() => setUpiQrDataUrl(""));
+  }, [paymentMode, splitEnabled, shop?.upi_id, payable]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ---------------- PRINT ---------------- */
   const generateBillText = invoiceNo => {
     const is80mm = (branch?.paper_size || "58mm") === "80mm";
@@ -862,6 +880,8 @@ const [customer, setCustomer] = useState({
     setSplitEnabled(false);
     setSplit({ cash: "", card: "", upi: "", gift_card: "", wallet: "" });
     setGiftCardCode("");
+    setUpiUtr("");
+    setUpiConfirmOpen(false);
   };
 
   const saveInvoice = async (print = false) => {
@@ -884,6 +904,10 @@ const [customer, setCustomer] = useState({
     if (splitEnabled && Number(split.wallet || 0) > 0 && /^9{9,}$/.test(String(customer.mobile || ""))) {
       return showToast("Valid customer mobile required for wallet split", "error");
     }
+    if (!splitEnabled && paymentMode === "upi" && upiUtr.trim().length !== 5) {
+      setUpiConfirmOpen(true);
+      return showToast("Enter UTR last 5 digits to confirm UPI payment", "error");
+    }
 
     const payload = {
       customer_name: customer.name,
@@ -903,7 +927,9 @@ const [customer, setCustomer] = useState({
             wallet_amount: Number(split.wallet || 0),
             wallet_mobile: String(customer.mobile || "").trim() || null,
           }
-        : paymentMode === "gift_card"
+        : paymentMode === "upi"
+          ? { upi_utr: upiUtr.trim().toUpperCase() || null }
+          : paymentMode === "gift_card"
           ? {
               gift_card_amount: Number(payable || 0),
               gift_card_code: String(giftCardCode || "").trim() || null,
@@ -1622,6 +1648,71 @@ const [customer, setCustomer] = useState({
                     {paymentModeLabel(m)}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* ── UPI QR Popup ── */}
+            {!splitEnabled && paymentMode === "upi" && (
+              <div className={`rounded-xl border overflow-hidden transition-all ${upiConfirmOpen ? "border-blue-300 bg-blue-50/40" : "border-gray-200 bg-gray-50"}`}>
+                <button
+                  onClick={() => setUpiConfirmOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold text-blue-700"
+                >
+                  <span>📱 UPI Payment QR</span>
+                  <span className="text-gray-400 text-[10px]">{upiConfirmOpen ? "▲ hide" : "▼ expand"}</span>
+                </button>
+
+                {upiConfirmOpen && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-blue-100">
+                    {shop?.upi_id ? (
+                      <div className="flex flex-col items-center gap-1.5 py-3">
+                        {upiQrDataUrl
+                          ? <img src={upiQrDataUrl} alt="UPI QR" className="w-36 h-36 rounded-lg border border-gray-200" />
+                          : <div className="w-36 h-36 bg-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-400">Generating QR…</div>
+                        }
+                        <p className="text-[11px] font-semibold text-gray-600">{shop.upi_id}</p>
+                        <p className="text-[13px] font-bold text-blue-700">₹{payable.toFixed(2)}</p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-2">
+                        No UPI ID configured in shop settings.
+                      </p>
+                    )}
+
+                    <div>
+                      <label className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">Customer Name *</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 mt-0.5"
+                        placeholder="Customer name"
+                        value={customer.name === "NA" ? "" : customer.name}
+                        onChange={e => setCustomer(c => ({ ...c, name: e.target.value || "NA" }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">Mobile Number *</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 mt-0.5"
+                        placeholder="10-digit mobile"
+                        value={customer.mobile === "9999999999" ? "" : customer.mobile}
+                        onChange={e => setCustomer(c => ({ ...c, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) || "9999999999" }))}
+                        maxLength={10}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">UTR Last 5 Digits *</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 mt-0.5 uppercase"
+                        placeholder="e.g. AB123"
+                        value={upiUtr}
+                        onChange={e => setUpiUtr(e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5))}
+                        maxLength={5}
+                      />
+                    </div>
+                    {upiUtr.length === 5 && (
+                      <p className="text-[10px] text-emerald-600 font-semibold">✓ UTR confirmed — proceed to Save / Print</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

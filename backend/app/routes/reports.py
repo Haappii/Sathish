@@ -4071,3 +4071,49 @@ def reservations_report(
         }
         for r in rows
     ]
+
+
+# =====================================================
+# UPI QR PAYMENTS REPORT
+# =====================================================
+@router.get("/upi-payments")
+def upi_payments_report(
+    from_date: str,
+    to_date: str,
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports")),
+):
+    branch_id = _force_branch(branch_id, user)
+    f, t = parse_dt_range(from_date, to_date)
+
+    q = (
+        db.query(Invoice, Branch.branch_name)
+        .outerjoin(Branch, Branch.branch_id == Invoice.branch_id)
+        .filter(
+            Invoice.shop_id == user.shop_id,
+            Invoice.payment_mode == "upi",
+            Invoice.created_time >= f,
+            Invoice.created_time < t,
+        )
+    )
+    if branch_id:
+        q = q.filter(Invoice.branch_id == branch_id)
+
+    rows = q.order_by(Invoice.created_time.desc()).all()
+
+    result = []
+    for inv, branch_name in rows:
+        split = inv.payment_split if isinstance(inv.payment_split, dict) else {}
+        utr = split.get("upi_utr", "") or ""
+        result.append({
+            "date": inv.created_time.strftime("%d/%m/%Y") if inv.created_time else "",
+            "time": inv.created_time.strftime("%H:%M") if inv.created_time else "",
+            "invoice_number": inv.invoice_number or "",
+            "customer_name": inv.customer_name or "",
+            "mobile": inv.mobile or "",
+            "amount": _as_float(inv.total_amount),
+            "utr_last_5": utr,
+            "branch": branch_name or "",
+        })
+    return result

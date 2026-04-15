@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -82,6 +83,8 @@ export default function TableOrderScreen({ route, navigation }) {
   const [walletMobile, setWalletMobile] = useState("");
   const [walletAmount, setWalletAmount] = useState("");
   const [branchDetails, setBranchDetails] = useState({});
+  const [shopDetails, setShopDetails] = useState({});
+  const [upiUtr, setUpiUtr] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTableId, setTransferTableId] = useState(null);
   const [transferBusy, setTransferBusy] = useState(false);
@@ -116,6 +119,7 @@ export default function TableOrderScreen({ route, navigation }) {
       const nextBranch = branchRes?.data || {};
       setBranchDetails(nextBranch);
       const shopData = shopRes?.data || {};
+      setShopDetails(shopData);
       const branchServiceCharge = nextBranch?.service_charge_required
         ? normalizeServiceCharge(nextBranch?.service_charge_amount ?? 0)
         : normalizeServiceCharge(shopData?.service_charge ?? shopData?.default_service_charge ?? 0);
@@ -306,11 +310,15 @@ export default function TableOrderScreen({ route, navigation }) {
     if ((order?.items?.length || 0) + cartCount <= 0) {
       return Alert.alert("No Items", "Add items before billing.");
     }
+    setUpiUtr("");
     setBillOpen(true);
   };
 
   const saveBill = async () => {
     if (!order?.order_id) return;
+    if (paymentMode === "upi" && upiUtr.trim().length !== 5) {
+      return Alert.alert("Validation", "Enter UTR last 5 digits to confirm UPI payment");
+    }
     setBilling(true);
     try {
       for (const [id, qty] of Object.entries(cart)) {
@@ -334,6 +342,7 @@ export default function TableOrderScreen({ route, navigation }) {
         wallet_amount: Number(walletAmount || 0) || undefined,
         customer_email: customerEmail.trim() || undefined,
         customer_gst: customerGst.trim() || undefined,
+        upi_utr: (paymentMode === "upi" && upiUtr.trim()) ? upiUtr.trim().toUpperCase() : undefined,
       };
       const paymentSplit = Object.fromEntries(Object.entries(splitPayload).filter(([, v]) => v !== undefined));
 
@@ -655,7 +664,7 @@ export default function TableOrderScreen({ route, navigation }) {
                 <Pressable
                   key={mode}
                   style={[styles.paymentBtn, paymentMode === mode && styles.paymentBtnActive]}
-                  onPress={() => setPaymentMode(mode)}
+                  onPress={() => { setPaymentMode(mode); setUpiUtr(""); }}
                 >
                   <Text style={[styles.paymentBtnText, paymentMode === mode && styles.paymentBtnTextActive]}>
                     {mode.toUpperCase()}
@@ -663,6 +672,37 @@ export default function TableOrderScreen({ route, navigation }) {
                 </Pressable>
               ))}
             </View>
+
+            {paymentMode === "upi" && (
+              <View style={styles.upiSection}>
+                {shopDetails?.upi_id ? (
+                  <View style={styles.upiQrBox}>
+                    <QRCode
+                      value={`upi://pay?pa=${encodeURIComponent(shopDetails.upi_id)}&pn=${encodeURIComponent(shopDetails.shop_name || "Shop")}&am=${netBillTotal.toFixed(2)}&cu=INR`}
+                      size={150}
+                      backgroundColor="#ffffff"
+                      color="#0b1220"
+                    />
+                    <Text style={styles.upiQrId}>{shopDetails.upi_id}</Text>
+                    <Text style={styles.upiQrAmt}>Amount: ₹{netBillTotal.toFixed(2)}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.upiNoIdBox}>
+                    <Text style={styles.upiNoIdTxt}>No UPI ID configured in shop settings.</Text>
+                  </View>
+                )}
+                <Text style={styles.modalSubTitle}>UTR Last 5 Digits *</Text>
+                <TextInput
+                  style={styles.search}
+                  placeholder="e.g. AB123"
+                  value={upiUtr}
+                  onChangeText={(v) => setUpiUtr(v.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5))}
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                  maxLength={5}
+                />
+              </View>
+            )}
 
             {(paymentMode === "gift_card" || paymentMode === "split") && (
               <>
@@ -960,4 +1000,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#059669",
   },
   modalSaveText: { color: "#fff", fontWeight: "800" },
+  upiSection: { gap: 8 },
+  upiQrBox: {
+    alignItems: "center",
+    backgroundColor: "#f8faff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#d9e3ff",
+    padding: 14,
+    gap: 6,
+  },
+  upiQrId: { fontSize: 12, fontWeight: "700", color: "#334155", textAlign: "center" },
+  upiQrAmt: { fontSize: 14, fontWeight: "800", color: "#0b57d0", textAlign: "center" },
+  upiNoIdBox: {
+    backgroundColor: "#fef9ec",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    padding: 10,
+  },
+  upiNoIdTxt: { fontSize: 12, color: "#92400e", fontWeight: "600", textAlign: "center" },
 });
