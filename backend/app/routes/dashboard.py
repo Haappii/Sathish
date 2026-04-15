@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, date
 from app.db import get_db
 from app.models.invoice import Invoice
 from app.models.invoice_details import InvoiceDetail
+from app.models.invoice_due import InvoiceDue
+from app.models.invoice_payment import InvoicePayment
 from app.models.sales_return import SalesReturn
 from app.models.shop_details import ShopDetails
 from app.utils.auth_user import get_current_user
@@ -85,6 +87,23 @@ def get_dashboard_stats(
         net_today_sales = 0.0
     net_total_bills = max(0, int(total_bills or 0) - int(total_returns_count or 0))
 
+    # Pending dues: sum original_amount of OPEN dues minus payments and returns for those invoices
+    open_due_invoice_ids = (
+        db.query(InvoiceDue.invoice_id)
+        .filter(InvoiceDue.shop_id == user.shop_id, InvoiceDue.branch_id == branch_id, InvoiceDue.status == "OPEN")
+        .subquery()
+    )
+    total_original = db.query(func.coalesce(func.sum(InvoiceDue.original_amount), 0)) \
+        .filter(InvoiceDue.shop_id == user.shop_id, InvoiceDue.branch_id == branch_id, InvoiceDue.status == "OPEN") \
+        .scalar() or 0
+    total_paid = db.query(func.coalesce(func.sum(InvoicePayment.amount), 0)) \
+        .filter(InvoicePayment.shop_id == user.shop_id, InvoicePayment.invoice_id.in_(open_due_invoice_ids)) \
+        .scalar() or 0
+    total_returns = db.query(func.coalesce(func.sum(SalesReturn.refund_amount), 0)) \
+        .filter(SalesReturn.shop_id == user.shop_id, SalesReturn.invoice_id.in_(open_due_invoice_ids), SalesReturn.status != "CANCELLED") \
+        .scalar() or 0
+    pending_dues = max(0.0, float(total_original) - float(total_paid) - float(total_returns))
+
     return {
         "branch_id": branch_id,
         "today_sales": net_today_sales,
@@ -92,6 +111,7 @@ def get_dashboard_stats(
         "total_bills": net_total_bills,
         "today_returns": float(today_returns_amount or 0),
         "today_return_bills": int(today_returns_count or 0),
+        "pending_dues": round(pending_dues, 2),
     }
 
 
