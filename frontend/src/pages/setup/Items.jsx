@@ -348,142 +348,111 @@ export default function Items() {
     <>
       <style>{`
         html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
-        .no-scroll::-webkit-scrollbar { display: none; }
-        .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-        .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider {
-          position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-          background-color: #d1d5db; border-radius: 20px; transition: .2s;
+        .ns::-webkit-scrollbar { display: none; }
+        .ns { -ms-overflow-style: none; scrollbar-width: none; }
+        .tsw { position: relative; display: inline-block; width: 38px; height: 22px; }
+        .tsw input { opacity: 0; width: 0; height: 0; }
+        .tsl {
+          position: absolute; cursor: pointer; inset: 0;
+          background: #d1d5db; border-radius: 22px; transition: .2s;
         }
-        .toggle-slider:before {
-          position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
-          background-color: white; border-radius: 50%; transition: .2s;
+        .tsl:before {
+          position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+          background: white; border-radius: 50%; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.15);
         }
-        input:checked + .toggle-slider { background-color: #10b981; }
-        input:checked + .toggle-slider:before { transform: translateX(16px); }
-        .toggle-switch-blue input:checked + .toggle-slider { background-color: #f59e0b; }
+        .tsw input:checked + .tsl { background: #10b981; }
+        .tsw input:checked + .tsl:before { transform: translateX(16px); }
+        .tsw-amber input:checked + .tsl { background: #f59e0b; }
       `}</style>
 
-      {/* Top bar */}
-      <div className="px-4 pt-2 pb-1 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+      {/* ── TOP BAR ── */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2 flex-wrap">
+        <div className="flex items-center gap-2.5">
           <BackButton />
+          <div>
+            <h1 className="text-[15px] font-bold text-gray-800 leading-tight">Item Management</h1>
+            <p className="text-[11px] text-gray-400 leading-none">
+              {items.filter(i => !i.is_raw_material).length} items · {categories.length} categories
+            </p>
+          </div>
           {branchWise && (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-gray-500 font-medium">Branch:</span>
+            <div className="flex items-center gap-1.5 ml-2">
+              <span className="text-[11px] text-gray-400">Branch:</span>
               {isAdmin ? (
                 <select
                   value={selectedBranchId}
-                  onChange={e => {
-                    const bid = e.target.value;
-                    setSelectedBranchId(bid);
-                    loadData(bid);
-                  }}
-                  className="border rounded-lg px-2 py-1 text-[12px] bg-white shadow-sm focus:outline-none focus:border-blue-400"
+                  onChange={e => { const bid = e.target.value; setSelectedBranchId(bid); loadData(bid); }}
+                  className="border rounded-lg px-2 py-1 text-[11px] bg-white focus:outline-none focus:border-blue-400"
                 >
                   {branches.map(b => (
-                    <option key={b.branch_id} value={String(b.branch_id)}>
-                      {b.branch_name}
-                    </option>
+                    <option key={b.branch_id} value={String(b.branch_id)}>{b.branch_name}</option>
                   ))}
                 </select>
               ) : (
-                <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[12px] font-semibold">
+                <span className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-semibold">
                   {branches.find(b => String(b.branch_id) === String(session?.branch_id))?.branch_name || "My Branch"}
                 </span>
               )}
             </div>
           )}
         </div>
+
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 p-1 rounded-xl border bg-white shadow-sm">
-            <button
-              type="button"
-              onClick={() => setStatusFilter("all")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                statusFilter === "all"
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              All ({items.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("on")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                statusFilter === "on"
-                  ? "bg-emerald-600 text-white"
-                  : "text-emerald-700 hover:bg-emerald-50"
-              }`}
-            >
-              On ({statusCounts.on})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("off")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                statusFilter === "off"
-                  ? "bg-rose-600 text-white"
-                  : "text-rose-700 hover:bg-rose-50"
-              }`}
-            >
-              Off ({statusCounts.off})
-            </button>
+          {/* Status filter */}
+          <div className="flex rounded-xl border bg-white shadow-sm overflow-hidden text-[11px] font-semibold">
+            {[
+              { key: "all",  label: `All (${items.filter(i=>!i.is_raw_material).length})`, active: "bg-gray-800 text-white", idle: "text-gray-500 hover:bg-gray-50" },
+              { key: "on",   label: `On (${statusCounts.on})`,  active: "bg-emerald-500 text-white", idle: "text-emerald-600 hover:bg-emerald-50" },
+              { key: "off",  label: `Off (${statusCounts.off})`, active: "bg-rose-500 text-white",   idle: "text-rose-500 hover:bg-rose-50"   },
+            ].map(({ key, label, active, idle }) => (
+              <button key={key} type="button" onClick={() => setStatusFilter(key)}
+                className={`px-3 py-1.5 transition-colors ${statusFilter === key ? active : idle}`}>
+                {label}
+              </button>
+            ))}
           </div>
+
           <input ref={xlsxRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelImport} />
-          <button
-            type="button"
-            onClick={() => xlsxRef.current?.click()}
-            disabled={importing}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm text-[12px] flex items-center gap-1.5 disabled:opacity-60"
-          >
+          <button type="button" onClick={() => xlsxRef.current?.click()} disabled={importing}
+            className="px-3 py-1.5 rounded-xl border bg-white shadow-sm text-[11px] font-medium text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-60">
             📥 {importing ? "Importing…" : "Import Excel"}
           </button>
-          <button
-            type="button"
-            onClick={() => resetForm({ keepCategory: true })}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-sm text-[12px]"
-          >
+
+          <button type="button" onClick={() => resetForm({ keepCategory: true })}
+            className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-semibold shadow-sm transition-colors">
             + Add Item
           </button>
         </div>
       </div>
 
-      {/* Main 3-column layout */}
-      <div
-        className="grid grid-cols-[190px_3fr_230px] gap-3 px-4 pb-4 no-scroll"
-        style={{ height: "calc(100vh - 110px)" }}
-      >
-        {/* ── CATEGORIES + SUPPLIERS ── */}
-        <aside className="rounded-2xl border shadow-lg p-3 bg-white text-[11px] flex flex-col overflow-hidden">
-          <input
-            className="border rounded-lg px-2 py-1.5 mb-2 text-[11px] w-full focus:outline-none focus:border-blue-400"
-            placeholder="Search category..."
-            value={categorySearch}
-            onChange={e => setCategorySearch(e.target.value)}
-          />
+      {/* ── MAIN 3-COLUMN LAYOUT ── */}
+      <div className="grid grid-cols-[200px_1fr_260px] gap-3 px-4 pb-4 ns"
+        style={{ height: "calc(100vh - 108px)" }}>
 
-          <div className="flex-1 overflow-y-auto no-scroll space-y-0.5">
+        {/* ── LEFT: CATEGORIES ── */}
+        <aside className="flex flex-col bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="px-3 pt-3 pb-2 border-b bg-gray-50">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Categories</p>
+            <input
+              className="w-full border rounded-lg px-2.5 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              placeholder="Search…"
+              value={categorySearch}
+              onChange={e => setCategorySearch(e.target.value)}
+            />
+          </div>
+
+          <div className="flex-1 overflow-y-auto ns px-2 py-2 space-y-0.5">
             {/* All Items */}
-            <button
-              type="button"
-              onClick={() => selectCategory("all")}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+            <button type="button" onClick={() => selectCategory("all")}
+              className={`w-full text-left px-2.5 py-2 rounded-xl transition-colors flex items-center justify-between gap-1 ${
                 activeCategoryId === "all" && !activeSupplierId
-                  ? "bg-blue-600 text-white"
-                  : "hover:bg-gray-100 text-gray-700"
-              }`}
-            >
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-[11px]">All Items</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                  activeCategoryId === "all" && !activeSupplierId ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                }`}>
-                  {items.filter(i => !i.is_raw_material).length}
-                </span>
-              </div>
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-gray-700 hover:bg-blue-50"
+              }`}>
+              <span className="font-semibold text-[12px]">All Items</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                activeCategoryId === "all" && !activeSupplierId ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"
+              }`}>{items.filter(i => !i.is_raw_material).length}</span>
             </button>
 
             {/* Category list */}
@@ -492,73 +461,53 @@ export default function Items() {
               const isActive = !activeSupplierId && String(activeCategoryId) === id;
               const count = itemCountByCategory[id] || 0;
               return (
-                <button
-                  key={c.category_id}
-                  type="button"
-                  onClick={() => selectCategory(id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    isActive ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-[11px] truncate pr-1">{c.category_name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                      isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                    }`}>{count}</span>
-                  </div>
+                <button key={c.category_id} type="button" onClick={() => selectCategory(id)}
+                  className={`w-full text-left px-2.5 py-2 rounded-xl transition-colors flex items-center justify-between gap-1 ${
+                    isActive ? "bg-blue-600 text-white shadow-sm" : "text-gray-700 hover:bg-blue-50"
+                  }`}>
+                  <span className="font-medium text-[11px] truncate pr-1">{c.category_name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                    isActive ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"
+                  }`}>{count}</span>
                 </button>
               );
             })}
 
             {/* Uncategorised virtual filter */}
             {(itemCountByCategory["__uncategorised__"] || 0) > 0 && (
-              <button
-                type="button"
-                onClick={() => { setActiveCategoryId("__uncategorised__"); setActiveSupplierId(null); }}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+              <button type="button" onClick={() => { setActiveCategoryId("__uncategorised__"); setActiveSupplierId(null); }}
+                className={`w-full text-left px-2.5 py-2 rounded-xl transition-colors flex items-center justify-between gap-1 ${
                   !activeSupplierId && activeCategoryId === "__uncategorised__"
-                    ? "bg-gray-500 text-white"
-                    : "hover:bg-gray-100 text-gray-500"
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-[11px] truncate pr-1 italic">Uncategorised</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                    !activeSupplierId && activeCategoryId === "__uncategorised__"
-                      ? "bg-white/20 text-white"
-                      : "bg-gray-100 text-gray-500"
-                  }`}>{itemCountByCategory["__uncategorised__"]}</span>
-                </div>
+                    ? "bg-slate-500 text-white shadow-sm"
+                    : "text-gray-400 hover:bg-gray-50"
+                }`}>
+                <span className="font-medium text-[11px] truncate pr-1 italic">Uncategorised</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                  !activeSupplierId && activeCategoryId === "__uncategorised__"
+                    ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"
+                }`}>{itemCountByCategory["__uncategorised__"]}</span>
               </button>
             )}
 
-            {/* Raw Materials by Supplier */}
+            {/* Raw Materials */}
             {suppliers.length > 0 && (
               <>
-                <div className="pt-2 pb-1 px-1">
-                  <div className="text-[9px] font-bold text-amber-600 uppercase tracking-widest border-t pt-2">
-                    Raw Materials
-                  </div>
+                <div className="pt-3 pb-1 px-1">
+                  <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest border-t border-gray-100 pt-2">Raw Materials</p>
                 </div>
                 {suppliers.map(s => {
                   const sid = String(s.supplier_id);
                   const isActive = String(activeSupplierId) === sid;
                   const count = items.filter(i => i.is_raw_material && String(i.supplier_id) === sid).length;
                   return (
-                    <button
-                      key={s.supplier_id}
-                      type="button"
-                      onClick={() => selectSupplier(sid)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        isActive ? "bg-amber-500 text-white" : "hover:bg-amber-50 text-gray-700"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-[11px] truncate pr-1">{s.supplier_name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                          isActive ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
-                        }`}>{count}</span>
-                      </div>
+                    <button key={s.supplier_id} type="button" onClick={() => selectSupplier(sid)}
+                      className={`w-full text-left px-2.5 py-2 rounded-xl transition-colors flex items-center justify-between gap-1 ${
+                        isActive ? "bg-amber-500 text-white shadow-sm" : "text-gray-700 hover:bg-amber-50"
+                      }`}>
+                      <span className="font-medium text-[11px] truncate pr-1">{s.supplier_name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                        isActive ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
+                      }`}>{count}</span>
                     </button>
                   );
                 })}
@@ -567,207 +516,186 @@ export default function Items() {
           </div>
         </aside>
 
-        {/* ── ITEM LIST ── */}
-        <div className="rounded-2xl border shadow-lg p-3 bg-white flex flex-col overflow-hidden">
-          <h2 className="text-[11px] font-bold text-center text-gray-500 uppercase tracking-widest mb-2">Item List</h2>
-
-          <input
-            className="border rounded-lg px-2 py-1.5 mb-3 text-[11px] w-full focus:outline-none focus:border-blue-400"
-            placeholder="Search items..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-
-          <div className="flex-1 overflow-y-auto no-scroll pr-1">
-            <div className="grid grid-cols-[repeat(auto-fill,_minmax(240px,_1fr))] gap-2">
-              {filteredItems.map(item => {
-                const imgUrl = item.image_filename
-                  ? `${API_BASE}/item-images/${item.image_filename}`
-                  : "";
-                const isSelected = editingId === item.item_id;
-                const catName =
-                  categories.find(c => c.category_id === item.category_id)?.category_name || (item.category_id == null && !item.is_raw_material ? "Uncategorised" : "");
-                const supplierName = item.is_raw_material
-                  ? (suppliers.find(s => String(s.supplier_id) === String(item.supplier_id))?.supplier_name || "")
-                  : "";
-                const branchName = branchWise
-                  ? (branches.find(b => String(b.branch_id) === String(item.branch_id))?.branch_name || null)
-                  : null;
-
-                return (
-                  <div
-                    key={item.item_id}
-                    className={`rounded-xl border cursor-pointer transition-all
-                      ${isSelected
-                        ? "border-blue-400 bg-blue-50 shadow-md"
-                        : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
-                      }`}
-                    onClick={() => editItem(item)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") editItem(item); }}
-                  >
-                    <div className="flex items-start gap-2 p-2">
-                      {/* Image */}
-                      <div className="w-11 h-11 rounded-lg border bg-gray-50 overflow-hidden flex-shrink-0">
-                        {imgUrl ? (
-                          <img
-                            src={imgUrl}
-                            alt={item.item_name}
-                            className="w-full h-full object-cover"
-                            onError={e => { e.currentTarget.style.display = "none"; }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-300 font-medium">
-                            IMG
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-1">
-                          <div className="font-semibold text-[12px] text-gray-800 leading-tight break-words min-w-0">
-                            {item.item_name}
-                          </div>
-                          {item.is_raw_material && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 flex-shrink-0 font-medium">
-                              RAW
-                            </span>
-                          )}
-                          {!item.is_raw_material && item.sold_by_weight && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-blue-300 bg-blue-50 text-blue-700 flex-shrink-0 font-medium">
-                              KG
-                            </span>
-                          )}
-                        </div>
-
-                        {item.is_raw_material ? (
-                          <div className="text-[11px] text-amber-600 font-medium mt-0.5">Raw Material</div>
-                        ) : (
-                          <div className="text-[12px] text-blue-700 font-bold mt-0.5">
-                            ₹{Number(item.price || 0).toFixed(0)}
-                          </div>
-                        )}
-
-                        <div className="text-[10px] text-gray-400 mt-0.5 truncate">
-                          {item.is_raw_material
-                            ? supplierName && <span className="text-amber-600">{supplierName}</span>
-                            : <>
-                                {activeCategoryId === "all" && catName ? catName : ""}
-                                {!hotelShop && (
-                                  <span> · Buy ₹{Number(item.buy_price || 0).toFixed(0)} · MRP ₹{Number(item.mrp_price || 0).toFixed(0)}</span>
-                                )}
-                                {item.min_stock > 0 && <span> · Min {item.min_stock}</span>}
-                              </>
-                          }
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between px-2 pb-2">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          item.item_status
-                            ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
-                            : "text-red-600 bg-red-50 border border-red-200"
-                        }`}>
-                          {item.item_status ? "Active" : "Disabled"}
-                        </span>
-                        {branchName && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700">
-                            {branchName}
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); toggleStatus(item); }}
-                        className={`text-[10px] px-2 py-0.5 rounded-lg border transition-colors ${
-                          item.item_status
-                            ? "text-red-500 border-red-200 hover:bg-red-50"
-                            : "text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                        }`}
-                      >
-                        {item.item_status ? "Disable" : "Enable"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* ── CENTRE: ITEM LIST ── */}
+        <div className="flex flex-col bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="px-4 pt-3 pb-2.5 border-b flex items-center gap-3 bg-gray-50">
+            <div className="flex-1 relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[13px]">🔍</span>
+              <input
+                className="w-full border rounded-xl pl-8 pr-3 py-2 text-[12px] bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                placeholder="Search items…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
             </div>
+            <span className="text-[11px] text-gray-400 font-medium flex-shrink-0">
+              {filteredItems.length} {filteredItems.length === 1 ? "item" : "items"}
+            </span>
+          </div>
 
-            {filteredItems.length === 0 && (
-              <div className="text-[12px] text-gray-400 text-center py-10">
-                No items found
+          <div className="flex-1 overflow-y-auto ns p-3">
+            {filteredItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 py-16">
+                <span className="text-4xl mb-3">📦</span>
+                <p className="text-[13px] font-medium">No items found</p>
+                <p className="text-[11px] mt-1">Try a different search or category</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,_minmax(220px,_1fr))] gap-2.5">
+                {filteredItems.map(item => {
+                  const imgUrl = item.image_filename ? `${API_BASE}/item-images/${item.image_filename}` : "";
+                  const isSelected = editingId === item.item_id;
+                  const catName =
+                    categories.find(c => c.category_id === item.category_id)?.category_name
+                    || (item.category_id == null && !item.is_raw_material ? "Uncategorised" : "");
+                  const supplierName = item.is_raw_material
+                    ? (suppliers.find(s => String(s.supplier_id) === String(item.supplier_id))?.supplier_name || "")
+                    : "";
+                  const branchName = branchWise
+                    ? (branches.find(b => String(b.branch_id) === String(item.branch_id))?.branch_name || null)
+                    : null;
+
+                  return (
+                    <div key={item.item_id} role="button" tabIndex={0}
+                      onClick={() => editItem(item)}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") editItem(item); }}
+                      className={`rounded-2xl border cursor-pointer transition-all select-none ${
+                        isSelected
+                          ? "border-blue-400 ring-2 ring-blue-100 bg-blue-50 shadow-md"
+                          : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-md"
+                      }`}>
+                      <div className="flex items-center gap-3 p-3">
+                        {/* Image */}
+                        <div className="w-12 h-12 rounded-xl border bg-gray-50 overflow-hidden flex-shrink-0">
+                          {imgUrl ? (
+                            <img src={imgUrl} alt={item.item_name} className="w-full h-full object-cover"
+                              onError={e => { e.currentTarget.style.display = "none"; }} />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-lg text-gray-200">📦</div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-1 justify-between mb-0.5">
+                            <p className="font-semibold text-[12px] text-gray-800 leading-snug break-words min-w-0">{item.item_name}</p>
+                            <div className="flex gap-1 flex-shrink-0">
+                              {item.is_raw_material && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">RAW</span>
+                              )}
+                              {!item.is_raw_material && item.sold_by_weight && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">KG</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {item.is_raw_material ? (
+                            <p className="text-[11px] text-amber-600 font-medium">{supplierName || "Raw Material"}</p>
+                          ) : (
+                            <p className="text-[14px] font-bold text-emerald-600">₹{Number(item.price || 0).toFixed(0)}</p>
+                          )}
+
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            {!item.is_raw_material && catName && (
+                              <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">{catName}</span>
+                            )}
+                            {!hotelShop && !item.is_raw_material && (
+                              <span className="text-[9px] text-gray-400">
+                                Buy ₹{Number(item.buy_price||0).toFixed(0)} · MRP ₹{Number(item.mrp_price||0).toFixed(0)}
+                              </span>
+                            )}
+                            {branchName && (
+                              <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">{branchName}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex items-center justify-between px-3 pb-2.5">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                          item.item_status
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-red-50 text-red-600 border border-red-200"
+                        }`}>
+                          {item.item_status ? "● Active" : "○ Disabled"}
+                        </span>
+                        <button type="button"
+                          onClick={e => { e.stopPropagation(); toggleStatus(item); }}
+                          className={`text-[10px] px-2.5 py-0.5 rounded-lg border font-medium transition-colors ${
+                            item.item_status
+                              ? "text-red-500 border-red-200 hover:bg-red-50"
+                              : "text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                          }`}>
+                          {item.item_status ? "Disable" : "Enable"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
-        {/* ── ADD / EDIT PANEL ── */}
-        <div className="rounded-2xl border shadow-lg bg-white flex flex-col overflow-hidden">
+        {/* ── RIGHT: ADD / EDIT PANEL ── */}
+        <div className="flex flex-col bg-white rounded-2xl border shadow-sm overflow-hidden">
           {/* Panel header */}
-          <div className={`px-4 py-3 border-b ${editingId ? "bg-blue-600" : "bg-emerald-600"}`}>
-            <h2 className="text-[12px] font-bold text-white text-center tracking-wide">
-              {editingId ? "✏️ EDIT ITEM" : "＋ ADD ITEM"}
-            </h2>
+          <div className={`px-4 py-3 flex items-center gap-2 ${editingId ? "bg-blue-600" : "bg-emerald-600"}`}>
+            <span className="text-white text-[15px]">{editingId ? "✏️" : "＋"}</span>
+            <div>
+              <p className="text-[12px] font-bold text-white leading-tight">{editingId ? "Edit Item" : "Add New Item"}</p>
+              {editingId && <p className="text-[10px] text-white/70 leading-tight truncate">{editingItem?.item_name}</p>}
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto no-scroll px-3 py-3 space-y-3">
+          <div className="flex-1 overflow-y-auto ns px-3 py-3 space-y-2.5">
 
-            {/* Raw Material toggle — at top so user sees it first */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+            {/* Raw Material toggle */}
+            <div className={`flex items-center justify-between px-3 py-2.5 rounded-xl border ${
+              form.is_raw_material ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"
+            }`}>
               <div>
-                <div className="text-[11px] font-semibold text-amber-800">Raw Material</div>
-                <div className="text-[10px] text-amber-600">Supplier-linked, no price</div>
+                <p className={`text-[11px] font-semibold ${form.is_raw_material ? "text-amber-800" : "text-gray-600"}`}>Raw Material</p>
+                <p className={`text-[10px] ${form.is_raw_material ? "text-amber-600" : "text-gray-400"}`}>No price, linked to supplier</p>
               </div>
-              <label className="toggle-switch toggle-switch-blue">
-                <input
-                  type="checkbox"
-                  checked={form.is_raw_material}
+              <label className="tsw tsw-amber">
+                <input type="checkbox" checked={form.is_raw_material}
                   onChange={e => {
                     const raw = e.target.checked;
-                    setForm({ ...form, is_raw_material: raw, sold_by_weight: raw ? false : form.sold_by_weight, price: "", buy_price: "", mrp_price: "", category_id: raw ? "" : form.category_id, supplier_id: raw ? form.supplier_id : "" });
+                    setForm({ ...form, is_raw_material: raw, sold_by_weight: raw ? false : form.sold_by_weight,
+                      price: "", buy_price: "", mrp_price: "",
+                      category_id: raw ? "" : form.category_id, supplier_id: raw ? form.supplier_id : "" });
                     if (!raw) setActiveSupplierId(null);
-                  }}
-                />
-                <span className="toggle-slider"></span>
+                  }} />
+                <span className="tsl"></span>
               </label>
             </div>
 
-            {/* Supplier (raw material) OR Category (normal item) */}
+            {/* Category / Supplier */}
             {form.is_raw_material ? (
               <div>
                 <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Supplier *</label>
-                <select
-                  className="border rounded-lg px-3 py-2 w-full text-[12px] focus:outline-none focus:border-amber-400 bg-white"
-                  value={form.supplier_id}
-                  onChange={e => setForm({ ...form, supplier_id: e.target.value })}
-                >
+                <select className="border rounded-xl px-3 py-2 w-full text-[12px] focus:outline-none focus:border-amber-400 bg-white"
+                  value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}>
                   <option value="">— Select supplier —</option>
-                  {suppliers.map(s => (
-                    <option key={s.supplier_id} value={String(s.supplier_id)}>{s.supplier_name}</option>
-                  ))}
+                  {suppliers.map(s => <option key={s.supplier_id} value={String(s.supplier_id)}>{s.supplier_name}</option>)}
                 </select>
               </div>
             ) : (
               <div>
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Category <span className="normal-case font-normal">(optional)</span></div>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">
+                  Category <span className="normal-case font-normal text-gray-300">(optional)</span>
+                </label>
                 {form.category_id ? (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                    <span className="text-[11px] text-blue-700 font-semibold truncate">{formCategoryName}</span>
-                    <button
-                      type="button"
-                      onClick={() => setForm(prev => ({ ...prev, category_id: "" }))}
-                      className="ml-auto text-[10px] text-blue-400 hover:text-red-500 flex-shrink-0"
-                    >✕</button>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl">
+                    <span className="text-[11px] text-blue-700 font-semibold truncate flex-1">{formCategoryName}</span>
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, category_id: "" }))}
+                      className="text-blue-300 hover:text-red-400 transition-colors text-[13px] flex-shrink-0">✕</button>
                   </div>
                 ) : (
-                  <div className="px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-[11px] text-gray-400 italic">
-                    ← Select from left panel or leave blank for Uncategorised
+                  <div className="px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-[11px] text-gray-400 italic">
+                    ← Pick from left or leave blank (Uncategorised)
                   </div>
                 )}
               </div>
@@ -777,141 +705,112 @@ export default function Items() {
             <div>
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Item Name *</label>
               <input
-                className="border rounded-lg px-3 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-                placeholder="Enter item name..."
+                className="border rounded-xl px-3 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                placeholder="Enter item name…"
                 value={form.item_name}
                 onChange={e => setForm({ ...form, item_name: e.target.value })}
               />
             </div>
 
-            {/* Pricing — only for normal items */}
+            {/* Pricing */}
             {!form.is_raw_material && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-2">
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pricing</div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Pricing</p>
+
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-0.5 block">Selling Price *</label>
+                  <label className="text-[10px] text-gray-500 mb-1 block">Selling Price *</label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
-                    <input
-                      type="number"
-                      className="border rounded-lg pl-6 pr-2 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
-                      placeholder="0"
-                      value={form.price}
-                      onChange={e => setForm({ ...form, price: e.target.value })}
-                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-medium">₹</span>
+                    <input type="number" placeholder="0"
+                      className="border rounded-xl pl-7 pr-3 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
+                      value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
                   </div>
                 </div>
+
                 {!hotelShop && (
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">Buy Price *</label>
+                      <label className="text-[10px] text-gray-500 mb-1 block">Buy Price *</label>
                       <div className="relative">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
-                        <input
-                          type="number"
-                          className="border rounded-lg pl-6 pr-2 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
-                          placeholder="0"
-                          value={form.buy_price}
-                          onChange={e => setForm({ ...form, buy_price: e.target.value })}
-                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
+                        <input type="number" placeholder="0"
+                          className="border rounded-xl pl-7 pr-2 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
+                          value={form.buy_price} onChange={e => setForm({ ...form, buy_price: e.target.value })} />
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">MRP *</label>
+                      <label className="text-[10px] text-gray-500 mb-1 block">MRP *</label>
                       <div className="relative">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
-                        <input
-                          type="number"
-                          className="border rounded-lg pl-6 pr-2 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
-                          placeholder="0"
-                          value={form.mrp_price}
-                          onChange={e => setForm({ ...form, mrp_price: e.target.value })}
-                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">₹</span>
+                        <input type="number" placeholder="0"
+                          className="border rounded-xl pl-7 pr-2 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400 bg-white"
+                          value={form.mrp_price} onChange={e => setForm({ ...form, mrp_price: e.target.value })} />
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+                {/* Sell by weight */}
+                <div className="flex items-center justify-between bg-white border border-blue-100 rounded-xl px-3 py-2">
                   <div>
-                    <div className="text-[10px] font-semibold text-blue-800">Sell by Weight (KG)</div>
-                    <div className="text-[10px] text-blue-600">Use grams in billing and auto-round line total</div>
+                    <p className="text-[10px] font-semibold text-blue-700">Sell by Weight (KG)</p>
+                    <p className="text-[9px] text-blue-400">Auto-rounds grams in billing</p>
                   </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={!!form.sold_by_weight}
-                      onChange={e => setForm({ ...form, sold_by_weight: e.target.checked })}
-                    />
-                    <span className="toggle-slider"></span>
+                  <label className="tsw">
+                    <input type="checkbox" checked={!!form.sold_by_weight}
+                      onChange={e => setForm({ ...form, sold_by_weight: e.target.checked })} />
+                    <span className="tsl"></span>
                   </label>
                 </div>
               </div>
             )}
 
-            {/* Min Stock — for all items */}
+            {/* Min Stock */}
             <div>
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Min Stock</label>
-              <input
-                type="number"
-                className="border rounded-lg px-3 py-1.5 w-full text-[12px] focus:outline-none focus:border-blue-400"
-                placeholder="0"
-                value={form.min_stock}
-                onChange={e => setForm({ ...form, min_stock: e.target.value })}
-              />
-              <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Alert when stock falls below this value</p>
+              <input type="number" placeholder="0"
+                className="border rounded-xl px-3 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400"
+                value={form.min_stock} onChange={e => setForm({ ...form, min_stock: e.target.value })} />
+              <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Low-stock alert threshold</p>
             </div>
 
-            {/* Image upload — only for normal items */}
+            {/* Image upload */}
             {!form.is_raw_material && (
               <div>
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Item Image</div>
-                <div className="flex items-center gap-2">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Item Image</label>
+                <div className="flex items-center gap-2.5">
                   <div className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
                     {imagePreviewUrl ? (
                       <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
                     ) : editingItem?.image_filename ? (
-                      <img
-                        src={`${API_BASE}/item-images/${editingItem.image_filename}`}
-                        alt={editingItem.item_name}
-                        className="w-full h-full object-cover"
-                        onError={e => { e.currentTarget.style.display = "none"; }}
-                      />
+                      <img src={`${API_BASE}/item-images/${editingItem.image_filename}`} alt={editingItem.item_name}
+                        className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = "none"; }} />
                     ) : (
-                      <span className="text-[9px] text-gray-300">📷</span>
+                      <span className="text-xl text-gray-200">📷</span>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <label className="block w-full cursor-pointer">
-                      <div className="px-2 py-1.5 border border-dashed border-gray-300 rounded-lg text-center text-[10px] text-gray-500 hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                        {imageFile ? imageFile.name : "Choose image"}
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={e => setImageFile(e.target.files?.[0] || null)}
-                      />
-                    </label>
-                    <div className="text-[9px] text-gray-400 mt-0.5 pl-1">JPG, PNG, WEBP</div>
-                  </div>
+                  <label className="flex-1 cursor-pointer">
+                    <div className="border border-dashed border-gray-300 rounded-xl px-2 py-2.5 text-center text-[10px] text-gray-500 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                      {imageFile ? imageFile.name : "Choose image"}
+                    </div>
+                    <p className="text-[9px] text-gray-400 mt-0.5 pl-1">JPG · PNG · WEBP</p>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                      onChange={e => setImageFile(e.target.files?.[0] || null)} />
+                  </label>
                 </div>
               </div>
             )}
 
             {/* Active toggle */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
               <div>
-                <div className="text-[11px] font-semibold text-gray-700">Active</div>
-                <div className="text-[10px] text-gray-400">Show in billing</div>
+                <p className="text-[11px] font-semibold text-gray-700">Active</p>
+                <p className="text-[10px] text-gray-400">Visible in billing</p>
               </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={form.item_status}
-                  onChange={e => setForm({ ...form, item_status: e.target.checked })}
-                />
-                <span className="toggle-slider"></span>
+              <label className="tsw">
+                <input type="checkbox" checked={form.item_status}
+                  onChange={e => setForm({ ...form, item_status: e.target.checked })} />
+                <span className="tsl"></span>
               </label>
             </div>
 
@@ -920,27 +819,20 @@ export default function Items() {
           {/* Action buttons */}
           <div className="px-3 py-3 border-t bg-gray-50 flex gap-2">
             {editingId && (
-              <button
-                type="button"
-                onClick={() => resetForm({ keepCategory: true })}
-                className="flex-1 py-2 border border-gray-300 rounded-xl text-[12px] text-gray-600 hover:bg-gray-100 transition-colors font-medium"
-              >
+              <button type="button" onClick={() => resetForm({ keepCategory: true })}
+                className="flex-1 py-2 border border-gray-300 rounded-xl text-[12px] text-gray-600 hover:bg-gray-100 transition-colors font-medium">
                 Cancel
               </button>
             )}
-            <button
-              type="button"
-              onClick={saveItem}
-              className={`flex-1 py-2 rounded-xl text-[12px] text-white font-semibold transition-colors shadow-sm ${
-                editingId
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-emerald-600 hover:bg-emerald-700"
-              }`}
-            >
-              {editingId ? "Update" : "Save Item"}
+            <button type="button" onClick={saveItem}
+              className={`flex-1 py-2 rounded-xl text-[12px] text-white font-bold transition-colors shadow-sm ${
+                editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"
+              }`}>
+              {editingId ? "Update Item" : "Save Item"}
             </button>
           </div>
         </div>
+
       </div>
     </>
   );
