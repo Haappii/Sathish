@@ -42,11 +42,6 @@ export default function PlatformDashboard() {
   const [busyId, setBusyId] = useState(null);
   const [acceptedInfo, setAcceptedInfo] = useState(null);
 
-  // Module management for shop detail panel
-  const [shopModules, setShopModules] = useState(null);   // null = loading
-  const [modulesConfigured, setModulesConfigured] = useState(false);
-  const [modulesSaving, setModulesSaving] = useState(false);
-
   // Direct shop creation
   const [directCreate, setDirectCreate] = useState({
     shop_name: "", owner_name: "", mobile: "", mailid: "",
@@ -376,31 +371,6 @@ export default function PlatformDashboard() {
     }
   };
 
-  const loadShopModules = async (shopId) => {
-    setShopModules(null);
-    try {
-      const res = await platformAxios.get(`/platform/shops/${shopId}/modules`);
-      setModulesConfigured(Boolean(res?.data?.configured));
-      setShopModules(res?.data?.modules || {});
-    } catch {
-      setShopModules({});
-    }
-  };
-
-  const saveModules = async () => {
-    if (!selectedShopId || !shopModules) return;
-    setModulesSaving(true);
-    try {
-      await platformAxios.post(`/platform/shops/${selectedShopId}/modules`, { modules: shopModules });
-      showToast("Modules updated", "success");
-      setModulesConfigured(true);
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Failed to save modules", "error");
-    } finally {
-      setModulesSaving(false);
-    }
-  };
-
   const createShopDirect = async () => {
     if (!directCreate.shop_name.trim()) return showToast("Shop name required", "error");
     if (!directCreate.mailid.trim()) return showToast("Email required to send credentials", "error");
@@ -433,7 +403,6 @@ export default function PlatformDashboard() {
     setSelectedShopDetail(null);
     setPaymentForm({ extend_days: "", paid_until: "", amount: "" });
     loadShopDetail(shopId);
-    loadShopModules(shopId);
   };
 
   const closeShopDetail = () => {
@@ -1198,7 +1167,6 @@ export default function PlatformDashboard() {
                   <div className={`text-xs mt-1 ${directCreatedInfo.email_sent ? "text-emerald-300" : "text-amber-300"}`}>
                     {directCreatedInfo.email_sent ? "✓ Credentials emailed to owner" : "⚠ Email not sent — SMTP not configured"}
                   </div>
-                  <p className="text-[11px] text-slate-500">This shop starts with Sales Billing + Item Management only. Enable more modules from the shop detail panel.</p>
                 </div>
               ) : (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-3 text-center text-slate-400">
@@ -1393,213 +1361,6 @@ export default function PlatformDashboard() {
                     >
                       Save Limits
                     </button>
-                  </div>
-
-                  {/* modules — mirrors the Home page menu structure */}
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
-                    {/* Header row */}
-                    {(() => {
-                      // All optional module keys (matches backend ALL_OPTIONAL_MODULES)
-                      const ALL_OPT = ["cash_drawer","trends","analytics","billing_history","table_billing","qr_orders","order_live","kot_management","reservations","delivery","recipes","online_orders","advance_orders","offline_sync","drafts","returns","dues","expenses","customers","employees","employee_attendance","employee_onboarding","loyalty","gift_cards","coupons","supplier_ledger","stock_audit","item_lots","labels","transfers","reports","feedback_review","deleted_invoices","alerts","support_tickets","admin"];
-
-                      // Same structure as Home page MENU_GROUPS + navigationMenu MENU_CATALOG
-                      const MENU_STRUCTURE = [
-                        {
-                          label: "Billing", icon: "🛒",
-                          items: [
-                            { key: "sales_billing",    label: "Sales Billing",    core: true },
-                            { key: "billing_history",  label: "Billing History" },
-                            { key: "table_billing",    label: "Table Billing" },
-                            { key: "qr_orders",        label: "QR Orders" },
-                            { key: "order_live",       label: "Order Live" },
-                            { key: "kot_management",   label: "KOT" },
-                            { key: "online_orders",    label: "Online Orders" },
-                            { key: "advance_orders",   label: "Advance Orders" },
-                            { key: "reservations",     label: "Reservations" },
-                            { key: "delivery",         label: "Delivery" },
-                            { key: "offline_sync",     label: "Offline Sync" },
-                            { key: "drafts",           label: "Draft Bills" },
-                            { key: "deleted_invoices", label: "Deleted Invoice" },
-                          ],
-                        },
-                        {
-                          label: "Customers & Receivables", icon: "👥",
-                          items: [
-                            { key: "customers", label: "Customers" },
-                            { key: "dues",      label: "Dues" },
-                          ],
-                        },
-                        {
-                          label: "Employees", icon: "👔",
-                          items: [
-                            { key: "employees",           label: "Employees" },
-                            { key: "employee_attendance", label: "Attendance" },
-                            { key: "employee_onboarding", label: "Onboarding Docs" },
-                          ],
-                        },
-                        {
-                          label: "Returns & Expenses", icon: "↩️",
-                          items: [
-                            { key: "returns",  label: "Returns" },
-                            { key: "expenses", label: "Expenses" },
-                          ],
-                        },
-                        {
-                          label: "Inventory", icon: "📦",
-                          items: [
-                            { key: "inventory",   label: "Inventory",        core: true },
-                            { key: "transfers",   label: "Transfers" },
-                            { key: "item_lots",   label: "Item Lots" },
-                            { key: "labels",      label: "Labels / Barcode" },
-                            { key: "stock_audit", label: "Stock Audit" },
-                          ],
-                        },
-                        {
-                          label: "Purchase & Suppliers", icon: "🚚",
-                          items: [
-                            { key: "supplier_ledger", label: "Supplier Ledger" },
-                          ],
-                        },
-                        {
-                          label: "Cash Drawer / Shift", icon: "💰",
-                          items: [
-                            { key: "cash_drawer", label: "Cash Drawer" },
-                          ],
-                        },
-                        {
-                          label: "Loyalty & Coupons", icon: "🎁",
-                          items: [
-                            { key: "loyalty",    label: "Loyalty" },
-                            { key: "gift_cards", label: "Gift Cards" },
-                            { key: "coupons",    label: "Coupons" },
-                          ],
-                        },
-                        {
-                          label: "Analytics & Trends", icon: "📊",
-                          items: [
-                            { key: "analytics", label: "Analytics" },
-                            { key: "trends",    label: "Trends" },
-                          ],
-                        },
-                        {
-                          label: "Reports & Feedback", icon: "📄",
-                          items: [
-                            { key: "reports",         label: "Reports" },
-                            { key: "feedback_review", label: "Feedback Review" },
-                          ],
-                        },
-                        {
-                          label: "System", icon: "⚙️",
-                          items: [
-                            { key: "alerts",          label: "Alerts" },
-                            { key: "support_tickets", label: "Support Tickets" },
-                            { key: "admin",           label: "Admin & Setup" },
-                            { key: "recipes",         label: "Recipes" },
-                          ],
-                        },
-                      ];
-
-                      const unlockedCount = shopModules ? ALL_OPT.filter(k => shopModules[k]).length : 0;
-
-                      return (
-                        <>
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-sm font-semibold">Menu Access</p>
-                              <p className="text-[11px] text-slate-400 mt-0.5">
-                                {shopModules
-                                  ? `${unlockedCount} / ${ALL_OPT.length} optional menus unlocked`
-                                  : modulesConfigured ? "Custom access configured." : "Currently unrestricted (all menus visible)."}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              {shopModules && (
-                                <>
-                                  <button
-                                    onClick={() => setShopModules(p => { const n = {...p}; ALL_OPT.forEach(k => { n[k] = true; }); return n; })}
-                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition"
-                                  >
-                                    🔓 Unlock All
-                                  </button>
-                                  <button
-                                    onClick={() => setShopModules(p => { const n = {...p}; ALL_OPT.forEach(k => { n[k] = false; }); return n; })}
-                                    className="px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-300 text-[11px] font-medium transition"
-                                  >
-                                    🔒 Lock All
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                onClick={saveModules}
-                                disabled={modulesSaving || !shopModules}
-                                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-[11px] font-medium transition disabled:opacity-50"
-                              >
-                                {modulesSaving ? "Saving…" : "Save"}
-                              </button>
-                            </div>
-                          </div>
-
-                          {shopModules === null ? (
-                            <div className="text-xs text-slate-400 py-2 text-center">Loading…</div>
-                          ) : (
-                            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-                              {MENU_STRUCTURE.map(({ label, icon, items }) => {
-                                const optionalKeys = items.filter(i => !i.core).map(i => i.key);
-                                return (
-                                  <div key={label} className="bg-white/3 rounded-xl p-2.5">
-                                    {/* Group header */}
-                                    <div className="flex items-center justify-between mb-2">
-                                      <p className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                                        <span>{icon}</span> {label}
-                                      </p>
-                                      {optionalKeys.length > 0 && (
-                                        <div className="flex gap-1">
-                                          <button
-                                            onClick={() => setShopModules(p => { const n = {...p}; optionalKeys.forEach(k => { n[k] = true; }); return n; })}
-                                            className="text-[9px] text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20 hover:border-emerald-400/40 transition"
-                                          >
-                                            Unlock all
-                                          </button>
-                                          <button
-                                            onClick={() => setShopModules(p => { const n = {...p}; optionalKeys.forEach(k => { n[k] = false; }); return n; })}
-                                            className="text-[9px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded border border-red-500/20 hover:border-red-400/40 transition"
-                                          >
-                                            Lock all
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {/* Menu item tiles */}
-                                    <div className="grid grid-cols-2 gap-1.5">
-                                      {items.map(({ key: k, label: itemLabel, core }) => {
-                                        const on = core ? true : Boolean(shopModules[k]);
-                                        return (
-                                          <button
-                                            key={k}
-                                            disabled={core}
-                                            onClick={() => !core && setShopModules(p => ({ ...p, [k]: !p[k] }))}
-                                            className={`flex items-center justify-between px-2.5 py-2 rounded-lg border text-[11px] text-left transition ${
-                                              on
-                                                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-200"
-                                                : "bg-white/3 border-white/8 text-slate-500 hover:bg-white/8"
-                                            } ${core ? "opacity-60 cursor-default" : "cursor-pointer"}`}
-                                          >
-                                            <span className="leading-tight">{itemLabel}</span>
-                                            <span className="text-[12px] flex-shrink-0 ml-1">
-                                              {core ? "✓" : on ? "🔓" : "🔒"}
-                                            </span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
                   </div>
 
                   {/* plan & renewal */}

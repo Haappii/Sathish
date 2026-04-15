@@ -370,13 +370,12 @@ class AcceptOnboardPayload(BaseModel):
 @router.post("/onboard/requests")
 def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_db)):
     """
-    Self-service registration: auto-provisions the shop immediately without admin approval.
-    Sends login credentials to the requester's email.
-    Free tier limits: 1 user, 1 branch, 20 items. Only Sales Billing + Item Management enabled.
+    Self-service registration: saves the request as PENDING for admin review.
+    Admin must accept the request from the Platform Dashboard to create the shop
+    and send login credentials.
     """
     billing_type = _normalize_billing_type(payload.billing_type)
 
-    # Store audit record
     row = PlatformOnboardRequest(
         status="PENDING",
         created_at=datetime.utcnow(),
@@ -415,126 +414,12 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
     db.commit()
     db.refresh(row)
 
-    # --- Auto-provision immediately ---
-    try:
-        admin_role = _ensure_admin_role(db)
-        _ensure_manager_role(db)
-        admin_username = (row.admin_username or "admin").strip()
-        admin_password = _generate_password()
-
-        shop = ShopDetails(
-            shop_name=(row.shop_name or "").strip(),
-            owner_name=row.owner_name,
-            mobile=row.mobile,
-            mailid=row.mailid,
-            billing_type=billing_type,
-            gst_enabled=bool(row.gst_enabled),
-            gst_percent=row.gst_percent or 0,
-            gst_mode=row.gst_mode or "inclusive",
-            city=row.city,
-            state=row.state,
-            # Free tier limits
-            max_users=1,
-            max_branches=1,
-            max_items=20,
-            plan="FREE",
-        )
-        db.add(shop)
-        db.commit()
-        db.refresh(shop)
-
-        base_branch_name = (row.branch_name or "").strip() or "Head Office"
-        branch_name = base_branch_name
-        existing = db.query(Branch).filter(Branch.branch_name == branch_name).first()
-        if existing:
-            branch_name = f"{base_branch_name} #{shop.shop_id}"
-
-        branch = Branch(
-            shop_id=shop.shop_id,
-            branch_name=branch_name,
-            city=row.branch_city,
-            state=row.branch_state,
-            country=row.branch_country,
-            type="Head Office",
-            status="ACTIVE",
-            branch_close="N",
-        )
-        db.add(branch)
-        db.commit()
-        db.refresh(branch)
-
-        shop.head_office_branch_id = branch.branch_id
-        db.add(shop)
-        db.commit()
-        db.refresh(shop)
-
-        user = User(
-            shop_id=shop.shop_id,
-            user_name=admin_username,
-            password=encode_password(admin_password),
-            name=row.admin_name or admin_username,
-            role=admin_role.role_id,
-            status=True,
-            branch_id=branch.branch_id,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-        # Seed core modules only (sales_billing + inventory)
-        _seed_core_modules(db, shop.shop_id)
-
-        row.status = "ACCEPTED"
-        row.decided_at = datetime.utcnow()
-        row.decided_by = "auto"
-        row.created_shop_id = shop.shop_id
-        row.created_branch_id = branch.branch_id
-        row.created_admin_user_id = user.user_id
-        db.commit()
-        db.refresh(row)
-
-        recipient = (row.requester_email or row.mailid or "").strip()
-        email_sent = False
-        try:
-            content = (
-                "Welcome to Haappii Billing!\n\n"
-                "Your shop has been set up and is ready to use.\n\n"
-                f"Shop ID  : {shop.shop_id}\n"
-                f"Username : {admin_username}\n"
-                f"Password : {admin_password}\n\n"
-                "Login at: https://haappiibilling.in\n\n"
-                "Free plan includes:\n"
-                "  - Sales Billing (Take Away)\n"
-                "  - Item Management (up to 20 items)\n"
-                "  - 1 branch, 1 user\n\n"
-                "Upgrade anytime to unlock all features.\n"
-            )
-            email_sent = _send_credentials_email(
-                to_email=recipient,
-                subject="Your Haappii Billing shop is ready!",
-                content=content,
-            )
-        except Exception:
-            email_sent = False
-
-        return {
-            "success": True,
-            "request_id": row.request_id,
-            "status": row.status,
-            "shop_id": shop.shop_id,
-            "admin_username": admin_username,
-            "email_sent": email_sent,
-            "message": "Shop created! Check your email for login credentials.",
-        }
-    except Exception as e:
-        db.rollback()
-        # Return partial success — request was saved, provisioning failed
-        return {
-            "success": False,
-            "request_id": row.request_id,
-            "status": "PENDING",
-            "message": f"Request saved but auto-setup failed: {str(e)}. Admin will activate your shop shortly.",
-        }
+    return {
+        "success": True,
+        "request_id": row.request_id,
+        "status": "PENDING",
+        "message": "Request received. Our team will activate your shop and email you the login credentials shortly.",
+    }
 
 
 @router.get("/onboard/requests")
@@ -672,9 +557,6 @@ def accept_onboard_request(
         db.commit()
         db.refresh(user)
 
-        # Seed restricted module access for the new shop (core only).
-        _seed_core_modules(db, shop.shop_id)
-
         row.status = "ACCEPTED"
         row.decided_at = datetime.utcnow()
         row.decided_by = str(owner.get("platform_username") or "")
@@ -688,18 +570,19 @@ def accept_onboard_request(
         email_sent = False
         try:
             content = (
-                "Your request is approved.\n\n"
-                f"Shop ID: {shop.shop_id}\n"
-                f"Username: {admin_username}\n"
-                f"Password: {admin_password}\n\n"
+                "Welcome to Haappii Billing!\n\n"
+                "Your shop has been activated and is ready to use.\n\n"
+                f"Shop ID  : {shop.shop_id}\n"
+                f"Username : {admin_username}\n"
+                f"Password : {admin_password}\n\n"
             )
             if monthly_amount is not None:
-                content += f"Monthly Amount: {monthly_amount}\n\n"
-            content += "Login URL: / (open the app and login)\n"
+                content += f"Monthly Amount: ₹{monthly_amount}\n\n"
+            content += "Login at: https://haappiibilling.in\n\nAll features are enabled for your account.\n"
 
             email_sent = _send_credentials_email(
                 to_email=recipient,
-                subject="Your shop has been activated",
+                subject="Your Haappii Billing shop is ready!",
                 content=content,
             )
         except Exception:
@@ -1504,10 +1387,6 @@ def direct_create_shop(
             branch_id=branch.branch_id,
         )
         db.add(user)
-        db.commit()
-
-        # Seed restricted module access: core only.
-        _seed_core_modules(db, shop.shop_id)
         db.commit()
 
         recipient = (payload.mailid or "").strip()

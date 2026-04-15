@@ -69,11 +69,7 @@ export default function SetupOnboard() {
         message: form.message,
       });
       setResult(res.data);
-      if (res.data?.status === "ACCEPTED") {
-        showToast("Shop created! Check your email for login credentials.", "success");
-      } else {
-        showToast("Request received! Admin will activate your shop shortly.", "success");
-      }
+      showToast("Request received! Our team will activate your shop and email you the credentials shortly.", "success");
     } catch (e) {
       showToast(e?.response?.data?.detail || "Request failed", "error");
     } finally {
@@ -371,26 +367,10 @@ export default function SetupOnboard() {
           {/* SUCCESS STATE */}
           {result?.request_id && (
             <div className="ob-success">
-              {result.status === "ACCEPTED" ? (
-                <>
-                  <p className="ob-success-title">✓ Your shop is ready!</p>
-                  <p className="ob-success-text">
-                    Login credentials have been sent to <strong>{form.email}</strong>.
-                    Check your inbox and log in to get started.
-                  </p>
-                  <p className="ob-success-text" style={{ marginTop: 8 }}>
-                    Free plan includes: Sales Billing (Take Away) + Item Management (up to 20 items).
-                    Upgrade anytime to unlock all features.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="ob-success-title">✓ Request received — #{result.request_id}</p>
-                  <p className="ob-success-text">
-                    Your request has been saved. You'll receive your login credentials via email shortly.
-                  </p>
-                </>
-              )}
+              <p className="ob-success-title">✓ Request received — #{result.request_id}</p>
+              <p className="ob-success-text">
+                Your request has been saved. Our team will review it and send your login credentials to <strong>{form.email}</strong> shortly.
+              </p>
             </div>
           )}
 
