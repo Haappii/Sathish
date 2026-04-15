@@ -650,15 +650,18 @@ const [customer, setCustomer] = useState({
   /* UPI QR generation — must be after payable is computed */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (paymentMode !== "upi" || splitEnabled || !shop?.upi_id) {
+    if (paymentMode !== "upi" || splitEnabled) {
       setUpiQrDataUrl("");
-      if (paymentMode !== "upi") setUpiConfirmOpen(false);
+      if (paymentMode !== "upi") { setUpiConfirmOpen(false); setUpiUtr(""); }
       return;
     }
-    const upiString = `upi://pay?pa=${encodeURIComponent(shop.upi_id)}&pn=${encodeURIComponent(shop.shop_name || "Shop")}&am=${payable.toFixed(2)}&cu=INR`;
-    QRCode.toDataURL(upiString, { width: 200, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } })
-      .then(url => setUpiQrDataUrl(url))
-      .catch(() => setUpiQrDataUrl(""));
+    if (shop?.upi_id) {
+      const upiString = `upi://pay?pa=${encodeURIComponent(shop.upi_id)}&pn=${encodeURIComponent(shop.shop_name || "Shop")}&am=${payable.toFixed(2)}&cu=INR`;
+      QRCode.toDataURL(upiString, { width: 220, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } })
+        .then(url => setUpiQrDataUrl(url))
+        .catch(() => setUpiQrDataUrl(""));
+    }
+    setUpiConfirmOpen(true);
   }, [paymentMode, splitEnabled, shop?.upi_id, payable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------------- PRINT ---------------- */
@@ -1651,68 +1654,94 @@ const [customer, setCustomer] = useState({
               </div>
             )}
 
-            {/* ── UPI QR Popup ── */}
-            {!splitEnabled && paymentMode === "upi" && (
-              <div className={`rounded-xl border overflow-hidden transition-all ${upiConfirmOpen ? "border-blue-300 bg-blue-50/40" : "border-gray-200 bg-gray-50"}`}>
-                <button
-                  onClick={() => setUpiConfirmOpen(v => !v)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold text-blue-700"
-                >
-                  <span>📱 UPI Payment QR</span>
-                  <span className="text-gray-400 text-[10px]">{upiConfirmOpen ? "▲ hide" : "▼ expand"}</span>
-                </button>
-
-                {upiConfirmOpen && (
-                  <div className="px-3 pb-3 space-y-2 border-t border-blue-100">
-                    {shop?.upi_id ? (
-                      <div className="flex flex-col items-center gap-1.5 py-3">
-                        {upiQrDataUrl
-                          ? <img src={upiQrDataUrl} alt="UPI QR" className="w-36 h-36 rounded-lg border border-gray-200" />
-                          : <div className="w-36 h-36 bg-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-400">Generating QR…</div>
-                        }
-                        <p className="text-[11px] font-semibold text-gray-600">{shop.upi_id}</p>
-                        <p className="text-[13px] font-bold text-blue-700">₹{payable.toFixed(2)}</p>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-2">
-                        No UPI ID configured in shop settings.
-                      </p>
-                    )}
-
-                    <div>
-                      <label className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">Customer Name *</label>
-                      <input
-                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 mt-0.5"
-                        placeholder="Customer name"
-                        value={customer.name === "NA" ? "" : customer.name}
-                        onChange={e => setCustomer(c => ({ ...c, name: e.target.value || "NA" }))}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">Mobile Number *</label>
-                      <input
-                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 mt-0.5"
-                        placeholder="10-digit mobile"
-                        value={customer.mobile === "9999999999" ? "" : customer.mobile}
-                        onChange={e => setCustomer(c => ({ ...c, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) || "9999999999" }))}
-                        maxLength={10}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">UTR Last 5 Digits *</label>
-                      <input
-                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:border-blue-400 mt-0.5 uppercase"
-                        placeholder="e.g. AB123"
-                        value={upiUtr}
-                        onChange={e => setUpiUtr(e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5))}
-                        maxLength={5}
-                      />
-                    </div>
-                    {upiUtr.length === 5 && (
-                      <p className="text-[10px] text-emerald-600 font-semibold">✓ UTR confirmed — proceed to Save / Print</p>
-                    )}
+            {/* ── UPI QR Modal ── */}
+            {!splitEnabled && paymentMode === "upi" && upiConfirmOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-4 text-white">
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-80">UPI Payment</p>
+                    <p className="text-2xl font-black mt-0.5">₹{payable.toFixed(2)}</p>
                   </div>
-                )}
+
+                  <div className="p-5 space-y-4">
+                    {/* QR code */}
+                    <div className="flex flex-col items-center gap-2">
+                      {shop?.upi_id ? (
+                        <>
+                          {upiQrDataUrl
+                            ? <img src={upiQrDataUrl} alt="UPI QR" className="w-44 h-44 rounded-xl border border-gray-200 shadow-sm" />
+                            : <div className="w-44 h-44 bg-gray-100 rounded-xl flex items-center justify-center text-xs text-gray-400 animate-pulse">Generating QR…</div>
+                          }
+                          <p className="text-[11px] font-semibold text-gray-500">{shop.upi_id}</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center w-full">
+                          ⚠️ No UPI ID configured in Shop Settings.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Fields */}
+                    <div className="space-y-2.5">
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Customer Name *</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 mt-1"
+                          placeholder="Enter customer name"
+                          value={customer.name === "NA" ? "" : customer.name}
+                          onChange={e => setCustomer(c => ({ ...c, name: e.target.value || "NA" }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Mobile Number *</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 mt-1"
+                          placeholder="10-digit mobile"
+                          value={customer.mobile === "9999999999" ? "" : customer.mobile}
+                          onChange={e => setCustomer(c => ({ ...c, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) || "9999999999" }))}
+                          maxLength={10}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">UTR Last 5 Digits *</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 mt-1 uppercase tracking-widest font-mono"
+                          placeholder="e.g. AB123"
+                          value={upiUtr}
+                          onChange={e => setUpiUtr(e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5))}
+                          maxLength={5}
+                        />
+                        {upiUtr.length === 5 && (
+                          <p className="text-[10px] text-emerald-600 font-semibold mt-1">✓ UTR confirmed</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => { setPaymentMode("cash"); setUpiConfirmOpen(false); setUpiUtr(""); }}
+                        className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          const name = customer.name && customer.name !== "NA" ? customer.name.trim() : "";
+                          const mobile = customer.mobile && customer.mobile !== "9999999999" ? customer.mobile.trim() : "";
+                          if (!name) return showToast("Customer name is required", "error");
+                          if (!/^\d{10}$/.test(mobile)) return showToast("Enter a valid 10-digit mobile number", "error");
+                          if (upiUtr.trim().length !== 5) return showToast("Enter UTR last 5 digits", "error");
+                          setUpiConfirmOpen(false);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-sm shadow-blue-200"
+                      >
+                        Payment Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
