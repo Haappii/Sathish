@@ -9,3 +9,6 @@ CREATE TABLE IF NOT EXISTS feedback (
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_shop_id ON feedback(shop_id);
+
+GRANT ALL PRIVILEGES ON TABLE feedback TO shopuser;
+GRANT USAGE, SELECT ON SEQUENCE feedback_feedback_id_seq TO shopuser;

@@ -8,3 +8,6 @@ CREATE TABLE IF NOT EXISTS shop_modules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_shop_modules_shop_id ON shop_modules(shop_id);
+
+GRANT ALL PRIVILEGES ON TABLE shop_modules TO shopuser;
+GRANT USAGE, SELECT ON SEQUENCE shop_modules_id_seq TO shopuser;
