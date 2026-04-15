@@ -1395,123 +1395,209 @@ export default function PlatformDashboard() {
                     </button>
                   </div>
 
-                  {/* modules */}
+                  {/* modules — mirrors the Home page menu structure */}
                   <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
                     {/* Header row */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold">Feature Modules</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {shopModules
-                            ? (() => {
-                                const OPTIONAL_KEYS = ["cash_drawer","trends","analytics","billing_history","table_billing","qr_orders","order_live","kot_management","reservations","delivery","recipes","online_orders","advance_orders","offline_sync","drafts","returns","dues","expenses","customers","employees","employee_attendance","employee_onboarding","loyalty","gift_cards","coupons","supplier_ledger","stock_audit","item_lots","labels","transfers","reports","feedback_review","deleted_invoices","alerts","support_tickets","admin"];
-                                const unlockedCount = OPTIONAL_KEYS.filter(k => shopModules[k]).length;
-                                return `${unlockedCount} / ${OPTIONAL_KEYS.length} optional modules unlocked`;
-                              })()
-                            : modulesConfigured ? "Custom access configured." : "Currently unrestricted (all modules visible)."}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {/* Bulk actions */}
-                        {shopModules && (
-                          <>
-                            <button
-                              onClick={() => setShopModules(p => {
-                                const next = { ...p };
-                                ["cash_drawer","trends","analytics","billing_history","table_billing","qr_orders","order_live","kot_management","reservations","delivery","recipes","online_orders","advance_orders","offline_sync","drafts","returns","dues","expenses","customers","employees","employee_attendance","employee_onboarding","loyalty","gift_cards","coupons","supplier_ledger","stock_audit","item_lots","labels","transfers","reports","feedback_review","deleted_invoices","alerts","support_tickets","admin"].forEach(k => { next[k] = true; });
-                                return next;
-                              })}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition"
-                              title="Unlock all optional modules"
-                            >
-                              🔓 Unlock All
-                            </button>
-                            <button
-                              onClick={() => setShopModules(p => {
-                                const next = { ...p };
-                                ["cash_drawer","trends","analytics","billing_history","table_billing","qr_orders","order_live","kot_management","reservations","delivery","recipes","online_orders","advance_orders","offline_sync","drafts","returns","dues","expenses","customers","employees","employee_attendance","employee_onboarding","loyalty","gift_cards","coupons","supplier_ledger","stock_audit","item_lots","labels","transfers","reports","feedback_review","deleted_invoices","alerts","support_tickets","admin"].forEach(k => { next[k] = false; });
-                                return next;
-                              })}
-                              className="px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-300 text-[11px] font-medium transition"
-                              title="Lock all optional modules"
-                            >
-                              🔒 Lock All
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={saveModules}
-                          disabled={modulesSaving || !shopModules}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-[11px] font-medium transition disabled:opacity-50"
-                        >
-                          {modulesSaving ? "Saving…" : "Save"}
-                        </button>
-                      </div>
-                    </div>
+                    {(() => {
+                      // All optional module keys (matches backend ALL_OPTIONAL_MODULES)
+                      const ALL_OPT = ["cash_drawer","trends","analytics","billing_history","table_billing","qr_orders","order_live","kot_management","reservations","delivery","recipes","online_orders","advance_orders","offline_sync","drafts","returns","dues","expenses","customers","employees","employee_attendance","employee_onboarding","loyalty","gift_cards","coupons","supplier_ledger","stock_audit","item_lots","labels","transfers","reports","feedback_review","deleted_invoices","alerts","support_tickets","admin"];
 
-                    {shopModules === null ? (
-                      <div className="text-xs text-slate-400 py-2 text-center">Loading modules…</div>
-                    ) : (() => {
-                      const GROUPS = [
-                        { label: "Always On (Core)", keys: ["sales_billing", "inventory"], core: true },
-                        { label: "Main", keys: ["cash_drawer", "trends", "analytics"] },
-                        { label: "Billing", keys: ["billing_history", "table_billing", "qr_orders", "order_live", "kot_management", "reservations", "delivery", "recipes", "online_orders", "advance_orders", "offline_sync"] },
-                        { label: "Operations", keys: ["drafts", "returns", "dues", "expenses", "customers"] },
-                        { label: "HR", keys: ["employees", "employee_attendance", "employee_onboarding"] },
-                        { label: "Promotions", keys: ["loyalty", "gift_cards", "coupons"] },
-                        { label: "Inventory", keys: ["supplier_ledger", "stock_audit", "item_lots", "labels", "transfers"] },
-                        { label: "Reports", keys: ["reports", "feedback_review", "deleted_invoices"] },
-                        { label: "System", keys: ["alerts", "support_tickets", "admin"] },
+                      // Same structure as Home page MENU_GROUPS + navigationMenu MENU_CATALOG
+                      const MENU_STRUCTURE = [
+                        {
+                          label: "Billing", icon: "🛒",
+                          items: [
+                            { key: "sales_billing",    label: "Sales Billing",    core: true },
+                            { key: "billing_history",  label: "Billing History" },
+                            { key: "table_billing",    label: "Table Billing" },
+                            { key: "qr_orders",        label: "QR Orders" },
+                            { key: "order_live",       label: "Order Live" },
+                            { key: "kot_management",   label: "KOT" },
+                            { key: "online_orders",    label: "Online Orders" },
+                            { key: "advance_orders",   label: "Advance Orders" },
+                            { key: "reservations",     label: "Reservations" },
+                            { key: "delivery",         label: "Delivery" },
+                            { key: "offline_sync",     label: "Offline Sync" },
+                            { key: "drafts",           label: "Draft Bills" },
+                            { key: "deleted_invoices", label: "Deleted Invoice" },
+                          ],
+                        },
+                        {
+                          label: "Customers & Receivables", icon: "👥",
+                          items: [
+                            { key: "customers", label: "Customers" },
+                            { key: "dues",      label: "Dues" },
+                          ],
+                        },
+                        {
+                          label: "Employees", icon: "👔",
+                          items: [
+                            { key: "employees",           label: "Employees" },
+                            { key: "employee_attendance", label: "Attendance" },
+                            { key: "employee_onboarding", label: "Onboarding Docs" },
+                          ],
+                        },
+                        {
+                          label: "Returns & Expenses", icon: "↩️",
+                          items: [
+                            { key: "returns",  label: "Returns" },
+                            { key: "expenses", label: "Expenses" },
+                          ],
+                        },
+                        {
+                          label: "Inventory", icon: "📦",
+                          items: [
+                            { key: "inventory",   label: "Inventory",        core: true },
+                            { key: "transfers",   label: "Transfers" },
+                            { key: "item_lots",   label: "Item Lots" },
+                            { key: "labels",      label: "Labels / Barcode" },
+                            { key: "stock_audit", label: "Stock Audit" },
+                          ],
+                        },
+                        {
+                          label: "Purchase & Suppliers", icon: "🚚",
+                          items: [
+                            { key: "supplier_ledger", label: "Supplier Ledger" },
+                          ],
+                        },
+                        {
+                          label: "Cash Drawer / Shift", icon: "💰",
+                          items: [
+                            { key: "cash_drawer", label: "Cash Drawer" },
+                          ],
+                        },
+                        {
+                          label: "Loyalty & Coupons", icon: "🎁",
+                          items: [
+                            { key: "loyalty",    label: "Loyalty" },
+                            { key: "gift_cards", label: "Gift Cards" },
+                            { key: "coupons",    label: "Coupons" },
+                          ],
+                        },
+                        {
+                          label: "Analytics & Trends", icon: "📊",
+                          items: [
+                            { key: "analytics", label: "Analytics" },
+                            { key: "trends",    label: "Trends" },
+                          ],
+                        },
+                        {
+                          label: "Reports & Feedback", icon: "📄",
+                          items: [
+                            { key: "reports",         label: "Reports" },
+                            { key: "feedback_review", label: "Feedback Review" },
+                          ],
+                        },
+                        {
+                          label: "System", icon: "⚙️",
+                          items: [
+                            { key: "alerts",          label: "Alerts" },
+                            { key: "support_tickets", label: "Support Tickets" },
+                            { key: "admin",           label: "Admin & Setup" },
+                            { key: "recipes",         label: "Recipes" },
+                          ],
+                        },
                       ];
-                      const fmt = (k) => k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+                      const unlockedCount = shopModules ? ALL_OPT.filter(k => shopModules[k]).length : 0;
+
                       return (
-                        <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-                          {GROUPS.map(({ label, keys, core }) => (
-                            <div key={label}>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <p className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</p>
-                                {!core && (
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => setShopModules(p => { const n = {...p}; keys.forEach(k => { n[k] = true; }); return n; })}
-                                      className="text-[9px] text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20 hover:border-emerald-400/40 transition"
-                                    >
-                                      Unlock all
-                                    </button>
-                                    <button
-                                      onClick={() => setShopModules(p => { const n = {...p}; keys.forEach(k => { n[k] = false; }); return n; })}
-                                      className="text-[9px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded border border-red-500/20 hover:border-red-400/40 transition"
-                                    >
-                                      Lock all
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                {keys.map((k) => {
-                                  const on = core ? true : Boolean(shopModules[k]);
-                                  return (
-                                    <button
-                                      key={k}
-                                      disabled={core}
-                                      onClick={() => !core && setShopModules((p) => ({ ...p, [k]: !p[k] }))}
-                                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] transition ${
-                                        on
-                                          ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-200"
-                                          : "bg-white/3 border-white/10 text-slate-500 hover:bg-white/8"
-                                      } ${core ? "opacity-60 cursor-default" : "cursor-pointer"}`}
-                                    >
-                                      <span>{fmt(k)}</span>
-                                      <span className="text-[12px] flex-shrink-0">
-                                        {core ? "✓" : on ? "🔓" : "🔒"}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold">Menu Access</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {shopModules
+                                  ? `${unlockedCount} / ${ALL_OPT.length} optional menus unlocked`
+                                  : modulesConfigured ? "Custom access configured." : "Currently unrestricted (all menus visible)."}
+                              </p>
                             </div>
-                          ))}
-                        </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {shopModules && (
+                                <>
+                                  <button
+                                    onClick={() => setShopModules(p => { const n = {...p}; ALL_OPT.forEach(k => { n[k] = true; }); return n; })}
+                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition"
+                                  >
+                                    🔓 Unlock All
+                                  </button>
+                                  <button
+                                    onClick={() => setShopModules(p => { const n = {...p}; ALL_OPT.forEach(k => { n[k] = false; }); return n; })}
+                                    className="px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-300 text-[11px] font-medium transition"
+                                  >
+                                    🔒 Lock All
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={saveModules}
+                                disabled={modulesSaving || !shopModules}
+                                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-[11px] font-medium transition disabled:opacity-50"
+                              >
+                                {modulesSaving ? "Saving…" : "Save"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {shopModules === null ? (
+                            <div className="text-xs text-slate-400 py-2 text-center">Loading…</div>
+                          ) : (
+                            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                              {MENU_STRUCTURE.map(({ label, icon, items }) => {
+                                const optionalKeys = items.filter(i => !i.core).map(i => i.key);
+                                return (
+                                  <div key={label} className="bg-white/3 rounded-xl p-2.5">
+                                    {/* Group header */}
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                                        <span>{icon}</span> {label}
+                                      </p>
+                                      {optionalKeys.length > 0 && (
+                                        <div className="flex gap-1">
+                                          <button
+                                            onClick={() => setShopModules(p => { const n = {...p}; optionalKeys.forEach(k => { n[k] = true; }); return n; })}
+                                            className="text-[9px] text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20 hover:border-emerald-400/40 transition"
+                                          >
+                                            Unlock all
+                                          </button>
+                                          <button
+                                            onClick={() => setShopModules(p => { const n = {...p}; optionalKeys.forEach(k => { n[k] = false; }); return n; })}
+                                            className="text-[9px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded border border-red-500/20 hover:border-red-400/40 transition"
+                                          >
+                                            Lock all
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {/* Menu item tiles */}
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                      {items.map(({ key: k, label: itemLabel, core }) => {
+                                        const on = core ? true : Boolean(shopModules[k]);
+                                        return (
+                                          <button
+                                            key={k}
+                                            disabled={core}
+                                            onClick={() => !core && setShopModules(p => ({ ...p, [k]: !p[k] }))}
+                                            className={`flex items-center justify-between px-2.5 py-2 rounded-lg border text-[11px] text-left transition ${
+                                              on
+                                                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-200"
+                                                : "bg-white/3 border-white/8 text-slate-500 hover:bg-white/8"
+                                            } ${core ? "opacity-60 cursor-default" : "cursor-pointer"}`}
+                                          >
+                                            <span className="leading-tight">{itemLabel}</span>
+                                            <span className="text-[12px] flex-shrink-0 ml-1">
+                                              {core ? "✓" : on ? "🔓" : "🔒"}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
                       );
                     })()}
                   </div>
