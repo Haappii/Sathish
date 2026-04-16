@@ -59,22 +59,23 @@ const normalizeOrderItems = (items) => {
 
 const sumOrderItems = (items) => normalizeOrderItems(items).reduce((acc, it) => acc + toNum(it.amount), 0);
 
-function printAdvanceInvoice(order, { shopName, branchName, userName }) {
+function printAdvanceInvoice(order, { shopName, branchName, userName, paperSize = "58mm" }) {
   const paid = paidFor(order);
   const due = dueFor(order);
   const createdAt = order?.created_at ? new Date(order.created_at) : new Date();
   const issueDate = Number.isNaN(createdAt.getTime()) ? new Date().toLocaleString() : createdAt.toLocaleString();
   const expected = `${order?.expected_date || "-"}${order?.expected_time ? ` ${order.expected_time}` : ""}`;
   const items = Array.isArray(order?.order_items) ? order.order_items : [];
+  const pw = String(paperSize || "58mm") === "80mm" ? "80mm" : "58mm";
 
   const html = `
     <html>
       <head>
         <title>Advance Invoice ${order?.order_id || ""}</title>
         <style>
-          @page { size: 58mm auto; margin: 0; }
-          html, body { margin: 0; padding: 0; width: 58mm; font-family: monospace; color: #111827; }
-          .ticket { width: 58mm; box-sizing: border-box; padding: 2.2mm; }
+          @page { size: ${pw} auto; margin: 0; }
+          html, body { margin: 0; padding: 0; width: ${pw}; font-family: monospace; color: #111827; }
+          .ticket { width: ${pw}; box-sizing: border-box; padding: 2.2mm; }
           .center { text-align: center; }
           .title { font-size: 11px; font-weight: 700; }
           .muted { font-size: 9px; color: #475569; }
@@ -602,6 +603,7 @@ export default function AdvanceOrders() {
                         shopName: shopInfo?.shop_name || session?.shop_name || "Haappii Billing",
                         branchName: session?.branch_name || "",
                         userName: session?.user_name || session?.name || "Staff",
+                        paperSize: branchInfo?.paper_size || "58mm",
                       })}
                       className="text-xs px-3 py-1 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
                     >Print Advance Invoice</button>

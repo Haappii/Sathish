@@ -90,19 +90,51 @@ export default function AnalyticsScreen() {
   const openDues = data?.open_dues || {};
   const stock = data?.stock || {};
 
+  // Keys that are non-monetary (phone numbers, codes, text) — must be excluded
+  const NON_MONETARY_KEYS = new Set([
+    "wallet_mobile", "gift_card_code", "coupon_code",
+    "customer_email", "customer_gst", "upi_utr",
+  ]);
+
+  // Map raw API keys to human-readable labels
+  const PAYMENT_LABEL_MAP = {
+    cash: "Cash", CASH: "Cash",
+    card: "Card", CARD: "Card",
+    upi: "UPI", UPI: "UPI",
+    credit: "Credit", CREDIT: "Credit",
+    wallet: "Wallet", WALLET: "Wallet",
+    wallet_amount: "Wallet",
+    gift_card: "Gift Card", GIFT_CARD: "Gift Card",
+    gift_card_amount: "Gift Card",
+    coupon: "Coupon", COUPON: "Coupon",
+    split: "Split", SPLIT: "Split",
+  };
+
   const paymentRows = Object.entries(payment)
-    .map(([key, amount]) => ({ key, amount: Number(amount || 0) }))
-    .filter((x) => x.amount > 0)
+    .filter(([key]) => !NON_MONETARY_KEYS.has(key))
+    .map(([key, amount]) => ({
+      key,
+      label: PAYMENT_LABEL_MAP[key] || key.replace(/_/g, " ").toUpperCase(),
+      amount: Number(amount || 0),
+    }))
+    .filter((x) => x.amount > 0 && x.amount < 1_000_000_000) // guard against phone numbers slipping through
+    .reduce((acc, row) => {
+      // Merge duplicate labels (e.g. wallet + wallet_amount both → "Wallet")
+      const existing = acc.find((r) => r.label === row.label);
+      if (existing) { existing.amount += row.amount; return acc; }
+      return [...acc, row];
+    }, [])
     .sort((a, b) => b.amount - a.amount);
 
   const paymentTotal = paymentRows.reduce((acc, row) => acc + row.amount, 0);
   const paymentColors = {
-    CASH: "#059669",
+    Cash: "#059669",
     UPI: "#7c3aed",
-    CARD: "#0891b2",
-    CREDIT: "#dc2626",
-    "GIFT CARD": "#d97706",
-    WALLET: "#ea580c",
+    Card: "#0891b2",
+    Credit: "#dc2626",
+    "Gift Card": "#d97706",
+    Wallet: "#ea580c",
+    Coupon: "#0284c7",
   };
 
   return (
@@ -174,10 +206,10 @@ export default function AnalyticsScreen() {
               {paymentRows.map((p) => {
                 const total = paymentTotal > 0 ? paymentTotal : 1;
                 const pct = Math.round((p.amount / total) * 100);
-                const color = paymentColors[p.key] || "#475569";
+                const color = paymentColors[p.label] || "#475569";
                 return (
                   <View key={p.key} style={styles.payRow}>
-                    <Text style={styles.payLabel}>{p.key}</Text>
+                    <Text style={styles.payLabel}>{p.label}</Text>
                     <View style={styles.barOuter}>
                       <View style={[styles.barInner, { width: `${pct}%`, backgroundColor: color }]} />
                     </View>
@@ -239,7 +271,7 @@ const styles = StyleSheet.create({
   kpiValue: { fontSize: 18, fontWeight: "800" },
   kpiSub: { fontSize: 10, color: "#94a3b8" },
   payRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  payLabel: { width: 44, fontSize: 12, fontWeight: "700", color: "#334155" },
+  payLabel: { width: 72, fontSize: 12, fontWeight: "700", color: "#334155" },
   barOuter: {
     flex: 1, height: 8, backgroundColor: "#d9e3ff", borderRadius: 4, overflow: "hidden",
   },

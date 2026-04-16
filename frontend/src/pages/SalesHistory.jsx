@@ -508,7 +508,19 @@ export default function SalesHistory() {
                   </td>
                   <td className="px-4 py-2.5 hidden md:table-cell">
                     <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 capitalize">
-                      {b.payment_mode || "cash"}
+                      {b.payment_mode === "split"
+                        ? (() => {
+                            const sp = b.payment_split || {};
+                            const parts = [
+                              Number(sp.cash || 0) > 0 && `Cash`,
+                              Number(sp.card || 0) > 0 && `Card`,
+                              Number(sp.upi || 0) > 0 && `UPI`,
+                              Number(sp.wallet_amount || sp.wallet || 0) > 0 && `Wallet`,
+                              Number(sp.gift_card_amount || sp.gift_card || 0) > 0 && `Gift Card`,
+                            ].filter(Boolean);
+                            return parts.length > 0 ? parts.join(" + ") : "Split";
+                          })()
+                        : (b.payment_mode || "cash")}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-sm">

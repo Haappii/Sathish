@@ -32,7 +32,6 @@ export default function EmployeeAttendanceScreen() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savedDate, setSavedDate] = useState(null);
   const [markedEmployeeMap, setMarkedEmployeeMap] = useState({}); // employee_id -> true
 
   const load = useCallback(async () => {
@@ -102,7 +101,6 @@ export default function EmployeeAttendanceScreen() {
       const marked = {};
       rows.forEach((r) => { marked[r.employee_id] = true; });
       setMarkedEmployeeMap(marked);
-      setSavedDate(attendanceDate);
       Alert.alert("Saved", `Attendance saved for ${attendanceDate}`);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to save attendance");
@@ -110,6 +108,11 @@ export default function EmployeeAttendanceScreen() {
       setSaving(false);
     }
   };
+
+  const allSaved = useMemo(
+    () => employees.length > 0 && employees.every((e) => markedEmployeeMap[e.employee_id]),
+    [employees, markedEmployeeMap]
+  );
 
   const filtered = useMemo(
     () => employees.filter((e) =>
@@ -178,14 +181,16 @@ export default function EmployeeAttendanceScreen() {
         />
       </View>
 
-      {savedDate === attendanceDate && (
-        <View style={styles.savedBanner}>
-          <Text style={styles.savedText}>✓ Attendance saved for {attendanceDate}</Text>
-        </View>
-      )}
-
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+      ) : allSaved ? (
+        <View style={styles.alreadySavedWrap}>
+          <Text style={styles.alreadySavedIcon}>✅</Text>
+          <Text style={styles.alreadySavedTitle}>Attendance Already Recorded</Text>
+          <Text style={styles.alreadySavedMsg}>
+            Attendance for {attendanceDate} has already been saved for all employees.
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filtered}
@@ -230,8 +235,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
     backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
   },
-  savedBanner: { backgroundColor: "#dcfce7", padding: 8, alignItems: "center" },
-  savedText: { color: "#166534", fontWeight: "700", fontSize: 13 },
   list: { padding: 12, gap: 8, paddingBottom: 24 },
   card: {
     backgroundColor: "#fff", borderRadius: 12, borderWidth: 1,
@@ -266,4 +269,11 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", paddingTop: 60, gap: 8 },
   emptyIcon: { fontSize: 40 },
   emptyTitle: { color: "#64748b", fontSize: 16, fontWeight: "700" },
+  alreadySavedWrap: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 32, gap: 12,
+  },
+  alreadySavedIcon: { fontSize: 52 },
+  alreadySavedTitle: { fontSize: 18, fontWeight: "800", color: "#166534", textAlign: "center" },
+  alreadySavedMsg: { fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 20 },
 });

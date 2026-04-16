@@ -855,7 +855,12 @@ export default function TableOrderScreen({ route, navigation }) {
                       onPress={() => setTransferTableId(t.table_id)}
                     >
                       <Text style={[styles.transferRowText, active && styles.transferRowTextActive]}>
-                        {t.table_name}
+                        {t.category_name ? (
+                          <>
+                            <Text style={styles.transferRowCategory}>{t.category_name} · </Text>
+                            {t.table_name}
+                          </>
+                        ) : t.table_name}
                       </Text>
                     </Pressable>
                   );
@@ -1003,6 +1008,7 @@ const styles = StyleSheet.create({
   },
   transferRowText: { color: "#0b1220", fontWeight: "700" },
   transferRowTextActive: { color: "#3730a3" },
+  transferRowCategory: { fontWeight: "400", color: "#64748b", opacity: 0.85 },
   emptyTransferText: { color: "#94a3b8", paddingVertical: 6 },
   paymentRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   paymentBtn: {

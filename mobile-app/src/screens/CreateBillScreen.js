@@ -524,6 +524,17 @@ export default function CreateBillScreen({ route }) {
           const checkoutRes = await api.post(`/table-billing/order/checkout/${sourceOrderId}`, checkoutPayload);
           invoiceNo = String(checkoutRes?.data?.invoice_number || "").trim();
         } else {
+          if (action === BILL_ACTIONS.HOLD) {
+            const draftRes = await api.post("/invoice/draft/", payload);
+            const draftNumber = String(draftRes?.data?.draft_number || "").trim();
+            Alert.alert(
+              "Bill Held",
+              `Draft: ${draftNumber || "-"}\nFind it in Held Invoices to process or cancel.`
+            );
+            resetForm();
+            return;
+          }
+
           const res = await api.post("/invoice/", payload);
           invoiceNo = String(res?.data?.invoice_number || "").trim();
           kotToken =
