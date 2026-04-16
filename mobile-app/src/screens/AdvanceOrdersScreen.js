@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import QRCode from "react-native-qrcode-svg";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -114,6 +115,7 @@ export default function AdvanceOrdersScreen() {
   const [pmPicker, setPmPicker] = useState(false);
   const [statusPicker, setStatusPicker] = useState(null); // order_id
   const [collectDue, setCollectDue] = useState(null); // { order, amount, payment_mode, mark_completed }
+  const [collectUpiIdx, setCollectUpiIdx] = useState(0);
   const [collecting, setCollecting] = useState(false);
   const [printingId, setPrintingId] = useState(null);
   const [shopDetails, setShopDetails] = useState({});
@@ -672,6 +674,53 @@ export default function AdvanceOrdersScreen() {
                 ))}
               </View>
 
+              {/* UPI QR */}
+              {collectDue?.payment_mode === "UPI" && (() => {
+                const upiIds = [
+                  branchDetails?.upi_id,
+                  branchDetails?.upi_id_2,
+                  branchDetails?.upi_id_3,
+                  branchDetails?.upi_id_4,
+                ].filter(Boolean);
+                if (upiIds.length === 0 && shopDetails?.upi_id) upiIds.push(shopDetails.upi_id);
+                const shopName = shopDetails?.shop_name || "Shop";
+                const amount = Number(collectDue?.amount || 0);
+                const safeIdx = Math.min(collectUpiIdx, Math.max(0, upiIds.length - 1));
+                if (upiIds.length === 0) {
+                  return (
+                    <View style={styles.upiWarning}>
+                      <Text style={styles.upiWarningText}>No UPI ID configured for this branch.</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View style={styles.upiQrBox}>
+                    {upiIds.length > 1 && (
+                      <View style={styles.upiQrTabs}>
+                        {upiIds.map((id, i) => (
+                          <Pressable
+                            key={id}
+                            style={[styles.upiQrTab, safeIdx === i && styles.upiQrTabActive]}
+                            onPress={() => setCollectUpiIdx(i)}
+                          >
+                            <Text style={[styles.upiQrTabText, safeIdx === i && styles.upiQrTabTextActive]}>
+                              QR {i + 1}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                    <View style={styles.upiQrCenter}>
+                      <QRCode
+                        value={`upi://pay?pa=${upiIds[safeIdx]}&pn=${encodeURIComponent(shopName)}&am=${amount > 0 ? amount.toFixed(2) : "0.00"}&cu=INR`}
+                        size={160}
+                      />
+                      <Text style={styles.upiQrId}>{upiIds[safeIdx]}</Text>
+                    </View>
+                  </View>
+                );
+              })()}
+
               <Pressable
                 style={styles.checkRow}
                 onPress={() => setCollectDue((prev) => ({ ...prev, mark_completed: !prev?.mark_completed }))}
@@ -856,4 +905,21 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontSize: 13, fontWeight: "700", color: "#334155" },
   saveBtn: { flex: 1, backgroundColor: "#0b57d0", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   saveBtnText: { fontSize: 13, fontWeight: "800", color: "#fff" },
+  // UPI QR
+  upiWarning: {
+    backgroundColor: "#fffbeb", borderRadius: 10, padding: 10, marginTop: 8,
+    borderWidth: 1, borderColor: "#fde68a",
+  },
+  upiWarningText: { fontSize: 12, color: "#92400e", fontWeight: "600" },
+  upiQrBox: { marginTop: 8, gap: 8 },
+  upiQrTabs: { flexDirection: "row", gap: 6 },
+  upiQrTab: {
+    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 5, backgroundColor: "#fff",
+  },
+  upiQrTabActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  upiQrTabText: { fontSize: 12, fontWeight: "700", color: "#475569" },
+  upiQrTabTextActive: { color: "#fff" },
+  upiQrCenter: { alignItems: "center", gap: 6, paddingVertical: 6 },
+  upiQrId: { fontSize: 11, color: "#64748b", fontWeight: "600" },
 });

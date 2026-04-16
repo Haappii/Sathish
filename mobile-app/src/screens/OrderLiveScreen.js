@@ -24,6 +24,13 @@ const STATUS_COLORS = {
   COMPLETED: "#475569",
 };
 
+const SUMMARY_STATUSES = [
+  { key: "ORDER_PLACED",    label: "Order Placed",    color: "#0b57d0", bg: "#eff6ff", border: "#bfdbfe" },
+  { key: "ORDER_PREPARING", label: "Order Preparing", color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+  { key: "FOOD_PREPARED",   label: "Food Prepared",   color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
+  { key: "MOVED_TO_TABLE",  label: "Moved To Table",  color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
+];
+
 function fmtTime(v) {
   if (!v) return "-";
   const d = new Date(v);
@@ -36,6 +43,7 @@ export default function OrderLiveScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingOrder, setUpdatingOrder] = useState(null);
+  const [activeTab, setActiveTab] = useState("live");
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -95,11 +103,100 @@ export default function OrderLiveScreen() {
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
+        {/* Header + tab toggle */}
         <View style={styles.headerRow}>
           <Text style={styles.header}>Live Orders ({rows.length})</Text>
-          {refreshing && <ActivityIndicator size="small" color="#0b57d0" />}
+          <View style={styles.tabRow}>
+            {["live", "summary"].map((tab) => (
+              <Pressable
+                key={tab}
+                style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
+                  {tab === "live" ? "Live" : "Summary"}
+                </Text>
+              </Pressable>
+            ))}
+            {refreshing && <ActivityIndicator size="small" color="#0b57d0" style={{ marginLeft: 4 }} />}
+          </View>
         </View>
 
+        {/* ── Summary Tab ── */}
+        {activeTab === "summary" ? (
+          rows.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyIcon}>🍽️</Text>
+              <Text style={styles.emptyText}>No active live orders.</Text>
+            </View>
+          ) : (
+            SUMMARY_STATUSES.map(({ key, label, color, bg, border }) => {
+              const group = rows.filter((r) => String(r.status || "").toUpperCase() === key);
+              const totalItems = group.reduce((acc, r) => acc + (r.items || []).length, 0);
+              const itemCountMap = {};
+              group.forEach((r) => {
+                (r.items || []).forEach((item) => {
+                  const name = item.item_name || "Item";
+                  itemCountMap[name] = (itemCountMap[name] || 0) + 1;
+                });
+              });
+              const itemCountList = Object.entries(itemCountMap).sort((a, b) => b[1] - a[1]);
+              return (
+                <View key={key} style={[styles.summaryCard, { borderColor: border }]}>
+                  {/* Status header */}
+                  <View style={[styles.summaryHeader, { backgroundColor: bg, borderBottomColor: border }]}>
+                    <View style={styles.summaryHeaderLeft}>
+                      <View style={[styles.summaryDot, { backgroundColor: color }]} />
+                      <Text style={[styles.summaryLabel, { color }]}>{label}</Text>
+                    </View>
+                    <Text style={[styles.summaryCount, { color }]}>{group.length}</Text>
+                  </View>
+
+                  {/* Total items */}
+                  <View style={styles.summaryTotalsRow}>
+                    <Text style={styles.summaryTotalsText}>Total items: </Text>
+                    <Text style={styles.summaryTotalsBold}>{totalItems}</Text>
+                  </View>
+
+                  {/* Item breakdown */}
+                  {itemCountList.length > 0 && (
+                    <View style={styles.summaryBreakdown}>
+                      <Text style={styles.summaryBreakdownTitle}>ITEM BREAKDOWN</Text>
+                      {itemCountList.map(([name, count]) => (
+                        <View key={name} style={styles.summaryBreakdownRow}>
+                          <Text style={styles.summaryBreakdownName} numberOfLines={1}>{name}</Text>
+                          <Text style={[styles.summaryBreakdownCount, { color }]}>×{count}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Per-order list */}
+                  {group.length === 0 ? (
+                    <Text style={styles.summaryEmpty}>No orders</Text>
+                  ) : (
+                    group.map((row) => {
+                      const itemCount = (row.items || []).length;
+                      const title = row.order_type?.toUpperCase() === "TAKEAWAY"
+                        ? (row.token_number ? `Take Away ${row.token_number}` : "Take Away")
+                        : (row.table_name ? `Table ${row.table_name}` : `Order #${row.order_id}`);
+                      return (
+                        <View key={String(row.order_id)} style={styles.summaryOrderRow}>
+                          <Text style={styles.summaryOrderTitle} numberOfLines={1}>{title}</Text>
+                          <View style={styles.summaryOrderBadge}>
+                            <Text style={styles.summaryOrderBadgeText}>{itemCount} item{itemCount !== 1 ? "s" : ""}</Text>
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              );
+            })
+          )
+        ) : (
+          /* ── Live Board Tab ── */
+          <>
         {rows.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyIcon}>🍽️</Text>
@@ -197,6 +294,8 @@ export default function OrderLiveScreen() {
             </View>
           );
         })}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -263,4 +362,61 @@ const styles = StyleSheet.create({
   },
   updateBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   updateBtnDisabled: { opacity: 0.5 },
+  // ── Tab toggle ──
+  tabRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  tabBtn: {
+    borderWidth: 1, borderColor: "#d9e3ff", borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4, backgroundColor: "#fff",
+  },
+  tabBtnActive: { backgroundColor: "#0b1220", borderColor: "#0b1220" },
+  tabBtnText: { fontSize: 11, fontWeight: "700", color: "#475569" },
+  tabBtnTextActive: { color: "#fff" },
+  // ── Summary ──
+  summaryCard: {
+    backgroundColor: "#fff", borderWidth: 1, borderRadius: 14,
+    overflow: "hidden", marginBottom: 4,
+  },
+  summaryHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1,
+  },
+  summaryHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  summaryDot: { width: 8, height: 8, borderRadius: 4 },
+  summaryLabel: { fontSize: 12, fontWeight: "800" },
+  summaryCount: { fontSize: 20, fontWeight: "900" },
+  summaryTotalsRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#f1f5f9",
+  },
+  summaryTotalsText: { fontSize: 11, color: "#64748b", fontWeight: "600" },
+  summaryTotalsBold: { fontSize: 11, color: "#0b1220", fontWeight: "800" },
+  summaryBreakdown: {
+    paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6,
+    borderBottomWidth: 1, borderBottomColor: "#f1f5f9",
+  },
+  summaryBreakdownTitle: {
+    fontSize: 9, fontWeight: "800", color: "#94a3b8",
+    letterSpacing: 0.8, marginBottom: 6,
+  },
+  summaryBreakdownRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", paddingVertical: 2,
+  },
+  summaryBreakdownName: { fontSize: 12, color: "#1e293b", flex: 1, paddingRight: 8 },
+  summaryBreakdownCount: { fontSize: 12, fontWeight: "800" },
+  summaryEmpty: {
+    padding: 12, textAlign: "center", fontSize: 11, color: "#94a3b8",
+  },
+  summaryOrderRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderBottomWidth: 1, borderBottomColor: "#f8fafc",
+  },
+  summaryOrderTitle: { fontSize: 12, fontWeight: "700", color: "#0b1220", flex: 1 },
+  summaryOrderBadge: {
+    backgroundColor: "#f1f5f9", borderRadius: 999,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  summaryOrderBadgeText: { fontSize: 10, fontWeight: "700", color: "#475569" },
 });

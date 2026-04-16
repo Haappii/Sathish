@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import QRCode from "qrcode";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
@@ -72,6 +73,9 @@ export default function TableGrid() {
     () => localStorage.getItem("billing_type") === "hotel"
   );
   const [branchInfo, setBranchInfo] = useState({});
+  const [shopInfo, setShopInfo] = useState({});
+  const [upiQrList, setUpiQrList] = useState([]);
+  const [selectedQrIdx, setSelectedQrIdx] = useState(0);
   const orderLiveTrackingEnabled = branchInfo?.order_live_tracking_enabled !== false;
 
   // print ref & helpers
@@ -97,6 +101,7 @@ export default function TableGrid() {
       .then((res) => {
         if (!mounted) return;
         setHotelAllowed(isHotelShop(res.data || {}));
+        setShopInfo(res.data || {});
       })
       .catch(() => {
         if (!mounted) return;
@@ -120,6 +125,44 @@ export default function TableGrid() {
       mounted = false;
     };
   }, [branchId]);
+
+  // Generate UPI QR codes when UPI mode is selected in the Complete Order modal
+  useEffect(() => {
+    if (confirming?.payment_mode !== "upi" || confirming?.split_enabled) {
+      setUpiQrList([]);
+      setSelectedQrIdx(0);
+      return;
+    }
+    const payable =
+      toAmount(confirming?.table?.running_total || 0) +
+      toAmount(confirming?.service_charge || 0);
+    const ids = [
+      branchInfo?.upi_id,
+      branchInfo?.upi_id_2,
+      branchInfo?.upi_id_3,
+      branchInfo?.upi_id_4,
+    ].filter(Boolean);
+    if (ids.length === 0 && shopInfo?.upi_id) ids.push(shopInfo.upi_id);
+    if (ids.length === 0) { setUpiQrList([]); return; }
+
+    const shopName = shopInfo?.shop_name || "Shop";
+    Promise.all(
+      ids.map(async (upiId) => {
+        const url = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(shopName)}&am=${payable.toFixed(2)}&cu=INR`;
+        const dataUrl = await QRCode.toDataURL(url, { width: 180, margin: 1 });
+        return { upiId, dataUrl };
+      })
+    )
+      .then((list) => { setUpiQrList(list); setSelectedQrIdx(0); })
+      .catch(() => setUpiQrList([]));
+  }, [
+    confirming?.payment_mode,
+    confirming?.split_enabled,
+    confirming?.table?.running_total,
+    confirming?.service_charge,
+    branchInfo?.upi_id, branchInfo?.upi_id_2, branchInfo?.upi_id_3, branchInfo?.upi_id_4,
+    shopInfo?.upi_id, shopInfo?.shop_name,
+  ]);
 
   useEffect(() => {
     if (!hotelAllowed) return;
@@ -836,6 +879,50 @@ export default function TableGrid() {
                   </div>
                 )}
               </div>
+
+              {/* UPI QR */}
+              {confirming.payment_mode === "upi" && !confirming.split_enabled && (
+                <div>
+                  {upiQrList.length === 0 ? (
+                    <p className="text-[11px] text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                      No UPI ID configured for this branch.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {upiQrList.length > 1 && (
+                        <div className="flex gap-1.5 flex-wrap">
+                          {upiQrList.map((q, i) => (
+                            <button
+                              key={q.upiId}
+                              type="button"
+                              onClick={() => setSelectedQrIdx(i)}
+                              className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
+                                selectedQrIdx === i
+                                  ? "bg-indigo-600 text-white border-indigo-600"
+                                  : "bg-white text-gray-600 hover:bg-gray-50"
+                              }`}
+                            >
+                              QR {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {upiQrList[selectedQrIdx] && (
+                        <div className="flex flex-col items-center gap-1 py-1">
+                          <img
+                            src={upiQrList[selectedQrIdx].dataUrl}
+                            alt="UPI QR"
+                            className="w-40 h-40 rounded-lg border"
+                          />
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            {upiQrList[selectedQrIdx].upiId}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Payable summary */}
               <div className="bg-slate-50 rounded-lg px-3.5 py-2.5 text-sm space-y-1">

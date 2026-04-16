@@ -157,6 +157,16 @@ export default function OrderLiveTracking() {
               (acc, r) => acc + (r.items || []).length,
               0
             );
+            // item-wise count across all orders in this status group
+            const itemCountMap = {};
+            group.forEach((r) => {
+              (r.items || []).forEach((item) => {
+                const name = item.item_name || "Item";
+                itemCountMap[name] = (itemCountMap[name] || 0) + 1;
+              });
+            });
+            const itemCountList = Object.entries(itemCountMap).sort((a, b) => b[1] - a[1]);
+
             return (
               <div key={key} className="rounded-2xl border bg-white shadow-sm overflow-hidden">
                 {/* Status header */}
@@ -175,6 +185,25 @@ export default function OrderLiveTracking() {
                   </span>
                   <span className="text-[11px] font-bold text-slate-700">{totalItems}</span>
                 </div>
+
+                {/* Item-wise count */}
+                {itemCountList.length > 0 && (
+                  <div className="px-4 py-2.5 border-b bg-white">
+                    <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      Item Breakdown
+                    </div>
+                    <div className="space-y-1">
+                      {itemCountList.map(([name, count]) => (
+                        <div key={name} className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-slate-700 truncate">{name}</span>
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700">
+                            ×{count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Order list */}
                 {group.length === 0 ? (

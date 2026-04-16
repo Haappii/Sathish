@@ -177,7 +177,9 @@ export default function TableGridScreen({ navigation }) {
                         onPress={() => openTable(table)}
                       >
                         <Text style={[styles.tableName, { color: meta.text }]}>
-                          {table.table_name}
+                          {table.category_name
+                            ? <><Text style={{ fontWeight: "400", opacity: 0.65 }}>{table.category_name} · </Text>{table.table_name}</>
+                            : table.table_name}
                         </Text>
                         <Text style={[styles.tableStatus, { color: meta.text }]}>
                           {meta.label}
