@@ -129,6 +129,7 @@ import PublicInvoice from "./pages/PublicInvoice";
 import FeedbackReview from "./pages/FeedbackReview";
 
 import AdvanceOrders from "./pages/AdvanceOrders";
+import NotFound from "./pages/NotFound";
 
 import { ToastProvider } from "./components/Toast";
 import api from "./utils/apiClient";
@@ -280,6 +281,9 @@ export default function App() {
               }
             />
           </Route>
+
+          {/* 404 — must be last */}
+          <Route path="*" element={<NotFound />} />
 
         </Routes>
       </BrowserRouter>
