@@ -85,6 +85,7 @@ export default function TableOrderScreen({ route, navigation }) {
   const [branchDetails, setBranchDetails] = useState({});
   const [shopDetails, setShopDetails] = useState({});
   const [upiUtr, setUpiUtr] = useState("");
+  const [upiQrIdx, setUpiQrIdx] = useState(0);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTableId, setTransferTableId] = useState(null);
   const [transferBusy, setTransferBusy] = useState(false);
@@ -311,6 +312,7 @@ export default function TableOrderScreen({ route, navigation }) {
       return Alert.alert("No Items", "Add items before billing.");
     }
     setUpiUtr("");
+    setUpiQrIdx(0);
     setBillOpen(true);
   };
 
@@ -580,16 +582,15 @@ export default function TableOrderScreen({ route, navigation }) {
 
       <Modal visible={billOpen} transparent animationType="fade" onRequestClose={() => setBillOpen(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { maxHeight: "90%" }]}>
             <Text style={styles.modalTitle}>Confirm Bill - Table {table.table_name}</Text>
-            <ScrollView style={{ maxHeight: 260 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 10 }}>
               {mergedBillItems.map((row) => (
                 <View key={String(row.item_id)} style={styles.modalItemRow}>
                   <Text style={styles.modalItemName}>{row.item_name} x{row.quantity}</Text>
                   <Text style={styles.modalItemAmt}>₹{Number(row.amount || 0).toFixed(2)}</Text>
                 </View>
               ))}
-            </ScrollView>
 
             <Text style={styles.modalTotal}>Items Total: ₹{Number(mergedBillTotal || 0).toFixed(2)}</Text>
             <Text style={styles.modalBreakdown}>Service Charge: ₹{serviceChargeNum.toFixed(2)}</Text>
@@ -692,21 +693,35 @@ export default function TableOrderScreen({ route, navigation }) {
                       </View>
                     );
                   }
+                  const safeIdx = Math.min(upiQrIdx, upiIds.length - 1);
                   return (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 4 }}>
-                      {upiIds.map((upiId) => (
-                        <View key={upiId} style={styles.upiQrBox}>
-                          <QRCode
-                            value={`upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopDetails.shop_name || "Shop")}&am=${netBillTotal.toFixed(2)}&cu=INR`}
-                            size={150}
-                            backgroundColor="#ffffff"
-                            color="#0b1220"
-                          />
-                          <Text style={styles.upiQrId}>{upiId}</Text>
-                          <Text style={styles.upiQrAmt}>Amount: ₹{netBillTotal.toFixed(2)}</Text>
+                    <View>
+                      {upiIds.length > 1 && (
+                        <View style={styles.upiTabRow}>
+                          {upiIds.map((_, i) => (
+                            <Pressable
+                              key={i}
+                              style={[styles.upiTab, safeIdx === i && styles.upiTabActive]}
+                              onPress={() => setUpiQrIdx(i)}
+                            >
+                              <Text style={[styles.upiTabText, safeIdx === i && styles.upiTabTextActive]}>
+                                QR {i + 1}
+                              </Text>
+                            </Pressable>
+                          ))}
                         </View>
-                      ))}
-                    </ScrollView>
+                      )}
+                      <View style={styles.upiQrBox}>
+                        <QRCode
+                          value={`upi://pay?pa=${encodeURIComponent(upiIds[safeIdx])}&pn=${encodeURIComponent(shopDetails.shop_name || "Shop")}&am=${netBillTotal.toFixed(2)}&cu=INR`}
+                          size={160}
+                          backgroundColor="#ffffff"
+                          color="#0b1220"
+                        />
+                        <Text style={styles.upiQrId}>{upiIds[safeIdx]}</Text>
+                        <Text style={styles.upiQrAmt}>Amount: ₹{netBillTotal.toFixed(2)}</Text>
+                      </View>
+                    </View>
                   );
                 })()}
                 <Text style={styles.modalSubTitle}>UTR Last 5 Digits *</Text>
@@ -818,6 +833,7 @@ export default function TableOrderScreen({ route, navigation }) {
                 <Text style={styles.modalSaveText}>{billing ? "Saving..." : "Save Bill"}</Text>
               </Pressable>
             </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -956,7 +972,6 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: "#d9e3ff",
-    gap: 10,
   },
   modalTitle: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   modalSubTitle: { fontSize: 13, fontWeight: "700", color: "#334155" },
@@ -1019,6 +1034,18 @@ const styles = StyleSheet.create({
   },
   modalSaveText: { color: "#fff", fontWeight: "800" },
   upiSection: { gap: 8 },
+  upiTabRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 },
+  upiTab: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: "#fff",
+  },
+  upiTabActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  upiTabText: { fontSize: 12, fontWeight: "700", color: "#334155" },
+  upiTabTextActive: { color: "#fff" },
   upiQrBox: {
     alignItems: "center",
     backgroundColor: "#f8faff",
