@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 
@@ -81,14 +83,15 @@ def adjust_stock(
 ) -> bool:
 
     row = ensure_stock_row(db, shop_id, item_id, branch_id)
+    qty_d = Decimal(str(qty))
 
     if mode == "ADD":
-        row.quantity += qty
+        row.quantity += qty_d
 
     elif mode == "REMOVE":
-        if row.quantity < qty:
+        if row.quantity < qty_d:
             return False
-        row.quantity -= qty
+        row.quantity -= qty_d
 
     # ✅ STOCK LEDGER ENTRY
     db.add(StockLedger(
@@ -96,7 +99,7 @@ def adjust_stock(
         item_id=item_id,
         branch_id=branch_id,
         change_type=mode,
-        quantity=qty,
+        quantity=qty_d,
         reference_no=ref_no
     ))
 
