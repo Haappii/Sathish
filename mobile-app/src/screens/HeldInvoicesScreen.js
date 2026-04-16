@@ -332,7 +332,6 @@ export default function HeldInvoicesScreen() {
                   {row?.draft_number ? row.draft_number : `#${orderId || index + 1}`}
                 </Text>
               </View>
-              <Text style={styles.totalText}>{fmt(total)}</Text>
             </View>
             <Text style={styles.customerText}>
               {row?.customer_name || "Walk-in"}
@@ -458,27 +457,6 @@ export default function HeldInvoicesScreen() {
                       <Text style={styles.itemSummaryAmt}>{fmt(it?.amount || 0)}</Text>
                     </View>
                   ))}
-                  <View style={styles.summaryDivider} />
-                  <View style={styles.itemSummaryRow}>
-                    <Text style={styles.itemSummaryName}>Subtotal</Text>
-                    <Text style={styles.itemSummaryAmt}>{fmt(processSubtotal)}</Text>
-                  </View>
-                  {gstEnabled && gstPercent > 0 && (
-                    <View style={styles.itemSummaryRow}>
-                      <Text style={styles.itemSummaryName}>GST ({gstPercent}%)</Text>
-                      <Text style={styles.itemSummaryAmt}>{fmt(processGst)}</Text>
-                    </View>
-                  )}
-                  {processDiscountValue > 0 && (
-                    <View style={styles.itemSummaryRow}>
-                      <Text style={[styles.itemSummaryName, { color: "#dc2626" }]}>Discount</Text>
-                      <Text style={[styles.itemSummaryAmt, { color: "#dc2626" }]}>− {fmt(processDiscountValue)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.itemSummaryTotal}>
-                    <Text style={styles.itemSummaryTotalLabel}>Payable</Text>
-                    <Text style={styles.itemSummaryTotalAmt}>{fmt(processPayable)}</Text>
-                  </View>
                 </View>
               )}
 
@@ -658,7 +636,7 @@ export default function HeldInvoicesScreen() {
                 }}
               >
                 <Text style={styles.printBtnTxt}>
-                  {processSaving ? "Processing…" : `Save & Print — ${fmt(processPayable)}`}
+                  {processSaving ? "Processing…" : "Save & Print"}
                 </Text>
               </Pressable>
 
