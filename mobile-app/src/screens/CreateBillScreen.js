@@ -125,6 +125,7 @@ export default function CreateBillScreen({ route }) {
   const [weightInput, setWeightInput] = useState("250");
   const [upiConfirmOpen, setUpiConfirmOpen] = useState(false);
   const [upiUtr, setUpiUtr] = useState("");
+  const [upiQrIdx, setUpiQrIdx] = useState(0);
   const [upiPendingAction, setUpiPendingAction] = useState(null);
   const routeOrderId = Number(route?.params?.prefillOrderId || 0) || null;
   const isTableBillingFlow = Boolean(routeOrderId);
@@ -932,6 +933,7 @@ export default function CreateBillScreen({ route }) {
               if (paymentMode === "upi") {
                 setUpiPendingAction(BILL_ACTIONS.PRINT_BOTH);
                 setUpiUtr("");
+                setUpiQrIdx(0);
                 setUpiConfirmOpen(true);
               } else {
                 saveInvoice(BILL_ACTIONS.PRINT_BOTH);
@@ -955,6 +957,7 @@ export default function CreateBillScreen({ route }) {
                 if (paymentMode === "upi") {
                   setUpiPendingAction(BILL_ACTIONS.SAVE_ONLY);
                   setUpiUtr("");
+                  setUpiQrIdx(0);
                   setUpiConfirmOpen(true);
                 } else {
                   saveInvoice(BILL_ACTIONS.SAVE_ONLY);
@@ -979,8 +982,13 @@ export default function CreateBillScreen({ route }) {
 
       {/* UPI Payment Confirmation Modal */}
       <Modal transparent visible={upiConfirmOpen} animationType="slide" onRequestClose={() => setUpiConfirmOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 16 }} keyboardShouldPersistTaps="handled">
+        <View style={[styles.modalBackdrop, { justifyContent: "flex-start", paddingTop: 40 }]}>
+          <ScrollView
+            style={{ width: "100%" }}
+            contentContainerStyle={{ padding: 16 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.upiModal}>
               <Text style={styles.upiModalTitle}>UPI Payment</Text>
 
@@ -1001,21 +1009,35 @@ export default function CreateBillScreen({ route }) {
                     </View>
                   );
                 }
+                const safeIdx = Math.min(upiQrIdx, upiIds.length - 1);
                 return (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 4 }}>
-                    {upiIds.map((upiId) => (
-                      <View key={upiId} style={styles.upiQrWrap}>
-                        <QRCode
-                          value={`upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${payableTotal.toFixed(2)}&cu=INR`}
-                          size={150}
-                          backgroundColor="#ffffff"
-                          color="#0b1220"
-                        />
-                        <Text style={styles.upiIdLabel}>{upiId}</Text>
-                        <Text style={styles.upiAmtLabel}>Amount: {fmt(payableTotal)}</Text>
+                  <View>
+                    {upiIds.length > 1 && (
+                      <View style={styles.upiTabRow}>
+                        {upiIds.map((_, i) => (
+                          <Pressable
+                            key={i}
+                            style={[styles.upiTab, safeIdx === i && styles.upiTabActive]}
+                            onPress={() => setUpiQrIdx(i)}
+                          >
+                            <Text style={[styles.upiTabText, safeIdx === i && styles.upiTabTextActive]}>
+                              QR {i + 1}
+                            </Text>
+                          </Pressable>
+                        ))}
                       </View>
-                    ))}
-                  </ScrollView>
+                    )}
+                    <View style={styles.upiQrWrap}>
+                      <QRCode
+                        value={`upi://pay?pa=${encodeURIComponent(upiIds[safeIdx])}&pn=${encodeURIComponent(shopName)}&am=${payableTotal.toFixed(2)}&cu=INR`}
+                        size={180}
+                        backgroundColor="#ffffff"
+                        color="#0b1220"
+                      />
+                      <Text style={styles.upiIdLabel}>{upiIds[safeIdx]}</Text>
+                      <Text style={styles.upiAmtLabel}>Amount: {fmt(payableTotal)}</Text>
+                    </View>
+                  </View>
                 );
               })()}
 
@@ -1254,6 +1276,18 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   upiNoIdText: { fontSize: 13, color: "#92400e", fontWeight: "600", textAlign: "center" },
+  upiTabRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  upiTab: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: "#fff",
+  },
+  upiTabActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  upiTabText: { fontSize: 12, fontWeight: "700", color: "#334155" },
+  upiTabTextActive: { color: "#fff" },
   upiFieldLabel: { fontSize: 12, fontWeight: "700", color: "#475569" },
   upiModalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
   upiCancelBtn: {
