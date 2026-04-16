@@ -406,7 +406,10 @@ export default function SalesHistory() {
   /* ================= UI ================= */
   const isViewOnly = !canEdit || mode === "view";
 
-  const totalSales = filtered.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+  const totalSales = filtered.reduce(
+    (s, b) => s + Number(b.total_amount || 0) - Number(b.discounted_amt || 0),
+    0
+  );
 
   return (
     <div className="space-y-3">
@@ -524,7 +527,7 @@ export default function SalesHistory() {
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-sm">
-                    ₹ {Number(b.total_amount).toFixed(2)}
+                    ₹ {(Number(b.total_amount || 0) - Number(b.discounted_amt || 0)).toFixed(2)}
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-center gap-1.5">

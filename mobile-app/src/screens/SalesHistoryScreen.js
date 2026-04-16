@@ -315,7 +315,7 @@ export default function SalesHistoryScreen() {
                   {r.customer_name || "Walk-in"} | {r.mobile || "-"}
                 </Text>
               </View>
-              <Text style={styles.amount}>{fmtMoney(r.total_amount)}</Text>
+              <Text style={styles.amount}>{fmtMoney(Number(r.total_amount || 0) - Number(r.discounted_amt || 0))}</Text>
             </Pressable>
           ))}
         </View>
@@ -395,7 +395,7 @@ export default function SalesHistoryScreen() {
               <Text style={styles.totalLine}>Tax: {fmtMoney(activeInvoice.tax_amt)}</Text>
               <Text style={styles.totalLine}>Service Charge: {fmtMoney(getServiceChargeValue(activeInvoice))}</Text>
               <Text style={styles.totalLine}>Discount: {fmtMoney(activeInvoice.discounted_amt)}</Text>
-              <Text style={styles.totalBig}>Total: {fmtMoney(activeInvoice.total_amount)}</Text>
+              <Text style={styles.totalBig}>Total: {fmtMoney(Number(activeInvoice.total_amount || 0) - Number(activeInvoice.discounted_amt || 0))}</Text>
 
               {isBusinessDateInvoice ? (
                 <View style={styles.editSection}>
