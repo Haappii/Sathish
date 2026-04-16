@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey
+from sqlalchemy import Column, Integer, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 from app.db import Base
 
@@ -12,7 +12,7 @@ class Inventory(Base):
 
     branch_id = Column(Integer, ForeignKey("branch.branch_id"))
 
-    quantity = Column(Integer, default=0)
+    quantity = Column(Numeric(12, 3), default=0)
     min_stock = Column(Integer, default=0)
 
     item = relationship("Item")

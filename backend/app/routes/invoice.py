@@ -5,7 +5,6 @@ from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from collections import defaultdict
-from math import ceil
 import json
 
 from app.db import get_db
@@ -106,8 +105,8 @@ def _build_recipe_requirements(
     db: Session,
     shop_id: int,
     item_qty_pairs: list[tuple[int, int]],
-) -> dict[int, int]:
-    """Return raw-material requirements (ingredient_item_id -> integer quantity)."""
+) -> dict[int, Decimal]:
+    """Return raw-material requirements (ingredient_item_id -> decimal quantity)."""
     if not item_qty_pairs:
         return {}
 
@@ -145,12 +144,7 @@ def _build_recipe_requirements(
             if required > 0:
                 ingredient_qty[int(ing.ingredient_item_id)] += required
 
-    # Inventory table stores integer quantities; round up to avoid under-consumption.
-    result: dict[int, int] = {}
-    for ing_item_id, qty in ingredient_qty.items():
-        if qty > 0:
-            result[ing_item_id] = int(ceil(float(qty)))
-    return result
+    return {k: v for k, v in ingredient_qty.items() if v > 0}
 
 
 def _add_raw_item_fallback(

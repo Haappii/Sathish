@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Numeric
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db import Base
@@ -14,7 +14,7 @@ class StockLedger(Base):
     branch_id = Column(Integer, ForeignKey("branch.branch_id"))
 
     change_type = Column(String(30))   # ADD / REMOVE / SALE / RETURN / EDIT / DELETE
-    quantity = Column(Integer, default=0)
+    quantity = Column(Numeric(12, 3), default=0)
     reference_no = Column(String(50))
     created_time = Column(DateTime, default=datetime.utcnow)
 

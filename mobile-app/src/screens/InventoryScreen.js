@@ -137,7 +137,7 @@ export default function InventoryScreen() {
             <Pressable
               style={[styles.subBtn, isBusy && styles.btnDisabled]}
               disabled={isBusy}
-              onPress={() => updateStock(item.item_id, "subtract")}
+              onPress={() => updateStock(item.item_id, "remove")}
             >
               <Text style={styles.subBtnText}>{isBusy ? "…" : "− Sub"}</Text>
             </Pressable>

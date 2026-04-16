@@ -78,7 +78,7 @@ def list_stock(
 @router.post("/add")
 def add_stock(
     item_id: int,
-    qty: int,
+    qty: float,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
     user = Depends(require_permission("inventory", "write"))
@@ -121,7 +121,7 @@ def add_stock(
 @router.post("/remove")
 def remove_stock(
     item_id: int,
-    qty: int,
+    qty: float,
     branch_id: int | None = None,
     db: Session = Depends(get_db),
     user = Depends(require_permission("inventory", "write"))

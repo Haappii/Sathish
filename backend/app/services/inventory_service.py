@@ -75,7 +75,7 @@ def adjust_stock(
     shop_id: int,
     item_id: int,
     branch_id: int,
-    qty: int,
+    qty: float,
     mode: str,
     ref_no: str | None = None
 ) -> bool:

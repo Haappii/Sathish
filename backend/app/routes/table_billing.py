@@ -5,7 +5,6 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Optional
 from collections import defaultdict
-from math import ceil
 
 from pydantic import BaseModel
 
@@ -71,7 +70,7 @@ def _build_recipe_requirements(
     db: Session,
     shop_id: int,
     item_qty_pairs: list[tuple[int, int]],
-) -> dict[int, int]:
+) -> dict[int, Decimal]:
     if not item_qty_pairs:
         return {}
 
@@ -109,7 +108,7 @@ def _build_recipe_requirements(
             if required > 0:
                 ingredient_qty[int(ing.ingredient_item_id)] += required
 
-    return {k: int(ceil(float(v))) for k, v in ingredient_qty.items() if v > 0}
+    return {k: v for k, v in ingredient_qty.items() if v > 0}
 
 
 def _running_total_for_order(db: Session, order_id: int) -> Decimal:
@@ -809,12 +808,12 @@ def checkout_order(
     for it in order.items:
         item = item_map.get(int(it.item_id))
         if item and bool(getattr(item, "is_raw_material", False)):
-            recipe_requirements[int(it.item_id)] = int(recipe_requirements.get(int(it.item_id), 0) + int(it.quantity or 0))
+            recipe_requirements[int(it.item_id)] = recipe_requirements.get(int(it.item_id), Decimal("0")) + Decimal(str(it.quantity or 0))
 
     if inv_enabled:
         for ing_item_id, req_qty in recipe_requirements.items():
             available = get_stock(db, user.shop_id, ing_item_id, order.branch_id)
-            if available < int(req_qty or 0):
+            if available < (req_qty or 0):
                 raise HTTPException(
                     400,
                     f"Insufficient raw material stock for item {ing_item_id} (required {req_qty}, available {available})",
@@ -839,7 +838,7 @@ def checkout_order(
                 user.shop_id,
                 ing_item_id,
                 order.branch_id,
-                int(req_qty),
+                float(req_qty),
                 "REMOVE",
                 ref_no=f"TBL-{order.order_id}"
             )
