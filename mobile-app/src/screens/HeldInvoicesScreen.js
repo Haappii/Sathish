@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -80,6 +80,7 @@ export default function HeldInvoicesScreen() {
   const [couponCode, setCouponCode] = useState("");
   const [walletMobile, setWalletMobile] = useState("");
   const [walletAmount, setWalletAmount] = useState("");
+  const [processDiscountAmt, setProcessDiscountAmt] = useState("0");
   const [processSaving, setProcessSaving] = useState(false);
 
   // UPI QR modal state
@@ -137,6 +138,7 @@ export default function HeldInvoicesScreen() {
     });
     const savedMode = String(row?.payment_mode || "cash").toLowerCase();
     setProcessPaymentMode(PAYMENT_MODES.includes(savedMode) ? savedMode : "cash");
+    setProcessDiscountAmt(String(Math.round(Number(row?.discounted_amt || 0))));
     // Pre-fill split fields from saved payment_split if any
     const sp = row?.payment_split || {};
     setSplitCash(sp.cash ? String(sp.cash) : "");
@@ -158,13 +160,31 @@ export default function HeldInvoicesScreen() {
     setUpiModalOpen(false);
   };
 
-  // ── Compute payable total for the process modal ────────────────────────────
-  const processTotal = (() => {
-    if (!processRow) return 0;
-    return Number(processRow?.discounted_amt !== undefined
-      ? (processRow?.total_amount || 0) - (processRow?.discounted_amt || 0)
-      : (processRow?.total_amount || 0));
-  })();
+  // ── Compute totals for the process modal (mirrors CreateBillScreen logic) ──
+  const processSubtotal = useMemo(
+    () => (processRow?.items || []).reduce((t, it) => t + Number(it.amount || 0), 0),
+    [processRow]
+  );
+  const gstEnabled  = Boolean(shopDetails?.gst_enabled);
+  const gstPercent  = Number(shopDetails?.gst_percent || 0);
+  const gstMode     = String(shopDetails?.gst_mode || "inclusive").toLowerCase();
+  const processGst  = useMemo(() => {
+    if (!gstEnabled || gstPercent <= 0) return 0;
+    if (gstMode === "exclusive") return (processSubtotal * gstPercent) / 100;
+    return processSubtotal - processSubtotal / (1 + gstPercent / 100);
+  }, [gstEnabled, gstPercent, gstMode, processSubtotal]);
+  const processGross = useMemo(
+    () => (gstEnabled && gstMode === "exclusive" ? processSubtotal + processGst : processSubtotal),
+    [gstEnabled, gstMode, processSubtotal, processGst]
+  );
+  const processDiscountValue = useMemo(
+    () => Math.min(processGross, Math.max(0, toAmount(processDiscountAmt))),
+    [processGross, processDiscountAmt]
+  );
+  const processPayable = useMemo(
+    () => Math.round(Math.max(0, processGross - processDiscountValue)),
+    [processGross, processDiscountValue]
+  );
 
   // ── Submit: create invoice + delete draft ──────────────────────────────────
   const submitProcess = async (printAction = "save_only", utrCode = null) => {
@@ -176,20 +196,18 @@ export default function HeldInvoicesScreen() {
     if (mobile.length !== 10) return Alert.alert("Validation", "Enter a valid 10-digit mobile");
     if (!String(processCustomer.name || "").trim()) return Alert.alert("Validation", "Customer name is required");
 
-    const payableTotal = processTotal;
-
     if (processPaymentMode === "split") {
       const splitTotal =
         toAmount(splitCash) + toAmount(splitCard) + toAmount(splitUpi) +
         toAmount(splitGift) + toAmount(walletAmount);
-      if (Math.abs(splitTotal - payableTotal) > 0.01) {
+      if (Math.abs(splitTotal - processPayable) > 0.01) {
         return Alert.alert("Validation", "Split total must match payable amount");
       }
     }
     if (processPaymentMode === "gift_card") {
       if (!giftCardCode.trim()) return Alert.alert("Validation", "Gift card code is required");
       if (toAmount(splitGift) <= 0) return Alert.alert("Validation", "Gift card amount is required");
-      if (Math.abs(toAmount(splitGift) - payableTotal) > 0.01) {
+      if (Math.abs(toAmount(splitGift) - processPayable) > 0.01) {
         return Alert.alert("Validation", "Gift card amount must match payable amount");
       }
     }
@@ -211,7 +229,7 @@ export default function HeldInvoicesScreen() {
       customer_name: String(processCustomer.name || "").trim(),
       mobile,
       customer_gst: String(processCustomer.gst_number || "").trim() || null,
-      discounted_amt: Number(processRow?.discounted_amt || 0),
+      discounted_amt: processDiscountValue,
       payment_mode: processPaymentMode,
       payment_split: Object.keys(paymentSplit).length ? paymentSplit : null,
       items: (Array.isArray(processRow?.items) ? processRow.items : []).map((it) => ({
@@ -440,9 +458,26 @@ export default function HeldInvoicesScreen() {
                       <Text style={styles.itemSummaryAmt}>{fmt(it?.amount || 0)}</Text>
                     </View>
                   ))}
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.itemSummaryRow}>
+                    <Text style={styles.itemSummaryName}>Subtotal</Text>
+                    <Text style={styles.itemSummaryAmt}>{fmt(processSubtotal)}</Text>
+                  </View>
+                  {gstEnabled && gstPercent > 0 && (
+                    <View style={styles.itemSummaryRow}>
+                      <Text style={styles.itemSummaryName}>GST ({gstPercent}%)</Text>
+                      <Text style={styles.itemSummaryAmt}>{fmt(processGst)}</Text>
+                    </View>
+                  )}
+                  {processDiscountValue > 0 && (
+                    <View style={styles.itemSummaryRow}>
+                      <Text style={[styles.itemSummaryName, { color: "#dc2626" }]}>Discount</Text>
+                      <Text style={[styles.itemSummaryAmt, { color: "#dc2626" }]}>− {fmt(processDiscountValue)}</Text>
+                    </View>
+                  )}
                   <View style={styles.itemSummaryTotal}>
-                    <Text style={styles.itemSummaryTotalLabel}>Total</Text>
-                    <Text style={styles.itemSummaryTotalAmt}>{fmt(processRow?.total_amount || 0)}</Text>
+                    <Text style={styles.itemSummaryTotalLabel}>Payable</Text>
+                    <Text style={styles.itemSummaryTotalAmt}>{fmt(processPayable)}</Text>
                   </View>
                 </View>
               )}
@@ -493,6 +528,17 @@ export default function HeldInvoicesScreen() {
                     </Pressable>
                   ))}
                 </View>
+
+                {/* Discount */}
+                <Text style={styles.fieldLabel}>Discount</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={processDiscountAmt}
+                  placeholderTextColor="#94a3b8"
+                  onChangeText={(v) => setProcessDiscountAmt(v.replace(/[^\d.]/g, ""))}
+                />
 
                 {/* Gift card fields */}
                 {(processPaymentMode === "gift_card" || processPaymentMode === "split") && (
@@ -586,9 +632,17 @@ export default function HeldInvoicesScreen() {
                   </>
                 )}
 
-                <Text style={styles.payableRow}>
-                  Payable: <Text style={styles.payableAmt}>{fmt(processTotal)}</Text>
-                </Text>
+                <View style={styles.payableSummary}>
+                  {gstEnabled && gstPercent > 0 && (
+                    <Text style={styles.payableLine}>GST ({gstPercent}%): {fmt(processGst)}</Text>
+                  )}
+                  {processDiscountValue > 0 && (
+                    <Text style={[styles.payableLine, { color: "#dc2626" }]}>Discount: − {fmt(processDiscountValue)}</Text>
+                  )}
+                  <Text style={styles.payableRow}>
+                    Payable: <Text style={styles.payableAmt}>{fmt(processPayable)}</Text>
+                  </Text>
+                </View>
               </View>
 
               {/* Action buttons */}
@@ -604,7 +658,7 @@ export default function HeldInvoicesScreen() {
                 }}
               >
                 <Text style={styles.printBtnTxt}>
-                  {processSaving ? "Processing…" : `Save & Print — ${fmt(processTotal)}`}
+                  {processSaving ? "Processing…" : `Save & Print — ${fmt(processPayable)}`}
                 </Text>
               </Pressable>
 
@@ -668,13 +722,13 @@ export default function HeldInvoicesScreen() {
                   )}
                   <View style={styles.upiQrWrap}>
                     <QRCode
-                      value={`upi://pay?pa=${encodeURIComponent(upiIds[Math.min(upiQrIdx, upiIds.length - 1)])}&pn=${encodeURIComponent(shopName)}&am=${processTotal.toFixed(2)}&cu=INR`}
+                      value={`upi://pay?pa=${encodeURIComponent(upiIds[Math.min(upiQrIdx, upiIds.length - 1)])}&pn=${encodeURIComponent(shopName)}&am=${processPayable.toFixed(2)}&cu=INR`}
                       size={180}
                       backgroundColor="#ffffff"
                       color="#0b1220"
                     />
                     <Text style={styles.upiIdLabel}>{upiIds[Math.min(upiQrIdx, upiIds.length - 1)]}</Text>
-                    <Text style={styles.upiAmtLabel}>Amount: {fmt(processTotal)}</Text>
+                    <Text style={styles.upiAmtLabel}>Amount: {fmt(processPayable)}</Text>
                   </View>
                 </View>
               )}
@@ -883,6 +937,11 @@ const styles = StyleSheet.create({
   itemSummaryName: { flex: 1, fontSize: 13, color: "#334155", fontWeight: "600" },
   itemSummaryQty: { fontSize: 12, color: "#64748b", marginHorizontal: 8 },
   itemSummaryAmt: { fontSize: 13, fontWeight: "700", color: "#0b1220" },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "#e2e8f0",
+    marginVertical: 4,
+  },
   itemSummaryTotal: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -912,7 +971,9 @@ const styles = StyleSheet.create({
     color: "#0b1220", fontSize: 14,
   },
 
-  payableRow: { fontSize: 14, fontWeight: "700", color: "#334155", marginTop: 4 },
+  payableSummary: { gap: 3, marginTop: 4 },
+  payableLine: { fontSize: 13, color: "#64748b", fontWeight: "600" },
+  payableRow: { fontSize: 14, fontWeight: "700", color: "#334155", marginTop: 2 },
   payableAmt: { fontSize: 16, fontWeight: "800", color: "#059669" },
 
   printBtn: {
