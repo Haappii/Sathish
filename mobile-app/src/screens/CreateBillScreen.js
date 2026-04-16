@@ -127,6 +127,7 @@ export default function CreateBillScreen({ route }) {
   const [upiUtr, setUpiUtr] = useState("");
   const [upiQrIdx, setUpiQrIdx] = useState(0);
   const [upiPendingAction, setUpiPendingAction] = useState(null);
+  const [customerDue, setCustomerDue] = useState(0);
   const routeOrderId = Number(route?.params?.prefillOrderId || 0) || null;
   const isTableBillingFlow = Boolean(routeOrderId);
   const isHotelFlow = String(shopDetails?.billing_type || shopDetails?.shop_type || "").toLowerCase() === "hotel";
@@ -376,6 +377,12 @@ export default function CreateBillScreen({ route }) {
   // ── Customer auto-fill ─────────────────────────────────────────────────────
   const fetchCustomerByMobile = async (mobile) => {
     if (!mobile || mobile.length !== 10 || !isOnline) return;
+
+    // Fetch outstanding due (non-blocking)
+    api.get(`/dues/total-by-mobile/${mobile}`)
+      .then(r => setCustomerDue(Number(r?.data?.total_due || 0)))
+      .catch(() => setCustomerDue(0));
+
     try {
       const res = await api.get(`/invoice/customer/by-mobile/${mobile}`);
       if (res?.data?.customer_name) {
@@ -393,6 +400,7 @@ export default function CreateBillScreen({ route }) {
   const resetForm = () => {
     setCart([]);
     setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "", email: "" });
+    setCustomerDue(0);
     setPaymentMode("cash");
     setServiceCharge(String(normalizeServiceCharge(shopDetails?.service_charge ?? shopDetails?.default_service_charge ?? 0)));
     setDiscountAmt("0");
@@ -782,6 +790,7 @@ export default function CreateBillScreen({ route }) {
               let next = v.replace(/\D/g, "").slice(0, 10);
               setCustomer((p) => ({ ...p, mobile: next }));
               if (next.length === 10) fetchCustomerByMobile(next);
+              else setCustomerDue(0);
             }}
           />
           <TextInput
@@ -944,6 +953,12 @@ export default function CreateBillScreen({ route }) {
           <Text style={styles.total}>Payable: {fmt(payableTotal)}</Text>
           {loyaltyPts > 0 && (
             <Text style={styles.loyaltyPts}>+{loyaltyPts} pts will be earned</Text>
+          )}
+          {customerDue > 0 && (
+            <Text style={styles.customerDueText}>Previous Due: {fmt(customerDue)}</Text>
+          )}
+          {customerDue > 0 && (
+            <Text style={styles.collectTotal}>Total to Collect: {fmt(payableTotal + customerDue)}</Text>
           )}
 
           <Pressable
@@ -1254,6 +1269,8 @@ const styles = StyleSheet.create({
   removeTxt: { color: "#b91c1c", fontSize: 16, fontWeight: "700", paddingHorizontal: 4 },
   total: { fontSize: 16, fontWeight: "800", color: "#047857", textAlign: "right" },
   loyaltyPts: { fontSize: 12, fontWeight: "700", color: "#d97706", textAlign: "right", marginTop: 2 },
+  customerDueText: { fontSize: 14, fontWeight: "700", color: "#dc2626", textAlign: "right", marginTop: 4 },
+  collectTotal: { fontSize: 16, fontWeight: "800", color: "#dc2626", textAlign: "right", marginTop: 2, borderTopWidth: 1, borderTopColor: "#fecaca", paddingTop: 4 },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   modeBtn: {
     borderWidth: 1,

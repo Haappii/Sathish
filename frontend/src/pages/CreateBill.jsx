@@ -47,6 +47,7 @@ const [customer, setCustomer] = useState({
   name: "NA",
   gst_number: ""
 });
+  const [customerDue, setCustomerDue] = useState(0);
 
   const [discountType, setDiscountType] = useState("flat");
   const [discount, setDiscount] = useState(0);
@@ -316,6 +317,11 @@ const [customer, setCustomer] = useState({
       return true;
     };
 
+    // Fetch outstanding due for this mobile (silently, non-blocking)
+    authAxios.get(`/dues/total-by-mobile/${mobile}`)
+      .then(r => setCustomerDue(Number(r?.data?.total_due || 0)))
+      .catch(() => setCustomerDue(0));
+
     try {
       const res = await authAxios.get(
         `/invoice/customer/by-mobile/${mobile}`
@@ -346,6 +352,7 @@ const [customer, setCustomer] = useState({
 
     setCustomer(prev => ({ ...prev, mobile: value, name: value ? prev.name : "NA" }));
     if (value.length === 10) fetchCustomerByMobile(value);
+    else setCustomerDue(0);
   };
 
   const handleMobileBlur = () => {
@@ -901,6 +908,7 @@ const [customer, setCustomer] = useState({
   const resetBillForm = () => {
     setCart([]);
     setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "" });
+    setCustomerDue(0);
     setDiscount(0);
     setCouponCode("");
     setCouponDiscount(0);
@@ -1095,6 +1103,7 @@ const [customer, setCustomer] = useState({
 
       setCart([]);
       setCustomer({ mobile: DEFAULT_MOBILE, name: "", gst_number: "" });
+      setCustomerDue(0);
       setDiscount(0);
       setCouponCode("");
       setCouponDiscount(0);
@@ -1609,9 +1618,17 @@ const [customer, setCustomer] = useState({
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left transition hover:border-blue-200"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] font-bold text-gray-800">Payable</span>
+                <div>
+                  <span className="text-[12px] font-bold text-gray-800">Payable</span>
+                  {customerDue > 0 && (
+                    <span className="ml-1.5 text-[10px] font-semibold text-red-500">(+₹{customerDue.toFixed(0)} due)</span>
+                  )}
+                </div>
                 <div className="text-right">
                   <div className="text-[13px] font-bold text-blue-700">₹{payable.toFixed(2)}</div>
+                  {customerDue > 0 && (
+                    <div className="text-[11px] font-bold text-red-600">Collect ₹{(payable + customerDue).toFixed(2)}</div>
+                  )}
                   <div className="text-[9px] font-semibold text-gray-400">{showBillDetails ? "Hide details" : "Show details"}</div>
                 </div>
               </div>
@@ -1647,6 +1664,18 @@ const [customer, setCustomer] = useState({
                     <span className="text-gray-800">Payable</span>
                     <span className="text-blue-700">₹{payable.toFixed(2)}</span>
                   </div>
+                  {customerDue > 0 && (
+                    <div className="flex justify-between text-[12px] text-red-600 font-semibold">
+                      <span>Previous Due</span>
+                      <span>+₹{customerDue.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {customerDue > 0 && (
+                    <div className="flex justify-between border-t border-red-200 pt-1 text-[13px] font-bold text-red-700">
+                      <span>Total to Collect</span>
+                      <span>₹{(payable + customerDue).toFixed(2)}</span>
+                    </div>
+                  )}
                   {loyaltyPts > 0 && (
                     <div className="flex justify-between text-[11px] text-amber-600 font-semibold mt-1">
                       <span>Loyalty points earned</span>

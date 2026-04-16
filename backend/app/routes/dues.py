@@ -103,6 +103,44 @@ def _build_due_summary(db: Session, due: InvoiceDue) -> DueSummary:
     )
 
 
+@router.get("/total-by-mobile/{mobile}")
+def get_total_due_by_mobile(
+    mobile: str,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("dues", "read")),
+):
+    """Return total outstanding due amount for a customer by mobile number."""
+    from app.services.credit_service import normalize_mobile as _norm
+    m = _norm(mobile)
+    if not m:
+        raise HTTPException(400, "Invalid mobile number")
+
+    customer = (
+        db.query(Customer)
+        .filter(Customer.shop_id == user.shop_id, Customer.mobile == m)
+        .first()
+    )
+    if not customer:
+        return {"mobile": m, "customer_name": None, "total_due": 0.0}
+
+    open_dues = (
+        db.query(InvoiceDue)
+        .filter(
+            InvoiceDue.shop_id == user.shop_id,
+            InvoiceDue.customer_id == customer.customer_id,
+            InvoiceDue.status == "OPEN",
+        )
+        .all()
+    )
+
+    total = sum(float(get_outstanding_amount(db, d)) for d in open_dues)
+    return {
+        "mobile": m,
+        "customer_name": customer.customer_name,
+        "total_due": round(total, 2),
+    }
+
+
 @router.get("/open", response_model=list[DueSummary])
 def list_open_dues(
     branch_id: int | None = Query(None),
