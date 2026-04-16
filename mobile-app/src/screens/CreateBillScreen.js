@@ -365,6 +365,9 @@ export default function CreateBillScreen({ route }) {
     [grossTotal, discountValue]
   );
 
+  const loyaltyPct = Number(branchDetails?.loyalty_points_percentage || 0);
+  const loyaltyPts = loyaltyPct > 0 ? Math.round(payableTotal * loyaltyPct / 100) : 0;
+
   useEffect(() => {
     const auto = branchDiscountAmount(subtotal, branchDetails);
     setDiscountAmt(String(Math.round(auto)));
@@ -939,6 +942,9 @@ export default function CreateBillScreen({ route }) {
           {gstEnabled && <Text style={styles.total}>GST ({gstPercent}%): {fmt(gstAmount)}</Text>}
           {discountValue > 0 && <Text style={styles.total}>Discount: {fmt(discountValue)}</Text>}
           <Text style={styles.total}>Payable: {fmt(payableTotal)}</Text>
+          {loyaltyPts > 0 && (
+            <Text style={styles.loyaltyPts}>+{loyaltyPts} pts will be earned</Text>
+          )}
 
           <Pressable
             style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -1247,6 +1253,7 @@ const styles = StyleSheet.create({
   gramTxt: { color: "#64748b", fontWeight: "700", fontSize: 12 },
   removeTxt: { color: "#b91c1c", fontSize: 16, fontWeight: "700", paddingHorizontal: 4 },
   total: { fontSize: 16, fontWeight: "800", color: "#047857", textAlign: "right" },
+  loyaltyPts: { fontSize: 12, fontWeight: "700", color: "#d97706", textAlign: "right", marginTop: 2 },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   modeBtn: {
     borderWidth: 1,

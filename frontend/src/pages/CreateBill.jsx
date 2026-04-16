@@ -630,6 +630,10 @@ const [customer, setCustomer] = useState({
   );
 
   const payable = Math.round(grossTotal - discountValue);
+
+  const loyaltyPct = Number(branch?.loyalty_points_percentage || 0);
+  const loyaltyPts = loyaltyPct > 0 ? Math.round(payable * loyaltyPct / 100) : 0;
+
   const hasRealCustomerMobile =
     String(customer.mobile || "").trim() &&
     String(customer.mobile || "").trim() !== DEFAULT_MOBILE &&
@@ -1643,6 +1647,12 @@ const [customer, setCustomer] = useState({
                     <span className="text-gray-800">Payable</span>
                     <span className="text-blue-700">₹{payable.toFixed(2)}</span>
                   </div>
+                  {loyaltyPts > 0 && (
+                    <div className="flex justify-between text-[11px] text-amber-600 font-semibold mt-1">
+                      <span>Loyalty points earned</span>
+                      <span>+{loyaltyPts} pts</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
