@@ -21,6 +21,7 @@ class DraftCreate(BaseModel):
 
 class DraftItemOut(BaseModel):
     item_id: int
+    item_name: Optional[str] = None
     quantity: int
     amount: float
 

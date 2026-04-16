@@ -50,3 +50,7 @@ class InvoiceDraftItem(Base):
 
     draft = relationship("InvoiceDraft", back_populates="items")
     item = relationship("Item")
+
+    @property
+    def item_name(self):
+        return self.item.item_name if self.item else None
