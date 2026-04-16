@@ -17,6 +17,7 @@ class ItemBase(BaseModel):
         serialization_alias="sold_by_weight",
     )
     min_stock: Optional[int] = None
+    unit: Optional[str] = None   # kg, g, ml, L, pcs — raw material stock unit
 
 
 class ItemCreate(ItemBase):
@@ -30,6 +31,7 @@ class ItemCreate(ItemBase):
     min_stock: int = 0
     is_raw_material: bool = False
     sold_by_weight: bool = False
+    unit: Optional[str] = None
 
 
 class ItemUpdate(ItemBase):
@@ -46,6 +48,7 @@ class ItemResponse(BaseModel):
     mrp_price: float
     image_filename: Optional[str] = None
     min_stock: int
+    unit: Optional[str] = None
     is_raw_material: bool = False
     sold_by_weight: bool = False
     item_status: bool

@@ -177,18 +177,23 @@ export default function Inventory() {
                     <div key={item.item_id} className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col gap-3 hover:border-slate-200 transition shadow-sm">
                       <div>
                         <p className="font-semibold text-sm text-slate-800 leading-tight line-clamp-2">{item.item_name}</p>
-                        {catName && <p className="text-xs text-slate-400 mt-0.5 truncate">{catName}</p>}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {catName && <p className="text-xs text-slate-400 truncate">{catName}</p>}
+                          {item.unit && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold flex-shrink-0">{item.unit}</span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div className={`flex flex-col px-2.5 py-1 rounded-xl text-xs font-bold ${isLow ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
                           <div className="flex items-center gap-1.5">
                             <span>Stock:</span>
-                            <span>{stock}</span>
+                            <span>{stock}{item.unit ? ` ${item.unit}` : ""}</span>
                           </div>
                           {item.min_stock > 0 && (
                             <span className={`text-[10px] font-medium ${isLow ? "text-red-500" : "text-emerald-600"}`}>
-                              Min: {item.min_stock}
+                              Min: {item.min_stock}{item.unit ? ` ${item.unit}` : ""}
                             </span>
                           )}
                         </div>

@@ -112,7 +112,7 @@ export default function InventoryScreen() {
           </View>
           <View style={styles.stockBadge}>
             <Text style={[styles.stockText, stock <= 0 && styles.stockTextZero]}>
-              {fmt(stock)}
+              {fmt(stock)}{item.unit ? ` ${item.unit}` : ""}
             </Text>
             <Text style={styles.stockLabel}>in stock</Text>
           </View>
@@ -122,7 +122,7 @@ export default function InventoryScreen() {
             <TextInput
               style={styles.qtyInput}
               keyboardType="numeric"
-              placeholder="Qty"
+              placeholder={item.unit ? `Qty (${item.unit})` : "Qty"}
               placeholderTextColor="#94a3b8"
               value={qtyInput[item.item_id] || ""}
               onChangeText={(v) => setQtyInput((p) => ({ ...p, [item.item_id]: v.replace(/[^\d.]/g, "") }))}

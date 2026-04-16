@@ -60,8 +60,9 @@ export default function PurchaseOrders() {
   const [attachments, setAttachments] = useState([]);
   const [attachUploading, setAttachUploading] = useState(false);
 
+  const UNITS = ["g", "kg", "ml", "L", "pcs", "tbsp", "tsp", "cup"];
   const [form, setForm] = useState({ supplier_id: "", expected_date: "", notes: "" });
-  const [poItems, setPoItems] = useState([{ item_id: "", qty: 1, unit_cost: "" }]);
+  const [poItems, setPoItems] = useState([{ item_id: "", qty: 1, unit: "", unit_cost: "" }]);
   const [saving, setSaving] = useState(false);
 
   /* ── load ── */
@@ -101,11 +102,17 @@ export default function PurchaseOrders() {
   const purchaseItems = isHotel ? items.filter(i => Boolean(i?.is_raw_material)) : items;
 
   /* ── po items ── */
-  const addRow = () => setPoItems(prev => [...prev, { item_id: "", qty: 1, unit_cost: "" }]);
+  const addRow = () => setPoItems(prev => [...prev, { item_id: "", qty: 1, unit: "", unit_cost: "" }]);
   const removeRow = idx => setPoItems(prev => prev.filter((_, i) => i !== idx));
   const updateRow = (idx, key, value) => {
     const clone = [...poItems];
-    clone[idx] = { ...clone[idx], [key]: value };
+    const updated = { ...clone[idx], [key]: value };
+    // Auto-fill unit from item when item is selected
+    if (key === "item_id" && value) {
+      const found = purchaseItems.find(i => String(i.item_id) === String(value));
+      if (found?.unit) updated.unit = found.unit;
+    }
+    clone[idx] = updated;
     setPoItems(clone);
   };
   const totalAmount = poItems.reduce((sum, r) => sum + Number(r.qty || 0) * Number(r.unit_cost || 0), 0);
@@ -115,7 +122,7 @@ export default function PurchaseOrders() {
     if (!form.supplier_id) return showToast("Select supplier", "error");
     const itemsPayload = poItems
       .filter(i => i.item_id && Number(i.qty) > 0)
-      .map(i => ({ item_id: Number(i.item_id), qty: Number(i.qty), unit_cost: Number(i.unit_cost) || undefined }));
+      .map(i => ({ item_id: Number(i.item_id), qty: Number(i.qty), unit: i.unit || undefined, unit_cost: Number(i.unit_cost) || undefined }));
     if (!itemsPayload.length) return showToast("Add valid items", "error");
     setSaving(true);
     try {
@@ -142,7 +149,7 @@ export default function PurchaseOrders() {
   const openReceive = po => {
     setActivePo(po);
     setReceiveRows((po.items || []).map(i => ({
-      item_id: i.item_id, item_name: i.item_name,
+      item_id: i.item_id, item_name: i.item_name, unit: i.unit || "",
       remaining: i.qty_ordered - i.qty_received,
       qty_received: 0, batch_no: "", expiry_date: "", serial_numbers_text: "",
     })));
@@ -350,6 +357,14 @@ export default function PurchaseOrders() {
                       value={r.qty}
                       onChange={e => updateRow(idx, "qty", e.target.value)}
                     />
+                    <select
+                      className="w-16 border border-slate-200 rounded-xl px-1 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
+                      value={r.unit}
+                      onChange={e => updateRow(idx, "unit", e.target.value)}
+                    >
+                      <option value="">Unit</option>
+                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
                     <input
                       type="number"
                       placeholder="Cost"
@@ -476,8 +491,11 @@ export default function PurchaseOrders() {
             {receiveRows.map((r, idx) => (
               <div key={idx} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold text-sm text-slate-800">{r.item_name}</p>
-                  <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">Balance: {r.remaining}</span>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm text-slate-800">{r.item_name}</p>
+                    {r.unit && <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold">{r.unit}</span>}
+                  </div>
+                  <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">Balance: {r.remaining}{r.unit ? ` ${r.unit}` : ""}</span>
                 </div>
 
                 <div className="space-y-1.5">

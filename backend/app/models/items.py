@@ -28,6 +28,7 @@ class Item(Base):
     image_filename = Column(String(255), nullable=True)
 
     min_stock = Column(Integer, nullable=False, default=0)   # 👈 Moved here
+    unit = Column(String(20), nullable=True)   # e.g. kg, g, ml, L, pcs — used for raw materials
     is_raw_material = Column(Boolean, nullable=False, default=False)
     sold_by_weight = Column(Boolean, nullable=False, default=False)
 

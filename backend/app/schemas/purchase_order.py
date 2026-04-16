@@ -6,6 +6,7 @@ from datetime import date
 class PurchaseOrderItemCreate(BaseModel):
     item_id: int
     qty: int
+    unit: Optional[str] = None
     unit_cost: Optional[float] = None
     sell_price: Optional[float] = None
     mrp_price: Optional[float] = None
@@ -44,6 +45,7 @@ class PurchaseOrderItemResponse(BaseModel):
     item_name: str
     qty_ordered: int
     qty_received: int
+    unit: Optional[str] = None
     unit_cost: float
     sell_price: float
     mrp_price: float

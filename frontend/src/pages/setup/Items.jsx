@@ -28,6 +28,8 @@ export default function Items() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  const UNITS = ["g", "kg", "ml", "L", "pcs", "tbsp", "tsp", "cup"];
+
   const [form, setForm] = useState({
     item_name: "",
     category_id: "",
@@ -36,6 +38,7 @@ export default function Items() {
     buy_price: "",
     mrp_price: "",
     min_stock: "",
+    unit: "",
     item_status: true,
     is_raw_material: false,
     sold_by_weight: false,
@@ -165,6 +168,7 @@ export default function Items() {
       buy_price: "",
       mrp_price: "",
       min_stock: "",
+      unit: "",
       item_status: true,
       is_raw_material: !!activeSupplierId,
       sold_by_weight: false,
@@ -212,6 +216,7 @@ export default function Items() {
           buy_price: 0,
           mrp_price: 0,
           min_stock: Number(form.min_stock) || 0,
+          unit: form.unit || null,
           item_status: !!form.item_status,
           sold_by_weight: false,
         }
@@ -296,6 +301,7 @@ export default function Items() {
       buy_price: item.buy_price ?? 0,
       mrp_price: item.mrp_price ?? 0,
       min_stock: item.min_stock ?? 0,
+      unit: item.unit || "",
       item_status: !!item.item_status,
       is_raw_material: isRaw,
       sold_by_weight: !isRaw && !!item.sold_by_weight,
@@ -590,7 +596,12 @@ export default function Items() {
                           </div>
 
                           {item.is_raw_material ? (
-                            <p className="text-[11px] text-amber-600 font-medium">{supplierName || "Raw Material"}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-[11px] text-amber-600 font-medium">{supplierName || "Raw Material"}</p>
+                              {item.unit && (
+                                <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold">{item.unit}</span>
+                              )}
+                            </div>
                           ) : (
                             <p className="text-[14px] font-bold text-emerald-600">₹{Number(item.price || 0).toFixed(0)}</p>
                           )}
@@ -765,13 +776,31 @@ export default function Items() {
               </div>
             )}
 
+            {/* Unit — raw materials only */}
+            {form.is_raw_material && (
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Stock Unit</label>
+                <select
+                  className="border rounded-xl px-3 py-2 w-full text-[12px] focus:outline-none focus:border-amber-400 bg-white"
+                  value={form.unit}
+                  onChange={e => setForm({ ...form, unit: e.target.value })}
+                >
+                  <option value="">— Select unit —</option>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Unit used for inventory & purchase orders</p>
+              </div>
+            )}
+
             {/* Min Stock */}
             <div>
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block">Min Stock</label>
               <input type="number" placeholder="0"
                 className="border rounded-xl px-3 py-2 w-full text-[12px] focus:outline-none focus:border-blue-400"
                 value={form.min_stock} onChange={e => setForm({ ...form, min_stock: e.target.value })} />
-              <p className="text-[10px] text-gray-400 mt-0.5 pl-1">Low-stock alert threshold</p>
+              <p className="text-[10px] text-gray-400 mt-0.5 pl-1">
+                Low-stock alert threshold{form.is_raw_material && form.unit ? ` (${form.unit})` : ""}
+              </p>
             </div>
 
             {/* Image upload */}

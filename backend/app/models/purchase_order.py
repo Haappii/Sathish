@@ -41,6 +41,7 @@ class PurchaseOrderItem(Base):
     item_name = Column(String(150), nullable=False)
     qty_ordered = Column(Integer, nullable=False, default=0)
     qty_received = Column(Integer, nullable=False, default=0)
+    unit = Column(String(20), nullable=True)   # kg, g, ml, L, pcs
 
     unit_cost = Column(Float, nullable=False, default=0)   # buy price
     sell_price = Column(Float, nullable=False, default=0)  # existing selling price

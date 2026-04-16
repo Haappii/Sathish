@@ -170,6 +170,7 @@ def create_po(
             item_name=item.item_name,
             qty_ordered=qty,
             qty_received=0,
+            unit=it.unit or getattr(item, "unit", None),
             unit_cost=unit_cost,
             sell_price=sell_price,
             mrp_price=mrp_price,
