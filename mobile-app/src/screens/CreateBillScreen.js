@@ -128,6 +128,17 @@ export default function CreateBillScreen({ route }) {
   const [upiQrIdx, setUpiQrIdx] = useState(0);
   const [upiPendingAction, setUpiPendingAction] = useState(null);
   const [customerDue, setCustomerDue] = useState(0);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState("");
+  const [discountType, setDiscountType] = useState("flat");
+  const [priceLevel, setPriceLevel] = useState("BASE");
+  const [priceLevels, setPriceLevels] = useState(["BASE"]);
+  const [priceMap, setPriceMap] = useState({});
+  const [stockData, setStockData] = useState([]);
+  const [inventoryEnabled, setInventoryEnabled] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [heldDrafts, setHeldDrafts] = useState([]);
+  const [showHeldPanel, setShowHeldPanel] = useState(false);
   const routeOrderId = Number(route?.params?.prefillOrderId || 0) || null;
   const isTableBillingFlow = Boolean(routeOrderId);
   const isHotelFlow = String(shopDetails?.billing_type || shopDetails?.shop_type || "").toLowerCase() === "hotel";
@@ -167,12 +178,43 @@ export default function CreateBillScreen({ route }) {
           setShopName(nextShop?.shop_name || "Haappii Billing");
           setShopDetails(nextShop);
           setServiceCharge(String(normalizeServiceCharge(nextShop?.service_charge ?? nextShop?.default_service_charge ?? 0)));
+          setInventoryEnabled(Boolean(nextShop?.inventory_enabled));
           setBranchDetails(branchRes?.data || {});
           setCategories(cats);
           setItemsData(items);
           // Refresh cache
           await cacheCategories(cats);
           await cacheItems(items);
+          // Load price levels
+          try {
+            const [lvlRes, allRes] = await Promise.all([
+              api.get("/pricing/levels"),
+              api.get("/pricing/all"),
+            ]);
+            const lvls = (lvlRes?.data || []).map(x => String(x?.level || "").trim().toUpperCase()).filter(Boolean);
+            const map = {};
+            for (const r of allRes?.data || []) {
+              const id = String(r.item_id);
+              const lvl = String(r.level || "").trim().toUpperCase();
+              if (!id || !lvl) continue;
+              if (!map[id]) map[id] = {};
+              map[id][lvl] = Number(r.price || 0);
+            }
+            setPriceLevels(["BASE", ...lvls]);
+            setPriceMap(map);
+          } catch { /* no custom price levels */ }
+          // Load inventory stock
+          if (nextShop?.inventory_enabled && session?.branch_id) {
+            try {
+              const stockRes = await api.get("/inventory/list", { params: { branch_id: session.branch_id } });
+              setStockData(stockRes?.data || []);
+            } catch { setStockData([]); }
+          }
+          // Load held drafts
+          try {
+            const draftRes = await api.get("/invoice/draft/list");
+            setHeldDrafts(draftRes?.data || []);
+          } catch { /* silent */ }
         } else {
           // Use cached data
           const [cats, items] = await Promise.all([
@@ -303,7 +345,7 @@ export default function CreateBillScreen({ route }) {
       if (found) {
         return prev.map((x) => x.item_id === item.item_id ? { ...x, qty: x.qty + 1 } : x);
       }
-      const price = Number(item.selling_price || item.price || 0);
+      const price = getPriceForItem(item);
       return [...prev, { ...item, qty: 1, price }];
     });
   };
@@ -356,9 +398,15 @@ export default function CreateBillScreen({ route }) {
     [gstEnabled, gstMode, subtotal, gstAmount]
   );
 
+  const manualDiscountValue = useMemo(() => {
+    const v = toAmount(discountAmt);
+    if (discountType === "percent") return (grossTotal * v) / 100;
+    return v;
+  }, [grossTotal, discountAmt, discountType]);
+
   const discountValue = useMemo(
-    () => Math.min(grossTotal, Math.max(0, toAmount(discountAmt))),
-    [grossTotal, discountAmt]
+    () => Math.min(grossTotal, Math.max(0, manualDiscountValue + Number(couponDiscount || 0))),
+    [grossTotal, manualDiscountValue, couponDiscount]
   );
 
   const payableTotal = useMemo(
@@ -397,10 +445,111 @@ export default function CreateBillScreen({ route }) {
     }
   };
 
+  // ── Price level helpers ────────────────────────────────────────────────────
+  const getPriceForItem = (item) => {
+    const base = Number(item?.selling_price ?? item?.price ?? 0);
+    const lvl = String(priceLevel || "BASE").toUpperCase();
+    if (!lvl || lvl === "BASE") return base;
+    const custom = priceMap?.[String(item?.item_id)]?.[lvl];
+    return (custom !== undefined && custom !== null && custom !== "") ? Number(custom) : base;
+  };
+
+  const applyPriceLevelToCart = () => {
+    setCart(prev =>
+      prev.map(x => {
+        const newPrice = getPriceForItem(x);
+        if (isWeightItem(x)) {
+          return { ...x, unit_rate: newPrice, price: computeWeightLineAmount(newPrice, x.weight_grams || 250) };
+        }
+        return { ...x, price: newPrice };
+      })
+    );
+  };
+
+  // ── Stock helpers ──────────────────────────────────────────────────────────
+  const getStock = (id) => stockData.find(s => s.item_id === id)?.quantity ?? 0;
+  const getEffectiveStock = (id) => getStock(id) - (cart.find(c => c.item_id === id)?.qty || 0);
+
+  // ── Coupon ─────────────────────────────────────────────────────────────────
+  const applyCoupon = async () => {
+    const code = String(couponCode || "").trim();
+    if (!code) { setCouponDiscount(0); setCouponMsg(""); return; }
+    try {
+      const res = await api.get(`/coupons/validate/${encodeURIComponent(code)}`, {
+        params: { amount: grossTotal }
+      });
+      const data = res?.data || {};
+      if (!data.valid) {
+        setCouponDiscount(0);
+        setCouponMsg(data.message || "Invalid coupon");
+        Alert.alert("Coupon", data.message || "Invalid coupon");
+        return;
+      }
+      const disc = Number(data.discount_amount || 0);
+      setCouponDiscount(disc);
+      setCouponMsg("Applied");
+      Alert.alert("Coupon", `Applied: -₹${disc.toFixed(2)}`);
+    } catch (e) {
+      setCouponDiscount(0);
+      setCouponMsg("");
+      Alert.alert("Coupon", e?.response?.data?.detail || "Coupon validation failed");
+    }
+  };
+
+  const clearCoupon = () => { setCouponCode(""); setCouponDiscount(0); setCouponMsg(""); };
+
+  // ── Held drafts ────────────────────────────────────────────────────────────
+  const loadHeldDrafts = async () => {
+    try {
+      const res = await api.get("/invoice/draft/list");
+      setHeldDrafts(res?.data || []);
+    } catch { /* silent */ }
+  };
+
+  const restoreFromDraft = async (draft) => {
+    const restoredCart = [];
+    for (const draftItem of draft.items || []) {
+      const fullItem = itemsData.find(i => i.item_id === draftItem.item_id);
+      if (!fullItem) continue;
+      const price = draftItem.quantity > 0
+        ? draftItem.amount / draftItem.quantity
+        : Number(fullItem.selling_price || fullItem.price || 0);
+      restoredCart.push({ ...fullItem, qty: draftItem.quantity || 1, price });
+    }
+    setCart(restoredCart);
+    setCustomer({
+      mobile: draft.mobile || DEFAULT_MOBILE,
+      name: draft.customer_name || "NA",
+      gst_number: draft.gst_number || "",
+      email: "",
+    });
+    setDiscountAmt(String(Number(draft.discounted_amt || 0)));
+    const mode = draft.payment_mode || "cash";
+    setPaymentMode(mode === "split" ? "cash" : mode);
+    setGiftCardCode(draft.payment_split?.gift_card_code || "");
+    setShowHeldPanel(false);
+    try {
+      await api.delete(`/invoice/draft/${draft.draft_id}`);
+      setHeldDrafts(prev => prev.filter(x => x?.draft_id !== draft.draft_id));
+      Alert.alert("Restored", `Draft ${draft.draft_number} loaded into cart.`);
+    } catch {
+      Alert.alert("Restored", "Draft loaded into cart.");
+    }
+  };
+
+  // ── Filtered categories ────────────────────────────────────────────────────
+  const filteredCategories = categories.filter(c =>
+    !categorySearch || String(c.category_name || "").toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
   const resetForm = () => {
     setCart([]);
     setCustomer({ mobile: DEFAULT_MOBILE, name: "NA", gst_number: "", email: "" });
     setCustomerDue(0);
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponMsg("");
+    setDiscountType("flat");
     setPaymentMode("cash");
     setServiceCharge(String(normalizeServiceCharge(shopDetails?.service_charge ?? shopDetails?.default_service_charge ?? 0)));
     setDiscountAmt("0");
@@ -610,8 +759,9 @@ export default function CreateBillScreen({ route }) {
           `Bill saved locally (${localId.slice(-6)}). It will sync automatically when you're back online.\n\nPending: ${count} bill(s)`
         );
       }
-      // Reset form
+      // Reset form and refresh held drafts list
       resetForm();
+      loadHeldDrafts();
     } catch (err) {
       const serverMessage = String(err?.response?.data?.detail || "").trim();
       const isNetworkFailure = !err?.response;
@@ -664,6 +814,15 @@ export default function CreateBillScreen({ route }) {
         </Pressable>
       )}
 
+      {/* Held Drafts Banner */}
+      {heldDrafts.length > 0 && (
+        <Pressable style={styles.heldBanner} onPress={() => setShowHeldPanel(true)}>
+          <Text style={styles.heldBannerText}>
+            ⏸ {heldDrafts.length} held bill{heldDrafts.length > 1 ? "s" : ""} — tap to restore
+          </Text>
+        </Pressable>
+      )}
+
       <ScrollView contentContainerStyle={styles.container}>
         {/* Item Search + Category Filter */}
         <View style={styles.section}>
@@ -675,6 +834,13 @@ export default function CreateBillScreen({ route }) {
             placeholder="Search item…"
             placeholderTextColor={theme.textMuted}
           />
+          <TextInput
+            value={categorySearch}
+            onChangeText={setCategorySearch}
+            style={[styles.input, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
+            placeholder="Search category…"
+            placeholderTextColor={theme.textMuted}
+          />
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <Pressable
               style={[styles.chip, selectedCat === "ALL" && styles.chipActive]}
@@ -682,7 +848,7 @@ export default function CreateBillScreen({ route }) {
             >
               <Text style={[styles.chipText, selectedCat === "ALL" && styles.chipTextActive]}>All</Text>
             </Pressable>
-            {categories.map((c) => (
+            {filteredCategories.map((c) => (
               <Pressable
                 key={String(c.category_id)}
                 style={[styles.chip, selectedCat === c.category_id && styles.chipActive]}
@@ -717,6 +883,11 @@ export default function CreateBillScreen({ route }) {
                   <Text style={styles.itemPrice}>
                     ₹{Number(item.selling_price || item.price || 0).toFixed(2)}{isWeightItem(item) ? "/kg" : ""}
                   </Text>
+                  {inventoryEnabled && !isHotelFlow && (
+                    <Text style={[styles.stockBadge, getEffectiveStock(item.item_id) <= 0 && styles.stockBadgeOut]}>
+                      {getEffectiveStock(item.item_id) <= 0 ? "Out of stock" : `Stock: ${getEffectiveStock(item.item_id)}`}
+                    </Text>
+                  )}
                   {inCart && (
                     <Text style={styles.inCartBadge}>
                       {isWeightItem(inCart)
@@ -780,6 +951,25 @@ export default function CreateBillScreen({ route }) {
         {/* Customer */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer</Text>
+
+          {/* Price Level */}
+          {priceLevels.length > 1 && (
+            <View style={styles.priceLevelRow}>
+              <Text style={styles.priceLevelLabel}>Price Level:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                {priceLevels.map(lvl => (
+                  <Pressable
+                    key={lvl}
+                    style={[styles.priceLevelBtn, priceLevel === lvl && styles.priceLevelBtnActive]}
+                    onPress={() => { setPriceLevel(lvl); applyPriceLevelToCart(); }}
+                  >
+                    <Text style={[styles.priceLevelTxt, priceLevel === lvl && styles.priceLevelTxtActive]}>{lvl}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           <TextInput
             style={styles.input}
             placeholder="Mobile number"
@@ -850,14 +1040,28 @@ export default function CreateBillScreen({ route }) {
           )}
 
           <Text style={styles.sectionTitle}>Discount</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            keyboardType="numeric"
-            value={discountAmt}
-            placeholderTextColor="#94a3b8"
-            onChangeText={(v) => setDiscountAmt(v.replace(/[^\d.]/g, ""))}
-          />
+          <View style={styles.discountRow}>
+            <Pressable
+              style={[styles.discTypeBtn, discountType === "flat" && styles.discTypeBtnActive]}
+              onPress={() => setDiscountType("flat")}
+            >
+              <Text style={[styles.discTypeTxt, discountType === "flat" && styles.discTypeTxtActive]}>₹ Flat</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.discTypeBtn, discountType === "percent" && styles.discTypeBtnActive]}
+              onPress={() => setDiscountType("percent")}
+            >
+              <Text style={[styles.discTypeTxt, discountType === "percent" && styles.discTypeTxtActive]}>% Off</Text>
+            </Pressable>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="0"
+              keyboardType="numeric"
+              value={discountAmt}
+              placeholderTextColor="#94a3b8"
+              onChangeText={(v) => setDiscountAmt(v.replace(/[^\d.]/g, ""))}
+            />
+          </View>
 
           {(paymentMode === "gift_card" || paymentMode === "split") && (
             <>
@@ -881,19 +1085,31 @@ export default function CreateBillScreen({ route }) {
             </>
           )}
 
-          {(paymentMode === "coupon" || paymentMode === "split") && (
-            <>
-              <Text style={styles.sectionTitle}>Coupon</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Coupon code"
-                value={couponCode}
-                placeholderTextColor="#94a3b8"
-                onChangeText={setCouponCode}
-                autoCapitalize="characters"
-              />
-            </>
-          )}
+          {/* Coupon — always visible */}
+          <Text style={styles.sectionTitle}>Coupon</Text>
+          <View style={styles.couponRow}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="Coupon code"
+              value={couponCode}
+              placeholderTextColor="#94a3b8"
+              onChangeText={setCouponCode}
+              autoCapitalize="characters"
+            />
+            <Pressable style={styles.couponApplyBtn} onPress={applyCoupon}>
+              <Text style={styles.couponApplyTxt}>Apply</Text>
+            </Pressable>
+            {couponCode ? (
+              <Pressable style={styles.couponClearBtn} onPress={clearCoupon}>
+                <Text style={styles.couponClearTxt}>✕</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {couponMsg ? (
+            <Text style={[styles.couponMsg, couponDiscount > 0 && styles.couponMsgSuccess]}>{couponMsg}</Text>
+          ) : null}
+
+          {(paymentMode === "coupon" || paymentMode === "split") && null}
 
           {paymentMode === "split" && (
             <>
@@ -949,7 +1165,9 @@ export default function CreateBillScreen({ route }) {
 
           <Text style={styles.total}>Subtotal: {fmt(subtotal)}</Text>
           {gstEnabled && <Text style={styles.total}>GST ({gstPercent}%): {fmt(gstAmount)}</Text>}
-          {discountValue > 0 && <Text style={styles.total}>Discount: {fmt(discountValue)}</Text>}
+          {manualDiscountValue > 0 && <Text style={styles.total}>Discount: -{fmt(manualDiscountValue)}</Text>}
+          {couponDiscount > 0 && <Text style={styles.couponDiscountLine}>Coupon: -{fmt(couponDiscount)}</Text>}
+          {discountValue > 0 && <Text style={styles.total}>Total discount: -{fmt(discountValue)}</Text>}
           <Text style={styles.total}>Payable: {fmt(payableTotal)}</Text>
           {loyaltyPts > 0 && (
             <Text style={styles.loyaltyPts}>+{loyaltyPts} pts will be earned</Text>
@@ -1132,6 +1350,43 @@ export default function CreateBillScreen({ route }) {
               </View>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Held Drafts Modal */}
+      <Modal transparent visible={showHeldPanel} animationType="slide" onRequestClose={() => setShowHeldPanel(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.heldModal]}>
+            <View style={styles.heldModalHeader}>
+              <Text style={styles.heldModalTitle}>⏸ Held Bills ({heldDrafts.length})</Text>
+              <Pressable onPress={() => setShowHeldPanel(false)}>
+                <Text style={styles.heldModalClose}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {heldDrafts.length === 0 ? (
+                <Text style={styles.heldEmptyText}>No held bills</Text>
+              ) : (
+                heldDrafts.map(draft => (
+                  <Pressable
+                    key={draft.draft_id}
+                    style={styles.heldDraftCard}
+                    onPress={() => restoreFromDraft(draft)}
+                  >
+                    <View style={styles.heldDraftRow}>
+                      <Text style={styles.heldDraftNumber}>{draft.draft_number}</Text>
+                      <Text style={styles.heldDraftCount}>{draft.items?.length || 0} item{draft.items?.length !== 1 ? "s" : ""}</Text>
+                    </View>
+                    <Text style={styles.heldDraftName}>{draft.customer_name || "—"}</Text>
+                    {draft.mobile && draft.mobile !== "9999999999" && (
+                      <Text style={styles.heldDraftMobile}>{draft.mobile}</Text>
+                    )}
+                    <Text style={styles.heldDraftAmount}>₹{Number(draft.discounted_amt || 0).toFixed(0)}</Text>
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </View>
         </View>
       </Modal>
 
@@ -1409,4 +1664,95 @@ const styles = StyleSheet.create({
   weightModalConfirm: { backgroundColor: "#0b57d0" },
   weightModalCancelText: { color: "#334155", fontWeight: "700" },
   weightModalConfirmText: { color: "#fff", fontWeight: "700" },
+  // ── Stock badge ────────────────────────────────────────────────────────────
+  stockBadge: { marginTop: 3, fontSize: 10, fontWeight: "600", color: "#047857" },
+  stockBadgeOut: { color: "#dc2626" },
+  // ── Held drafts banner ─────────────────────────────────────────────────────
+  heldBanner: { backgroundColor: "#b45309", padding: 10, alignItems: "center" },
+  heldBannerText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  // ── Held drafts modal ──────────────────────────────────────────────────────
+  heldModal: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    overflow: "hidden",
+  },
+  heldModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fffbeb",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#fde68a",
+  },
+  heldModalTitle: { fontSize: 15, fontWeight: "800", color: "#92400e" },
+  heldModalClose: { fontSize: 18, fontWeight: "700", color: "#92400e", paddingHorizontal: 4 },
+  heldEmptyText: { textAlign: "center", color: "#94a3b8", fontSize: 13, padding: 20 },
+  heldDraftCard: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#fef3c7",
+    backgroundColor: "#fff",
+  },
+  heldDraftRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
+  heldDraftNumber: { fontSize: 12, fontWeight: "800", color: "#b45309" },
+  heldDraftCount: { fontSize: 11, color: "#94a3b8" },
+  heldDraftName: { fontSize: 13, fontWeight: "600", color: "#0b1220" },
+  heldDraftMobile: { fontSize: 11, color: "#64748b", marginTop: 1 },
+  heldDraftAmount: { fontSize: 13, fontWeight: "800", color: "#0b57d0", marginTop: 4 },
+  // ── Price level ────────────────────────────────────────────────────────────
+  priceLevelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  priceLevelLabel: { fontSize: 12, fontWeight: "700", color: "#475569", flexShrink: 0 },
+  priceLevelBtn: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 6,
+    backgroundColor: "#fff",
+  },
+  priceLevelBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  priceLevelTxt: { fontSize: 11, fontWeight: "700", color: "#334155" },
+  priceLevelTxtActive: { color: "#fff" },
+  // ── Coupon ─────────────────────────────────────────────────────────────────
+  couponRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  couponApplyBtn: {
+    backgroundColor: "#0b57d0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  couponApplyTxt: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  couponClearBtn: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: "#f8fafc",
+  },
+  couponClearTxt: { color: "#64748b", fontWeight: "700", fontSize: 12 },
+  couponMsg: { fontSize: 11, fontWeight: "600", color: "#dc2626", marginTop: 2 },
+  couponMsgSuccess: { color: "#047857" },
+  couponDiscountLine: { fontSize: 14, fontWeight: "700", color: "#047857", textAlign: "right" },
+  // ── Discount type toggle ───────────────────────────────────────────────────
+  discountRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  discTypeBtn: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    flexShrink: 0,
+  },
+  discTypeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  discTypeTxt: { fontSize: 11, fontWeight: "700", color: "#334155" },
+  discTypeTxtActive: { color: "#fff" },
 });
