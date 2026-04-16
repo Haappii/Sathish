@@ -9,6 +9,9 @@ import { isHotelShop } from "../utils/shopType";
 
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES = ["cash", "card", "upi"];
+/** Returns "Category · TableName" when category is available, else just the table name */
+const tableLabel = (t) =>
+  t?.category_name ? `${t.category_name} · ${t.table_name}` : (t?.table_name || "");
 const toAmount = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -593,7 +596,7 @@ export default function TableGrid() {
                           <div className={`text-sm font-bold truncate ${
                             isOccupied ? "text-orange-700" : isPaid ? "text-green-700" : "text-indigo-700"
                           }`}>
-                            {t.table_name}
+                            {t.category_name && <span className="font-normal opacity-70">{t.category_name} · </span>}{t.table_name}
                           </div>
                           <div className="text-[10px] text-gray-500">
                             {t.capacity} seats
@@ -652,6 +655,7 @@ export default function TableGrid() {
                                   setTransfering({
                                     from_table_id: t.table_id,
                                     from_table_name: t.table_name,
+                                    from_table_label: tableLabel(t),
                                   });
                                 }}
                                 className="flex-1 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[11px] text-indigo-700 font-semibold"
@@ -685,7 +689,7 @@ export default function TableGrid() {
             <div className="flex items-center justify-between px-5 py-3.5 border-b">
               <div>
                 <div className="font-semibold text-gray-800 text-sm">Transfer Table</div>
-                <div className="text-[11px] text-gray-400">From: {transfering.from_table_name}</div>
+                <div className="text-[11px] text-gray-400">From: {transfering.from_table_label || transfering.from_table_name}</div>
               </div>
               <button
                 onClick={() => setTransfering(null)}
@@ -705,7 +709,7 @@ export default function TableGrid() {
                   .filter((x) => Number(x.table_id) !== Number(transfering.from_table_id) && !x.order_id)
                   .map((x) => (
                     <option key={x.table_id} value={String(x.table_id)}>
-                      {x.table_name}
+                      {tableLabel(x)}
                     </option>
                   ))}
               </select>
@@ -740,7 +744,7 @@ export default function TableGrid() {
             <div className="flex items-center justify-between px-5 py-3.5 border-b">
               <div>
                 <div className="font-semibold text-gray-800 text-sm">Complete Order</div>
-                <div className="text-[11px] text-gray-400">Table: {confirming.table?.table_name}</div>
+                <div className="text-[11px] text-gray-400">Table: {tableLabel(confirming.table)}</div>
               </div>
               <button
                 onClick={() => setConfirming(null)}

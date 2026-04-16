@@ -311,6 +311,10 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
         "service_charge_gst_percent": float(getattr(branch, "service_charge_gst_percent", 0) or 0),
         "feedback_qr_enabled": False if feedback_qr_enabled is False else True,
         "print_logo_enabled": False if print_logo_enabled is False else True,
+        "upi_id": getattr(branch, "upi_id", None) or None,
+        "upi_id_2": getattr(branch, "upi_id_2", None) or None,
+        "upi_id_3": getattr(branch, "upi_id_3", None) or None,
+        "upi_id_4": getattr(branch, "upi_id_4", None) or None,
     }
 
     out.update(_read_branch_discount_from_params(pmap, bid))

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import QRCode from "qrcode";
 
 import authAxios from "../api/authAxios";
 import { useToast } from "../components/Toast";
@@ -187,6 +188,8 @@ export default function AdvanceOrders() {
   const [collectDue, setCollectDue] = useState(null); // { order, amount, payment_mode, mark_completed }
   const [collectingDue, setCollectingDue] = useState(false);
   const [shopInfo, setShopInfo] = useState({});
+  const [branchInfo, setBranchInfo] = useState({});
+  const [collectUpiQrList, setCollectUpiQrList] = useState([]); // [{upiId, dataUrl}]
   const [itemCatalog, setItemCatalog] = useState([]);
   const [itemSearch, setItemSearch] = useState("");
 
@@ -211,14 +214,22 @@ export default function AdvanceOrders() {
     let mounted = true;
     (async () => {
       try {
-        const res = await authAxios.get("/shop/details");
-        if (mounted) setShopInfo(res?.data || {});
+        const [shopRes, branchRes] = await Promise.all([
+          authAxios.get("/shop/details"),
+          session?.branch_id
+            ? authAxios.get(`/branch/${session.branch_id}`).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        if (mounted) {
+          setShopInfo(shopRes?.data || {});
+          setBranchInfo(branchRes?.data || {});
+        }
       } catch {
         if (mounted) setShopInfo({});
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let mounted = true;
@@ -234,6 +245,28 @@ export default function AdvanceOrders() {
     })();
     return () => { mounted = false; };
   }, []);
+
+  /* Generate UPI QR codes when UPI is selected in the Collect Due modal */
+  useEffect(() => {
+    if (!collectDue || collectDue.payment_mode !== "UPI") {
+      setCollectUpiQrList([]);
+      return;
+    }
+    const ids = [branchInfo?.upi_id, branchInfo?.upi_id_2, branchInfo?.upi_id_3, branchInfo?.upi_id_4]
+      .map(id => String(id || "").trim()).filter(Boolean);
+    if (ids.length === 0 && shopInfo?.upi_id) ids.push(String(shopInfo.upi_id).trim());
+    if (ids.length === 0) { setCollectUpiQrList([]); return; }
+    const payeeName = encodeURIComponent(shopInfo?.shop_name || "Shop");
+    const amount = Number(collectDue.amount || 0).toFixed(2);
+    Promise.all(
+      ids.map(upiId =>
+        QRCode.toDataURL(
+          `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${payeeName}&am=${amount}&cu=INR`,
+          { width: 200, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } }
+        ).then(dataUrl => ({ upiId, dataUrl })).catch(() => ({ upiId, dataUrl: "" }))
+      )
+    ).then(results => setCollectUpiQrList(results));
+  }, [collectDue?.payment_mode, collectDue?.amount, branchInfo?.upi_id, branchInfo?.upi_id_2, branchInfo?.upi_id_3, branchInfo?.upi_id_4, shopInfo?.upi_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openCreate = () => {
     setEditId(null);
@@ -792,6 +825,27 @@ export default function AdvanceOrders() {
                   {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
+              {collectDue.payment_mode === "UPI" && (
+                <div className="mt-1">
+                  {collectUpiQrList.length > 0 ? (
+                    <div className={`flex gap-3 ${collectUpiQrList.length > 1 ? "overflow-x-auto pb-1" : "justify-center"}`}>
+                      {collectUpiQrList.map(({ upiId, dataUrl }) => (
+                        <div key={upiId} className="flex flex-col items-center gap-1 flex-shrink-0">
+                          {dataUrl
+                            ? <img src={dataUrl} alt={`UPI QR ${upiId}`} className="w-36 h-36 rounded-xl border border-gray-200 shadow-sm" />
+                            : <div className="w-36 h-36 bg-gray-100 rounded-xl flex items-center justify-center text-xs text-gray-400 animate-pulse">Generating…</div>
+                          }
+                          <p className="text-[10px] font-semibold text-gray-500 max-w-[144px] truncate">{upiId}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">
+                      ⚠️ No UPI ID configured for this branch.
+                    </p>
+                  )}
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"

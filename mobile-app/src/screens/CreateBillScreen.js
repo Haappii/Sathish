@@ -984,22 +984,40 @@ export default function CreateBillScreen({ route }) {
             <View style={styles.upiModal}>
               <Text style={styles.upiModalTitle}>UPI Payment</Text>
 
-              {shopDetails?.upi_id ? (
-                <View style={styles.upiQrWrap}>
-                  <QRCode
-                    value={`upi://pay?pa=${encodeURIComponent(shopDetails.upi_id)}&pn=${encodeURIComponent(shopName)}&am=${payableTotal.toFixed(2)}&cu=INR`}
-                    size={170}
-                    backgroundColor="#ffffff"
-                    color="#0b1220"
-                  />
-                  <Text style={styles.upiIdLabel}>{shopDetails.upi_id}</Text>
-                  <Text style={styles.upiAmtLabel}>Amount: {fmt(payableTotal)}</Text>
-                </View>
-              ) : (
-                <View style={styles.upiNoId}>
-                  <Text style={styles.upiNoIdText}>No UPI ID configured in shop settings.</Text>
-                </View>
-              )}
+              {(() => {
+                const upiIds = [
+                  branchDetails?.upi_id,
+                  branchDetails?.upi_id_2,
+                  branchDetails?.upi_id_3,
+                  branchDetails?.upi_id_4,
+                ]
+                  .map(id => String(id || "").trim())
+                  .filter(Boolean);
+                if (upiIds.length === 0 && shopDetails?.upi_id) upiIds.push(String(shopDetails.upi_id).trim());
+                if (upiIds.length === 0) {
+                  return (
+                    <View style={styles.upiNoId}>
+                      <Text style={styles.upiNoIdText}>No UPI ID configured for this branch.</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 4 }}>
+                    {upiIds.map((upiId) => (
+                      <View key={upiId} style={styles.upiQrWrap}>
+                        <QRCode
+                          value={`upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${payableTotal.toFixed(2)}&cu=INR`}
+                          size={150}
+                          backgroundColor="#ffffff"
+                          color="#0b1220"
+                        />
+                        <Text style={styles.upiIdLabel}>{upiId}</Text>
+                        <Text style={styles.upiAmtLabel}>Amount: {fmt(payableTotal)}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                );
+              })()}
 
               <Text style={styles.upiFieldLabel}>Customer Name</Text>
               <TextInput

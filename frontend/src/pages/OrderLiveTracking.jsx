@@ -19,6 +19,13 @@ const STATUS_TONE = {
   AWAITING_KOT: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
+const SUMMARY_STATUSES = [
+  { key: "ORDER_PLACED",    label: "Order Placed",    tone: "bg-sky-50 text-sky-700 border-sky-200",         dot: "bg-sky-500" },
+  { key: "ORDER_PREPARING", label: "Order Preparing", tone: "bg-amber-50 text-amber-700 border-amber-200",   dot: "bg-amber-500" },
+  { key: "FOOD_PREPARED",   label: "Food Prepared",   tone: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+  { key: "MOVED_TO_TABLE",  label: "Moved To Table",  tone: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500" },
+];
+
 export default function OrderLiveTracking() {
   const { showToast } = useToast();
 
@@ -26,6 +33,7 @@ export default function OrderLiveTracking() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState("");
+  const [activeTab, setActiveTab] = useState("live");
 
   const load = async ({ silent = false } = {}) => {
     if (!silent) setRefreshing(true);
@@ -89,6 +97,24 @@ export default function OrderLiveTracking() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Tab toggles */}
+          <div className="flex rounded-xl border bg-white overflow-hidden text-[12px] font-semibold">
+            {["live", "summary"].map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 capitalize transition ${
+                  activeTab === tab
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {tab === "live" ? "Live Board" : "Summary"}
+              </button>
+            ))}
+          </div>
+
           {lastRefresh && (
             <span className="rounded-xl border bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500">
               Updated {lastRefresh}
@@ -120,7 +146,81 @@ export default function OrderLiveTracking() {
             Generate KOT from a table order to start live tracking here.
           </p>
         </div>
+      ) : activeTab === "summary" ? (
+        /* ── Summary Tab ── */
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {SUMMARY_STATUSES.map(({ key, label, tone, dot }) => {
+            const group = rows.filter(
+              (r) => String(r.status || "").toUpperCase() === key
+            );
+            const totalItems = group.reduce(
+              (acc, r) => acc + (r.items || []).length,
+              0
+            );
+            return (
+              <div key={key} className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+                {/* Status header */}
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${tone}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${dot}`} />
+                    <span className="text-xs font-bold">{label}</span>
+                  </div>
+                  <span className="text-lg font-extrabold">{group.length}</span>
+                </div>
+
+                {/* Totals strip */}
+                <div className="flex items-center gap-1 px-4 py-2 border-b bg-slate-50">
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Total items:
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-700">{totalItems}</span>
+                </div>
+
+                {/* Order list */}
+                {group.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-[11px] text-slate-400">
+                    No orders
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {group.map((row) => {
+                      const itemCount = (row.items || []).length;
+                      return (
+                        <li key={row.order_id} className="px-4 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-semibold text-slate-800 truncate">
+                              {getTrackingDisplayTitle({
+                                tableName: row.table_name,
+                                orderType: row.order_type,
+                                tokenNumber: row.token_number,
+                                orderId: row.order_id,
+                              })}
+                            </span>
+                            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                              {itemCount} item{itemCount !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {(row.items || []).map((item) => (
+                              <span
+                                key={item.order_item_id}
+                                className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                              >
+                                {item.item_name || "Item"}
+                              </span>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        /* ── Live Board Tab ── */
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {rows.map((row) => {
             const statusLabel = formatTrackingStatusLabel(

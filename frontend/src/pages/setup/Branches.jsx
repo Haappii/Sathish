@@ -83,6 +83,10 @@ export default function Branches() {
       zomato_status_sync_token: "",
       swiggy_status_sync_secret: "",
       zomato_status_sync_secret: "",
+      upi_id: "",
+      upi_id_2: "",
+      upi_id_3: "",
+      upi_id_4: "",
     }),
     []
   );
@@ -117,6 +121,10 @@ export default function Branches() {
         service_charge_required: normalizedServiceChargeRequired,
         service_charge_amount: rawServiceChargeAmount,
         loyalty_points_percentage: Number(branch?.loyalty_points_percentage || 0),
+        upi_id: branch?.upi_id || "",
+        upi_id_2: branch?.upi_id_2 || "",
+        upi_id_3: branch?.upi_id_3 || "",
+        upi_id_4: branch?.upi_id_4 || "",
         swiggy_enabled: Boolean(branch?.swiggy_enabled),
         zomato_enabled: Boolean(branch?.zomato_enabled),
         online_orders_auto_accept: Boolean(branch?.online_orders_auto_accept),
@@ -642,6 +650,51 @@ export default function Branches() {
                 )}
               </FormSection>
             )}
+
+            {/* UPI Payment */}
+            <FormSection
+              icon={<span className="text-sm font-bold">₹</span>}
+              title="UPI Payment"
+              subtitle="Add up to 4 UPI IDs — a separate QR code is generated for each at billing time"
+            >
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Primary UPI ID">
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. shopname@upi"
+                    value={form.upi_id || ""}
+                    onChange={(e) => setField("upi_id", e.target.value.trim())}
+                  />
+                </Field>
+                <Field label="UPI ID 2">
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. owner@okaxis"
+                    value={form.upi_id_2 || ""}
+                    onChange={(e) => setField("upi_id_2", e.target.value.trim())}
+                  />
+                </Field>
+                <Field label="UPI ID 3">
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. store@ybl"
+                    value={form.upi_id_3 || ""}
+                    onChange={(e) => setField("upi_id_3", e.target.value.trim())}
+                  />
+                </Field>
+                <Field label="UPI ID 4">
+                  <input
+                    className={inputClass}
+                    placeholder="e.g. billing@paytm"
+                    value={form.upi_id_4 || ""}
+                    onChange={(e) => setField("upi_id_4", e.target.value.trim())}
+                  />
+                </Field>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Leave unused fields blank. At checkout a QR code will be shown for each UPI ID added here.
+              </p>
+            </FormSection>
 
             {/* Online Orders */}
             <FormSection

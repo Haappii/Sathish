@@ -72,7 +72,7 @@ const [customer, setCustomer] = useState({
   const [giftCardCode, setGiftCardCode] = useState("");
   const [upiConfirmOpen, setUpiConfirmOpen] = useState(false);
   const [upiUtr, setUpiUtr] = useState("");
-  const [upiQrDataUrl, setUpiQrDataUrl] = useState("");
+  const [upiQrList, setUpiQrList] = useState([]); // [{upiId, dataUrl}]
   const selectedItemIds = useMemo(() => new Set(cart.map((c) => c.item_id)), [cart]);
 
   const paymentModeLabel = m => {
@@ -651,18 +651,40 @@ const [customer, setCustomer] = useState({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (paymentMode !== "upi" || splitEnabled) {
-      setUpiQrDataUrl("");
+      setUpiQrList([]);
       if (paymentMode !== "upi") { setUpiConfirmOpen(false); setUpiUtr(""); }
       return;
     }
-    if (shop?.upi_id) {
-      const upiString = `upi://pay?pa=${encodeURIComponent(shop.upi_id)}&pn=${encodeURIComponent(shop.shop_name || "Shop")}&am=${payable.toFixed(2)}&cu=INR`;
-      QRCode.toDataURL(upiString, { width: 220, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } })
-        .then(url => setUpiQrDataUrl(url))
-        .catch(() => setUpiQrDataUrl(""));
+    // Collect all non-empty UPI IDs from branch (fallback to shop-level primary)
+    const ids = [
+      branch?.upi_id,
+      branch?.upi_id_2,
+      branch?.upi_id_3,
+      branch?.upi_id_4,
+    ]
+      .map(id => String(id || "").trim())
+      .filter(Boolean);
+
+    if (ids.length === 0 && shop?.upi_id) ids.push(String(shop.upi_id).trim());
+
+    if (ids.length > 0) {
+      const payeeName = encodeURIComponent(shop?.shop_name || "Shop");
+      const amount = payable.toFixed(2);
+      Promise.all(
+        ids.map(upiId =>
+          QRCode.toDataURL(
+            `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${payeeName}&am=${amount}&cu=INR`,
+            { width: 220, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } }
+          )
+            .then(dataUrl => ({ upiId, dataUrl }))
+            .catch(() => ({ upiId, dataUrl: "" }))
+        )
+      ).then(results => setUpiQrList(results));
+    } else {
+      setUpiQrList([]);
     }
     setUpiConfirmOpen(true);
-  }, [paymentMode, splitEnabled, shop?.upi_id, payable]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [paymentMode, splitEnabled, branch?.upi_id, branch?.upi_id_2, branch?.upi_id_3, branch?.upi_id_4, shop?.upi_id, payable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------------- PRINT ---------------- */
   const generateBillText = invoiceNo => {
@@ -1665,22 +1687,24 @@ const [customer, setCustomer] = useState({
                   </div>
 
                   <div className="p-5 space-y-4">
-                    {/* QR code */}
-                    <div className="flex flex-col items-center gap-2">
-                      {shop?.upi_id ? (
-                        <>
-                          {upiQrDataUrl
-                            ? <img src={upiQrDataUrl} alt="UPI QR" className="w-44 h-44 rounded-xl border border-gray-200 shadow-sm" />
-                            : <div className="w-44 h-44 bg-gray-100 rounded-xl flex items-center justify-center text-xs text-gray-400 animate-pulse">Generating QR…</div>
-                          }
-                          <p className="text-[11px] font-semibold text-gray-500">{shop.upi_id}</p>
-                        </>
-                      ) : (
-                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center w-full">
-                          ⚠️ No UPI ID configured in Shop Settings.
-                        </p>
-                      )}
-                    </div>
+                    {/* QR codes — one per UPI ID */}
+                    {upiQrList.length > 0 ? (
+                      <div className={`flex gap-4 ${upiQrList.length > 1 ? "overflow-x-auto pb-1" : "justify-center"}`}>
+                        {upiQrList.map(({ upiId, dataUrl }) => (
+                          <div key={upiId} className="flex flex-col items-center gap-1 flex-shrink-0">
+                            {dataUrl
+                              ? <img src={dataUrl} alt={`UPI QR ${upiId}`} className="w-40 h-40 rounded-xl border border-gray-200 shadow-sm" />
+                              : <div className="w-40 h-40 bg-gray-100 rounded-xl flex items-center justify-center text-xs text-gray-400 animate-pulse">Generating…</div>
+                            }
+                            <p className="text-[10px] font-semibold text-gray-500 max-w-[160px] truncate">{upiId}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center w-full">
+                        ⚠️ No UPI ID configured for this branch.
+                      </p>
+                    )}
 
                     {/* Fields */}
                     <div className="space-y-2.5">

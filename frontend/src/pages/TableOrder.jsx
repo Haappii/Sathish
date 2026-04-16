@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState, useRef } from "react";
+import QRCode from "qrcode";
 import api from "../utils/apiClient";
 import { API_BASE } from "../config/api";
 import { useToast } from "../components/Toast";
@@ -14,6 +15,9 @@ import appLogo from "../assets/app_logo.png";
 
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES = ["cash", "card", "upi"];
+/** Returns "Category · TableName" when category is available, else just the table name */
+const tableLabel = (t) =>
+  t?.category_name ? `${t.category_name} · ${t.table_name}` : (t?.table_name || "");
 const toAmount = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -51,6 +55,7 @@ export default function TableOrder() {
   const [paymentMode, setPaymentMode] = useState("cash");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [split, setSplit] = useState({ cash: "", card: "", upi: "" });
+  const [upiQrList, setUpiQrList] = useState([]); // [{upiId, dataUrl}]
   const [showTotals, setShowTotals] = useState(false);
   const [cartBusy, setCartBusy] = useState(false);
   const [tables, setTables] = useState([]);
@@ -723,6 +728,25 @@ export default function TableOrder() {
     Number(split.card || 0) +
     Number(split.upi || 0);
 
+  /* UPI QR generation */
+  useEffect(() => {
+    if (paymentMode !== "upi" || splitEnabled) { setUpiQrList([]); return; }
+    const ids = [branch?.upi_id, branch?.upi_id_2, branch?.upi_id_3, branch?.upi_id_4]
+      .map(id => String(id || "").trim()).filter(Boolean);
+    if (ids.length === 0 && shop?.upi_id) ids.push(String(shop.upi_id).trim());
+    if (ids.length === 0) { setUpiQrList([]); return; }
+    const payeeName = encodeURIComponent(shop?.shop_name || "Shop");
+    const amount = payableTotal.toFixed(2);
+    Promise.all(
+      ids.map(upiId =>
+        QRCode.toDataURL(
+          `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${payeeName}&am=${amount}&cu=INR`,
+          { width: 200, margin: 2, color: { dark: "#0b1220", light: "#ffffff" } }
+        ).then(dataUrl => ({ upiId, dataUrl })).catch(() => ({ upiId, dataUrl: "" }))
+      )
+    ).then(results => setUpiQrList(results));
+  }, [paymentMode, splitEnabled, branch?.upi_id, branch?.upi_id_2, branch?.upi_id_3, branch?.upi_id_4, shop?.upi_id, payableTotal]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (hotelAllowed === false) {
     return (
       <div className="mt-10 text-center space-y-3">
@@ -773,7 +797,7 @@ export default function TableOrder() {
             ← Back
           </button>
           <span className="text-sm font-bold text-gray-700 hidden sm:block">
-            {tableName ? `Table: ${tableName}` : "Table Order"}
+            {tableName ? `Table: ${tableLabel(tables.find(t => String(t.table_id) === String(tableId)) || { table_name: tableName })}` : "Table Order"}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -1046,21 +1070,44 @@ export default function TableOrder() {
               </label>
             </div>
             {!splitEnabled && (
-              <div className="flex flex-wrap gap-1">
-                {PAYMENT_MODES.map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setPaymentMode(m)}
-                    className={`px-2 py-1 rounded-lg border text-[10px] font-bold transition ${
-                      paymentMode === m
-                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                    }`}
-                  >
-                    {m.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="flex flex-wrap gap-1">
+                  {PAYMENT_MODES.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setPaymentMode(m)}
+                      className={`px-2 py-1 rounded-lg border text-[10px] font-bold transition ${
+                        paymentMode === m
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                      }`}
+                    >
+                      {m.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                {paymentMode === "upi" && (
+                  <div className="mt-2">
+                    {upiQrList.length > 0 ? (
+                      <div className={`flex gap-3 ${upiQrList.length > 1 ? "overflow-x-auto pb-1" : "justify-center"}`}>
+                        {upiQrList.map(({ upiId, dataUrl }) => (
+                          <div key={upiId} className="flex flex-col items-center gap-1 flex-shrink-0">
+                            {dataUrl
+                              ? <img src={dataUrl} alt={`UPI QR ${upiId}`} className="w-32 h-32 rounded-lg border border-gray-200 shadow-sm" />
+                              : <div className="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-400 animate-pulse">Generating…</div>
+                            }
+                            <p className="text-[9px] font-semibold text-gray-500 max-w-[128px] truncate">{upiId}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-center">
+                        ⚠️ No UPI ID configured for this branch.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
             {splitEnabled && (
               <>
@@ -1189,7 +1236,7 @@ export default function TableOrder() {
                   .filter((t) => Number(t.table_id) !== Number(tableId) && !t.order_id)
                   .map((t) => (
                     <option key={t.table_id} value={String(t.table_id)}>
-                      {t.table_name}
+                      {tableLabel(t)}
                     </option>
                   ))}
               </select>

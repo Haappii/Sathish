@@ -30,6 +30,12 @@ class BranchBase(BaseModel):
     invoice_whatsapp_enabled: Optional[bool] = False
     invoice_whatsapp_country_code: Optional[str] = "91"
 
+    # Optional: UPI payment IDs (stored directly on branch row)
+    upi_id: Optional[str] = None
+    upi_id_2: Optional[str] = None
+    upi_id_3: Optional[str] = None
+    upi_id_4: Optional[str] = None
+
     # Optional: service charge (stored directly on branch row)
     service_charge_required: Optional[bool] = False
     service_charge_amount: Optional[float] = 0
