@@ -552,7 +552,7 @@ def create_invoice(
         if is_hotel:
             for ing_item_id, req_qty in recipe_requirements.items():
                 available = get_stock(db, user.shop_id, ing_item_id, branch_id)
-                if available < int(req_qty or 0):
+                if available < (req_qty or 0):
                     raise HTTPException(
                         400,
                         f"Insufficient raw material stock for item {ing_item_id} (required {req_qty}, available {available})",
@@ -669,7 +669,7 @@ def create_invoice(
                 user.shop_id,
                 ing_item_id,
                 branch_id,
-                int(req_qty),
+                float(req_qty),
                 "REMOVE",
                 ref_no=invoice.invoice_number,
             )
@@ -921,7 +921,7 @@ def modify_invoice(
                 user.shop_id,
                 ing_item_id,
                 invoice.branch_id,
-                int(qty),
+                float(qty),
                 "ADD",
                 ref_no=f"MOD-OLD-{invoice.invoice_number}",
             )
@@ -963,7 +963,7 @@ def modify_invoice(
     if inv_enabled and is_hotel:
         for ing_item_id, req_qty in new_recipe_requirements.items():
             available = get_stock(db, user.shop_id, ing_item_id, invoice.branch_id)
-            if available < int(req_qty or 0):
+            if available < (req_qty or 0):
                 raise HTTPException(
                     400,
                     f"Insufficient raw material stock for item {ing_item_id} (required {req_qty}, available {available})",
@@ -997,7 +997,7 @@ def modify_invoice(
                 user.shop_id,
                 ing_item_id,
                 invoice.branch_id,
-                int(qty),
+                float(qty),
                 "REMOVE",
                 ref_no=f"MOD-NEW-{invoice.invoice_number}",
             )
@@ -1208,7 +1208,7 @@ def delete_invoice(
                 user.shop_id,
                 ing_item_id,
                 invoice.branch_id,
-                int(qty),
+                float(qty),
                 "ADD",
                 ref_no=f"DEL-{invoice.invoice_id}"
             )
