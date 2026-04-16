@@ -491,6 +491,18 @@ export default function CreateBillScreen({ route }) {
           const checkoutRes = await api.post(`/table-billing/order/checkout/${routeOrderId}`, checkoutPayload);
           invoiceNo = String(checkoutRes?.data?.invoice_number || "").trim();
         } else if (isHotelFlow) {
+          // For HOLD in hotel takeaway — save as draft invoice (same as non-hotel)
+          if (action === BILL_ACTIONS.HOLD) {
+            const draftRes = await api.post("/invoice/draft/", payload);
+            const draftNumber = String(draftRes?.data?.draft_number || "").trim();
+            Alert.alert(
+              "Bill Held",
+              `Draft: ${draftNumber || "-"}\nFind it in Held Invoices to process or cancel.`
+            );
+            resetForm();
+            return;
+          }
+
           const takeawayRes = await api.post("/table-billing/takeaway", {
             customer_name: payload.customer_name,
             mobile: payload.mobile,
@@ -505,15 +517,6 @@ export default function CreateBillScreen({ route }) {
 
           sourceOrderId = Number(takeawayRes?.data?.order_id || 0) || null;
           kotToken = String(takeawayRes?.data?.token_number || "").trim();
-
-          if (action === BILL_ACTIONS.HOLD) {
-            Alert.alert(
-              "Hold Saved",
-              `Token: ${kotToken || "-"}\nOrder: #${sourceOrderId || "-"}\nYou can complete or cancel this hold bill from Home.`
-            );
-            resetForm();
-            return;
-          }
 
           const kotRes = await api.post(`/kot/create/${sourceOrderId}`);
           kotToken =
