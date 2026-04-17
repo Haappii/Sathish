@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, session } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const child_process = require("child_process");
@@ -449,6 +449,10 @@ function createWindow(targetUrl, offlineUrl, serverUrl) {
   let triedOffline = false;
 
   win.once("ready-to-show", () => win.show());
+  win.setMenuBarVisibility(false);
+  win.webContents.on("did-finish-load", function () {
+    if (!win.isDestroyed()) win.webContents.executeJavaScript(getTitleBarScript()).catch(function () {});
+  });
   win.webContents.on("did-fail-load", (_evt, code, description, validatedUrl) => {
     if (!triedOffline && offlineUrl) {
       triedOffline = true;
@@ -486,6 +490,130 @@ function createWindow(targetUrl, offlineUrl, serverUrl) {
 
   return win;
 }
+
+function buildViewMenu() {
+  return Menu.buildFromTemplate([
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+  ]);
+}
+
+function getTitleBarScript() {
+  return `
+(function() {
+  if (document.getElementById('poss-titlebar')) return;
+  var bar = document.createElement('div');
+  bar.id = 'poss-titlebar';
+  var drag = document.createElement('div');
+  drag.className = 'ptb-drag';
+  var brand = document.createElement('div');
+  brand.className = 'ptb-brand';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '16'); svg.setAttribute('height', '16'); svg.setAttribute('viewBox', '0 0 24 24');
+  var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('width', '24'); rect.setAttribute('height', '24'); rect.setAttribute('rx', '5'); rect.setAttribute('fill', '#7c3aed');
+  var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  txt.setAttribute('x', '12'); txt.setAttribute('y', '17'); txt.setAttribute('text-anchor', 'middle');
+  txt.setAttribute('fill', 'white'); txt.setAttribute('font-size', '13'); txt.setAttribute('font-weight', 'bold');
+  txt.setAttribute('font-family', 'sans-serif'); txt.textContent = 'H';
+  svg.appendChild(rect); svg.appendChild(txt);
+  var brandName = document.createElement('span');
+  brandName.className = 'ptb-brand-name';
+  brandName.textContent = 'Haappii Billing';
+  brand.appendChild(svg); brand.appendChild(brandName);
+  var nav = document.createElement('div');
+  nav.className = 'ptb-menu';
+  var viewBtn = document.createElement('div');
+  viewBtn.className = 'ptb-menu-item';
+  viewBtn.id = 'ptb-view-btn';
+  var viewLabel = document.createElement('span');
+  viewLabel.textContent = 'View';
+  var dd = document.createElement('div');
+  dd.className = 'ptb-dropdown';
+  var menuItems = [
+    {label: 'Reload', shortcut: 'Ctrl+R', action: 'reload'},
+    {label: 'Force Reload', shortcut: 'Ctrl+Shift+R', action: 'force-reload'},
+    {label: 'Toggle DevTools', shortcut: 'Ctrl+Shift+I', action: 'devtools'},
+    null,
+    {label: 'Zoom In', shortcut: 'Ctrl++', action: 'zoom-in'},
+    {label: 'Zoom Out', shortcut: 'Ctrl+-', action: 'zoom-out'},
+    {label: 'Reset Zoom', shortcut: 'Ctrl+0', action: 'zoom-reset'},
+    null,
+    {label: 'Toggle Fullscreen', shortcut: 'F11', action: 'fullscreen'}
+  ];
+  menuItems.forEach(function(item) {
+    if (!item) { var sep = document.createElement('div'); sep.className = 'ptb-separator'; dd.appendChild(sep); return; }
+    var el = document.createElement('div'); el.className = 'ptb-dd-item'; el.dataset.action = item.action;
+    var l = document.createElement('span'); l.textContent = item.label;
+    var s = document.createElement('span'); s.className = 'ptb-shortcut'; s.textContent = item.shortcut;
+    el.appendChild(l); el.appendChild(s); dd.appendChild(el);
+  });
+  viewBtn.appendChild(viewLabel); viewBtn.appendChild(dd);
+  nav.appendChild(viewBtn);
+  drag.appendChild(brand); drag.appendChild(nav);
+  bar.appendChild(drag);
+  var style = document.createElement('style');
+  style.id = 'poss-titlebar-style';
+  style.textContent = [
+    '#poss-titlebar{position:fixed;top:0;left:0;right:0;height:32px;z-index:999999;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;}',
+    '.ptb-drag{display:flex;align-items:center;height:100%;background:#0d1b35;border-bottom:1px solid rgba(99,155,255,0.15);-webkit-app-region:drag;padding:0 8px;gap:16px;}',
+    '.ptb-brand{display:flex;align-items:center;gap:6px;opacity:0.9;}',
+    '.ptb-brand-name{color:rgba(255,255,255,0.6);font-size:11px;font-weight:500;letter-spacing:0.3px;}',
+    '.ptb-menu{display:flex;align-items:center;-webkit-app-region:no-drag;}',
+    '.ptb-menu-item{position:relative;padding:0 10px;height:32px;display:flex;align-items:center;cursor:default;color:rgba(255,255,255,0.75);border-radius:4px;transition:background 0.1s;user-select:none;}',
+    '.ptb-menu-item:hover,.ptb-menu-item.active{background:rgba(255,255,255,0.1);color:#fff;}',
+    '.ptb-dropdown{display:none;position:absolute;top:32px;left:0;min-width:240px;background:#162040;border:1px solid rgba(99,155,255,0.2);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.4);padding:4px 0;z-index:1000000;}',
+    '.ptb-menu-item.active .ptb-dropdown{display:block;}',
+    '.ptb-dd-item{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;color:rgba(255,255,255,0.8);cursor:default;border-radius:4px;margin:0 4px;transition:background 0.1s;}',
+    '.ptb-dd-item:hover{background:rgba(99,155,255,0.15);color:#fff;}',
+    '.ptb-shortcut{color:rgba(255,255,255,0.35);font-size:10px;margin-left:24px;}',
+    '.ptb-separator{height:1px;background:rgba(99,155,255,0.12);margin:3px 8px;}',
+    'body{padding-top:32px!important;}'
+  ].join('');
+  if (!document.getElementById('poss-titlebar-style')) document.head.appendChild(style);
+  document.body.prepend(bar);
+  viewBtn.addEventListener('click', function(e) { e.stopPropagation(); viewBtn.classList.toggle('active'); });
+  document.addEventListener('click', function() { viewBtn.classList.remove('active'); }, true);
+  dd.addEventListener('click', function(e) {
+    var item = e.target.closest ? e.target.closest('.ptb-dd-item') : null;
+    if (!item) return;
+    e.stopPropagation();
+    var action = item.dataset.action;
+    viewBtn.classList.remove('active');
+    var api = window.electronAPI && window.electronAPI.titlebar;
+    if (api) {
+      if (action === 'reload') api.reload();
+      else if (action === 'force-reload') api.forceReload();
+      else if (action === 'devtools') api.toggleDevTools();
+      else if (action === 'zoom-in') api.zoomIn();
+      else if (action === 'zoom-out') api.zoomOut();
+      else if (action === 'zoom-reset') api.resetZoom();
+      else if (action === 'fullscreen') api.toggleFullscreen();
+    }
+  });
+})();
+`;
+}
+
+ipcMain.on("titlebar-reload", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.reload(); });
+ipcMain.on("titlebar-force-reload", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.reloadIgnoringCache(); });
+ipcMain.on("titlebar-zoom-in", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.setZoomLevel(w.webContents.getZoomLevel() + 0.5); });
+ipcMain.on("titlebar-zoom-out", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.setZoomLevel(Math.max(w.webContents.getZoomLevel() - 0.5, -3)); });
+ipcMain.on("titlebar-reset-zoom", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.setZoomLevel(0); });
+ipcMain.on("titlebar-toggle-fullscreen", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.setFullScreen(!w.isFullScreen()); });
+ipcMain.on("titlebar-toggle-devtools", function () { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.toggleDevTools(); });
 
 function getProtocolArg(argv = process.argv) {
   return (argv || []).find((a) => String(a || "").startsWith(`${PROTOCOL}://`)) || null;
@@ -895,6 +1023,8 @@ app.whenReady().then(async () => {
   if (!app.isDefaultProtocolClient(PROTOCOL)) {
     registerProtocolClient();
   }
+
+  Menu.setApplicationMenu(buildViewMenu());
 
   const initialTarget = toAbsoluteUrl(pendingProtocolUrl) || baseUrl;
   pendingProtocolUrl = null;

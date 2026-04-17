@@ -28,6 +28,10 @@ class Settings:
         if o.strip()
     ] or ["*"]
 
+    # AI — voice billing
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
     # Deployment environment: "production" triggers stricter checks.
     ENV: str = os.getenv("APP_ENV", "development").lower()
 

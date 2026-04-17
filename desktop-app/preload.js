@@ -31,6 +31,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   /** Check live reachability of the server (resolves to true/false). */
   checkOnline: () => ipcRenderer.invoke("is-server-reachable"),
 
+  /** Custom title bar — View menu actions. */
+  titlebar: {
+    reload:           () => ipcRenderer.send("titlebar-reload"),
+    forceReload:      () => ipcRenderer.send("titlebar-force-reload"),
+    zoomIn:           () => ipcRenderer.send("titlebar-zoom-in"),
+    zoomOut:          () => ipcRenderer.send("titlebar-zoom-out"),
+    resetZoom:        () => ipcRenderer.send("titlebar-reset-zoom"),
+    toggleFullscreen: () => ipcRenderer.send("titlebar-toggle-fullscreen"),
+    toggleDevTools:   () => ipcRenderer.send("titlebar-toggle-devtools"),
+  },
+
   /**
    * Silently print plain text (monospace) via main process.
    * Returns a promise that resolves true/false.
