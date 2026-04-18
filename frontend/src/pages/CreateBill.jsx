@@ -813,7 +813,7 @@ const [customer, setCustomer] = useState({
 
   const generateLogoHtml = async () => {
     if (branch?.print_logo_enabled === false) return "";
-    return `<img src="${appLogo}" alt="Logo" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
+    return `<img src="${appLogo}" alt="" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
   };
 
   const generateKOTText = (kotItems, invoiceNumber, customerName, categoryLabel = null) => {
@@ -835,12 +835,10 @@ const [customer, setCustomer] = useState({
     t += center("Date & Time") + "\n";
     t += center(buildBusinessDateTimeLabel(getBusinessDate(shop?.app_date))) + "\n";
     t += center("Take Away") + "\n";
+    if (categoryLabel) t += center(`[ ${categoryLabel} ]`) + "\n";
     t += line + "\n";
     t += `Invoice : ${invoiceNumber || "N/A"}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";
     t += `Customer: ${(customerName || "N/A").slice(0, 22)}`.padEnd(WIDTH) + "\n";
-    if (categoryLabel) {
-      t += `Category: ${categoryLabel.slice(0, 22)}`.padEnd(WIDTH) + "\n";
-    }
     t += line + "\n";
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
     t += line + "\n";
@@ -870,11 +868,16 @@ const [customer, setCustomer] = useState({
     const catIds = Object.keys(grouped);
     const multiCat = catIds.length > 1;
 
+    const [logoHtml, qrHtml] = await Promise.all([
+      generateLogoHtml(),
+      generateFeedbackQrHtml(invoiceNumber),
+    ]);
+
     for (const catId of catIds) {
       const label = multiCat ? (categoryNameById[catId] || catId) : null;
       const ok = await printDirectText(
         generateKOTText(grouped[catId], invoiceNumber, customerName, label),
-        { fontSize: 9, paperSize: branch?.paper_size || "58mm" }
+        { fontSize: 9, paperSize: branch?.paper_size || "58mm", headerHtml: logoHtml, extraHtml: qrHtml }
       );
       if (!ok) {
         showToast("Printing failed. Check printer/popup settings.", "error");

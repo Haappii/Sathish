@@ -478,7 +478,7 @@ export default function TableOrder() {
 
   const getLogoHtml = async () => {
     if (branch?.print_logo_enabled === false) return "";
-    return `<img src="${appLogo}" alt="Logo" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
+    return `<img src="${appLogo}" alt="" style="max-height:20mm;max-width:100%;display:block;margin:0 auto 2px;" />`;
   };
 
   const printInvoice = async invoiceNo => {
@@ -531,7 +531,7 @@ export default function TableOrder() {
     t += center(tableName ? `Table ${tableName}` : "Table Billing") + "\n";
     t += line + "\n";
     if (categoryLabel) {
-      t += `Category: ${categoryLabel.slice(0, 22)}`.padEnd(WIDTH) + "\n";
+      t += center(`[ ${categoryLabel} ]`) + "\n";
       t += line + "\n";
     }
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
@@ -575,11 +575,18 @@ export default function TableOrder() {
     const catIds = Object.keys(grouped);
     const multiCat = catIds.length > 1;
 
+    const [logoHtml, qrHtml] = await Promise.all([
+      getLogoHtml(),
+      getFeedbackQrHtml(null),
+    ]);
+
     for (const catId of catIds) {
       const label = multiCat ? (catNameMap[catId] || catId) : null;
       const ok = await printDirectText(generateKOTText(grouped[catId], label), {
         fontSize: 9,
         paperSize: branch?.paper_size || "58mm",
+        headerHtml: logoHtml,
+        extraHtml: qrHtml,
       });
       if (!ok) {
         showToast("Printing failed. Check printer/popup settings.", "error");
