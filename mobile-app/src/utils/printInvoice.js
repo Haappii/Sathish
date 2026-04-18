@@ -6,12 +6,10 @@ import { API_BASE, WEB_APP_BASE } from "../config/api";
 import { getPrinterSettings } from "./printerSettings";
 
 let nativePrinterModule = null;
-let nativeBtPrinterModule = null;
 
 function getNativePrinterModule() {
   if (nativePrinterModule) return nativePrinterModule;
   try {
-    // Lazy require avoids runtime crash if native module is unavailable in a build.
     const mod = require("react-native-esc-pos-printer");
     if (mod?.Printer && mod?.PrinterConstants && mod?.PrinterModelLang) {
       nativePrinterModule = mod;
@@ -23,18 +21,21 @@ function getNativePrinterModule() {
   }
 }
 
-function getBluetoothClassicModule() {
-  if (nativeBtPrinterModule) return nativeBtPrinterModule;
+async function requestBluetoothConnectPermission() {
+  if (Platform.OS !== "android" || Platform.Version < 31) return true;
   try {
-    const mod = require("react-native-bluetooth-classic");
-    const api = mod?.default ?? mod;
-    if (api?.connectToDevice) {
-      nativeBtPrinterModule = api;
-      return nativeBtPrinterModule;
-    }
-    return null;
+    const { PermissionsAndroid } = require("react-native");
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+      {
+        title: "Bluetooth Permission",
+        message: "Bluetooth access is required to print receipts.",
+        buttonPositive: "Allow",
+      }
+    );
+    return result === PermissionsAndroid.RESULTS.GRANTED;
   } catch {
-    return null;
+    return true;
   }
 }
 
@@ -150,6 +151,9 @@ async function sendToPrinter(html, options = {}) {
     options?.disableNative !== true;
 
   if (shouldUseNative) {
+    const nativeMod = getNativePrinterModule();
+    if (!nativeMod) throw new Error("Direct thermal module is not available in this build.");
+
     let target = String(options?.printerTarget || settings?.target || "").trim();
     if (!target) throw new Error("Direct thermal printing is enabled but printer target is not configured.");
 
@@ -158,52 +162,46 @@ async function sendToPrinter(html, options = {}) {
       target = `BT:${target}`;
     }
 
+    const validTarget = /^((TCP|BT):|[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9A-Fa-f:]{11,})/.test(target);
+    if (!validTarget) throw new Error("Printer target is invalid. Use format: BT:XX:XX:XX:XX:XX:XX or TCP:192.168.x.x");
+
     const payload = String(options?.nativeText || "");
     if (!payload) throw new Error("No printable payload available for native printer.");
 
-    // Bluetooth target → react-native-bluetooth-classic (works with any paired BT thermal printer)
+    // Request BLUETOOTH_CONNECT permission on Android 12+ before connecting
     if (/^BT:/i.test(target)) {
-      const btMod = getBluetoothClassicModule();
-      if (!btMod) throw new Error("Bluetooth Classic module is not available in this build.");
-      const mac = target.slice(3); // strip "BT:" → raw MAC
-      const device = await btMod.connectToDevice(mac);
-      try {
-        await device.write(payload);
-      } finally {
-        await device.disconnect().catch(() => {});
-      }
-      return;
+      const granted = await requestBluetoothConnectPermission();
+      if (!granted) throw new Error("Bluetooth permission denied. Please allow Bluetooth access in Settings.");
     }
 
-    // TCP/LAN target → Epson SDK (TM-series network printers)
-    if (/^TCP:/i.test(target)) {
-      const nativeMod = getNativePrinterModule();
-      if (!nativeMod) throw new Error("Epson printer module is not available in this build.");
-      const deviceName = String(
-        options?.printerDeviceName ||
-        settings?.deviceName ||
-        options?.branch?.printer_model ||
-        "TM-T88V"
-      ).trim();
-      const printer = new nativeMod.Printer({
-        target,
-        deviceName,
-        lang: nativeMod.PrinterModelLang.MODEL_ANK,
-      });
-      await printer.connect();
+    const deviceName = String(
+      options?.printerDeviceName ||
+      settings?.deviceName ||
+      options?.branch?.printer_model ||
+      "TM-T88V"
+    ).trim();
+
+    const printer = new nativeMod.Printer({
+      target,
+      deviceName,
+      lang: nativeMod.PrinterModelLang.MODEL_ANK,
+    });
+
+    await printer.connect();
+    try {
+      await printer.addTextAlign(nativeMod.PrinterConstants.ALIGN_LEFT);
+      await printer.addText(payload);
+      await printer.addFeedLine(3);
       try {
-        await printer.addTextAlign(nativeMod.PrinterConstants.ALIGN_LEFT);
-        await printer.addText(payload);
-        await printer.addFeedLine(3);
         await printer.addCut(nativeMod.PrinterConstants.CUT_FEED);
-        await printer.sendData();
-      } finally {
-        await printer.disconnect().catch(() => {});
+      } catch {
+        // Printer may not support auto-cut (e.g. mobile thermal printers without cutter)
       }
-      return;
+      await printer.sendData();
+    } finally {
+      await printer.disconnect().catch(() => {});
     }
-
-    throw new Error("Printer target is invalid. Use format: BT:XX:XX:XX:XX:XX:XX or TCP:192.168.x.x");
+    return;
   }
 
   const mergedOptions = {
