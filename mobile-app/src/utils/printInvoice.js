@@ -6,6 +6,7 @@ import { API_BASE, WEB_APP_BASE } from "../config/api";
 import { getPrinterSettings } from "./printerSettings";
 
 let nativePrinterModule = null;
+let nativeBtPrinterModule = null;
 
 function getNativePrinterModule() {
   if (nativePrinterModule) return nativePrinterModule;
@@ -15,6 +16,20 @@ function getNativePrinterModule() {
     if (mod?.Printer && mod?.PrinterConstants && mod?.PrinterModelLang) {
       nativePrinterModule = mod;
       return nativePrinterModule;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getBluetoothEscPosModule() {
+  if (nativeBtPrinterModule) return nativeBtPrinterModule;
+  try {
+    const mod = require("react-native-bluetooth-escpos-printer");
+    if (mod?.BluetoothManager && mod?.BluetoothEscposPrinter) {
+      nativeBtPrinterModule = mod;
+      return nativeBtPrinterModule;
     }
     return null;
   } catch {
@@ -132,12 +147,8 @@ async function sendToPrinter(html, options = {}) {
     Platform.OS === "android" &&
     Boolean(settings?.directThermalEnabled) &&
     options?.disableNative !== true;
-  if (shouldUseNative) {
-    const nativeMod = getNativePrinterModule();
-    if (!nativeMod) {
-      throw new Error("Direct thermal module is not available in this build.");
-    }
 
+  if (shouldUseNative) {
     let target = String(options?.printerTarget || settings?.target || "").trim();
     if (!target) throw new Error("Direct thermal printing is enabled but printer target is not configured.");
 
@@ -146,38 +157,54 @@ async function sendToPrinter(html, options = {}) {
       target = `BT:${target}`;
     }
 
-    const deviceName = String(
-      options?.printerDeviceName ||
-      settings?.deviceName ||
-      options?.branch?.printer_model ||
-      "TM-T88V"
-    ).trim();
-
     const payload = String(options?.nativeText || "");
     if (!payload) throw new Error("No printable payload available for native printer.");
 
-    const validTarget = /^((TCP|BT):|[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9A-Fa-f:]{11,})/.test(target);
-    if (!validTarget) {
-      throw new Error("Printer target is invalid. Use format: BT:XX:XX:XX:XX:XX:XX or TCP:192.168.x.x");
+    // Bluetooth target → generic ESC/POS (works with any paired BT thermal printer)
+    if (/^BT:/i.test(target)) {
+      const btMod = getBluetoothEscPosModule();
+      if (!btMod) throw new Error("Bluetooth ESC/POS module is not available in this build.");
+      const mac = target.slice(3); // strip "BT:" → raw MAC
+      await btMod.BluetoothManager.connect(mac);
+      await btMod.BluetoothEscposPrinter.printText(payload, {
+        encoding: "UTF8",
+        codepage: 0,
+        widthtimes: 0,
+        heigthtimes: 0,
+        fonttype: 1,
+      });
+      return;
     }
 
-    const printer = new nativeMod.Printer({
-      target,
-      deviceName,
-      lang: nativeMod.PrinterModelLang.MODEL_ANK,
-    });
-
-    await printer.connect();
-    try {
-      await printer.addTextAlign(nativeMod.PrinterConstants.ALIGN_LEFT);
-      await printer.addText(payload);
-      await printer.addFeedLine(3);
-      await printer.addCut(nativeMod.PrinterConstants.CUT_FEED);
-      await printer.sendData();
-    } finally {
-      await printer.disconnect().catch(() => {});
+    // TCP/LAN target → Epson SDK (TM-series network printers)
+    if (/^TCP:/i.test(target)) {
+      const nativeMod = getNativePrinterModule();
+      if (!nativeMod) throw new Error("Epson printer module is not available in this build.");
+      const deviceName = String(
+        options?.printerDeviceName ||
+        settings?.deviceName ||
+        options?.branch?.printer_model ||
+        "TM-T88V"
+      ).trim();
+      const printer = new nativeMod.Printer({
+        target,
+        deviceName,
+        lang: nativeMod.PrinterModelLang.MODEL_ANK,
+      });
+      await printer.connect();
+      try {
+        await printer.addTextAlign(nativeMod.PrinterConstants.ALIGN_LEFT);
+        await printer.addText(payload);
+        await printer.addFeedLine(3);
+        await printer.addCut(nativeMod.PrinterConstants.CUT_FEED);
+        await printer.sendData();
+      } finally {
+        await printer.disconnect().catch(() => {});
+      }
+      return;
     }
-    return;
+
+    throw new Error("Printer target is invalid. Use format: BT:XX:XX:XX:XX:XX:XX or TCP:192.168.x.x");
   }
 
   const mergedOptions = {
