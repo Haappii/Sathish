@@ -23,12 +23,13 @@ function getNativePrinterModule() {
   }
 }
 
-function getBluetoothEscPosModule() {
+function getBluetoothClassicModule() {
   if (nativeBtPrinterModule) return nativeBtPrinterModule;
   try {
-    const mod = require("react-native-bluetooth-escpos-printer");
-    if (mod?.BluetoothManager && mod?.BluetoothEscposPrinter) {
-      nativeBtPrinterModule = mod;
+    const mod = require("react-native-bluetooth-classic");
+    const api = mod?.default ?? mod;
+    if (api?.connectToDevice) {
+      nativeBtPrinterModule = api;
       return nativeBtPrinterModule;
     }
     return null;
@@ -160,19 +161,17 @@ async function sendToPrinter(html, options = {}) {
     const payload = String(options?.nativeText || "");
     if (!payload) throw new Error("No printable payload available for native printer.");
 
-    // Bluetooth target → generic ESC/POS (works with any paired BT thermal printer)
+    // Bluetooth target → react-native-bluetooth-classic (works with any paired BT thermal printer)
     if (/^BT:/i.test(target)) {
-      const btMod = getBluetoothEscPosModule();
-      if (!btMod) throw new Error("Bluetooth ESC/POS module is not available in this build.");
+      const btMod = getBluetoothClassicModule();
+      if (!btMod) throw new Error("Bluetooth Classic module is not available in this build.");
       const mac = target.slice(3); // strip "BT:" → raw MAC
-      await btMod.BluetoothManager.connect(mac);
-      await btMod.BluetoothEscposPrinter.printText(payload, {
-        encoding: "UTF8",
-        codepage: 0,
-        widthtimes: 0,
-        heigthtimes: 0,
-        fonttype: 1,
-      });
+      const device = await btMod.connectToDevice(mac);
+      try {
+        await device.write(payload);
+      } finally {
+        await device.disconnect().catch(() => {});
+      }
       return;
     }
 
