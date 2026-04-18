@@ -358,8 +358,17 @@ function buildReceiptText(invoice, { shop = {}, branch = {}, paperSize = "58mm",
       "\n";
   });
 
+  const split = (invoice?.payment_split && typeof invoice.payment_split === "object") ? invoice.payment_split : {};
+  const serviceCharge = Number(
+    invoice?.service_charge ?? invoice?.service_charge_amt ?? invoice?.service_charge_amount ??
+    split?.service_charge ?? split?.service_charge_amt ?? split?.service_charge_amount ?? 0
+  );
+  const serviceChargeGst = Number(split?.service_charge_gst ?? split?.service_charge_gst_amt ?? 0);
+
   t += `${line}\n`;
   t += rightKV("Subtotal", money(subtotal), WIDTH) + "\n";
+  if (serviceCharge > 0) t += rightKV("Service Charge", money(serviceCharge), WIDTH) + "\n";
+  if (serviceChargeGst > 0) t += rightKV("SC GST", money(serviceChargeGst), WIDTH) + "\n";
   if (Number(invoice?.tax_amt || 0) > 0) t += rightKV("GST", money(invoice?.tax_amt || 0), WIDTH) + "\n";
   if (Number(invoice?.discounted_amt || 0) > 0) t += rightKV("Discount", money(invoice?.discounted_amt || 0), WIDTH) + "\n";
   t += rightKV("Grand Total", money(invoice?.total_amount || 0), WIDTH) + "\n";

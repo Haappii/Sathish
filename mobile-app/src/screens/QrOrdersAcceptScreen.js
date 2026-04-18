@@ -12,6 +12,8 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
+import { printKotTokenSlip } from "../utils/printInvoice";
 
 function dt(value) {
   const d = new Date(value);
@@ -20,24 +22,36 @@ function dt(value) {
 }
 
 export default function QrOrdersAcceptScreen({ navigation }) {
+  const { session } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState({});
+  const [shopDetails, setShopDetails] = useState({});
+  const [branchDetails, setBranchDetails] = useState({});
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await api.get("/qr-orders/pending");
+      const branchPromise = session?.branch_id
+        ? api.get(`/branch/${session.branch_id}`).catch(() => null)
+        : Promise.resolve(null);
+      const [res, shopRes, branchRes] = await Promise.all([
+        api.get("/qr-orders/pending"),
+        api.get("/shop/details").catch(() => null),
+        branchPromise,
+      ]);
       setRows(Array.isArray(res?.data) ? res.data : []);
+      setShopDetails(shopRes?.data || {});
+      setBranchDetails(branchRes?.data || {});
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load QR orders");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [session?.branch_id]);
 
   useEffect(() => {
     load();
@@ -52,6 +66,26 @@ export default function QrOrdersAcceptScreen({ navigation }) {
       if (type === "accept") {
         const res = await api.post(`/qr-orders/${id}/accept`);
         const orderId = res?.data?.order_id;
+
+        // Print KOT on accept
+        if (orderId && (row.items || []).length > 0) {
+          try {
+            await printKotTokenSlip(
+              {
+                tokenNumber: String(orderId),
+                items: (row.items || []).map((it) => ({
+                  item_name: it.item_name || `Item ${it.item_id}`,
+                  quantity: it.quantity,
+                })),
+                customerName: row.customer_name || "",
+              },
+              { shop: shopDetails, branch: branchDetails, shopName: shopDetails?.shop_name || "Haappii Billing" }
+            );
+          } catch {
+            // ignore print errors
+          }
+        }
+
         if (orderId) {
           navigation.navigate("TableOrder", {
             table: {

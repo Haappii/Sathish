@@ -22,6 +22,7 @@ import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { WEB_APP_BASE } from "../config/api";
+import { printKotTokenSlip, printInvoiceByNumber } from "../utils/printInvoice";
 
 const normalizeServiceCharge = (value) => {
   const n = Number(value);
@@ -296,6 +297,28 @@ export default function TableOrderScreen({ route, navigation }) {
 
       await api.post(`/kot/create/${order.order_id}`);
 
+      // Print KOT slip per category
+      try {
+        const catGroupMap = new Map();
+        for (const [id, qty] of Object.entries(cart)) {
+          const item = items.find((i) => Number(i.item_id) === Number(id));
+          const catId = item?.category_id || "__none__";
+          if (!catGroupMap.has(catId)) {
+            const cat = categories.find((c) => c.category_id === catId);
+            catGroupMap.set(catId, { categoryName: cat?.category_name || "", items: [] });
+          }
+          catGroupMap.get(catId).items.push({ item_name: item?.item_name || `Item ${id}`, quantity: qty });
+        }
+        for (const [, group] of catGroupMap) {
+          await printKotTokenSlip(
+            { tokenNumber: String(order.order_id), items: group.items, categoryName: group.categoryName },
+            { shop: shopDetails, branch: branchDetails, shopName: shopDetails?.shop_name || "Haappii Billing" }
+          );
+        }
+      } catch {
+        // ignore print errors
+      }
+
       setCart({});
       Alert.alert("KOT Sent", "Items sent to kitchen!");
       load(true);
@@ -364,6 +387,21 @@ export default function TableOrderScreen({ route, navigation }) {
 
       setBillOpen(false);
       setCart({});
+
+      // Print invoice
+      if (invoiceNo && branchDetails?.receipt_required !== false) {
+        try {
+          await printInvoiceByNumber(api, invoiceNo, {
+            shop: shopDetails,
+            branch: branchDetails,
+            shopName: shopDetails?.shop_name || "Haappii Billing",
+            webBase: WEB_APP_BASE,
+          });
+        } catch {
+          // ignore print errors
+        }
+      }
+
       Alert.alert("Bill Saved", invoiceNo ? `Invoice: ${invoiceNo}` : "Invoice saved successfully.", [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
