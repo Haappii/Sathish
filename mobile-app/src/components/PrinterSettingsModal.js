@@ -74,6 +74,15 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
     };
   }, [visible]);
 
+  // Auto-select first discovered printer when no target is set
+  useEffect(() => {
+    if (!printers?.length || form.target) return;
+    const first = printers[0];
+    if (!first?.target) return;
+    update("target", String(first.target));
+    if (first.deviceName) update("deviceName", String(first.deviceName));
+  }, [printers]);
+
   const errorText = useMemo(() => {
     if (!printerModule) return "Printer discovery module unavailable in this build.";
     if (!printerError) return "";
