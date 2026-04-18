@@ -868,16 +868,11 @@ const [customer, setCustomer] = useState({
     const catIds = Object.keys(grouped);
     const multiCat = catIds.length > 1;
 
-    const [logoHtml, qrHtml] = await Promise.all([
-      generateLogoHtml(),
-      generateFeedbackQrHtml(invoiceNumber),
-    ]);
-
     for (const catId of catIds) {
       const label = multiCat ? (categoryNameById[catId] || catId) : null;
       const ok = await printDirectText(
         generateKOTText(grouped[catId], invoiceNumber, customerName, label),
-        { fontSize: 9, paperSize: branch?.paper_size || "58mm", headerHtml: logoHtml, extraHtml: qrHtml }
+        { fontSize: 9, paperSize: branch?.paper_size || "58mm" }
       );
       if (!ok) {
         showToast("Printing failed. Check printer/popup settings.", "error");

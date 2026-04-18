@@ -575,18 +575,11 @@ export default function TableOrder() {
     const catIds = Object.keys(grouped);
     const multiCat = catIds.length > 1;
 
-    const [logoHtml, qrHtml] = await Promise.all([
-      getLogoHtml(),
-      getFeedbackQrHtml(null),
-    ]);
-
     for (const catId of catIds) {
       const label = multiCat ? (catNameMap[catId] || catId) : null;
       const ok = await printDirectText(generateKOTText(grouped[catId], label), {
         fontSize: 9,
         paperSize: branch?.paper_size || "58mm",
-        headerHtml: logoHtml,
-        extraHtml: qrHtml,
       });
       if (!ok) {
         showToast("Printing failed. Check printer/popup settings.", "error");
