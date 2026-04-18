@@ -145,7 +145,7 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
               <Text style={[styles.label, { color: theme.text }]}>Printer Target</Text>
               <TextInput
                 style={[styles.input, { borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.text }]}
-                placeholder="Example: TCP:192.168.1.120 or BT:01:23:45:67:89:AB"
+                placeholder="BT:66:32:8C:CC:78:E3 or TCP:192.168.1.120"
                 placeholderTextColor={theme.textSub}
                 value={form.target}
                 onChangeText={(v) => update("target", v)}
@@ -207,7 +207,7 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
                 </Pressable>
               ))}
 
-              <Text style={[styles.help, { color: theme.textSub }]}>If discovery does not find your printer, enter target manually (for example: TCP:192.168.1.120 or BT:01:23:45:67:89:AB).</Text>
+              <Text style={[styles.help, { color: theme.textSub }]}>Enter target manually if not discovered. Bluetooth format: BT:66:32:8C:CC:78:E3 — raw MAC (without BT:) is auto-corrected. LAN format: TCP:192.168.1.120</Text>
             </View>
 
             <Pressable style={[styles.saveBtn, { backgroundColor: theme.success }, saving && styles.disabled]} disabled={saving} onPress={save}>

@@ -138,8 +138,13 @@ async function sendToPrinter(html, options = {}) {
       throw new Error("Direct thermal module is not available in this build.");
     }
 
-    const target = String(options?.printerTarget || settings?.target || "").trim();
+    let target = String(options?.printerTarget || settings?.target || "").trim();
     if (!target) throw new Error("Direct thermal printing is enabled but printer target is not configured.");
+
+    // Auto-prepend BT: if raw MAC address (e.g. 66:32:8C:CC:78:E3 → BT:66:32:8C:CC:78:E3)
+    if (/^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$/.test(target)) {
+      target = `BT:${target}`;
+    }
 
     const deviceName = String(
       options?.printerDeviceName ||
@@ -153,7 +158,7 @@ async function sendToPrinter(html, options = {}) {
 
     const validTarget = /^((TCP|BT):|[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9A-Fa-f:]{11,})/.test(target);
     if (!validTarget) {
-      throw new Error("Printer target is invalid for direct thermal printing.");
+      throw new Error("Printer target is invalid. Use format: BT:XX:XX:XX:XX:XX:XX or TCP:192.168.x.x");
     }
 
     const printer = new nativeMod.Printer({
