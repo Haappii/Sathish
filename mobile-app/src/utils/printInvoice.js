@@ -5,35 +5,35 @@ import appLogo from "../../assets/app_logo.png";
 import { API_BASE, WEB_APP_BASE } from "../config/api";
 import { getPrinterSettings } from "./printerSettings";
 
-let nativePrinterModule = null;
+let _btPrinterModule = null;
+let _btPrinterModuleChecked = false;
 
-function getNativePrinterModule() {
-  if (nativePrinterModule) return nativePrinterModule;
+function getBluetoothPrinterModule() {
+  if (_btPrinterModuleChecked) return _btPrinterModule;
+  _btPrinterModuleChecked = true;
   try {
-    const mod = require("react-native-esc-pos-printer");
-    if (mod?.Printer && mod?.PrinterConstants && mod?.PrinterModelLang) {
-      nativePrinterModule = mod;
-      return nativePrinterModule;
+    const { NativeModules } = require("react-native");
+    if (NativeModules?.BluetoothPrinterModule?.printText) {
+      _btPrinterModule = NativeModules.BluetoothPrinterModule;
     }
-    return null;
   } catch {
-    return null;
+    // module not available
   }
+  return _btPrinterModule;
 }
 
-async function requestBluetoothConnectPermission() {
-  if (Platform.OS !== "android" || Platform.Version < 31) return true;
+async function requestBluetoothPermissions() {
+  if (Platform.OS !== "android") return true;
   try {
     const { PermissionsAndroid } = require("react-native");
-    const result = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-      {
-        title: "Bluetooth Permission",
-        message: "Bluetooth access is required to print receipts.",
-        buttonPositive: "Allow",
-      }
+    const perms = [PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT];
+    if (Platform.Version >= 31) {
+      perms.push(PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN);
+    }
+    const results = await PermissionsAndroid.requestMultiple(perms);
+    return Object.values(results).every(
+      (r) => r === PermissionsAndroid.RESULTS.GRANTED
     );
-    return result === PermissionsAndroid.RESULTS.GRANTED;
   } catch {
     return true;
   }
@@ -152,61 +152,33 @@ async function sendToPrinter(html, options = {}) {
     options?.disableNative !== true;
 
   if (shouldUseNative) {
-    const nativeMod = getNativePrinterModule();
-    if (!nativeMod) throw new Error("Direct thermal module is not available in this build.");
+    const btMod = getBluetoothPrinterModule();
+    if (!btMod) throw new Error("Bluetooth printing module is not available in this build.");
 
     let target = String(options?.printerTarget || settings?.target || "").trim();
 
     if (!target) {
       throw new Error(
-        "Printer not configured. Open Printer Settings, it will auto-detect your paired printer."
+        "Printer not configured. Open Printer Settings and save your printer target."
       );
     }
 
-    // Auto-prepend BT: if raw MAC address (e.g. 66:32:8C:CC:78:E3 → BT:66:32:8C:CC:78:E3)
+    // Auto-prepend BT: if raw MAC address
     if (/^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$/.test(target)) {
       target = `BT:${target}`;
     }
 
-    const validTarget = /^((TCP|BT):|[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9A-Fa-f:]{11,})/.test(target);
-    if (!validTarget) throw new Error("Printer target is invalid. Use format: BT:XX:XX:XX:XX:XX:XX or TCP:192.168.x.x");
+    if (!/^BT:/i.test(target)) {
+      throw new Error("Only Bluetooth printers (BT:XX:XX:XX:XX:XX:XX) are supported with direct thermal printing.");
+    }
 
     const payload = String(options?.nativeText || "");
-    if (!payload) throw new Error("No printable payload available for native printer.");
+    if (!payload) throw new Error("No printable content for the printer.");
 
-    // Request BLUETOOTH_CONNECT permission on Android 12+ before connecting
-    if (/^BT:/i.test(target)) {
-      const granted = await requestBluetoothConnectPermission();
-      if (!granted) throw new Error("Bluetooth permission denied. Please allow Bluetooth access in Settings.");
-    }
+    const granted = await requestBluetoothPermissions();
+    if (!granted) throw new Error("Bluetooth permission denied. Please allow Bluetooth access in Android Settings.");
 
-    const deviceName = String(
-      options?.printerDeviceName ||
-      settings?.deviceName ||
-      options?.branch?.printer_model ||
-      "TM-T88V"
-    ).trim();
-
-    const printer = new nativeMod.Printer({
-      target,
-      deviceName,
-      lang: nativeMod.PrinterModelLang.MODEL_ANK,
-    });
-
-    await printer.connect();
-    try {
-      await printer.addTextAlign(nativeMod.PrinterConstants.ALIGN_LEFT);
-      await printer.addText(payload);
-      await printer.addFeedLine(3);
-      try {
-        await printer.addCut(nativeMod.PrinterConstants.CUT_FEED);
-      } catch {
-        // Printer may not support auto-cut (e.g. mobile thermal printers without cutter)
-      }
-      await printer.sendData();
-    } finally {
-      await printer.disconnect().catch(() => {});
-    }
+    await btMod.printText(target, payload);
     return;
   }
 
