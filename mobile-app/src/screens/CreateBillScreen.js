@@ -718,19 +718,36 @@ export default function CreateBillScreen({ route }) {
         if (action === BILL_ACTIONS.PRINT_BOTH && invoiceNo) {
           try {
             if (kotToken) {
-              await printKotTokenSlip(
-                {
-                  tokenNumber: kotToken,
-                  orderId: sourceOrderId,
-                  items: cart.map((x) => ({ item_name: x.item_name, quantity: x.qty })),
-                  customerName: payload.customer_name,
-                },
-                {
-                  shop: shopDetails,
-                  branch: branchDetails,
-                  shopName,
+              // Group cart items by category — one KOT slip per category
+              const catGroupMap = new Map();
+              for (const x of cart) {
+                const catId = x.category_id || "__none__";
+                if (!catGroupMap.has(catId)) {
+                  const cat = categories.find((c) => c.category_id === catId);
+                  catGroupMap.set(catId, {
+                    categoryName: cat?.category_name || "",
+                    items: [],
+                  });
                 }
-              );
+                catGroupMap.get(catId).items.push({ item_name: x.item_name, quantity: x.qty });
+              }
+              for (const [, group] of catGroupMap) {
+                await printKotTokenSlip(
+                  {
+                    tokenNumber: kotToken,
+                    orderId: sourceOrderId,
+                    items: group.items,
+                    customerName: payload.customer_name,
+                    categoryName: group.categoryName,
+                  },
+                  {
+                    shop: shopDetails,
+                    branch: branchDetails,
+                    shopName,
+                    webBase: WEB_APP_BASE,
+                  }
+                );
+              }
             }
 
             if (receiptRequired) {

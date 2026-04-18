@@ -363,7 +363,7 @@ function buildReceiptText(invoice, { shop = {}, branch = {}, paperSize = "58mm",
   return t;
 }
 
-function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize = "58mm" } = {}) {
+function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize = "58mm", categoryName = "" } = {}) {
   const is80mm = String(paperSize || "58mm") === "80mm";
   const BASE_WIDTH = is80mm ? 48 : 32;
   const RIGHT_MARGIN_CHARS = 1;
@@ -387,6 +387,7 @@ function buildKotTokenText(tokenData = {}, { shop = {}, branch = {}, paperSize =
   t += `${center("Date & Time", WIDTH)}\n`;
   t += `${center(formatDateTimeLabel(new Date()), WIDTH)}\n`;
   t += `${center("Take Away", WIDTH)}\n`;
+  if (categoryName) t += `${center(`[ ${categoryName} ]`, WIDTH)}\n`;
   t += `${line}\n`;
   t += `Invoice : ${(token || orderId || "N/A")}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";
   t += `Customer: ${(customerName || "N/A").slice(0, 22)}`.padEnd(WIDTH) + "\n";
@@ -537,11 +538,13 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
     orderId,
     items = [],
     customerName,
+    categoryName = "",
   } = tokenData || {};
   const {
     shop = {},
     branch = {},
     shopName = "Haappii Billing",
+    webBase = WEB_APP_BASE,
   } = options;
 
   const normalizedShop = shop?.shop_name ? shop : { ...shop, shop_name: shopName };
@@ -560,8 +563,25 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
       shop: normalizedShop,
       branch,
       paperSize,
+      categoryName,
     }
   );
+
+  const logoUrl = await getReceiptLogoUrl({ shop: normalizedShop, branch });
+  const logoHtml =
+    branch?.print_logo_enabled === false
+      ? ""
+      : (() => {
+          if (!logoUrl) return "";
+          return `<div class="logo-wrap"><img class="logo" src="${esc(logoUrl)}" alt="logo" /></div>`;
+        })();
+
+  const feedbackQrHtml = buildFeedbackQrHtml({
+    shopId: normalizedShop?.shop_id,
+    invoiceNo: token || String(orderId || ""),
+    enabled: branch?.feedback_qr_enabled !== false,
+    webBase,
+  });
 
   const html = `
     <html>
@@ -580,17 +600,46 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
             padding: 2mm;
             box-sizing: border-box;
           }
+          .logo-wrap {
+            width: 100%;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+          .logo {
+            display: block;
+            margin: 0 auto 2px;
+            max-width: 100%;
+            max-height: 20mm;
+            object-fit: contain;
+          }
           pre {
             margin: 0;
             white-space: pre;
             font-size: 9px;
             line-height: 1.25;
           }
+          .qr-wrap {
+            text-align: center;
+            margin-top: 4px;
+            font-size: 8px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+          }
+          .qr-title { font-weight: 700; margin-bottom: 2px; }
+          .qr-sub { font-size: 7px; margin-top: 2px; }
+          .qr-sep { letter-spacing: 1px; margin-bottom: 2px; }
         </style>
       </head>
       <body>
         <div class="ticket">
+          ${logoHtml}
           <pre>${esc(nativeText)}</pre>
+          ${feedbackQrHtml}
         </div>
       </body>
     </html>
