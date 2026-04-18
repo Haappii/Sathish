@@ -39,38 +39,6 @@ async function requestBluetoothConnectPermission() {
   }
 }
 
-// Auto-discover the first bonded Bluetooth printer. Returns device info or null on timeout.
-async function discoverFirstPairedPrinter(nativeMod, timeoutMs = 7000) {
-  const discovery = nativeMod?.PrintersDiscovery;
-  const filterOpt = nativeMod?.DiscoveryFilterOption;
-  if (!discovery || !filterOpt) return null;
-
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (result) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      removeListener();
-      discovery.stop().catch(() => {});
-      resolve(result);
-    };
-    const removeListener = discovery.onDiscovery((printers) => {
-      if (printers.length > 0) finish(printers[0]);
-    });
-    const timer = setTimeout(() => finish(null), timeoutMs);
-    discovery
-      .start({
-        timeout: timeoutMs,
-        autoStop: false,
-        filterOption: {
-          portType: filterOpt.PORTTYPE_BLUETOOTH,
-          bondedDevices: filterOpt.TRUE,
-        },
-      })
-      .catch(() => finish(null));
-  });
-}
 
 async function toDataUri(uri) {
   if (!uri) return "";
@@ -188,24 +156,11 @@ async function sendToPrinter(html, options = {}) {
     if (!nativeMod) throw new Error("Direct thermal module is not available in this build.");
 
     let target = String(options?.printerTarget || settings?.target || "").trim();
-    let discoveredDeviceName = "";
 
-    // No target set → auto-discover any paired Bluetooth printer
     if (!target) {
-      const found = await discoverFirstPairedPrinter(nativeMod);
-      if (!found?.target) {
-        throw new Error(
-          "No Bluetooth printer found. Pair your printer in Android Bluetooth Settings and try again."
-        );
-      }
-      target = String(found.target);
-      discoveredDeviceName = String(found.deviceName || "");
-      // Persist for next print so discovery isn't needed again
-      savePrinterSettings({
-        ...settings,
-        target,
-        deviceName: discoveredDeviceName || settings?.deviceName || "TM-T88V",
-      }).catch(() => {});
+      throw new Error(
+        "Printer not configured. Open Printer Settings, it will auto-detect your paired printer."
+      );
     }
 
     // Auto-prepend BT: if raw MAC address (e.g. 66:32:8C:CC:78:E3 → BT:66:32:8C:CC:78:E3)
@@ -228,7 +183,6 @@ async function sendToPrinter(html, options = {}) {
     const deviceName = String(
       options?.printerDeviceName ||
       settings?.deviceName ||
-      discoveredDeviceName ||
       options?.branch?.printer_model ||
       "TM-T88V"
     ).trim();
