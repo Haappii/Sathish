@@ -178,7 +178,12 @@ async function sendToPrinter(html, options = {}) {
     const granted = await requestBluetoothPermissions();
     if (!granted) throw new Error("Bluetooth permission denied. Please allow Bluetooth access in Android Settings.");
 
-    await btMod.printText(target, payload);
+    const qrData = String(options?.qrData || "");
+    if (qrData && typeof btMod.printTextWithQR === "function") {
+      await btMod.printTextWithQR(target, payload, qrData);
+    } else {
+      await btMod.printText(target, payload);
+    }
     return;
   }
 
@@ -453,6 +458,11 @@ export async function printInvoiceByData(invoice, options = {}) {
           return `<div class="logo-wrap"><img class="logo" src="${esc(logoUrl)}" alt="logo" /></div>`;
         })();
 
+  const feedbackEnabled = branch?.feedback_qr_enabled !== false && !!normalizedShop?.shop_id && !!invoice?.invoice_number && !!webBase;
+  const feedbackUrl = feedbackEnabled
+    ? `${String(webBase).replace(/\/$/, "")}/feedback?shop_id=${encodeURIComponent(normalizedShop.shop_id)}&invoice_no=${encodeURIComponent(invoice.invoice_number)}`
+    : "";
+
   const feedbackQrHtml = buildFeedbackQrHtml({
     shopId: normalizedShop?.shop_id,
     invoiceNo: invoice?.invoice_number,
@@ -524,7 +534,7 @@ export async function printInvoiceByData(invoice, options = {}) {
     </html>
   `;
 
-  await sendToPrinter(html, { ...options, nativeText: receiptText });
+  await sendToPrinter(html, { ...options, nativeText: receiptText, qrData: feedbackUrl });
 }
 
 export async function printInvoiceByNumber(api, invoiceNo, options = {}) {
@@ -553,94 +563,22 @@ export async function printKotTokenSlip(tokenData = {}, options = {}) {
   const token = String(tokenNumber || "").trim();
 
   const nativeText = buildKotTokenText(
-    {
-      tokenNumber: token,
-      orderId,
-      customerName,
-      items,
-    },
-    {
-      shop: normalizedShop,
-      branch,
-      paperSize,
-      categoryName,
-    }
+    { tokenNumber: token, orderId, customerName, items },
+    { shop: normalizedShop, branch, paperSize, categoryName }
   );
-
-  const logoUrl = await getReceiptLogoUrl({ shop: normalizedShop, branch });
-  const logoHtml =
-    branch?.print_logo_enabled === false
-      ? ""
-      : (() => {
-          if (!logoUrl) return "";
-          return `<div class="logo-wrap"><img class="logo" src="${esc(logoUrl)}" alt="logo" /></div>`;
-        })();
-
-  const feedbackQrHtml = buildFeedbackQrHtml({
-    shopId: normalizedShop?.shop_id,
-    invoiceNo: token || String(orderId || ""),
-    enabled: branch?.feedback_qr_enabled !== false,
-    webBase,
-  });
 
   const html = `
     <html>
       <head>
         <style>
           @page { size: ${paperWidth} auto; margin: 0; }
-          html, body {
-            margin: 0;
-            padding: 0;
-            width: ${paperWidth};
-            font-family: monospace;
-            color: #000;
-          }
-          .ticket {
-            width: ${paperWidth};
-            padding: 2mm;
-            box-sizing: border-box;
-          }
-          .logo-wrap {
-            width: 100%;
-            text-align: center;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-          }
-          .logo {
-            display: block;
-            margin: 0 auto 2px;
-            max-width: 100%;
-            max-height: 20mm;
-            object-fit: contain;
-          }
-          pre {
-            margin: 0;
-            white-space: pre;
-            font-size: 9px;
-            line-height: 1.25;
-          }
-          .qr-wrap {
-            text-align: center;
-            margin-top: 4px;
-            font-size: 8px;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-          }
-          .qr-title { font-weight: 700; margin-bottom: 2px; }
-          .qr-sub { font-size: 7px; margin-top: 2px; }
-          .qr-sep { letter-spacing: 1px; margin-bottom: 2px; }
+          html, body { margin: 0; padding: 0; width: ${paperWidth}; font-family: monospace; color: #000; }
+          .ticket { width: ${paperWidth}; padding: 2mm; box-sizing: border-box; }
+          pre { margin: 0; white-space: pre; font-size: 9px; line-height: 1.25; }
         </style>
       </head>
       <body>
-        <div class="ticket">
-          ${logoHtml}
-          <pre>${esc(nativeText)}</pre>
-          ${feedbackQrHtml}
-        </div>
+        <div class="ticket"><pre>${esc(nativeText)}</pre></div>
       </body>
     </html>
   `;
@@ -670,6 +608,12 @@ function buildAdvanceReceiptText(order = {}, { shop = {}, branch = {}, paperSize
 
   let t = "\n".repeat(TOP_PADDING_LINES);
   t += `${center(headerName, WIDTH)}\n`;
+  getReceiptAddressLines({ branch, shop }).forEach((row) => {
+    if (!row) return;
+    t += `${center(String(row), WIDTH)}\n`;
+  });
+  if (shop?.mobile) t += `${center(`Ph: ${shop.mobile}`, WIDTH)}\n`;
+  if (shop?.gst_number) t += `${center(`GSTIN: ${shop.gst_number}`, WIDTH)}\n`;
   t += `${center("ADVANCE BOOKING INVOICE", WIDTH)}\n`;
   t += `${line}\n`;
   t += `Order No : ${String(order?.order_id || "-")}\n`;

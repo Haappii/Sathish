@@ -245,7 +245,6 @@ export default function SalesHistoryScreen() {
         branch: branchDetails,
         shopName: shopDetails?.shop_name || "Haappii Billing",
         webBase: WEB_APP_BASE,
-        disableNative: true,
       });
       Alert.alert("Print", "Invoice sent to printer.");
     } catch (err) {

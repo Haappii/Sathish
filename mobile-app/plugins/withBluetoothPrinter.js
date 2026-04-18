@@ -19,39 +19,76 @@ class BluetoothPrinterModule(reactContext: ReactApplicationContext) :
 
     override fun getName(): String = "BluetoothPrinterModule"
 
+    private fun connectSocket(address: String): Pair<BluetoothSocket, OutputStream> {
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+            ?: throw Exception("BT_UNAVAILABLE: Bluetooth not available on this device")
+        val cleanAddress = address.removePrefix("BT:").removePrefix("bt:").trim().uppercase()
+        val device = try {
+            adapter.getRemoteDevice(cleanAddress)
+        } catch (e: IllegalArgumentException) {
+            throw Exception("INVALID_ADDRESS: Invalid Bluetooth address: $cleanAddress")
+        }
+        adapter.cancelDiscovery()
+        val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+        socket.connect()
+        return Pair(socket, socket.outputStream)
+    }
+
+    private fun writeQRCode(out: OutputStream, data: String) {
+        val qrBytes = data.toByteArray(Charsets.UTF_8)
+        val totalLen = qrBytes.size + 3
+        val pL = (totalLen and 0xFF).toByte()
+        val pH = ((totalLen shr 8) and 0xFF).toByte()
+        out.write(byteArrayOf(0x0A))                                                          // line feed before QR
+        out.write(byteArrayOf(0x1B, 0x61, 0x01))                                             // center align
+        out.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00))       // model 2
+        out.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x42, 0x05))             // size 5
+        out.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x31))             // error correction M
+        out.write(byteArrayOf(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30))                 // store data
+        out.write(qrBytes)
+        out.write(byteArrayOf(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30))             // print QR
+        out.write(byteArrayOf(0x0A, 0x0A))                                                    // feed after QR
+        out.write(byteArrayOf(0x1B, 0x61, 0x00))                                             // left align
+    }
+
     @ReactMethod
     fun printText(address: String, text: String, promise: Promise) {
         Thread {
             var socket: BluetoothSocket? = null
             try {
-                val adapter = BluetoothAdapter.getDefaultAdapter()
-                    ?: return@Thread promise.reject("BT_UNAVAILABLE", "Bluetooth not available on this device")
-
-                val cleanAddress = address.removePrefix("BT:").removePrefix("bt:").trim().uppercase()
-
-                val device = try {
-                    adapter.getRemoteDevice(cleanAddress)
-                } catch (e: IllegalArgumentException) {
-                    return@Thread promise.reject("INVALID_ADDRESS", "Invalid Bluetooth address: $cleanAddress")
-                }
-
-                adapter.cancelDiscovery()
-
-                socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-                socket.connect()
-
-                val out: OutputStream = socket.outputStream
-
-                // ESC/POS: initialize printer
+                val (sock, out) = connectSocket(address)
+                socket = sock
                 out.write(byteArrayOf(0x1B, 0x40))
-                // Print text content
                 out.write(text.toByteArray(Charsets.UTF_8))
-                // Feed 4 lines then partial cut
                 out.write(byteArrayOf(0x1B, 0x64, 0x04))
                 out.write(byteArrayOf(0x1D, 0x56, 0x41, 0x10))
                 out.flush()
-
                 Thread.sleep(800)
+                promise.resolve(null)
+            } catch (e: Exception) {
+                promise.reject("PRINT_FAILED", e.message ?: "Bluetooth print failed")
+            } finally {
+                try { socket?.close() } catch (_: Exception) {}
+            }
+        }.start()
+    }
+
+    @ReactMethod
+    fun printTextWithQR(address: String, text: String, qrData: String, promise: Promise) {
+        Thread {
+            var socket: BluetoothSocket? = null
+            try {
+                val (sock, out) = connectSocket(address)
+                socket = sock
+                out.write(byteArrayOf(0x1B, 0x40))
+                out.write(text.toByteArray(Charsets.UTF_8))
+                if (qrData.isNotBlank()) {
+                    writeQRCode(out, qrData)
+                }
+                out.write(byteArrayOf(0x1B, 0x64, 0x04))
+                out.write(byteArrayOf(0x1D, 0x56, 0x41, 0x10))
+                out.flush()
+                Thread.sleep(1000)
                 promise.resolve(null)
             } catch (e: Exception) {
                 promise.reject("PRINT_FAILED", e.message ?: "Bluetooth print failed")

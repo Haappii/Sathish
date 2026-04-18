@@ -28,7 +28,7 @@ import {
 } from "../offline/cache";
 import { enqueueInvoice, getPendingCount } from "../offline/queue";
 import { syncOfflineQueue } from "../offline/sync";
-import { printInvoiceByNumber, printKotTokenSlip } from "../utils/printInvoice";
+import { printInvoiceByData, printInvoiceByNumber, printKotTokenSlip } from "../utils/printInvoice";
 
 const DEFAULT_MOBILE = "9999999999";
 const PAYMENT_MODES  = ["cash", "card", "upi", "credit", "gift_card", "coupon", "split", "wallet"];
@@ -775,6 +775,35 @@ export default function CreateBillScreen({ route }) {
           "Saved Offline 📦",
           `Bill saved locally (${localId.slice(-6)}). It will sync automatically when you're back online.\n\nPending: ${count} bill(s)`
         );
+        // Print offline receipt using local cart data
+        if (action === BILL_ACTIONS.PRINT_BOTH) {
+          try {
+            const offlineInvoice = {
+              invoice_number: `OFFLINE-${localId.slice(-6)}`,
+              created_time: new Date().toISOString(),
+              customer_name: payload.customer_name,
+              mobile: payload.mobile,
+              payment_mode: payload.payment_mode,
+              total_amount: payableTotal,
+              discounted_amt: discountValue,
+              tax_amt: gstAmount,
+              items: cart.map((x) => ({
+                item_name: x.item_name,
+                quantity: x.qty,
+                price: Number(x.price || 0),
+                amount: getLineAmount(x),
+              })),
+            };
+            await printInvoiceByData(offlineInvoice, {
+              shop: shopDetails,
+              branch: branchDetails,
+              shopName,
+              webBase: WEB_APP_BASE,
+            });
+          } catch {
+            // ignore print errors in offline mode
+          }
+        }
       }
       // Reset form and refresh held drafts list
       resetForm();
