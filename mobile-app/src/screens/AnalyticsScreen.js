@@ -155,11 +155,11 @@ export default function AnalyticsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.container}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#2563eb"]} />}
         >
           {/* KPIs */}
           <View style={styles.section}>
@@ -188,7 +188,7 @@ export default function AnalyticsScreen() {
               <KpiCard
                 label="Due Collections"
                 value={fmt(collections.amount)}
-                accent="#0b57d0"
+                accent="#2563eb"
               />
               <KpiCard
                 label="Open Dues"
@@ -244,45 +244,43 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  rangeBar: {
-    flexDirection: "row", padding: 12, paddingBottom: 0, gap: 8,
-  },
+  rangeBar: { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 12, paddingBottom: 4, gap: 8 },
   rangeBtn: {
-    flex: 1, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
-    paddingVertical: 7, alignItems: "center", backgroundColor: "#fff",
+    flex: 1, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
+    paddingVertical: 8, alignItems: "center", backgroundColor: "#fff",
   },
-  rangeBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  rangeTxt: { fontSize: 12, fontWeight: "700", color: "#334155" },
+  rangeBtnActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  rangeTxt: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
   rangeTxtActive: { color: "#fff" },
-  container: { padding: 12, gap: 10, paddingBottom: 32 },
+  container: { padding: 14, gap: 12, paddingBottom: 36 },
   section: {
-    backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-    borderColor: "#d9e3ff", padding: 12, gap: 10,
+    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 14, gap: 12,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0b1220" },
-  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.5 },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kpiCard: {
-    width: "48%", backgroundColor: "#ffffff", borderRadius: 10,
-    padding: 10, gap: 2,
+    width: "47.5%", backgroundColor: "#f6f8fe", borderRadius: 14, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 12, gap: 3,
   },
-  kpiLabel: { fontSize: 10, color: "#64748b", fontWeight: "600", textTransform: "uppercase" },
-  kpiValue: { fontSize: 18, fontWeight: "800" },
-  kpiSub: { fontSize: 10, color: "#94a3b8" },
-  payRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  payLabel: { width: 72, fontSize: 12, fontWeight: "700", color: "#334155" },
-  barOuter: {
-    flex: 1, height: 8, backgroundColor: "#d9e3ff", borderRadius: 4, overflow: "hidden",
-  },
-  barInner: { height: 8, borderRadius: 4 },
-  payAmt: { width: 72, textAlign: "right", fontSize: 12, fontWeight: "700" },
+  kpiLabel: { fontSize: 9, color: "#8896ae", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  kpiValue: { fontSize: 20, fontWeight: "900", letterSpacing: -0.5 },
+  kpiSub: { fontSize: 10, color: "#8896ae", fontWeight: "600" },
+  payRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  payLabel: { width: 76, fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  barOuter: { flex: 1, height: 9, backgroundColor: "#dde6f7", borderRadius: 5, overflow: "hidden" },
+  barInner: { height: 9, borderRadius: 5 },
+  payAmt: { width: 76, textAlign: "right", fontSize: 12, fontWeight: "800", color: "#0c1228" },
   topRow: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f3f6ff",
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f4ff",
   },
-  topRank: { width: 22, textAlign: "center", color: "#94a3b8", fontWeight: "800", fontSize: 13 },
-  topName: { fontWeight: "700", color: "#0b1220", fontSize: 13 },
-  topMeta: { color: "#64748b", fontSize: 11 },
-  topAmt: { fontSize: 13, fontWeight: "800", color: "#059669" },
+  topRank: { width: 24, textAlign: "center", color: "#8896ae", fontWeight: "800", fontSize: 13 },
+  topName: { fontWeight: "800", color: "#0c1228", fontSize: 13 },
+  topMeta: { color: "#8896ae", fontSize: 11 },
+  topAmt: { fontSize: 14, fontWeight: "900", color: "#059669" },
 });

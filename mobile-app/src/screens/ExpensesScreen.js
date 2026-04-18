@@ -159,8 +159,8 @@ export default function ExpensesScreen() {
             />
 
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-              <Pressable style={[styles.btn, { backgroundColor: "#d9e3ff", flex: 1 }]} onPress={() => setAddModal(false)}>
-                <Text style={[styles.btnText, { color: "#475569" }]}>Cancel</Text>
+              <Pressable style={[styles.btn, { backgroundColor: "#f0f4ff", flex: 1, borderWidth: 1.5, borderColor: "#dde6f7" }]} onPress={() => setAddModal(false)}>
+                <Text style={[styles.btnText, { color: "#4a5a78" }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.btn, { flex: 1 }]} onPress={saveExpense} disabled={saving}>
                 <Text style={styles.btnText}>{saving ? "Saving…" : "Save"}</Text>
@@ -178,63 +178,58 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: "#f3f6ff" },
+  safe:     { flex: 1, backgroundColor: "#f0f4ff" },
   center:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
-  topBar:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#d9e3ff" },
-  topLabel: { color: "#64748b", fontSize: 12 },
-  bizDate: { color: "#0b57d0", fontSize: 11, fontWeight: "700" },
-  topTotal: { fontSize: 22, fontWeight: "800", color: "#b45309" },
-  addBtn:   { backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  addBtnText: { color: "#fff", fontWeight: "700" },
+  topBar: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: "#0c1228",
+  },
+  topLabel: { color: "#7a8fa8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  bizDate:  { color: "#93c5fd", fontSize: 11, fontWeight: "700", marginTop: 2 },
+  topTotal: { fontSize: 24, fontWeight: "900", color: "#f0a820", marginTop: 2 },
+  addBtn: {
+    backgroundColor: "#2563eb", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10,
+    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 5,
+  },
+  addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   card: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: "#fff", borderRadius: 18, padding: 14,
+    borderWidth: 1.5, borderColor: "#dde6f7",
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  cardLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  catBadge: { backgroundColor: "#fef3c7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  catText:  { color: "#b45309", fontWeight: "600", fontSize: 12 },
-  description: { fontWeight: "600", color: "#0b1220", maxWidth: 200 },
-  meta:     { color: "#94a3b8", fontSize: 12, marginTop: 2 },
-  amount:   { fontWeight: "800", color: "#b91c1c", fontSize: 16 },
+  cardLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  catBadge: { backgroundColor: "#fef3c7", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#fde68a" },
+  catText:  { color: "#b45309", fontWeight: "700", fontSize: 12 },
+  description: { fontWeight: "700", color: "#0c1228", maxWidth: 200, fontSize: 13 },
+  meta:     { color: "#8896ae", fontSize: 12, marginTop: 2 },
+  amount:   { fontWeight: "900", color: "#dc2626", fontSize: 16 },
   overlay:  { flex: 1, justifyContent: "flex-end" },
-  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   modal: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 22, paddingBottom: 44,
+    shadowColor: "#0c1228", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220", marginBottom: 14 },
-  fieldLabel: { color: "#64748b", fontSize: 12, marginBottom: 6, fontWeight: "600" },
+  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", marginBottom: 16, letterSpacing: -0.3 },
+  fieldLabel: { color: "#4a5a78", fontSize: 11, marginBottom: 6, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: "#ffffff",
-    color: "#0b1220",
-    marginBottom: 12,
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
+    paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#f6f8fe",
+    color: "#0c1228", fontSize: 14, marginBottom: 12,
   },
   catChip: {
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    backgroundColor: "#ffffff",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
+    paddingHorizontal: 13, paddingVertical: 7, marginRight: 8, backgroundColor: "#f6f8fe",
   },
-  catChipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  catChipText:  { color: "#475569", fontWeight: "600" },
+  catChipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  catChipText:   { color: "#4a5a78", fontWeight: "700", fontSize: 12 },
   catChipTextActive: { color: "#fff" },
-  btn:     { backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  btnText: { color: "#fff", fontWeight: "700" },
-  empty:   { color: "#94a3b8" },
+  btn: {
+    backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 14, alignItems: "center",
+    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+  },
+  btnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  empty:   { color: "#8896ae", fontSize: 14 },
 });

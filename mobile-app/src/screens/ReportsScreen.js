@@ -128,7 +128,7 @@ export default function ReportsScreen() {
       {loaded && summary && (
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <SumItem label="Invoices" value={String(summary.invoice_count ?? rows.length)} color="#0b57d0" />
+            <SumItem label="Invoices" value={String(summary.invoice_count ?? rows.length)} color="#2563eb" />
             <SumItem label="Total Sales" value={fmt(summary.total_amount ?? summary.total_sales)} color="#059669" />
             <SumItem label="Avg Ticket" value={fmt(summary.avg_ticket ?? summary.average_invoice)} color="#d97706" />
           </View>
@@ -167,54 +167,60 @@ function SumItem({ label, value, color }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   filterCard: {
-    backgroundColor: "#fff", margin: 12, borderRadius: 14,
-    borderWidth: 1, borderColor: "#d9e3ff", padding: 12, gap: 10,
+    backgroundColor: "#fff", margin: 14, borderRadius: 18,
+    borderWidth: 1.5, borderColor: "#dde6f7", padding: 14, gap: 10,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   dateRow: { flexDirection: "row", gap: 10 },
-  label: { fontSize: 11, fontWeight: "700", color: "#64748b", marginBottom: 4 },
+  label: { fontSize: 11, fontWeight: "700", color: "#8896ae", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
   dateInput: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#ffffff", paddingHorizontal: 10, paddingVertical: 9, color: "#0b1220",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
+    backgroundColor: "#f6f8fe", paddingHorizontal: 12, paddingVertical: 10, color: "#0c1228", fontSize: 14,
   },
-  modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   chip: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
-    paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f6f8fe",
   },
-  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  chipText: { fontSize: 11, fontWeight: "600", color: "#334155" },
+  chipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  chipText: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
   chipTextActive: { color: "#fff" },
   runBtn: {
-    backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12,
+    backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 13,
     alignItems: "center", justifyContent: "center", minHeight: 44,
+    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
-  runBtnText: { color: "#fff", fontWeight: "800" },
+  runBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   btnDisabled: { opacity: 0.5 },
   summaryCard: {
-    backgroundColor: "#fff", marginHorizontal: 12, borderRadius: 12,
-    borderWidth: 1, borderColor: "#d9e3ff", padding: 12, gap: 6,
+    backgroundColor: "#fff", marginHorizontal: 14, borderRadius: 18,
+    borderWidth: 1.5, borderColor: "#dde6f7", padding: 14, gap: 8,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
   summaryRow: { flexDirection: "row", justifyContent: "space-between" },
-  sumItem: { alignItems: "center", gap: 2 },
-  sumLabel: { fontSize: 10, color: "#64748b", fontWeight: "600" },
-  sumValue: { fontSize: 16, fontWeight: "800" },
-  taxLine: { color: "#64748b", fontSize: 12, textAlign: "center" },
-  list: { padding: 12, paddingTop: 8, gap: 6, paddingBottom: 24 },
+  sumItem: { alignItems: "center", gap: 3 },
+  sumLabel: { fontSize: 10, color: "#8896ae", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  sumValue: { fontSize: 18, fontWeight: "900" },
+  taxLine: { color: "#8896ae", fontSize: 12, textAlign: "center", fontWeight: "600" },
+  list: { padding: 14, paddingTop: 8, gap: 8, paddingBottom: 24 },
   row: {
-    backgroundColor: "#fff", borderRadius: 10, borderWidth: 1,
-    borderColor: "#d9e3ff", padding: 10, flexDirection: "row", alignItems: "center",
+    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 12, flexDirection: "row", alignItems: "center",
+    shadowColor: "#1a2463", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  invNo: { fontWeight: "800", color: "#0b1220" },
-  rowMeta: { color: "#64748b", fontSize: 12, marginTop: 2 },
+  invNo: { fontWeight: "800", color: "#0c1228", fontSize: 14 },
+  rowMeta: { color: "#4a5a78", fontSize: 12, marginTop: 2 },
   modeBadge: {
-    marginTop: 4, backgroundColor: "#e8f0ff", borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2, alignSelf: "flex-start",
+    marginTop: 4, backgroundColor: "#eff4ff", borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start",
+    borderWidth: 1, borderColor: "#bfdbfe",
   },
-  modeBadgeText: { color: "#0b57d0", fontSize: 10, fontWeight: "700" },
-  rowAmt: { fontSize: 15, fontWeight: "800", color: "#059669" },
-  emptyWrap: { alignItems: "center", paddingTop: 40, gap: 8 },
-  emptyIcon: { fontSize: 36 },
-  emptyTitle: { color: "#64748b", fontSize: 15, fontWeight: "700" },
+  modeBadgeText: { color: "#2563eb", fontSize: 10, fontWeight: "800" },
+  rowAmt: { fontSize: 15, fontWeight: "900", color: "#059669", marginLeft: 8 },
+  emptyWrap: { alignItems: "center", paddingTop: 50, gap: 10 },
+  emptyIcon: { fontSize: 44 },
+  emptyTitle: { color: "#8896ae", fontSize: 15, fontWeight: "700" },
 });

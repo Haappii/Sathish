@@ -194,7 +194,7 @@ export default function SupplierLedgerScreen() {
   if (loading || allowed === null) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       </SafeAreaView>
     );
   }
@@ -214,7 +214,7 @@ export default function SupplierLedgerScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} colors={["#0b57d0"]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} colors={["#2563eb"]} />}
       >
         <View style={styles.card}>
           <View style={styles.headRow}>
@@ -412,94 +412,63 @@ export default function SupplierLedgerScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  container: { padding: 12, gap: 10, paddingBottom: 26 },
+  container: { padding: 14, gap: 12, paddingBottom: 30 },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
-    padding: 12,
-    gap: 8,
+    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 14, gap: 10,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
-  totalDue: { color: "#dc2626", fontWeight: "700", fontSize: 13 },
+  title: { fontSize: 16, fontWeight: "900", color: "#0c1228", letterSpacing: -0.3 },
+  totalDue: { color: "#dc2626", fontWeight: "800", fontSize: 13, marginTop: 2 },
   refreshBtn: {
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#e8f0ff",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderWidth: 1.5, borderColor: "#dde6f7", backgroundColor: "#f0f4ff",
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
   },
-  refreshTxt: { color: "#0b57d0", fontWeight: "700", fontSize: 12 },
-  section: { fontSize: 13, fontWeight: "800", color: "#1e293b" },
-  subSection: { fontSize: 11, fontWeight: "700", color: "#475569", marginTop: 4 },
-  empty: { color: "#94a3b8", fontSize: 12, paddingVertical: 8 },
-  chips: { flexDirection: "row", gap: 8, paddingVertical: 4 },
+  refreshTxt: { color: "#2563eb", fontWeight: "700", fontSize: 12 },
+  section: { fontSize: 11, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.5 },
+  subSection: { fontSize: 11, fontWeight: "700", color: "#8896ae", marginTop: 6 },
+  empty: { color: "#8896ae", fontSize: 12, paddingVertical: 8 },
+  chips: { flexDirection: "row", gap: 8, paddingVertical: 6 },
   chip: {
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    backgroundColor: "#ffffff",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderWidth: 1.5, borderColor: "#d0dcf0", backgroundColor: "#f6f8fe",
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
   },
-  chipOn: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  chipTxt: { color: "#334155", fontWeight: "700", fontSize: 11 },
+  chipOn: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  chipTxt: { color: "#4a5a78", fontWeight: "700", fontSize: 11 },
   chipTxtOn: { color: "#fff" },
   row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "#f3f6ff",
-    borderRadius: 10,
-    padding: 8,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderWidth: 1.5, borderColor: "#dde6f7", borderRadius: 14, padding: 10, backgroundColor: "#f6f8fe",
   },
-  rowActive: { borderColor: "#93c5fd", backgroundColor: "#e8f0ff" },
-  rowName: { color: "#0b1220", fontWeight: "700", fontSize: 12 },
-  rowMeta: { color: "#64748b", fontSize: 11 },
-  rowDue: { color: "#dc2626", fontWeight: "800", fontSize: 12 },
-  supplierNote: { color: "#475569", fontSize: 12, fontWeight: "600" },
+  rowActive: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
+  rowName: { color: "#0c1228", fontWeight: "800", fontSize: 12 },
+  rowMeta: { color: "#8896ae", fontSize: 11, marginTop: 2 },
+  rowDue: { color: "#dc2626", fontWeight: "900", fontSize: 13 },
+  supplierNote: { color: "#4a5a78", fontSize: 12, fontWeight: "700" },
   input: {
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    fontSize: 13,
-    color: "#0b1220",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12, backgroundColor: "#f6f8fe",
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: "#0c1228",
   },
   saveBtn: {
-    backgroundColor: "#059669",
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: "center",
+    backgroundColor: "#059669", borderRadius: 14, paddingVertical: 13, alignItems: "center",
+    shadowColor: "#059669", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   saveBtnOff: { opacity: 0.6 },
-  saveTxt: { color: "#fff", fontWeight: "800" },
+  saveTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
   poRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f6ff",
-    paddingVertical: 8,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderBottomWidth: 1, borderBottomColor: "#f0f4ff", paddingVertical: 9,
   },
   stRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f6ff",
-    paddingVertical: 8,
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    borderBottomWidth: 1, borderBottomColor: "#f0f4ff", paddingVertical: 9,
   },
-  debit: { color: "#dc2626", fontSize: 11, fontWeight: "700" },
-  credit: { color: "#059669", fontSize: 11, fontWeight: "700" },
-  errorTitle: { fontSize: 16, fontWeight: "800", color: "#b91c1c" },
-  errorSub: { marginTop: 6, color: "#64748b" },
+  debit: { color: "#dc2626", fontSize: 12, fontWeight: "800" },
+  credit: { color: "#059669", fontSize: 12, fontWeight: "800" },
+  errorTitle: { fontSize: 16, fontWeight: "900", color: "#dc2626" },
+  errorSub: { marginTop: 8, color: "#8896ae", fontSize: 13 },
 });

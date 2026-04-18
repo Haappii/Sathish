@@ -91,7 +91,7 @@ export default function DayCloseScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       </SafeAreaView>
     );
   }
@@ -100,7 +100,7 @@ export default function DayCloseScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} colors={["#0b57d0"]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} colors={["#2563eb"]} />}
       >
         {/* Date + Status */}
         <View style={[styles.section, styles.headerSection]}>
@@ -124,7 +124,7 @@ export default function DayCloseScreen() {
             <View style={styles.statsGrid}>
               {[
                 { label: "Total Sales", value: fmt(report.total_sales ?? report.total_invoice_amount), accent: "#059669" },
-                { label: "Invoices", value: String(report.invoice_count ?? report.total_invoices ?? 0), accent: "#0b57d0" },
+                { label: "Invoices", value: String(report.invoice_count ?? report.total_invoices ?? 0), accent: "#2563eb" },
                 { label: "Cash", value: fmt(report.cash ?? report.cash_sales), accent: "#d97706" },
                 { label: "UPI", value: fmt(report.upi ?? report.upi_sales), accent: "#7c3aed" },
                 { label: "Card", value: fmt(report.card ?? report.card_sales), accent: "#0891b2" },
@@ -192,46 +192,52 @@ export default function DayCloseScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 32 },
   section: {
-    backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-    borderColor: "#d9e3ff", padding: 14, gap: 10,
+    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 14, gap: 10,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  headerSection: { backgroundColor: "#0b57d0" },
+  headerSection: { backgroundColor: "#0c1228" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   dateLabel: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  branchLabel: { color: "#bfdbfe", fontSize: 13 },
+  branchLabel: { color: "#7a8fa8", fontSize: 13, fontWeight: "600" },
   statusBadge: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, borderWidth: 2 },
   badgeOpen: { backgroundColor: "#dcfce7", borderColor: "#86efac" },
   badgeClosed: { backgroundColor: "#fee2e2", borderColor: "#fca5a5" },
   statusBadgeText: { fontWeight: "800", fontSize: 13 },
   badgeOpenText: { color: "#166534" },
   badgeClosedText: { color: "#991b1b" },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0b1220" },
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.6 },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kpiCard: {
-    width: "48%", backgroundColor: "#ffffff", borderRadius: 10,
-    borderWidth: 1, borderColor: "#d9e3ff", padding: 10, gap: 2,
+    width: "47.5%", backgroundColor: "#f6f8fe", borderRadius: 14,
+    borderWidth: 1.5, borderColor: "#dde6f7", padding: 12, gap: 3,
   },
-  kpiLabel: { fontSize: 11, color: "#64748b", fontWeight: "600" },
-  kpiValue: { fontSize: 16, fontWeight: "800" },
-  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 6, borderTopWidth: 1, borderTopColor: "#d9e3ff" },
+  kpiLabel: { fontSize: 10, color: "#8896ae", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  kpiValue: { fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 8, borderTopWidth: 1.5, borderTopColor: "#dde6f7" },
   expenseLabel: { color: "#dc2626", fontWeight: "700" },
   expenseValue: { color: "#dc2626", fontWeight: "800" },
   netRow: { flexDirection: "row", justifyContent: "space-between" },
   netLabel: { color: "#059669", fontWeight: "700" },
   netValue: { color: "#059669", fontWeight: "800", fontSize: 15 },
-  branchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 4 },
-  branchRowName: { color: "#334155", fontWeight: "600" },
-  miniStatus: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1 },
+  branchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f0f4ff" },
+  branchRowName: { color: "#4a5a78", fontWeight: "700" },
+  miniStatus: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1.5 },
   miniStatusText: { fontWeight: "700", fontSize: 11 },
   closeBtn: {
-    backgroundColor: "#dc2626", borderRadius: 14, paddingVertical: 15, alignItems: "center",
+    backgroundColor: "#dc2626", borderRadius: 16, paddingVertical: 15, alignItems: "center",
+    shadowColor: "#dc2626", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   closeBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
   btnDisabled: { opacity: 0.5 },
-  closedNotice: { backgroundColor: "#dcfce7", borderRadius: 12, padding: 14, alignItems: "center" },
-  closedNoticeText: { color: "#166534", fontWeight: "700", textAlign: "center" },
+  closedNotice: {
+    backgroundColor: "#ecfdf5", borderRadius: 16, padding: 16, alignItems: "center",
+    borderWidth: 1.5, borderColor: "#6ee7b7",
+  },
+  closedNoticeText: { color: "#166534", fontWeight: "700", textAlign: "center", fontSize: 14 },
 });

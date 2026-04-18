@@ -194,8 +194,8 @@ export default function CustomersScreen() {
             <Field label="Email"    value={form.email}   onChangeText={(t) => setForm((f) => ({ ...f, email: t }))} keyboardType="email-address" />
             <Field label="Address"  value={form.address} onChangeText={(t) => setForm((f) => ({ ...f, address: t }))} />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-              <Pressable style={[styles.closeBtn, { flex: 1, backgroundColor: "#d9e3ff" }]} onPress={() => setAddModal(false)}>
-                <Text style={[styles.closeBtnText, { color: "#475569" }]}>Cancel</Text>
+              <Pressable style={[styles.closeBtn, { flex: 1, backgroundColor: "#f0f4ff", borderWidth: 1.5, borderColor: "#dde6f7" }]} onPress={() => setAddModal(false)}>
+                <Text style={[styles.closeBtnText, { color: "#4a5a78" }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.closeBtn, { flex: 1 }]} onPress={saveCustomer} disabled={saving}>
                 <Text style={styles.closeBtnText}>{saving ? "Saving…" : "Save"}</Text>
@@ -211,23 +211,23 @@ export default function CustomersScreen() {
 function DetailRow({ label, value }) {
   if (!value) return null;
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f3f6ff" }}>
-      <Text style={{ color: "#64748b" }}>{label}</Text>
-      <Text style={{ fontWeight: "600", color: "#0b1220" }}>{value}</Text>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f4ff" }}>
+      <Text style={{ color: "#8896ae", fontSize: 13, fontWeight: "600" }}>{label}</Text>
+      <Text style={{ fontWeight: "700", color: "#0c1228", fontSize: 13 }}>{value}</Text>
     </View>
   );
 }
 
 function Field({ label, value, onChangeText, keyboardType }) {
   return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={{ color: "#64748b", marginBottom: 4, fontSize: 12 }}>{label}</Text>
+    <View style={{ marginBottom: 12 }}>
+      <Text style={{ color: "#4a5a78", marginBottom: 5, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</Text>
       <TextInput
-        style={{ borderWidth: 1, borderColor: "#d9e3ff", borderRadius: 8, padding: 10, backgroundColor: "#ffffff", color: "#0b1220" }}
+        style={{ borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#f6f8fe", color: "#0c1228", fontSize: 14 }}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType || "default"}
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor="#8896ae"
       />
     </View>
   );
@@ -238,56 +238,91 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: "#f3f6ff" },
+  safe:    { flex: 1, backgroundColor: "#f0f4ff" },
   center:  { flex: 1, alignItems: "center", justifyContent: "center" },
   topBar:  { flexDirection: "row", padding: 14, gap: 10 },
   searchInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderColor: "#d0dcf0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: "#fff",
-    color: "#0b1220",
+    color: "#0c1228",
+    fontSize: 14,
+    shadowColor: "#1a2463",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  addBtn: { backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 16, justifyContent: "center" },
-  addBtnText: { color: "#fff", fontWeight: "700" },
+  addBtn: {
+    backgroundColor: "#2563eb",
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    justifyContent: "center",
+    shadowColor: "#2563eb",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   card: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: "#dde6f7",
+    shadowColor: "#1a2463",
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
-  cardLeft:  { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  cardRight: { alignItems: "flex-end", gap: 4 },
+  cardLeft:  { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  cardRight: { alignItems: "flex-end", gap: 5 },
   avatar: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "#d7e4ff",
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: "#eef2ff",
     alignItems: "center", justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#dde6f7",
   },
-  avatarText: { color: "#0b57d0", fontWeight: "800", fontSize: 16 },
-  name:   { fontWeight: "700", color: "#0b1220" },
-  mobile: { color: "#64748b", fontSize: 13 },
-  walletBadge: { backgroundColor: "#dcfce7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  walletText:  { color: "#15803d", fontWeight: "600", fontSize: 12 },
-  dueBadge: { backgroundColor: "#fee2e2", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  dueText:  { color: "#b91c1c", fontWeight: "600", fontSize: 12 },
+  avatarText: { color: "#2563eb", fontWeight: "900", fontSize: 18 },
+  name:   { fontWeight: "800", color: "#0c1228", fontSize: 15 },
+  mobile: { color: "#4a5a78", fontSize: 13, marginTop: 2 },
+  walletBadge: { backgroundColor: "#ecfdf5", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "#6ee7b7" },
+  walletText:  { color: "#059669", fontWeight: "700", fontSize: 12 },
+  dueBadge: { backgroundColor: "#fef2f2", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "#fca5a5" },
+  dueText:  { color: "#dc2626", fontWeight: "700", fontSize: 12 },
   overlay: { flex: 1, justifyContent: "flex-end" },
-  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   modal: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 22,
+    paddingBottom: 44,
+    shadowColor: "#0c1228",
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220", marginBottom: 14 },
-  closeBtn: { backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  closeBtnText: { color: "#fff", fontWeight: "700" },
-  empty: { color: "#94a3b8" },
+  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", marginBottom: 16, letterSpacing: -0.3 },
+  closeBtn: {
+    backgroundColor: "#2563eb",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    shadowColor: "#2563eb",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  closeBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  empty: { color: "#8896ae", fontSize: 15 },
 });

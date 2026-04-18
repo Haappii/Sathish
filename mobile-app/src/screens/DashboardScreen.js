@@ -64,8 +64,8 @@ export default function DashboardScreen() {
 
         {/* Summary Cards */}
         <View style={styles.cardRow}>
-          <StatCard label="Today's Sales" value={`₹${fmt(sales)}`} color="#0b57d0" />
-          <StatCard label="Invoices"       value={String(invoices)}  color="#0b57d0" />
+          <StatCard label="Today's Sales" value={`₹${fmt(sales)}`} color="#2563eb" />
+          <StatCard label="Invoices"       value={String(invoices)}  color="#2563eb" />
         </View>
         <View style={styles.cardRow}>
           <StatCard label="Expenses" value={`₹${fmt(expense)}`} color="#b45309" />
@@ -113,7 +113,8 @@ export default function DashboardScreen() {
 
 function StatCard({ label, value, color }) {
   return (
-    <View style={[styles.card, { borderTopColor: color, borderTopWidth: 3 }]}>
+    <View style={styles.card}>
+      <View style={[styles.cardAccentBar, { backgroundColor: color }]} />
       <Text style={[styles.cardValue, { color }]}>{value}</Text>
       <Text style={styles.cardLabel}>{label}</Text>
     </View>
@@ -126,40 +127,49 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: "#f3f6ff" },
-  scroll: { padding: 14, gap: 12 },
+  safe:  { flex: 1, backgroundColor: "#f0f4ff" },
+  scroll: { padding: 14, gap: 12, paddingBottom: 28 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  dateLabel: { color: "#64748b", fontWeight: "600", marginBottom: 2 },
+  dateLabel: { color: "#8896ae", fontWeight: "700", fontSize: 12, marginBottom: 2, letterSpacing: 0.3 },
   cardRow:   { flexDirection: "row", gap: 10 },
   card: {
     flex: 1,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 14,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    paddingLeft: 18,
+    borderWidth: 1.5,
+    borderColor: "#dde6f7",
+    overflow: "hidden",
+    shadowColor: "#1a2463", shadowOpacity: 0.08, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
-  cardValue: { fontSize: 22, fontWeight: "800" },
-  cardLabel: { color: "#64748b", marginTop: 2, fontSize: 12 },
+  cardAccentBar: {
+    position: "absolute", top: 0, left: 0, bottom: 0, width: 4,
+    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
+  },
+  cardValue: { fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
+  cardLabel: { color: "#8896ae", marginTop: 3, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
   section: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 14,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderWidth: 1.5,
+    borderColor: "#dde6f7",
     gap: 10,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
-  sectionTitle: { fontWeight: "700", fontSize: 15, color: "#0b1220" },
+  sectionTitle: { fontWeight: "800", fontSize: 13, color: "#0c1228", textTransform: "uppercase", letterSpacing: 0.5 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f6ff",
+    borderBottomColor: "#f0f4ff",
   },
-  rowLabel: { fontWeight: "600", color: "#1e293b", maxWidth: "60%" },
-  rowSub:   { color: "#94a3b8", fontSize: 12 },
-  rowValue: { color: "#475569", fontSize: 13 },
-  empty: { color: "#94a3b8" },
+  rowLabel: { fontWeight: "700", color: "#0c1228", maxWidth: "60%", fontSize: 13 },
+  rowSub:   { color: "#8896ae", fontSize: 12, marginTop: 2 },
+  rowValue: { color: "#4a5a78", fontSize: 13, fontWeight: "700" },
+  empty: { color: "#8896ae", fontWeight: "600" },
 });

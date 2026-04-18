@@ -99,10 +99,10 @@ export default function CashDrawerScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
         >
           {/* Status Card */}
-          <View style={[styles.statusCard, { borderTopColor: isOpen ? "#16a34a" : "#64748b", borderTopWidth: 4 }]}>
+          <View style={[styles.statusCard, { borderColor: isOpen ? "#6ee7b7" : "#dde6f7" }]}>
             <Text style={styles.statusLabel}>Cash Drawer</Text>
             <View style={styles.statusRow}>
-              <Text style={[styles.statusBadge, { backgroundColor: isOpen ? "#dcfce7" : "#f3f6ff", color: isOpen ? "#15803d" : "#475569" }]}>
+              <Text style={[styles.statusBadge, { backgroundColor: isOpen ? "#dcfce7" : "#f0f4ff", color: isOpen ? "#15803d" : "#4a5a78" }]}>
                 {isOpen ? "OPEN" : "CLOSED"}
               </Text>
               {drawer?.opened_at && (
@@ -175,8 +175,8 @@ export default function CashDrawerScreen() {
               autoFocus
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: "#d9e3ff", flex: 1 }]} onPress={() => setOpenModal(false)}>
-                <Text style={[styles.btnText, { color: "#475569" }]}>Cancel</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: "#f0f4ff", flex: 1 }]} onPress={() => setOpenModal(false)}>
+                <Text style={[styles.btnText, { color: "#4a5a78" }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, { backgroundColor: "#16a34a", flex: 1 }]} onPress={openDrawer} disabled={saving}>
                 <Text style={styles.btnText}>{saving ? "Opening…" : "Open"}</Text>
@@ -203,8 +203,8 @@ export default function CashDrawerScreen() {
               autoFocus
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: "#d9e3ff", flex: 1 }]} onPress={() => setCloseModal(false)}>
-                <Text style={[styles.btnText, { color: "#475569" }]}>Cancel</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: "#f0f4ff", flex: 1 }]} onPress={() => setCloseModal(false)}>
+                <Text style={[styles.btnText, { color: "#4a5a78" }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, { backgroundColor: "#b91c1c", flex: 1 }]} onPress={closeDrawer} disabled={saving}>
                 <Text style={styles.btnText}>{saving ? "Closing…" : "Close"}</Text>
@@ -219,9 +219,9 @@ export default function CashDrawerScreen() {
 
 function AmountBox({ label, value, highlight }) {
   return (
-    <View style={[styles.amountBox, highlight && { backgroundColor: "#e8f0ff", borderColor: "#bfdbfe" }]}>
+    <View style={[styles.amountBox, highlight && { backgroundColor: "#eff4ff", borderColor: "#93c5fd" }]}>
       <Text style={styles.amountLabel}>{label}</Text>
-      <Text style={[styles.amountValue, highlight && { color: "#0b57d0" }]}>₹{fmt(value)}</Text>
+      <Text style={[styles.amountValue, highlight && { color: "#2563eb" }]}>₹{fmt(value)}</Text>
     </View>
   );
 }
@@ -236,75 +236,81 @@ function fmtTime(dt) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f3f6ff" },
+  safe:   { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   statusCard: {
     backgroundColor: "#fff",
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 16,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderWidth: 1.5,
+    borderColor: "#dde6f7",
     gap: 12,
+    shadowColor: "#1a2463", shadowOpacity: 0.08, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
-  statusLabel: { fontWeight: "700", fontSize: 16, color: "#0b1220" },
+  statusLabel: { fontWeight: "800", fontSize: 16, color: "#0c1228" },
   statusRow:   { flexDirection: "row", alignItems: "center", gap: 10 },
-  statusBadge: { fontWeight: "700", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, overflow: "hidden" },
-  statusTime:  { color: "#64748b", fontSize: 13 },
-  amountGrid:  { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  statusBadge: { fontWeight: "800", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, overflow: "hidden" },
+  statusTime:  { color: "#8896ae", fontSize: 13, fontWeight: "600" },
+  amountGrid:  { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   amountBox: {
     width: "47%",
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    backgroundColor: "#f6f8fe",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: "#dde6f7",
   },
-  amountLabel: { color: "#64748b", fontSize: 11, marginBottom: 2 },
-  amountValue: { fontWeight: "700", color: "#0b1220", fontSize: 15 },
-  noDrawer:    { color: "#94a3b8", textAlign: "center", paddingVertical: 10 },
+  amountLabel: { color: "#8896ae", fontSize: 10, marginBottom: 3, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  amountValue: { fontWeight: "800", color: "#0c1228", fontSize: 16 },
+  noDrawer:    { color: "#8896ae", textAlign: "center", paddingVertical: 12, fontWeight: "600" },
   actionRow:   { flexDirection: "row" },
-  btn:         { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  btnText:     { color: "#fff", fontWeight: "700" },
+  btn:         { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: "center", shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
+  btnText:     { color: "#fff", fontWeight: "800", fontSize: 14 },
   section: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 14,
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderWidth: 1.5,
+    borderColor: "#dde6f7",
     gap: 8,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
-  sectionTitle: { fontWeight: "700", fontSize: 15, color: "#0b1220" },
+  sectionTitle: { fontWeight: "800", fontSize: 14, color: "#0c1228" },
   txnRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f6ff",
+    borderBottomColor: "#f0f4ff",
   },
-  txnDesc:   { fontWeight: "600", color: "#1e293b" },
-  txnTime:   { color: "#94a3b8", fontSize: 12 },
-  txnAmount: { fontWeight: "700", fontSize: 15 },
+  txnDesc:   { fontWeight: "700", color: "#0c1228", fontSize: 13 },
+  txnTime:   { color: "#8896ae", fontSize: 12, marginTop: 2 },
+  txnAmount: { fontWeight: "800", fontSize: 15 },
   overlay:   { flex: 1, justifyContent: "flex-end" },
-  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   modal: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
-    gap: 10,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 22,
+    paddingBottom: 44,
+    gap: 12,
+    shadowColor: "#0c1228", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220" },
-  fieldLabel: { color: "#64748b", fontSize: 12, fontWeight: "600" },
+  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", letterSpacing: -0.3 },
+  fieldLabel: { color: "#4a5a78", fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
-    borderWidth: 1,
-    borderColor: "#d9e3ff",
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: "#ffffff",
-    color: "#0b1220",
-    fontSize: 18,
+    borderWidth: 1.5,
+    borderColor: "#d0dcf0",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: "#f6f8fe",
+    color: "#0c1228",
+    fontSize: 20,
+    fontWeight: "700",
   },
-  modalBtn: { borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  modalBtn: { borderRadius: 14, paddingVertical: 14, alignItems: "center", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
 });

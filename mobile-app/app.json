@@ -33,10 +33,10 @@
     "web": {
       "bundler": "metro"
     },
-    "owner": "haappii52",
+    "owner": "srikar52",
     "extra": {
       "eas": {
-        "projectId": "c8982018-797c-4547-be07-e8ef42475df6"
+        "projectId": "9c4dae84-9eec-4f50-95da-0c9afdd9b292"
       }
     }
   }

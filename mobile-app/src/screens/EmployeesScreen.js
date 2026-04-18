@@ -342,17 +342,17 @@ export default function EmployeesScreen({ route, navigation }) {
       )}
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       ) : activeTab === "settlements" ? (
         settleLoading ? (
-          <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+          <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
         ) : (
           <FlatList
             data={settlementRows}
             keyExtractor={(e) => String(e.employee_id)}
             renderItem={renderSettlement}
             contentContainerStyle={styles.list}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadSettlements} colors={["#0b57d0"]} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadSettlements} colors={["#2563eb"]} />}
             ListEmptyComponent={
               <View style={styles.emptyWrap}>
                 <Text style={styles.emptyIcon}>💵</Text>
@@ -368,7 +368,7 @@ export default function EmployeesScreen({ route, navigation }) {
           renderItem={renderEmployee}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#2563eb"]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -535,93 +535,103 @@ export default function EmployeesScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  tabRow: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingTop: 12 },
+  tabRow: { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 4 },
   tabBtn: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, paddingHorizontal: 12,
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999, paddingHorizontal: 14,
     paddingVertical: 8, backgroundColor: "#fff",
   },
-  tabBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  tabTxt: { color: "#334155", fontSize: 12, fontWeight: "700" },
+  tabBtnActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  tabTxt: { color: "#4a5a78", fontSize: 12, fontWeight: "700" },
   tabTxtActive: { color: "#fff" },
-  headerBar: { padding: 12, flexDirection: "row", gap: 8, alignItems: "center" },
+  headerBar: { paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row", gap: 8, alignItems: "center" },
   dateInput: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 10, paddingVertical: 10, color: "#0b1220", width: 120,
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0c1228", width: 126,
   },
   searchInput: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
+    backgroundColor: "#fff", paddingHorizontal: 13, paddingVertical: 10, color: "#0c1228",
+    shadowColor: "#1a2463", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
   addBtn: {
-    backgroundColor: "#0b57d0", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: "#2563eb", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
+    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
   },
-  addBtnText: { color: "#fff", fontWeight: "700" },
-  filterRow: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
+  addBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  filterRow: { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
   chip: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
-    paddingHorizontal: 14, paddingVertical: 6, backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 7, backgroundColor: "#f6f8fe",
   },
-  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  chipText: { color: "#334155", fontSize: 12, fontWeight: "600" },
+  chipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  chipText: { color: "#4a5a78", fontSize: 12, fontWeight: "700" },
   chipTextActive: { color: "#fff" },
-  list: { padding: 12, gap: 8, paddingTop: 0, paddingBottom: 24 },
+  list: { padding: 14, gap: 10, paddingTop: 0, paddingBottom: 28 },
   card: {
-    backgroundColor: "#fff", borderRadius: 12, borderWidth: 1,
-    borderColor: "#d9e3ff", padding: 12,
+    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 14,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   cardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: "#d7e4ff",
+    width: 46, height: 46, borderRadius: 23, backgroundColor: "#eef2ff",
     alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: "#dde6f7",
   },
-  avatarText: { color: "#0b57d0", fontSize: 18, fontWeight: "800" },
-  empName: { fontWeight: "800", color: "#0b1220", fontSize: 14 },
-  empMeta: { color: "#64748b", fontSize: 12, marginTop: 1 },
+  avatarText: { color: "#2563eb", fontSize: 18, fontWeight: "900" },
+  empName: { fontWeight: "800", color: "#0c1228", fontSize: 14 },
+  empMeta: { color: "#8896ae", fontSize: 12, marginTop: 2 },
   wageWrap: { alignItems: "flex-end" },
-  wageAmt: { fontSize: 15, fontWeight: "800", color: "#059669" },
-  wageLabel: { fontSize: 11, color: "#64748b" },
-  actionsRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  wageAmt: { fontSize: 16, fontWeight: "900", color: "#059669" },
+  wageLabel: { fontSize: 11, color: "#8896ae", fontWeight: "700", textTransform: "uppercase" },
+  actionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   actionBtn: {
-    flex: 1, borderRadius: 8, paddingVertical: 8, alignItems: "center", backgroundColor: "#e2e8f0",
+    flex: 1, borderRadius: 10, paddingVertical: 9, alignItems: "center",
+    backgroundColor: "#f0f4ff", borderWidth: 1.5, borderColor: "#dde6f7",
   },
-  actionBtnText: { fontSize: 12, fontWeight: "700", color: "#334155" },
-  deactivateBtn: { backgroundColor: "#b91c1c" },
-  restoreBtn: { backgroundColor: "#0b57d0" },
-  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 40 },
-  emptyTitle: { color: "#64748b", fontSize: 16, fontWeight: "700" },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(2,6,23,0.5)", justifyContent: "flex-end" },
+  actionBtnText: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  deactivateBtn: { backgroundColor: "#dc2626", borderColor: "#dc2626" },
+  restoreBtn: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
+  emptyIcon: { fontSize: 44 },
+  emptyTitle: { color: "#8896ae", fontSize: 16, fontWeight: "700" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(2,6,23,0.55)", justifyContent: "flex-end" },
   modalCard: {
-    backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, gap: 8, maxHeight: "90%",
+    backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 22, gap: 10, maxHeight: "92%",
+    shadowColor: "#0c1228", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0b1220", marginBottom: 4 },
-  label: { fontSize: 12, fontWeight: "700", color: "#334155" },
+  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", marginBottom: 4, letterSpacing: -0.3 },
+  label: { fontSize: 11, fontWeight: "700", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, backgroundColor: "#ffffff",
-    paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12, backgroundColor: "#f6f8fe",
+    paddingHorizontal: 13, paddingVertical: 12, color: "#0c1228", fontSize: 14,
   },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 8 },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
-  summaryLabel: { fontSize: 12, fontWeight: "700", color: "#475569" },
-  summaryValue: { fontSize: 13, fontWeight: "800", color: "#0b1220" },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f0f4ff" },
+  summaryLabel: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  summaryValue: { fontSize: 13, fontWeight: "800", color: "#0c1228" },
   paymentRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginTop: 6,
+    borderWidth: 1.5, borderColor: "#dde6f7", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, marginTop: 6,
+    backgroundColor: "#f6f8fe",
   },
-  paymentDate: { fontSize: 11, color: "#475569", width: 90 },
-  paymentMode: { fontSize: 11, color: "#334155", fontWeight: "700", flex: 1, textAlign: "center" },
-  paymentAmount: { fontSize: 12, color: "#047857", fontWeight: "800", width: 80, textAlign: "right" },
+  paymentDate: { fontSize: 11, color: "#4a5a78", width: 90 },
+  paymentMode: { fontSize: 11, color: "#0c1228", fontWeight: "700", flex: 1, textAlign: "center" },
+  paymentAmount: { fontSize: 12, color: "#059669", fontWeight: "800", width: 80, textAlign: "right" },
   cancelBtn: {
-    flex: 1, backgroundColor: "#d9e3ff", borderRadius: 10, paddingVertical: 12, alignItems: "center",
+    flex: 1, backgroundColor: "#f0f4ff", borderRadius: 14, paddingVertical: 13,
+    alignItems: "center", borderWidth: 1.5, borderColor: "#dde6f7",
   },
-  cancelBtnText: { color: "#334155", fontWeight: "700" },
+  cancelBtnText: { color: "#4a5a78", fontWeight: "700" },
   saveBtn: {
-    flex: 2, backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 12, alignItems: "center",
+    flex: 2, backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 13, alignItems: "center",
+    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
-  saveBtnText: { color: "#fff", fontWeight: "800" },
+  saveBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   btnDisabled: { opacity: 0.5 },
 });

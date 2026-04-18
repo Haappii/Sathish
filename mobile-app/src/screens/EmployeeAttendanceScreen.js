@@ -182,7 +182,7 @@ export default function EmployeeAttendanceScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       ) : allSaved ? (
         <View style={styles.alreadySavedWrap}>
           <Text style={styles.alreadySavedIcon}>✅</Text>
@@ -223,57 +223,61 @@ export default function EmployeeAttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  topBar: { padding: 12, flexDirection: "row", gap: 8 },
+  topBar: { paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", gap: 10 },
   dateInput: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
-    width: 130,
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0c1228", width: 136,
   },
   searchInput: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0b1220",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
+    backgroundColor: "#fff", paddingHorizontal: 13, paddingVertical: 10, color: "#0c1228",
+    shadowColor: "#1a2463", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  list: { padding: 12, gap: 8, paddingBottom: 24 },
+  list: { padding: 14, gap: 10, paddingBottom: 28 },
   card: {
-    backgroundColor: "#fff", borderRadius: 12, borderWidth: 1,
-    borderColor: "#d9e3ff", padding: 12, gap: 10,
+    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 14, gap: 12,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: "#d7e4ff",
+    width: 44, height: 44, borderRadius: 22, backgroundColor: "#eef2ff",
     alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: "#dde6f7",
   },
-  avatarText: { color: "#0b57d0", fontSize: 16, fontWeight: "800" },
-  empName: { fontWeight: "700", color: "#0b1220" },
-  empMeta: { color: "#64748b", fontSize: 12 },
+  avatarText: { color: "#2563eb", fontSize: 17, fontWeight: "900" },
+  empName: { fontWeight: "800", color: "#0c1228", fontSize: 14 },
+  empMeta: { color: "#8896ae", fontSize: 12, marginTop: 2 },
   unitsInput: {
-    width: 50, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8,
-    paddingHorizontal: 6, paddingVertical: 6, textAlign: "center",
-    color: "#0b1220", backgroundColor: "#ffffff",
+    width: 52, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
+    paddingHorizontal: 6, paddingVertical: 8, textAlign: "center",
+    color: "#0c1228", backgroundColor: "#f6f8fe", fontSize: 14, fontWeight: "700",
   },
-  unitsLabel: { color: "#64748b", fontSize: 12, fontWeight: "600" },
-  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  unitsLabel: { color: "#8896ae", fontSize: 12, fontWeight: "700" },
+  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statusBtn: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f6f8fe",
   },
-  statusTxt: { fontSize: 11, fontWeight: "700", color: "#334155" },
+  statusTxt: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
   saveBtn: {
-    margin: 12, backgroundColor: "#0b57d0", borderRadius: 12,
-    paddingVertical: 14, alignItems: "center",
+    margin: 14, backgroundColor: "#2563eb", borderRadius: 14,
+    paddingVertical: 15, alignItems: "center",
+    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   saveBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
   btnDisabled: { opacity: 0.5 },
-  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 40 },
-  emptyTitle: { color: "#64748b", fontSize: 16, fontWeight: "700" },
+  emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
+  emptyIcon: { fontSize: 44 },
+  emptyTitle: { color: "#8896ae", fontSize: 16, fontWeight: "700" },
   alreadySavedWrap: {
     flex: 1, alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 32, gap: 12,
+    paddingHorizontal: 32, gap: 14,
   },
-  alreadySavedIcon: { fontSize: 52 },
-  alreadySavedTitle: { fontSize: 18, fontWeight: "800", color: "#166534", textAlign: "center" },
-  alreadySavedMsg: { fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 20 },
+  alreadySavedIcon: { fontSize: 56 },
+  alreadySavedTitle: { fontSize: 18, fontWeight: "900", color: "#059669", textAlign: "center" },
+  alreadySavedMsg: { fontSize: 14, color: "#8896ae", textAlign: "center", lineHeight: 22 },
 });

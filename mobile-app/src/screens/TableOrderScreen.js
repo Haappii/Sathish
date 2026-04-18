@@ -558,7 +558,7 @@ export default function TableOrderScreen({ route, navigation }) {
                     <Text style={styles.qtyNum}>{qty}</Text>
                   </>
                 ) : null}
-                <Pressable style={[styles.qtyBtn, { backgroundColor: "#0b57d0" }]} onPress={() => adjust(item.item_id, 1)}>
+                <Pressable style={[styles.qtyBtn, { backgroundColor: "#2563eb" }]} onPress={() => adjust(item.item_id, 1)}>
                   <Text style={[styles.qtyBtnText, { color: "#fff" }]}>+</Text>
                 </Pressable>
               </View>
@@ -894,10 +894,10 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f3f6ff" },
+  safe:   { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   orderBanner: {
-    backgroundColor: "#0b57d0",
+    backgroundColor: "#2563eb",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -906,7 +906,7 @@ const styles = StyleSheet.create({
   orderBannerText: { color: "#bfdbfe", fontWeight: "600", flex: 1 },
   bannerActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   billBtn:     { backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  billBtnText: { color: "#0b57d0", fontWeight: "800" },
+  billBtnText: { color: "#2563eb", fontWeight: "800" },
   transferBtn: { backgroundColor: "#e0e7ff", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   transferBtnText: { color: "#3730a3", fontWeight: "800" },
   cancelTableBtn: { backgroundColor: "#fee2e2", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
@@ -916,19 +916,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderColor: "#dde6f7",
     color: "#0b1220",
   },
   catChip: {
     borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderColor: "#dde6f7",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginRight: 8,
     backgroundColor: "#fff",
   },
-  catChipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  catChipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
   catText:       { color: "#475569", fontWeight: "600", fontSize: 13 },
   catTextActive: { color: "#fff" },
   itemCard: {
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderColor: "#dde6f7",
   },
   itemThumb: {
     width: 44,
@@ -951,11 +951,11 @@ const styles = StyleSheet.create({
   itemName:  { fontWeight: "600", color: "#0b1220" },
   itemPrice: { color: "#475569", marginTop: 2 },
   qtyRow:    { flexDirection: "row", alignItems: "center", gap: 8 },
-  qtyBtn:    { width: 32, height: 32, borderRadius: 8, backgroundColor: "#f3f6ff", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#d9e3ff" },
+  qtyBtn:    { width: 32, height: 32, borderRadius: 8, backgroundColor: "#f0f4ff", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#dde6f7" },
   qtyBtnText: { fontWeight: "800", fontSize: 18 },
   qtyNum:    { fontWeight: "700", fontSize: 16, minWidth: 20, textAlign: "center" },
   cartFooter: {
-    backgroundColor: "#0b57d0",
+    backgroundColor: "#2563eb",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
   cartItems: { color: "#bfdbfe", fontSize: 12 },
   cartTotal: { color: "#fff", fontWeight: "800", fontSize: 18 },
   kotBtn:    { backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
-  kotBtnText: { color: "#0b57d0", fontWeight: "800" },
+  kotBtnText: { color: "#2563eb", fontWeight: "800" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(2,6,23,0.45)",
@@ -976,7 +976,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderColor: "#dde6f7",
   },
   modalTitle: { fontSize: 16, fontWeight: "800", color: "#0b1220" },
   modalSubTitle: { fontSize: 13, fontWeight: "700", color: "#334155" },
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f6ff",
+    borderBottomColor: "#f0f4ff",
     paddingVertical: 6,
   },
   modalItemName: { color: "#0b1220", flex: 1, paddingRight: 8 },
@@ -992,10 +992,10 @@ const styles = StyleSheet.create({
   modalTotal: { textAlign: "right", fontWeight: "800", fontSize: 16, color: "#047857" },
   modalBreakdown: { textAlign: "right", color: "#334155", fontWeight: "600" },
   modalGrandTotal: { textAlign: "right", fontWeight: "900", fontSize: 18, color: "#047857" },
-  lookupHint: { color: "#0b57d0", fontSize: 12, fontWeight: "600" },
+  lookupHint: { color: "#2563eb", fontSize: 12, fontWeight: "600" },
   transferRow: {
     borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderColor: "#dde6f7",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1019,7 +1019,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     backgroundColor: "#fff",
   },
-  paymentBtnActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  paymentBtnActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
   paymentBtnText: { color: "#334155", fontWeight: "700", fontSize: 12 },
   paymentBtnTextActive: { color: "#fff" },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 4 },
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: "#fff",
   },
-  upiTabActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
+  upiTabActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
   upiTabText: { fontSize: 12, fontWeight: "700", color: "#334155" },
   upiTabTextActive: { color: "#fff" },
   upiQrBox: {
@@ -1057,12 +1057,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8faff",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#d9e3ff",
+    borderColor: "#dde6f7",
     padding: 14,
     gap: 6,
   },
   upiQrId: { fontSize: 12, fontWeight: "700", color: "#334155", textAlign: "center" },
-  upiQrAmt: { fontSize: 14, fontWeight: "800", color: "#0b57d0", textAlign: "center" },
+  upiQrAmt: { fontSize: 14, fontWeight: "800", color: "#2563eb", textAlign: "center" },
   upiNoIdBox: {
     backgroundColor: "#fef9ec",
     borderRadius: 10,

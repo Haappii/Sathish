@@ -26,7 +26,7 @@ const NEXT_STATUS = {
 
 const STATUS_COLOR = {
   NEW: "#d97706",
-  ACCEPTED: "#0b57d0",
+  ACCEPTED: "#2563eb",
   PREPARING: "#7c3aed",
   READY: "#0891b2",
   DISPATCHED: "#9333ea",
@@ -185,7 +185,7 @@ export default function OnlineOrdersScreen() {
       />
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#0b57d0" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       ) : (
         <FlatList
           data={orders}
@@ -193,7 +193,7 @@ export default function OnlineOrdersScreen() {
           renderItem={renderOrder}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#0b57d0"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={["#2563eb"]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -209,41 +209,44 @@ export default function OnlineOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f6ff" },
+  safe: { flex: 1, backgroundColor: "#f0f4ff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  filterBar: { flexDirection: "row", padding: 12, paddingBottom: 4, gap: 8 },
-  statusBar: { paddingHorizontal: 12, paddingBottom: 8, flexGrow: 0 },
+  filterBar: { flexDirection: "row", padding: 14, paddingBottom: 6, gap: 8 },
+  statusBar: { paddingHorizontal: 14, paddingBottom: 10, flexGrow: 0 },
   chip: {
-    borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 6, marginRight: 6, backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
+    paddingHorizontal: 13, paddingVertical: 7, marginRight: 6, backgroundColor: "#f6f8fe",
   },
-  chipActive: { backgroundColor: "#0b57d0", borderColor: "#0b57d0" },
-  chipText: { fontSize: 11, fontWeight: "600", color: "#334155" },
+  chipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  chipText: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
   chipTextActive: { color: "#fff" },
-  list: { padding: 12, paddingTop: 0, gap: 8, paddingBottom: 24 },
+  list: { padding: 14, paddingTop: 4, gap: 10, paddingBottom: 24 },
   card: {
-    backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-    borderColor: "#d9e3ff", padding: 12, gap: 8,
+    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#dde6f7", padding: 14, gap: 10,
+    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  cardTop: { flexDirection: "row", gap: 8 },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  orderId: { fontWeight: "800", color: "#0b1220", fontSize: 13 },
-  providerBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  cardTop: { flexDirection: "row", gap: 10 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  orderId: { fontWeight: "900", color: "#0c1228", fontSize: 14 },
+  providerBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   providerText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  orderMeta: { color: "#64748b", fontSize: 12, marginTop: 1 },
-  itemsList: { color: "#475569", fontSize: 11, marginTop: 2 },
-  rightCol: { alignItems: "flex-end", gap: 4 },
-  orderAmt: { fontSize: 15, fontWeight: "800", color: "#059669" },
-  statusBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  statusText: { fontSize: 10, fontWeight: "700" },
+  orderMeta: { color: "#4a5a78", fontSize: 12, marginTop: 2, fontWeight: "600" },
+  itemsList: { color: "#8896ae", fontSize: 11, marginTop: 3, lineHeight: 16 },
+  rightCol: { alignItems: "flex-end", gap: 6 },
+  orderAmt: { fontSize: 15, fontWeight: "900", color: "#059669" },
+  statusBadge: { borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 4 },
+  statusText: { fontSize: 10, fontWeight: "800" },
   nextBtn: {
-    backgroundColor: "#0b57d0", borderRadius: 10, paddingVertical: 10,
+    backgroundColor: "#2563eb", borderRadius: 13, paddingVertical: 12,
     alignItems: "center", justifyContent: "center",
+    shadowColor: "#2563eb", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  nextBtnText: { color: "#fff", fontWeight: "700" },
+  nextBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   btnDisabled: { opacity: 0.5 },
-  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 40 },
-  emptyTitle: { color: "#64748b", fontSize: 16, fontWeight: "700" },
-  emptyMsg: { color: "#94a3b8", fontSize: 13 },
+  emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
+  emptyIcon: { fontSize: 48 },
+  emptyTitle: { color: "#8896ae", fontSize: 16, fontWeight: "800" },
+  emptyMsg: { color: "#8896ae", fontSize: 13 },
 });
