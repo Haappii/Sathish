@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models.advance_order import AdvanceOrder
+from app.models.shop_details import ShopDetails
 from app.utils.permissions import require_permission
+from app.services.whatsapp_service import (
+    get_branch_invoice_whatsapp_settings,
+    send_advance_receipt_whatsapp_async,
+)
 
 router = APIRouter(prefix="/advance-orders", tags=["Advance Orders"])
 
@@ -175,6 +180,48 @@ def create_advance_order(
         db.rollback()
         raise HTTPException(500, "Failed to create advance order")
 
+    try:
+        whatsapp_settings = get_branch_invoice_whatsapp_settings(
+            db, shop_id=user.shop_id, branch_id=branch_id
+        )
+        if whatsapp_settings.get("enabled") and order.customer_phone:
+            shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+            items = [
+                {
+                    "item_name": it.get("item_name") or it.get("name") or f"Item {it.get('item_id', '')}",
+                    "qty": it.get("qty") or it.get("quantity") or 1,
+                    "rate": float(it.get("rate") or it.get("price") or 0),
+                    "amount": float(it.get("amount") or 0),
+                }
+                for it in (order.order_items or [])
+            ]
+            receipt_data = {
+                "shop_name": getattr(shop, "shop_name", None),
+                "shop_phone": getattr(shop, "phone", None),
+                "shop_gst": getattr(shop, "gst_number", None),
+                "order_id": order.order_id,
+                "created_at": order.created_at,
+                "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
+                "items": items,
+                "total_amount": float(order.total_amount or 0),
+                "advance_amount": float(order.advance_amount or 0),
+                "advance_payment_mode": order.advance_payment_mode,
+                "expected_date": str(order.expected_date or ""),
+                "expected_time": order.expected_time,
+                "notes": order.notes,
+            }
+            send_advance_receipt_whatsapp_async(
+                mobile=order.customer_phone,
+                customer_name=order.customer_name,
+                order_id=order.order_id,
+                shop_name=getattr(shop, "shop_name", None),
+                country_code=str(whatsapp_settings.get("country_code") or "91"),
+                receipt_data=receipt_data,
+            )
+    except Exception:
+        pass
+
     return _to_out(order)
 
 
@@ -307,6 +354,49 @@ def collect_due_amount(
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(500, "Failed to collect due amount")
+
+    try:
+        whatsapp_settings = get_branch_invoice_whatsapp_settings(
+            db, shop_id=user.shop_id, branch_id=order.branch_id
+        )
+        if whatsapp_settings.get("enabled") and order.customer_phone:
+            shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+            items = [
+                {
+                    "item_name": it.get("item_name") or it.get("name") or f"Item {it.get('item_id', '')}",
+                    "qty": it.get("qty") or it.get("quantity") or 1,
+                    "rate": float(it.get("rate") or it.get("price") or 0),
+                    "amount": float(it.get("amount") or 0),
+                }
+                for it in (order.order_items or [])
+            ]
+            receipt_data = {
+                "shop_name": getattr(shop, "shop_name", None),
+                "shop_phone": getattr(shop, "phone", None),
+                "shop_gst": getattr(shop, "gst_number", None),
+                "order_id": order.order_id,
+                "created_at": order.created_at,
+                "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
+                "items": items,
+                "total_amount": float(order.total_amount or 0),
+                "advance_amount": float(order.advance_amount or 0),
+                "due_amount": due_after,
+                "advance_payment_mode": order.advance_payment_mode,
+                "expected_date": str(order.expected_date or ""),
+                "expected_time": order.expected_time,
+                "notes": order.notes,
+            }
+            send_advance_receipt_whatsapp_async(
+                mobile=order.customer_phone,
+                customer_name=order.customer_name,
+                order_id=order.order_id,
+                shop_name=getattr(shop, "shop_name", None),
+                country_code=str(whatsapp_settings.get("country_code") or "91"),
+                receipt_data=receipt_data,
+            )
+    except Exception:
+        pass
 
     return {
         **_to_out(order),

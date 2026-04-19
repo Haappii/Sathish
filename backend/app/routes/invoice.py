@@ -58,6 +58,7 @@ from app.services.invoice_share_service import build_public_invoice_url, parse_i
 from app.services.whatsapp_service import (
     get_branch_invoice_whatsapp_settings,
     send_invoice_link_whatsapp_async,
+    send_invoice_pdf_whatsapp_async,
 )
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
@@ -763,13 +764,50 @@ def create_invoice(
             branch_id=branch_id,
         )
         if whatsapp_settings.get("enabled"):
-            send_invoice_link_whatsapp_async(
+            inv_items = [
+                {
+                    "name": item_map.get(it.item_id).item_name if item_map.get(it.item_id) else f"Item {it.item_id}",
+                    "qty": it.quantity,
+                    "rate": float(it.amount) / max(int(it.quantity), 1),
+                    "tax_rate": float(getattr(item_map.get(it.item_id), "gst_rate", 0) or 0),
+                    "amount": float(it.amount),
+                }
+                for it in payload.items
+            ]
+            br = branch_row
+            branch_addr_parts = [
+                getattr(br, "address_line1", None),
+                getattr(br, "address_line2", None),
+                getattr(br, "city", None),
+                getattr(br, "state", None),
+            ] if br else []
+            branch_addr = ", ".join(p for p in branch_addr_parts if p)
+            invoice_data = {
+                "shop_name": getattr(shop, "shop_name", None),
+                "shop_address": None,
+                "shop_phone": getattr(shop, "phone", None),
+                "shop_gst": getattr(shop, "gst_number", None),
+                "branch_address": branch_addr or None,
+                "invoice_number": invoice.invoice_number,
+                "created_time": invoice.created_time,
+                "payment_mode": invoice.payment_mode,
+                "customer_name": invoice.customer_name,
+                "customer_mobile": invoice.mobile,
+                "customer_gst": invoice.gst_number,
+                "items": inv_items,
+                "subtotal": float(invoice.total_amount or 0) - float(invoice.tax_amt or 0),
+                "tax_amt": float(invoice.tax_amt or 0),
+                "discounted_amt": float(invoice.discounted_amt or 0),
+                "total_amount": float(invoice.total_amount or 0),
+            }
+            send_invoice_pdf_whatsapp_async(
                 mobile=invoice.mobile,
                 customer_name=invoice.customer_name,
                 invoice_number=invoice.invoice_number,
-                invoice_url=build_public_invoice_url(int(user.shop_id), invoice.invoice_number),
                 shop_name=getattr(shop, "shop_name", None),
                 country_code=str(whatsapp_settings.get("country_code") or "91"),
+                invoice_data=invoice_data,
+                invoice_url=build_public_invoice_url(int(user.shop_id), invoice.invoice_number),
             )
     except Exception:
         # Never block invoice creation due to optional WhatsApp messaging setup/runtime issues.

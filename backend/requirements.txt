@@ -38,6 +38,7 @@ typing_extensions==4.15.0
 uvicorn==0.40.0
 wrapt==2.1.2
 Pillow==10.4.0
+fpdf2==2.8.3
 
 # ── Testing (not needed in production) ──────────────────────────────────────
 coverage==7.13.5
