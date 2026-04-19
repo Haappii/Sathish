@@ -743,14 +743,14 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     html, body {
       margin: 0;
       padding: 0;
-      width: ${paperWidth};
+      width: 100%;
       background: #fff;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     body { font-family: monospace; }
     .receipt {
-      width: ${paperWidth};
+      width: 100%;
       margin: 0;
       padding: 0;
     }
@@ -864,6 +864,18 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     true
   );
 
+  // Resolve printer: explicit option > env var > auto-detect by thermal keywords
+  let deviceName = String(options.printerName || process.env.THERMAL_PRINTER_NAME || "").trim();
+  if (!deviceName) {
+    try {
+      const printers = await printWin.webContents.getPrintersAsync();
+      const thermal = printers.find(p =>
+        /58mm|pos[-_.]?58|thermal|receipt|sp[-_.]?drv|xprinter|postek|hprt|bixolon/i.test(p.name)
+      );
+      if (thermal) deviceName = thermal.name;
+    } catch {}
+  }
+
   return new Promise((resolve, reject) => {
     const opts = {
       silent: true,
@@ -871,7 +883,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
       margins: { marginType: "none" },
       pageSize: { width: pageWidth, height: 200000 },
     };
-    if (process.env.THERMAL_PRINTER_NAME) opts.deviceName = process.env.THERMAL_PRINTER_NAME;
+    if (deviceName) opts.deviceName = deviceName;
 
     printWin.webContents.print(opts, (success, failureReason) => {
       setTimeout(() => printWin.close(), 200);
@@ -879,6 +891,16 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
       else reject(new Error(failureReason || "print failed"));
     });
   });
+});
+
+ipcMain.handle("list-printers", async () => {
+  try {
+    if (!mainWindow) return [];
+    const printers = await mainWindow.webContents.getPrintersAsync();
+    return printers.map(p => ({ name: p.name, isDefault: p.isDefault }));
+  } catch {
+    return [];
+  }
 });
 
 function buildEscPosBuffer(text, { codepage = 0, fontSize = 12, feedLines = 4 } = {}) {

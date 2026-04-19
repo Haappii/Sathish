@@ -58,4 +58,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   rawPrintText: async ({ text = "", port, codepage } = {}) => {
     return ipcRenderer.invoke("raw-print-text", { text, port, codepage });
   },
+
+  /** Returns the list of installed Windows printers: [{ name, isDefault }] */
+  listPrinters: () => ipcRenderer.invoke("list-printers"),
 });

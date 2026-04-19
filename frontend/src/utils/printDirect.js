@@ -63,6 +63,7 @@ const waitForPrintAssets = async (targetWindow, timeoutMs = 2000) => {
 export async function printDirectText(text, { fontSize = 9, port = "COM7", paperSize = "58mm", extraHtml = "", headerHtml = "" } = {}) {
   const hasExtraHtml = String(extraHtml || "").trim().length > 0 || String(headerHtml || "").trim().length > 0;
   const paperWidth = String(paperSize || "58mm") === "80mm" ? "80mm" : "58mm";
+  const printerName = (typeof localStorage !== "undefined" && localStorage.getItem("thermalPrinterName")) || undefined;
 
   // Try Electron silent print first (desktop app)
   if (window?.electronAPI?.rawPrintText || window?.electronAPI?.silentPrintText) {
@@ -84,10 +85,10 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
         console.warn("Raw print failed, falling back to browser print", e);
       }
     }
-    // 2) Silent browser print (honors fontSize and paperSize)
+    // 2) Silent browser print (honors fontSize, paperSize, and saved thermal printer name)
     if (window.electronAPI.silentPrintText) {
       try {
-        const ok = await window.electronAPI.silentPrintText(text, { fontSize, paperSize, extraHtml, headerHtml });
+        const ok = await window.electronAPI.silentPrintText(text, { fontSize, paperSize, extraHtml, headerHtml, printerName });
         if (ok) return true;
       } catch (e) {
         console.warn("Silent browser print failed", e);
@@ -122,7 +123,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
             html, body {
               margin: 0;
               padding: 0;
-              width: ${paperWidth};
+              width: 100%;
               background: #fff;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -131,9 +132,9 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               font-family: monospace;
             }
             .receipt {
-              width: ${paperWidth};
+              width: 100%;
               margin: 0;
-              padding: 1.5mm 2.2mm 0 0;
+              padding: 0;
               box-sizing: border-box;
             }
             pre {

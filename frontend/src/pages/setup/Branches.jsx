@@ -39,6 +39,10 @@ export default function Branches() {
   const [hotelShop, setHotelShop] = useState(
     () => localStorage.getItem("billing_type") === "hotel"
   );
+  const [availablePrinters, setAvailablePrinters] = useState([]);
+  const [thermalPrinterName, setThermalPrinterName] = useState(
+    () => localStorage.getItem("thermalPrinterName") || ""
+  );
 
   const emptyForm = useMemo(
     () => ({
@@ -172,7 +176,19 @@ export default function Branches() {
       });
   }, [loadBranches]);
 
+  useEffect(() => {
+    if (window.electronAPI?.listPrinters) {
+      window.electronAPI.listPrinters().then(list => setAvailablePrinters(list || [])).catch(() => {});
+    }
+  }, []);
+
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handlePrinterChange = (name) => {
+    setThermalPrinterName(name);
+    if (name) localStorage.setItem("thermalPrinterName", name);
+    else localStorage.removeItem("thermalPrinterName");
+  };
 
   const saveBranch = async () => {
     if (!isAdmin && !editingId) {
@@ -588,6 +604,29 @@ export default function Branches() {
                     onChange={e => setField("fssai_number", e.target.value)}
                   />
                 </div>
+                {availablePrinters.length > 0 && (
+                  <div className="py-2 space-y-1.5 md:col-span-2">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">Desktop Thermal Printer</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Select the printer for this computer (saved locally, not synced)</p>
+                    </div>
+                    <select
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition bg-white"
+                      value={thermalPrinterName}
+                      onChange={e => handlePrinterChange(e.target.value)}
+                    >
+                      <option value="">— Auto-detect (use keywords: thermal / 58mm / pos) —</option>
+                      {availablePrinters.map(p => (
+                        <option key={p.name} value={p.name}>
+                          {p.name}{p.isDefault ? " ✓ (default)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {thermalPrinterName && (
+                      <p className="text-xs text-green-600">Saved: receipts will print to &quot;{thermalPrinterName}&quot;</p>
+                    )}
+                  </div>
+                )}
               </div>
             </FormSection>
 
