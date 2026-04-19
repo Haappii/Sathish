@@ -502,7 +502,7 @@ export default function TableOrder() {
         invoiceTotal: invoice.total_amount,
       }),
       {
-        fontSize: 8,
+        fontSize: 9,
         paperSize: branch?.paper_size || "58mm",
         headerHtml: logoHtml,
         extraHtml: qrHtml,

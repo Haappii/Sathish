@@ -1007,7 +1007,7 @@ const [customer, setCustomer] = useState({
           generateFeedbackQrHtml(res.data.invoice_number),
         ]);
         const ok = await printDirectText(generateBillText(res.data.invoice_number), {
-          fontSize: 8,
+          fontSize: 9,
           paperSize: branch?.paper_size || "58mm",
           headerHtml: logoHtml,
           extraHtml: qrHtml,

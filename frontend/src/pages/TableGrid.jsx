@@ -423,7 +423,7 @@ export default function TableGrid() {
         if (receiptRequired) {
           const ok = await printDirectText(
             generateBillText(invoice, shopRes.data || {}, branchData, items),
-            { fontSize: 8, paperSize: branchData?.paper_size || "58mm" }
+            { fontSize: 9, paperSize: branchData?.paper_size || "58mm" }
           );
           if (ok) {
             showToast("Order completed and invoice printed", "success");

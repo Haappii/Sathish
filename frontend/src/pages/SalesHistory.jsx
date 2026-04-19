@@ -396,7 +396,7 @@ export default function SalesHistory() {
       enabled: branch?.feedback_qr_enabled !== false,
     });
     const ok = await printDirectText(generateBillText(), {
-      fontSize: 8,
+      fontSize: 9,
       paperSize: branch?.paper_size || "58mm",
       extraHtml: qrHtml,
     });

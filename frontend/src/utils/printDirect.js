@@ -142,7 +142,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               padding: 1.5mm 2.2mm 0 1.5mm;
               font-family: Consolas, "Courier New", monospace;
               font-size: ${Math.max(Number(fontSize) || 9, 6)}px;
-              line-height: 1.1;
+              line-height: 1.2;
               width: 100%;
               letter-spacing: 0;
               white-space: pre;

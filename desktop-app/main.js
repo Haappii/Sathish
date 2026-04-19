@@ -756,15 +756,15 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     }
     pre {
       margin: 0;
-      padding: 0;
       box-sizing: border-box;
       padding: 0 1.5mm;
       font-family: Consolas, "Courier New", monospace;
       font-size: ${Math.max(fontSize, 6)}px;
-      line-height: 1.1;
+      line-height: 1.2;
       width: 100%;
       letter-spacing: 0;
       white-space: pre;
+      overflow: hidden;
     }
     .header-html {
       box-sizing: border-box;
@@ -883,7 +883,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
 
 function buildEscPosBuffer(text, { codepage = 0, fontSize = 12, feedLines = 4 } = {}) {
   const chunks = [];
-  const useFontB = Number(fontSize) <= 9; // choose smaller built-in font
+  const useFontB = false; // always Font A for clean, full-width characters on 58mm paper
   const normalizedFeed = Math.min(12, Math.max(4, Math.round(feedLines)));
   const safeText = String(text || "").replace(/\r\n/g, "\n");
   const body = safeText.endsWith("\n") ? safeText : `${safeText}\n`;
