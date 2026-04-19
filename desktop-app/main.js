@@ -864,15 +864,19 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     true
   );
 
-  // Resolve printer: explicit option > env var > auto-detect by thermal keywords
+  // Resolve printer: explicit option > env var > thermal keyword match > first non-system printer
   let deviceName = String(options.printerName || process.env.THERMAL_PRINTER_NAME || "").trim();
   if (!deviceName) {
     try {
       const printers = await printWin.webContents.getPrintersAsync();
+      const systemPrinter = /microsoft|xps|pdf|onenote|fax|generic text|adobe/i;
       const thermal = printers.find(p =>
-        /58mm|pos[-_.]?58|thermal|receipt|sp[-_.]?drv|xprinter|postek|hprt|bixolon/i.test(p.name)
+        /58mm|pos[-_.]?58|thermal|receipt|sp[-_.]?drv|xprinter|postek|hprt|bixolon|mobile\s*print/i.test(p.name)
       );
-      if (thermal) deviceName = thermal.name;
+      // Fallback: first printer that isn't a known system/virtual printer
+      const fallback = printers.find(p => !systemPrinter.test(p.name));
+      const chosen = thermal || fallback;
+      if (chosen) deviceName = chosen.name;
     } catch {}
   }
 
