@@ -261,6 +261,18 @@ export default function MainLayout({ hideSidebar = false }) {
     return () => window.removeEventListener("online", attemptSync);
   }, [showToast]);
 
+  useEffect(() => {
+    const onBrowserPrint = (e) => {
+      const size = e?.detail?.paperSize || "58mm";
+      showToast(
+        `Print dialog opened — select your ${size} thermal printer from the list`,
+        "info"
+      );
+    };
+    window.addEventListener("haappii:browser-print", onBrowserPrint);
+    return () => window.removeEventListener("haappii:browser-print", onBrowserPrint);
+  }, [showToast]);
+
   /* ================= SHOP DETAILS ================= */
   useEffect(() => {
     api.get("/shop/details")

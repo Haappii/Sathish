@@ -96,6 +96,9 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
     }
   }
 
+  // Notify the app so it can guide the user (e.g. "select your thermal printer")
+  window.dispatchEvent(new CustomEvent("haappii:browser-print", { detail: { paperSize: paperWidth } }));
+
   // Browser fallback: hidden iframe + print dialog
   try {
     const iframe = document.createElement("iframe");
