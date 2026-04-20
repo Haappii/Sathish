@@ -746,14 +746,14 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
+      width: ${paperWidth};
       background: #fff;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     body { font-family: monospace; }
     .receipt {
-      width: 100%;
+      width: ${paperWidth};
       margin: 0;
       padding: 0;
     }
@@ -764,14 +764,14 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
       font-family: Consolas, "Courier New", monospace;
       font-size: ${fontSizeMm}mm;
       line-height: 1.2;
-      width: 100%;
+      width: ${paperWidth};
       letter-spacing: 0;
       white-space: pre;
       overflow: hidden;
     }
     .header-html {
       box-sizing: border-box;
-      width: 100%;
+      width: ${paperWidth};
       margin: 0;
       padding: 1.5mm 1.5mm 0;
       text-align: center;
@@ -790,7 +790,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     }
     .extra-html {
       box-sizing: border-box;
-      width: 100%;
+      width: ${paperWidth};
       margin: 0;
       padding: 2mm 1.5mm 0;
       text-align: center;

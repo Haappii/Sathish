@@ -129,7 +129,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
             html, body {
               margin: 0;
               padding: 0;
-              width: 100%;
+              width: ${paperWidth};
               background: #fff;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -138,7 +138,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               font-family: monospace;
             }
             .receipt {
-              width: 100%;
+              width: ${paperWidth};
               margin: 0;
               padding: 0;
               box-sizing: border-box;
@@ -150,14 +150,14 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               font-family: Consolas, "Courier New", monospace;
               font-size: ${fontSizeMm}mm;
               line-height: 1.2;
-              width: 100%;
+              width: ${paperWidth};
               letter-spacing: 0;
               white-space: pre;
               overflow: hidden;
             }
             .header-html {
               box-sizing: border-box;
-              width: 100%;
+              width: ${paperWidth};
               margin: 0;
               padding: 1.5mm 1.5mm 0;
               text-align: center;
@@ -176,7 +176,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
             }
             .extra-html {
               box-sizing: border-box;
-              width: 100%;
+              width: ${paperWidth};
               margin: 0;
               padding: 2mm 1.5mm 0;
               text-align: center;
