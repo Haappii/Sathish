@@ -732,7 +732,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
   const pageWidth = paperWidth === "80mm" ? 80000 : 58000;
   // Font size in mm so 32/48 chars fill the usable paper width exactly (mirrors ESC/POS Font A)
   const WIDTH = paperWidth === "80mm" ? 48 : 32;
-  const fontSizeMm = ((parseFloat(paperWidth) - 3) / WIDTH / 0.6).toFixed(2);
+  const fontSizeMm = ((parseFloat(paperWidth) - 1) / WIDTH / 0.6).toFixed(2);
   const headerHtml = String(options.headerHtml || "");
   const extraHtml = String(options.extraHtml || "");
 
@@ -760,7 +760,7 @@ ipcMain.handle("silent-print-text", async (_event, payload) => {
     pre {
       margin: 0;
       box-sizing: border-box;
-      padding: 0 1.5mm;
+      padding: 0 0.5mm;
       font-family: Consolas, "Courier New", monospace;
       font-size: ${fontSizeMm}mm;
       line-height: 1.2;
