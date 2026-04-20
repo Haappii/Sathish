@@ -64,6 +64,9 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
   const hasExtraHtml = String(extraHtml || "").trim().length > 0 || String(headerHtml || "").trim().length > 0;
   const paperWidth = String(paperSize || "58mm") === "80mm" ? "80mm" : "58mm";
   const printerName = (typeof localStorage !== "undefined" && localStorage.getItem("thermalPrinterName")) || undefined;
+  // Compute font-size in mm so 32/48 chars fill the usable paper width exactly (mirrors ESC/POS Font A)
+  const _WIDTH = paperWidth === "80mm" ? 48 : 32;
+  const fontSizeMm = ((parseFloat(paperWidth) - 3) / _WIDTH / 0.6).toFixed(2);
 
   // Try Electron silent print first (desktop app)
   if (window?.electronAPI?.rawPrintText || window?.electronAPI?.silentPrintText) {
@@ -145,7 +148,7 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
               box-sizing: border-box;
               padding: 1.5mm 2.2mm 0 1.5mm;
               font-family: Consolas, "Courier New", monospace;
-              font-size: ${Math.max(Number(fontSize) || 9, 6)}px;
+              font-size: ${fontSizeMm}mm;
               line-height: 1.2;
               width: 100%;
               letter-spacing: 0;
