@@ -146,13 +146,14 @@ export async function printDirectText(text, { fontSize = 9, port = "COM7", paper
             pre {
               margin: 0;
               box-sizing: border-box;
-              padding: 1.5mm 2.2mm 0 1.5mm;
+              padding: 0 1.5mm;
               font-family: Consolas, "Courier New", monospace;
               font-size: ${fontSizeMm}mm;
               line-height: 1.2;
               width: 100%;
               letter-spacing: 0;
               white-space: pre;
+              overflow: hidden;
             }
             .header-html {
               box-sizing: border-box;
