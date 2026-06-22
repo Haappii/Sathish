@@ -64,6 +64,16 @@ export default function PlatformDashboard() {
   const [aboutPhotoFile, setAboutPhotoFile] = useState(null);
   const [aboutSaving, setAboutSaving] = useState(false);
 
+  const [pwForm, setPwForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
+  const [pwBusy, setPwBusy] = useState(false);
+
+  const [teamProfiles, setTeamProfiles] = useState([]);
+  const BLANK_PROFILE = { name: "", role_title: "", bio: "", display_order: 0, is_active: true };
+  const [profileForm, setProfileForm] = useState(BLANK_PROFILE);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [editingProfileId, setEditingProfileId] = useState(null);
+  const [profileBusy, setProfileBusy] = useState(false);
+
   const token = getPlatformToken();
 
   useEffect(() => {
@@ -100,6 +110,12 @@ export default function PlatformDashboard() {
         });
       } catch {
         // Ignore optional endpoint failure (404/old backend) and keep defaults.
+      }
+      try {
+        const teamRes = await platformAxios.get("/platform/team-profiles");
+        setTeamProfiles(Array.isArray(teamRes.data) ? teamRes.data : []);
+      } catch {
+        // optional — ignore if not yet deployed
       }
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to load platform data", "error");
@@ -293,7 +309,10 @@ export default function PlatformDashboard() {
     setBusyId(shopId);
     try {
       const res = await platformAxios.post(`/platform/shops/${shopId}/reminder`);
-      showToast(res?.data?.email_sent ? "Reminder email sent" : "Email not sent (SMTP not configured)", "success");
+      showToast(
+        res?.data?.email_sent ? "Reminder email sent" : "Email not sent — SMTP not configured",
+        res?.data?.email_sent ? "success" : "error"
+      );
     } catch (e) {
       showToast(e?.response?.data?.detail || "Reminder failed", "error");
     } finally {
@@ -500,14 +519,15 @@ export default function PlatformDashboard() {
   };
 
   const TABS = [
-    { id: "OVERVIEW", label: "Overview",  icon: "📊", badge: null },
-    { id: "SHOPS",    label: "Shops",     icon: "🏪", badge: shops.length || null },
-    { id: "CREATE",   label: "Create",    icon: "➕", badge: null },
-    { id: "PLANS",    label: "Plans",     icon: "📋", badge: null },
-    { id: "WEBSITE",  label: "Website",   icon: "🌐", badge: null },
-    { id: "ONBOARD",  label: "Onboard",   icon: "📥", badge: pendingOnboard.length || null },
-    { id: "DEMO",     label: "Demo",      icon: "🎬", badge: openDemoTickets.length || null },
-    { id: "SUPPORT",  label: "Support",   icon: "🎧", badge: openSupportTickets.length || null },
+    { id: "OVERVIEW",  label: "Overview",  icon: "📊", badge: null },
+    { id: "SHOPS",     label: "Shops",     icon: "🏪", badge: shops.length || null },
+    { id: "CREATE",    label: "Create",    icon: "➕", badge: null },
+    { id: "PLANS",     label: "Plans",     icon: "📋", badge: null },
+    { id: "WEBSITE",   label: "Website",   icon: "🌐", badge: null },
+    { id: "ONBOARD",   label: "Onboard",   icon: "📥", badge: pendingOnboard.length || null },
+    { id: "DEMO",      label: "Demo",      icon: "🎬", badge: openDemoTickets.length || null },
+    { id: "SUPPORT",   label: "Support",   icon: "🎧", badge: openSupportTickets.length || null },
+    { id: "SECURITY",  label: "Security",  icon: "🔒", badge: null },
   ];
 
   return (
@@ -675,7 +695,6 @@ export default function PlatformDashboard() {
                   <tr className="text-[11px] text-slate-400 uppercase tracking-wider border-b border-white/10 bg-white/3">
                     <th className="py-3 px-5 text-left font-semibold">Shop</th>
                     <th className="py-3 px-3 text-center font-semibold">Status</th>
-                    <th className="py-3 px-3 text-left font-semibold">Plan</th>
                     <th className="py-3 px-3 text-left font-semibold">Last Payment</th>
                     <th className="py-3 px-3 text-left font-semibold">Next Renewal</th>
                     <th className="py-3 px-3 text-right font-semibold">Revenue</th>
@@ -685,7 +704,7 @@ export default function PlatformDashboard() {
                 <tbody className="divide-y divide-white/5">
                   {shops.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">No shops found.</td>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">No shops found.</td>
                     </tr>
                   ) : shops.map((s) => {
                     const statusKey = String(s.status || "").toUpperCase();
@@ -710,31 +729,6 @@ export default function PlatformDashboard() {
                             <span className={`w-1 h-1 rounded-full ${statusCfg.dot}`} />
                             {statusKey || "UNKNOWN"}
                           </span>
-                        </td>
-                        <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-2">
-                            <select
-                              className="rounded-lg px-2 py-1.5 text-xs bg-slate-900/80 border border-white/10 text-white max-w-[140px]"
-                              value={planSelections[s.shop_id] ?? ""}
-                              onChange={(e) =>
-                                setPlanSelections((prev) => ({ ...prev, [s.shop_id]: e.target.value || "" }))
-                              }
-                            >
-                              <option value="">Select plan</option>
-                              {plans.map((p) => (
-                                <option key={p.plan_id} value={p.plan_id}>
-                                  {p.name} · {p.duration_months}m · ₹{Number(p.price || 0).toFixed(0)}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => savePlan(s.shop_id)}
-                              disabled={busyId === s.shop_id}
-                              className="px-2 py-1.5 bg-blue-600/70 hover:bg-blue-600 rounded-lg text-[11px] transition disabled:opacity-50"
-                            >
-                              Save
-                            </button>
-                          </div>
                         </td>
                         <td className="py-3 px-3 text-xs text-slate-300">{fmtDate(s.last_payment_on)}</td>
                         <td className="py-3 px-3 text-xs text-slate-300">{fmtDate(s.next_renewal)}</td>
@@ -872,100 +866,191 @@ export default function PlatformDashboard() {
             </div>
           </div>
         ) : tab === "WEBSITE" ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
-              <h3 className="text-base font-semibold">About Page Contact</h3>
-              <p className="text-xs text-slate-400">Edit details shown in the public About page.</p>
-
-              <div>
-                <label className="text-xs text-slate-400 font-medium">Name</label>
-                <input
-                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
-                  value={aboutContact.name}
-                  onChange={(e) => setAboutContact((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Support name"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 font-medium">Mobile / WhatsApp</label>
-                <input
-                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
-                  value={aboutContact.mobile}
-                  onChange={(e) => setAboutContact((p) => ({ ...p, mobile: e.target.value }))}
-                  placeholder="+91 ..."
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 font-medium">Email</label>
-                <input
-                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
-                  value={aboutContact.email}
-                  onChange={(e) => setAboutContact((p) => ({ ...p, email: e.target.value }))}
-                  placeholder="support@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 font-medium">Instagram ID</label>
-                <input
-                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white"
-                  value={aboutContact.insta}
-                  onChange={(e) => setAboutContact((p) => ({ ...p, insta: e.target.value }))}
-                  placeholder="@haappiibilling"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 font-medium">Photo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="mt-1 block w-full text-xs text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-blue-600/80 file:text-white hover:file:bg-blue-600"
-                  onChange={(e) => setAboutPhotoFile(e.target.files?.[0] || null)}
-                />
-                <p className="mt-1 text-[11px] text-slate-500">Upload to replace current About photo.</p>
-              </div>
-
-              <button
-                onClick={saveAboutContact}
-                disabled={aboutSaving}
-                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition disabled:opacity-60"
-              >
-                {aboutSaving ? "Saving..." : "Save Contact Details"}
-              </button>
+          <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-6">
+            <div>
+              <h3 className="text-base font-semibold text-white">Contact Details</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Shared contact info and sliding profiles shown on the public page.</p>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
-              <h3 className="text-base font-semibold">Preview</h3>
+            {/* Shared contact fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4 border-b border-white/10">
+              <div>
+                <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Mobile / WhatsApp</label>
+                <input
+                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={aboutContact.mobile}
+                  onChange={(e) => setAboutContact((p) => ({ ...p, mobile: e.target.value }))}
+                  placeholder="+91 79042 63246"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Email</label>
+                <input
+                  className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={aboutContact.email}
+                  onChange={(e) => setAboutContact((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="support@haappiibilling.in"
+                />
+              </div>
+              <div className="sm:col-span-2 flex justify-end">
+                <button
+                  onClick={saveAboutContact}
+                  disabled={aboutSaving}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition disabled:opacity-60"
+                >
+                  {aboutSaving ? "Saving..." : "Save Contact Info"}
+                </button>
+              </div>
+            </div>
+
+            {/* Profiles */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                  Profiles &nbsp;<span className="text-slate-500 font-normal normal-case">(auto-slide on public page)</span>
+                </p>
+                {editingProfileId !== null && (
+                  <button
+                    className="px-3 py-1.5 rounded-xl text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 transition"
+                    onClick={() => { setEditingProfileId(null); setProfileForm(BLANK_PROFILE); setProfilePhoto(null); }}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+
+              {/* Add / Edit form */}
               <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  {aboutPhotoFile ? (
-                    <img
-                      src={URL.createObjectURL(aboutPhotoFile)}
-                      alt="Contact preview"
-                      className="w-16 h-16 rounded-xl object-cover"
-                    />
-                  ) : aboutContact.photo_url ? (
-                    <img
-                      src={aboutContact.photo_url}
-                      alt="Contact"
-                      className="w-16 h-16 rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl bg-blue-600/60 flex items-center justify-center font-bold text-xl">
-                      {(aboutContact.name || "H").trim().charAt(0).toUpperCase()}
+                <p className="text-[11px] text-slate-400">{editingProfileId ? `Editing profile #${editingProfileId}` : "Add new profile"}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: "Full Name *", key: "name", placeholder: "Sathish Kumar" },
+                    { label: "Role / Title", key: "role_title", placeholder: "Co-Founder & CEO" },
+                  ].map(({ label, key, placeholder }) => (
+                    <div key={key}>
+                      <label className="text-[11px] text-slate-400 font-medium">{label}</label>
+                      <input
+                        className="mt-1 w-full rounded-xl px-3 py-2 bg-slate-800 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={profileForm[key]}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                      />
                     </div>
-                  )}
+                  ))}
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 font-medium">Bio (optional)</label>
+                  <textarea
+                    className="mt-1 w-full rounded-xl px-3 py-2 bg-slate-800 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                    rows={2}
+                    value={profileForm.bio}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
+                    placeholder="Short intro..."
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
                   <div>
-                    <div className="text-sm font-semibold text-white">{aboutContact.name || "Name"}</div>
-                    <div className="text-xs text-slate-400">{aboutContact.mobile || "Mobile / WhatsApp"}</div>
+                    <label className="text-[11px] text-slate-400 font-medium">Order</label>
+                    <input
+                      type="number"
+                      className="mt-1 w-full rounded-xl px-3 py-2 bg-slate-800 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      value={profileForm.display_order}
+                      onChange={(e) => setProfileForm((p) => ({ ...p, display_order: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-5">
+                    <input type="checkbox" id="prof-active" checked={profileForm.is_active}
+                      onChange={(e) => setProfileForm((p) => ({ ...p, is_active: e.target.checked }))}
+                      className="w-4 h-4 accent-blue-500" />
+                    <label htmlFor="prof-active" className="text-xs text-slate-300">Active</label>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium">Photo</label>
+                    <input type="file" accept="image/*"
+                      className="mt-1 block w-full text-xs text-slate-300 file:mr-2 file:px-2 file:py-1.5 file:rounded-lg file:border-0 file:bg-blue-600/80 file:text-white hover:file:bg-blue-600"
+                      onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)} />
                   </div>
                 </div>
-                <div className="text-xs text-slate-300">Email: {aboutContact.email || "-"}</div>
-                <div className="text-xs text-slate-300">Instagram: {aboutContact.insta || "-"}</div>
+                <button
+                  disabled={profileBusy}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold transition"
+                  onClick={async () => {
+                    if (!profileForm.name.trim()) { showToast("Name is required", "error"); return; }
+                    setProfileBusy(true);
+                    try {
+                      const fd = new FormData();
+                      fd.append("name", profileForm.name.trim());
+                      fd.append("role_title", profileForm.role_title.trim());
+                      fd.append("bio", profileForm.bio.trim());
+                      fd.append("display_order", String(profileForm.display_order));
+                      fd.append("is_active", profileForm.is_active ? "true" : "false");
+                      if (profilePhoto) fd.append("photo", profilePhoto);
+                      if (editingProfileId) {
+                        const res = await platformAxios.put(`/platform/team-profiles/${editingProfileId}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+                        setTeamProfiles((prev) => prev.map((p) => p.profile_id === editingProfileId ? res.data : p));
+                        showToast("Profile updated", "success");
+                      } else {
+                        const res = await platformAxios.post("/platform/team-profiles", fd, { headers: { "Content-Type": "multipart/form-data" } });
+                        setTeamProfiles((prev) => [...prev, res.data]);
+                        showToast("Profile added", "success");
+                      }
+                      setEditingProfileId(null); setProfileForm(BLANK_PROFILE); setProfilePhoto(null);
+                    } catch (e) {
+                      showToast(e?.response?.data?.detail || "Failed to save profile", "error");
+                    } finally { setProfileBusy(false); }
+                  }}
+                >
+                  {profileBusy ? "Saving…" : editingProfileId ? "Update Profile" : "Add Profile"}
+                </button>
               </div>
+
+              {/* Profile cards */}
+              {teamProfiles.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-3">No profiles yet. Add one above.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {teamProfiles.map((p) => (
+                    <div key={p.profile_id} className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-2">
+                      <div className="flex items-center gap-3">
+                        {p.photo_url ? (
+                          <img src={p.photo_url} alt={p.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                            {(p.name || "?").trim().charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">{p.name}</div>
+                          <div className="text-[11px] text-blue-300 truncate">{p.role_title || "—"}</div>
+                        </div>
+                      </div>
+                      {p.bio && <p className="text-[11px] text-slate-400 line-clamp-2">{p.bio}</p>}
+                      <div className="flex items-center justify-between pt-1">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${p.is_active ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30" : "text-slate-400 bg-slate-500/15 border-slate-500/30"}`}>
+                          {p.is_active ? "Active" : "Hidden"}
+                        </span>
+                        <div className="flex gap-1.5">
+                          <button className="px-2.5 py-1 rounded-lg text-[11px] bg-white/8 hover:bg-white/15 text-blue-300 transition"
+                            onClick={() => { setEditingProfileId(p.profile_id); setProfileForm({ name: p.name, role_title: p.role_title, bio: p.bio || "", display_order: p.display_order, is_active: p.is_active }); setProfilePhoto(null); }}>
+                            Edit
+                          </button>
+                          <button className="px-2.5 py-1 rounded-lg text-[11px] bg-red-500/20 hover:bg-red-500/30 text-red-300 transition"
+                            onClick={async () => {
+                              if (!window.confirm(`Delete "${p.name}"?`)) return;
+                              try {
+                                await platformAxios.delete(`/platform/team-profiles/${p.profile_id}`);
+                                setTeamProfiles((prev) => prev.filter((x) => x.profile_id !== p.profile_id));
+                                showToast("Deleted", "success");
+                              } catch (e) { showToast(e?.response?.data?.detail || "Delete failed", "error"); }
+                            }}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : tab === "ONBOARD" ? (
@@ -1231,6 +1316,58 @@ export default function PlatformDashboard() {
                 </div>
               );
             })}
+          </div>
+        ) : tab === "SECURITY" ? (
+          <div className="max-w-md">
+            <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+              <h2 className="text-white font-semibold text-lg">Change Password</h2>
+              <div className="space-y-3">
+                {["current_password", "new_password", "confirm_password"].map((field) => (
+                  <div key={field}>
+                    <label className="block text-xs text-slate-400 mb-1 capitalize">
+                      {field.replace(/_/g, " ")}
+                    </label>
+                    <input
+                      type="password"
+                      className="w-full rounded-xl px-3 py-2 bg-slate-900/80 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      value={pwForm[field]}
+                      onChange={(e) => setPwForm((p) => ({ ...p, [field]: e.target.value }))}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                disabled={pwBusy}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold transition"
+                onClick={async () => {
+                  if (!pwForm.current_password || !pwForm.new_password) {
+                    showToast("Fill in all fields", "error"); return;
+                  }
+                  if (pwForm.new_password !== pwForm.confirm_password) {
+                    showToast("New passwords do not match", "error"); return;
+                  }
+                  if (pwForm.new_password.length < 6) {
+                    showToast("New password must be at least 6 characters", "error"); return;
+                  }
+                  setPwBusy(true);
+                  try {
+                    await platformAxios.post("/platform/auth/change-password", {
+                      current_password: pwForm.current_password,
+                      new_password: pwForm.new_password,
+                    });
+                    showToast("Password updated successfully", "success");
+                    setPwForm({ current_password: "", new_password: "", confirm_password: "" });
+                  } catch (e) {
+                    showToast(e?.response?.data?.detail || "Failed to update password", "error");
+                  } finally {
+                    setPwBusy(false);
+                  }
+                }}
+              >
+                {pwBusy ? "Updating…" : "Update Password"}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="bg-white/5 rounded-2xl border border-white/10 p-10 text-center text-slate-400">
