@@ -393,11 +393,16 @@ class AcceptOnboardPayload(BaseModel):
 @router.post("/onboard/requests")
 def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_db)):
     """
-    Self-service registration: saves the request as PENDING for admin review.
-    Admin must accept the request from the Platform Dashboard to create the shop
-    and send login credentials.
+    Self-service registration: instantly provisions the shop with a 30-day
+    free trial and sends login credentials by email.
     """
+    from datetime import timedelta
+
     billing_type = _normalize_billing_type(payload.billing_type)
+    admin_role = _ensure_admin_role(db)
+    _ensure_manager_role(db)
+    admin_username = (payload.admin_username or "").strip() or "admin"
+    admin_password = _generate_password()
 
     row = PlatformOnboardRequest(
         status="PENDING",
@@ -430,19 +435,123 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
         branch_state=payload.branch_state,
         branch_country=payload.branch_country,
         branch_pincode=payload.branch_pincode,
-        admin_username=(payload.admin_username or "").strip() or None,
+        admin_username=admin_username,
         admin_name=(payload.admin_name or "").strip() or None,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
 
-    return {
-        "success": True,
-        "request_id": row.request_id,
-        "status": "PENDING",
-        "message": "Request received. Our team will activate your shop and email you the login credentials shortly.",
-    }
+    try:
+        shop = ShopDetails(
+            shop_name=payload.shop_name.strip(),
+            owner_name=(payload.owner_name or "").strip() or None,
+            mobile=(payload.mobile or "").strip() or None,
+            mailid=(payload.mailid or "").strip() or None,
+            billing_type=billing_type,
+            gst_enabled=bool(payload.gst_enabled),
+            gst_percent=payload.gst_percent or 0,
+            gst_mode=(payload.gst_mode or "inclusive"),
+            city=payload.city,
+            state=payload.state,
+            pincode=payload.pincode,
+        )
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
+        base_branch_name = payload.branch_name.strip() or "Head Office"
+        branch_name = base_branch_name
+        existing = db.query(Branch).filter(Branch.branch_name == branch_name).first()
+        if existing:
+            branch_name = f"{base_branch_name} #{shop.shop_id}"
+
+        branch = Branch(
+            shop_id=shop.shop_id,
+            branch_name=branch_name,
+            city=payload.branch_city,
+            state=payload.branch_state,
+            country=payload.branch_country,
+            pincode=payload.branch_pincode,
+            type="Head Office",
+            status="ACTIVE",
+            branch_close="N",
+        )
+        db.add(branch)
+        db.commit()
+        db.refresh(branch)
+
+        trial_end = (datetime.utcnow() + timedelta(days=30)).date()
+        shop.head_office_branch_id = branch.branch_id
+        shop.expires_on = trial_end
+        shop.paid_until = trial_end
+        db.add(shop)
+        db.commit()
+        db.refresh(shop)
+
+        user = User(
+            shop_id=shop.shop_id,
+            user_name=admin_username,
+            password=encode_password(admin_password),
+            name=(payload.admin_name or payload.owner_name or admin_username).strip(),
+            role=admin_role.role_id,
+            status=True,
+            branch_id=branch.branch_id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        row.status = "ACCEPTED"
+        row.decided_at = datetime.utcnow()
+        row.decided_by = "auto"
+        row.created_shop_id = shop.shop_id
+        row.created_branch_id = branch.branch_id
+        row.created_admin_user_id = user.user_id
+        db.commit()
+
+        recipient = (payload.requester_email or payload.mailid or "").strip()
+        email_sent = False
+        try:
+            content = (
+                "Welcome to Haappii Billing!\n\n"
+                "Your shop has been activated and is ready to use.\n\n"
+                f"Shop ID  : {shop.shop_id}\n"
+                f"Username : {admin_username}\n"
+                f"Password : {admin_password}\n\n"
+                f"Your free trial is active until: {trial_end.strftime('%d %b %Y')}\n"
+                "All features are unlocked during your trial period.\n\n"
+                "Login at: https://haappiibilling.in\n"
+            )
+            email_sent = _send_credentials_email(
+                to_email=recipient,
+                subject="Your Haappii Billing shop is ready!",
+                content=content,
+            )
+        except Exception:
+            email_sent = False
+
+        return {
+            "success": True,
+            "request_id": row.request_id,
+            "shop_id": shop.shop_id,
+            "username": admin_username,
+            "password": admin_password,
+            "trial_ends": str(trial_end),
+            "email_sent": email_sent,
+            "status": "ACTIVATED",
+            "message": f"Your shop is live! Login with Shop ID {shop.shop_id}, username '{admin_username}'. Credentials have been sent to {recipient}.",
+        }
+    except Exception as exc:
+        row.status = "PENDING"
+        row.decision_note = f"Auto-provision failed: {exc}"
+        db.commit()
+        return {
+            "success": True,
+            "request_id": row.request_id,
+            "status": "PENDING",
+            "message": "Request saved. Our team will activate your shop manually and email credentials shortly.",
+        }
 
 
 @router.get("/onboard/requests")
