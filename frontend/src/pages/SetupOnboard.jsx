@@ -3,404 +3,305 @@ import { Link } from "react-router-dom";
 import api from "../utils/apiClient";
 import { useToast } from "../components/Toast";
 
-const STEPS = ["Business", "Contact"];
-
 export default function SetupOnboard() {
   const { showToast } = useToast();
-
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-
   const [form, setForm] = useState({
-    shop_name: "",
-    billing_type: "store",
-    city: "",
-    state: "",
-    name: "",
-    email: "",
-    phone: "",
-    message: "",
+    shop_name: "", billing_type: "store", city: "", state: "",
+    name: "", email: "", phone: "", message: "",
   });
 
-  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-  const validateStep = () => {
+  const validate = () => {
     if (step === 0) {
       if (!form.shop_name.trim()) return "Shop name is required";
-      if (!["store", "hotel"].includes(form.billing_type)) return "Business type is required";
+      if (!["store", "hotel"].includes(form.billing_type)) return "Select a business type";
     }
     if (step === 1) {
       if (!form.name.trim()) return "Your name is required";
-      if (!form.email.includes("@")) return "A valid email is required";
+      if (!form.email.includes("@")) return "Enter a valid email";
     }
     return null;
   };
 
-  const next = () => {
-    const err = validateStep();
-    if (err) return showToast(err, "error");
-    setStep((s) => s + 1);
-  };
-
-  const back = () => setStep((s) => s - 1);
+  const next = () => { const e = validate(); if (e) return showToast(e, "error"); setStep(1); };
+  const back = () => setStep(0);
 
   const submit = async () => {
-    const err = validateStep();
-    if (err) return showToast(err, "error");
-
+    const e = validate();
+    if (e) return showToast(e, "error");
     try {
       setLoading(true);
       const res = await api.post("/platform/onboard/requests", {
-        shop_name: form.shop_name,
-        billing_type: form.billing_type,
-        city: form.city,
-        state: form.state,
-        branch_name: form.shop_name,
-        branch_city: form.city,
-        branch_state: form.state,
-        owner_name: form.name,
-        mailid: form.email,
-        mobile: form.phone,
-        requester_name: form.name,
-        requester_email: form.email,
-        requester_phone: form.phone,
+        shop_name: form.shop_name, billing_type: form.billing_type,
+        city: form.city, state: form.state,
+        branch_name: form.shop_name, branch_city: form.city, branch_state: form.state,
+        owner_name: form.name, mailid: form.email, mobile: form.phone,
+        requester_name: form.name, requester_email: form.email, requester_phone: form.phone,
         business: form.billing_type === "store" ? "Store / Retail" : "Hotel / Restaurant",
         message: form.message,
       });
       setResult(res.data);
-      showToast("Request received! Our team will activate your shop and email you the credentials shortly.", "success");
-    } catch (e) {
-      showToast(e?.response?.data?.detail || "Request failed", "error");
-    } finally {
-      setLoading(false);
-    }
+      showToast("Request received!", "success");
+    } catch (err) {
+      showToast(err?.response?.data?.detail || "Request failed", "error");
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="ob-root">
+    <div className="ob">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800;9..144,900&family=Inter:wght@400;500;600;700;800&display=swap');
-        html,body{height:auto;overflow-y:auto}
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        html,body{height:auto;overflow-y:auto;margin:0}
         #root{min-height:100%}
 
-        .ob-root{
-          min-height:100vh;
-          background:#0f172a;
-          color:#f0f2f8;
-          font-family:Inter,system-ui,sans-serif;
-          display:flex;flex-direction:column;
-          overflow-x:hidden;
+        .ob{min-height:100vh;font-family:Inter,system-ui,sans-serif;display:flex}
+
+        /* ---- LEFT PANEL ---- */
+        .ob-left{
+          width:44%;min-height:100vh;position:sticky;top:0;
+          background:linear-gradient(160deg,#4338ca 0%,#6366f1 35%,#7c3aed 65%,#a855f7 100%);
+          display:flex;flex-direction:column;justify-content:center;
+          padding:60px 48px;color:#fff;overflow:hidden;position:relative;
         }
+        .ob-left-pattern{position:absolute;inset:0;opacity:.06;background-image:
+          radial-gradient(circle at 20% 50%,#fff 1px,transparent 1px),
+          radial-gradient(circle at 80% 20%,#fff 1px,transparent 1px),
+          radial-gradient(circle at 60% 80%,#fff 1px,transparent 1px);
+          background-size:60px 60px,80px 80px,50px 50px}
+        .ob-left-glow{position:absolute;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(80px);top:10%;right:-100px}
+        .ob-left-glow2{position:absolute;width:250px;height:250px;border-radius:50%;background:rgba(255,255,255,.06);filter:blur(60px);bottom:15%;left:-80px}
 
-        /* ---- NAV ---- */
-        .ob-nav{
-          position:sticky;top:0;z-index:40;
-          padding:0 40px;height:64px;
-          display:flex;align-items:center;justify-content:space-between;
-          background:rgba(15,23,42,.92);backdrop-filter:blur(20px);
-          border-bottom:1px solid rgba(255,255,255,.06);
+        .ob-left-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;background:rgba(255,255,255,.15);font-size:12px;font-weight:700;letter-spacing:.06em;margin-bottom:24px;width:fit-content;backdrop-filter:blur(8px)}
+        .ob-left h1{font-size:clamp(2.4rem,4vw,3.4rem);font-weight:900;line-height:.95;letter-spacing:-.04em;margin:0 0 20px;max-width:10ch}
+        .ob-left p{font-size:16px;line-height:1.7;opacity:.8;margin:0 0 36px;max-width:340px}
+
+        .ob-perks{display:flex;flex-direction:column;gap:14px}
+        .ob-perk{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:600}
+        .ob-perk-icon{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;backdrop-filter:blur(8px)}
+
+        /* ---- RIGHT PANEL ---- */
+        .ob-right{flex:1;min-height:100vh;background:#fafbfe;display:flex;flex-direction:column}
+
+        .ob-nav{padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+        .ob-logo{font-size:18px;font-weight:900;color:#1e1b4b;letter-spacing:-.02em;text-decoration:none}
+        .ob-nav-link{font-size:13px;color:#6366f1;text-decoration:none;font-weight:600}
+        .ob-nav-link:hover{text-decoration:underline}
+
+        .ob-form-area{flex:1;display:flex;align-items:center;justify-content:center;padding:20px 32px 60px}
+        .ob-form-box{width:min(460px,100%)}
+
+        /* ---- PROGRESS ---- */
+        .ob-progress{display:flex;align-items:center;gap:0;margin-bottom:36px}
+        .ob-prog-step{display:flex;align-items:center;gap:8px}
+        .ob-prog-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #e2e8f0;color:#94a3b8;background:#fff;transition:all .3s}
+        .ob-prog-step.active .ob-prog-dot{border-color:#6366f1;color:#6366f1;background:#eef2ff;box-shadow:0 0 0 4px rgba(99,102,241,.1)}
+        .ob-prog-step.done .ob-prog-dot{border-color:#10b981;color:#fff;background:#10b981}
+        .ob-prog-label{font-size:13px;font-weight:600;color:#cbd5e1}
+        .ob-prog-step.active .ob-prog-label{color:#1e1b4b}
+        .ob-prog-step.done .ob-prog-label{color:#64748b}
+        .ob-prog-line{flex:1;height:2px;background:#e2e8f0;margin:0 14px;border-radius:1px}
+        .ob-prog-step.done+.ob-prog-line,.ob-prog-line.done{background:#10b981}
+
+        /* ---- FORM ---- */
+        .ob-title{font-size:24px;font-weight:900;color:#0f172a;letter-spacing:-.03em;margin:0 0 4px}
+        .ob-subtitle{font-size:14px;color:#94a3b8;margin:0 0 28px}
+
+        .ob-field{margin-bottom:18px}
+        .ob-field-label{display:block;font-size:12px;font-weight:700;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px}
+        .ob-field-input{
+          width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #e2e8f0;
+          background:#fff;color:#0f172a;font-size:15px;font-family:inherit;outline:none;
+          transition:all .2s;box-sizing:border-box;
         }
-        .ob-brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-        .ob-brand-mark{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#a855f7);box-shadow:0 0 24px rgba(99,102,241,.3)}
-        .ob-brand-name{font-family:Fraunces,serif;font-size:20px;font-weight:800;color:#fff;letter-spacing:-.02em}
-        .ob-nav-link{font-size:13px;color:rgba(255,255,255,.45);text-decoration:none;font-weight:500;transition:color .2s}
-        .ob-nav-link:hover{color:#fff}
+        .ob-field-input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+        .ob-field-input::placeholder{color:#cbd5e1}
+        .ob-field-textarea{min-height:90px;resize:vertical}
 
-        /* ---- HERO SECTION ---- */
-        .ob-hero{
-          position:relative;overflow:hidden;
-          background:linear-gradient(165deg,#0f172a 0%,#1a0a2e 30%,#1e1145 50%,#0f172a 100%);
-          padding:60px 24px 48px;text-align:center;
+        .ob-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+        /* ---- TYPE SELECTOR ---- */
+        .ob-types{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+        .ob-type{
+          padding:20px 16px;border-radius:16px;border:2px solid #e2e8f0;
+          background:#fff;cursor:pointer;text-align:center;transition:all .2s;
         }
-        .ob-hero-glow1{position:absolute;width:500px;height:500px;border-radius:50%;filter:blur(100px);opacity:.4;pointer-events:none;top:-200px;right:-100px;background:radial-gradient(circle,#6366f1,transparent 70%);animation:pulse-glow 5s ease-in-out infinite}
-        .ob-hero-glow2{position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(100px);opacity:.25;pointer-events:none;bottom:-150px;left:-80px;background:radial-gradient(circle,#a855f7,transparent 70%);animation:pulse-glow 6s ease-in-out infinite 1s}
-        @keyframes pulse-glow{0%,100%{opacity:.25}50%{opacity:.45}}
+        .ob-type:hover{border-color:#c7d2fe;background:#fafafe}
+        .ob-type.on{border-color:#6366f1;background:#eef2ff;box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+        .ob-type-emoji{font-size:36px;margin-bottom:8px}
+        .ob-type-name{font-size:14px;font-weight:700;color:#1e1b4b}
+        .ob-type .ob-type-name{color:#64748b}
+        .ob-type.on .ob-type-name{color:#4338ca}
+        .ob-type-desc{font-size:11px;color:#94a3b8;margin-top:4px}
 
-        .ob-hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.2);color:#818cf8;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
-        .ob-hero-title{font-family:Fraunces,serif;font-size:clamp(2rem,5vw,3.2rem);font-weight:900;line-height:.95;letter-spacing:-.04em;color:#fff;margin:0 auto 16px;max-width:14ch;position:relative;z-index:1}
-        .ob-hero-title em{font-style:normal;background:linear-gradient(135deg,#6366f1,#a855f7,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .ob-hero-sub{max-width:480px;margin:0 auto;color:rgba(255,255,255,.5);font-size:16px;line-height:1.7;position:relative;z-index:1}
-
-        /* ---- FORM SECTION ---- */
-        .ob-body{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:0 24px 80px;margin-top:-20px;position:relative;z-index:2}
-
-        .ob-card{
-          width:min(580px,100%);
-          background:rgba(255,255,255,.04);
-          border:1px solid rgba(255,255,255,.08);
-          border-radius:28px;padding:36px;
-          backdrop-filter:blur(12px);
-          box-shadow:0 40px 80px rgba(0,0,0,.4);
+        /* ---- BUTTONS ---- */
+        .ob-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:28px}
+        .ob-btn{
+          display:inline-flex;align-items:center;justify-content:center;gap:6px;
+          padding:13px 28px;border-radius:12px;font-weight:700;font-size:14px;
+          border:none;cursor:pointer;transition:all .2s;font-family:inherit;text-decoration:none;
         }
-
-        /* ---- STEPPER ---- */
-        .ob-stepper{display:flex;align-items:center;margin-bottom:36px;gap:0}
-        .ob-step{display:flex;align-items:center;flex:1;gap:10px}
-        .ob-step-circle{
-          width:40px;height:40px;border-radius:50%;
-          display:flex;align-items:center;justify-content:center;
-          font-size:14px;font-weight:700;flex-shrink:0;
-          border:2px solid rgba(255,255,255,.1);
-          color:rgba(255,255,255,.3);background:rgba(255,255,255,.03);
-          transition:all .3s ease;
-        }
-        .ob-step.active .ob-step-circle{border-color:#6366f1;color:#c7d2fe;background:rgba(99,102,241,.15);box-shadow:0 0 20px rgba(99,102,241,.2)}
-        .ob-step.done .ob-step-circle{border-color:#10b981;color:#a7f3d0;background:rgba(16,185,129,.12)}
-        .ob-step-label{font-size:13px;font-weight:600;color:rgba(255,255,255,.25);transition:color .3s}
-        .ob-step.active .ob-step-label{color:#e2e8f0}
-        .ob-step.done .ob-step-label{color:rgba(255,255,255,.4)}
-        .ob-step-line{flex:1;height:2px;background:rgba(255,255,255,.06);margin:0 12px 0 10px;border-radius:1px;transition:background .3s}
-        .ob-step.done .ob-step-line{background:rgba(16,185,129,.35)}
-
-        /* ---- FORM FIELDS ---- */
-        .ob-head{margin-bottom:24px}
-        .ob-step-title{font-family:Fraunces,serif;font-size:26px;font-weight:800;margin:0 0 6px;letter-spacing:-.03em;color:#fff}
-        .ob-step-sub{color:rgba(255,255,255,.4);font-size:14px;margin:0;line-height:1.6}
-        .ob-fields{display:flex;flex-direction:column;gap:14px}
-        .ob-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .ob-label{display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-
-        .ob-input{
-          background:rgba(255,255,255,.05);
-          border:1.5px solid rgba(255,255,255,.08);
-          color:#f0f2f8;padding:13px 16px;border-radius:14px;
-          font-size:15px;outline:none;width:100%;box-sizing:border-box;
-          transition:all .2s ease;font-family:inherit;
-        }
-        .ob-input:focus{border-color:#6366f1;background:rgba(99,102,241,.06);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
-        .ob-input::placeholder{color:rgba(255,255,255,.2)}
-        .ob-textarea{min-height:100px;resize:vertical}
-
-        /* ---- BUSINESS TYPE ---- */
-        .ob-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .ob-type-btn{
-          padding:20px 16px;border-radius:18px;
-          border:1.5px solid rgba(255,255,255,.08);
-          background:rgba(255,255,255,.03);color:rgba(255,255,255,.45);
-          cursor:pointer;text-align:center;transition:all .25s ease;font-family:inherit;
-        }
-        .ob-type-btn:hover{border-color:rgba(99,102,241,.3);color:rgba(255,255,255,.7);background:rgba(99,102,241,.05)}
-        .ob-type-btn.selected{border-color:#6366f1;background:rgba(99,102,241,.1);color:#c7d2fe;box-shadow:0 0 24px rgba(99,102,241,.12)}
-        .ob-type-icon{font-size:32px;margin-bottom:10px}
-        .ob-type-label{font-size:14px;font-weight:700}
-        .ob-type-sub{font-size:12px;opacity:.6;margin-top:4px}
+        .ob-btn:hover{transform:translateY(-1px)}
+        .ob-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+        .ob-btn-back{background:#f1f5f9;color:#64748b}
+        .ob-btn-back:hover{background:#e2e8f0}
+        .ob-btn-next{background:#6366f1;color:#fff;box-shadow:0 4px 16px rgba(99,102,241,.3)}
+        .ob-btn-next:hover{box-shadow:0 6px 24px rgba(99,102,241,.4)}
+        .ob-btn-go{background:#10b981;color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3)}
+        .ob-btn-go:hover{box-shadow:0 6px 24px rgba(16,185,129,.4)}
 
         /* ---- SUCCESS ---- */
-        .ob-success{
-          background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);
-          border-radius:20px;padding:28px;margin-bottom:20px;text-align:center;
+        .ob-done{text-align:center;padding:20px 0}
+        .ob-done-icon{font-size:64px;margin-bottom:16px}
+        .ob-done-title{font-size:26px;font-weight:900;color:#0f172a;margin:0 0 8px;letter-spacing:-.03em}
+        .ob-done-text{font-size:14px;color:#64748b;line-height:1.7;margin:0 0 20px;max-width:360px;margin-left:auto;margin-right:auto}
+        .ob-done-text strong{color:#0f172a}
+        .ob-done-id{display:inline-flex;padding:8px 18px;border-radius:999px;background:#ecfdf5;border:1px solid #a7f3d0;color:#059669;font-size:13px;font-weight:700;margin-bottom:24px}
+        .ob-done-trial{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;background:#eef2ff;color:#4338ca;font-size:13px;font-weight:600;margin-bottom:24px}
+
+        @media(max-width:900px){
+          .ob{flex-direction:column}
+          .ob-left{width:100%;min-height:auto;padding:40px 24px;position:relative;top:auto}
+          .ob-left h1{font-size:2rem}
+          .ob-right{min-height:auto}
+          .ob-form-area{padding:24px 20px 48px}
         }
-        .ob-success-icon{font-size:48px;margin-bottom:12px}
-        .ob-success-title{font-family:Fraunces,serif;font-weight:800;color:#34d399;margin:0 0 8px;font-size:22px;letter-spacing:-.02em}
-        .ob-success-text{color:rgba(255,255,255,.5);font-size:14px;margin:0;line-height:1.7}
-        .ob-success-text strong{color:#a7f3d0}
-        .ob-success-id{display:inline-flex;padding:6px 14px;border-radius:999px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);color:#34d399;font-size:12px;font-weight:700;margin-top:14px;letter-spacing:.05em}
-
-        /* ---- FOOTER ---- */
-        .ob-foot{display:flex;justify-content:space-between;align-items:center;margin-top:28px;gap:12px}
-        .btn{
-          display:inline-flex;align-items:center;justify-content:center;gap:8px;
-          padding:13px 26px;border-radius:14px;font-weight:700;font-size:14px;
-          border:none;cursor:pointer;transition:all .22s ease;font-family:inherit;text-decoration:none;
-        }
-        .btn:hover{transform:translateY(-2px)}
-        .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-        .btn-ghost{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5)}
-        .btn-ghost:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7)}
-        .btn-primary{background:#6366f1;color:#fff;box-shadow:0 8px 28px rgba(99,102,241,.35)}
-        .btn-primary:hover{box-shadow:0 12px 36px rgba(99,102,241,.45)}
-        .btn-success{background:linear-gradient(135deg,#10b981,#34d399);color:#052e16;box-shadow:0 8px 28px rgba(16,185,129,.3)}
-        .btn-success:hover{box-shadow:0 12px 36px rgba(16,185,129,.4)}
-
-        /* ---- FEATURES ---- */
-        .ob-features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:580px;margin:0 auto;padding:40px 24px 0}
-        .ob-feat{text-align:center;padding:16px 12px}
-        .ob-feat-icon{font-size:28px;margin-bottom:8px}
-        .ob-feat-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px}
-        .ob-feat-desc{font-size:11px;color:rgba(255,255,255,.35);line-height:1.5}
-
-        /* ---- FOOTER BAR ---- */
-        .ob-footer{padding:32px 20px 40px;text-align:center;color:rgba(255,255,255,.2);font-size:12px;border-top:1px solid rgba(255,255,255,.04)}
-
-        @media(max-width:560px){
-          .ob-nav{padding:0 20px}
-          .ob-hero{padding:40px 20px 36px}
-          .ob-card{padding:24px 20px}
-          .ob-row,.ob-type-grid{grid-template-columns:1fr}
-          .ob-step-label{display:none}
-          .ob-features{grid-template-columns:1fr}
-          .ob-foot{flex-direction:column-reverse}.ob-foot .btn{width:100%}
+        @media(max-width:500px){
+          .ob-row,.ob-types{grid-template-columns:1fr}
+          .ob-actions{flex-direction:column-reverse}.ob-actions .ob-btn{width:100%}
         }
       `}</style>
 
-      {/* NAV */}
-      <nav className="ob-nav">
-        <Link className="ob-brand" to="/">
-          <span className="ob-brand-mark" />
-          <span className="ob-brand-name">Haappii Billing</span>
-        </Link>
-        <Link className="ob-nav-link" to="/">← Back to home</Link>
-      </nav>
-
-      {/* HERO */}
-      <section className="ob-hero">
-        <div className="ob-hero-glow1" />
-        <div className="ob-hero-glow2" />
-        <div className="ob-hero-badge">Free setup in 2 minutes</div>
-        <h1 className="ob-hero-title">
-          Get your shop <em>live</em> today.
-        </h1>
-        <p className="ob-hero-sub">
-          Register your business and receive login credentials by email. No payment required to start.
-        </p>
-      </section>
-
-      {/* FEATURES */}
-      <div className="ob-features">
-        <div className="ob-feat">
-          <div className="ob-feat-icon">⚡</div>
-          <div className="ob-feat-title">Instant Setup</div>
-          <div className="ob-feat-desc">Start billing within minutes of signing up</div>
-        </div>
-        <div className="ob-feat">
-          <div className="ob-feat-icon">🔒</div>
-          <div className="ob-feat-title">Secure & Private</div>
-          <div className="ob-feat-desc">Your data stays encrypted and protected</div>
-        </div>
-        <div className="ob-feat">
-          <div className="ob-feat-icon">💳</div>
-          <div className="ob-feat-title">No Card Required</div>
-          <div className="ob-feat-desc">Start free — upgrade when you're ready</div>
+      {/* LEFT PANEL */}
+      <div className="ob-left">
+        <div className="ob-left-pattern" />
+        <div className="ob-left-glow" />
+        <div className="ob-left-glow2" />
+        <div className="ob-left-badge">30 days free trial</div>
+        <h1>Start billing in minutes.</h1>
+        <p>Set up your shop, get login credentials by email, and start billing immediately. No credit card needed.</p>
+        <div className="ob-perks">
+          <div className="ob-perk"><span className="ob-perk-icon">⚡</span> Instant activation after approval</div>
+          <div className="ob-perk"><span className="ob-perk-icon">🏪</span> Works for retail & restaurants</div>
+          <div className="ob-perk"><span className="ob-perk-icon">📱</span> Web, Windows & Android apps</div>
+          <div className="ob-perk"><span className="ob-perk-icon">🔓</span> All features unlocked for 30 days</div>
         </div>
       </div>
 
-      {/* FORM */}
-      <div className="ob-body">
-        <div className="ob-card">
+      {/* RIGHT PANEL */}
+      <div className="ob-right">
+        <nav className="ob-nav">
+          <Link className="ob-logo" to="/">Haappii Billing</Link>
+          <Link className="ob-nav-link" to="/">← Back to home</Link>
+        </nav>
 
-          {/* STEPPER */}
-          <div className="ob-stepper">
-            {STEPS.map((label, i) => (
-              <div className={`ob-step ${i < step ? "done" : i === step ? "active" : ""}`} key={label}>
-                <div className="ob-step-circle">{i < step ? "✓" : i + 1}</div>
-                <span className="ob-step-label">{label}</span>
-                {i < STEPS.length - 1 && <div className="ob-step-line" />}
+        <div className="ob-form-area">
+          <div className="ob-form-box">
+
+            {/* PROGRESS */}
+            <div className="ob-progress">
+              <div className={`ob-prog-step ${step > 0 ? "done" : "active"}`}>
+                <div className="ob-prog-dot">{step > 0 ? "✓" : "1"}</div>
+                <span className="ob-prog-label">Business</span>
               </div>
-            ))}
-          </div>
-
-          {/* SUCCESS */}
-          {result?.request_id && (
-            <div className="ob-success">
-              <div className="ob-success-icon">🎉</div>
-              <p className="ob-success-title">You're all set!</p>
-              <p className="ob-success-text">
-                Your shop setup request has been received. We'll review it and send login credentials to <strong>{form.email}</strong> shortly.
-              </p>
-              <span className="ob-success-id">Request #{result.request_id}</span>
+              <div className={`ob-prog-line ${step > 0 ? "done" : ""}`} />
+              <div className={`ob-prog-step ${step === 1 ? "active" : result ? "done" : ""}`}>
+                <div className="ob-prog-dot">{result ? "✓" : "2"}</div>
+                <span className="ob-prog-label">Contact</span>
+              </div>
             </div>
-          )}
 
-          {/* STEP 0 */}
-          {!result?.request_id && step === 0 && (
-            <>
-              <div className="ob-head">
-                <h2 className="ob-step-title">Your business</h2>
-                <p className="ob-step-sub">Tell us about the shop you want to set up.</p>
+            {/* SUCCESS */}
+            {result?.request_id ? (
+              <div className="ob-done">
+                <div className="ob-done-icon">🎉</div>
+                <h2 className="ob-done-title">You're all set!</h2>
+                <div className="ob-done-id">Request #{result.request_id}</div>
+                <p className="ob-done-text">
+                  We'll review your request and send login credentials to <strong>{form.email}</strong> shortly.
+                </p>
+                <div className="ob-done-trial">🎁 30 days free trial included</div>
+                <br />
+                <Link to="/login" className="ob-btn ob-btn-next" style={{ textDecoration: "none" }}>
+                  Go to Login →
+                </Link>
               </div>
-              <div className="ob-fields">
-                <div>
-                  <label className="ob-label">Shop name *</label>
-                  <input className="ob-input" placeholder="e.g. Sunrise Mart" value={form.shop_name} onChange={(e) => update("shop_name", e.target.value)} />
+            ) : step === 0 ? (
+              <>
+                <h2 className="ob-title">Your business</h2>
+                <p className="ob-subtitle">Tell us about the shop you want to set up.</p>
+
+                <div className="ob-field">
+                  <label className="ob-field-label">Shop name *</label>
+                  <input className="ob-field-input" placeholder="e.g. Sunrise Mart" value={form.shop_name} onChange={(e) => set("shop_name", e.target.value)} />
                 </div>
 
-                <div>
-                  <label className="ob-label">Business type *</label>
-                  <div className="ob-type-grid">
-                    <button type="button" className={`ob-type-btn ${form.billing_type === "store" ? "selected" : ""}`} onClick={() => update("billing_type", "store")}>
-                      <div className="ob-type-icon">🏪</div>
-                      <div className="ob-type-label">Store / Retail</div>
-                      <div className="ob-type-sub">Counter billing, inventory</div>
-                    </button>
-                    <button type="button" className={`ob-type-btn ${form.billing_type === "hotel" ? "selected" : ""}`} onClick={() => update("billing_type", "hotel")}>
-                      <div className="ob-type-icon">🍽️</div>
-                      <div className="ob-type-label">Hotel / Restaurant</div>
-                      <div className="ob-type-sub">Table billing, KOT, menu</div>
-                    </button>
-                  </div>
+                <label className="ob-field-label" style={{ marginBottom: 8 }}>Business type *</label>
+                <div className="ob-types">
+                  <button type="button" className={`ob-type ${form.billing_type === "store" ? "on" : ""}`} onClick={() => set("billing_type", "store")}>
+                    <div className="ob-type-emoji">🏪</div>
+                    <div className="ob-type-name">Store / Retail</div>
+                    <div className="ob-type-desc">Counter billing & inventory</div>
+                  </button>
+                  <button type="button" className={`ob-type ${form.billing_type === "hotel" ? "on" : ""}`} onClick={() => set("billing_type", "hotel")}>
+                    <div className="ob-type-emoji">🍽️</div>
+                    <div className="ob-type-name">Hotel / Restaurant</div>
+                    <div className="ob-type-desc">Table billing, KOT & menu</div>
+                  </button>
                 </div>
 
                 <div className="ob-row">
-                  <div>
-                    <label className="ob-label">City</label>
-                    <input className="ob-input" placeholder="City" value={form.city} onChange={(e) => update("city", e.target.value)} />
+                  <div className="ob-field">
+                    <label className="ob-field-label">City</label>
+                    <input className="ob-field-input" placeholder="City" value={form.city} onChange={(e) => set("city", e.target.value)} />
                   </div>
-                  <div>
-                    <label className="ob-label">State</label>
-                    <input className="ob-input" placeholder="State" value={form.state} onChange={(e) => update("state", e.target.value)} />
+                  <div className="ob-field">
+                    <label className="ob-field-label">State</label>
+                    <input className="ob-field-input" placeholder="State" value={form.state} onChange={(e) => set("state", e.target.value)} />
                   </div>
                 </div>
-              </div>
-            </>
-          )}
 
-          {/* STEP 1 */}
-          {!result?.request_id && step === 1 && (
-            <>
-              <div className="ob-head">
-                <h2 className="ob-step-title">Your contact</h2>
-                <p className="ob-step-sub">We'll send your login credentials to this email.</p>
-              </div>
-              <div className="ob-fields">
-                <div>
-                  <label className="ob-label">Full name *</label>
-                  <input className="ob-input" placeholder="Your name" value={form.name} onChange={(e) => update("name", e.target.value)} />
+                <div className="ob-actions">
+                  <Link to="/" style={{ textDecoration: "none" }}><button className="ob-btn ob-btn-back">Cancel</button></Link>
+                  <button className="ob-btn ob-btn-next" onClick={next}>Next →</button>
                 </div>
-                <div>
-                  <label className="ob-label">Email *</label>
-                  <input className="ob-input" placeholder="you@example.com" type="email" value={form.email} onChange={(e) => update("email", e.target.value)} />
-                </div>
-                <div>
-                  <label className="ob-label">Phone</label>
-                  <input className="ob-input" placeholder="Phone number (optional)" value={form.phone} onChange={(e) => update("phone", e.target.value)} />
-                </div>
-                <div>
-                  <label className="ob-label">Notes (optional)</label>
-                  <textarea className="ob-input ob-textarea" placeholder="Any setup requirements?" value={form.message} onChange={(e) => update("message", e.target.value)} />
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* FOOTER */}
-          <div className="ob-foot">
-            {step === 0 ? (
-              <Link to="/" style={{ textDecoration: "none" }}>
-                <button className="btn btn-ghost">Cancel</button>
-              </Link>
+              </>
             ) : (
-              <button className="btn btn-ghost" onClick={back}>← Back</button>
-            )}
+              <>
+                <h2 className="ob-title">Your contact</h2>
+                <p className="ob-subtitle">We'll send your login credentials to this email.</p>
 
-            {result?.request_id ? (
-              <Link to="/login" style={{ textDecoration: "none" }}>
-                <button className="btn btn-primary">Go to Login →</button>
-              </Link>
-            ) : step < STEPS.length - 1 ? (
-              <button className="btn btn-primary" onClick={next}>Next →</button>
-            ) : (
-              <button className="btn btn-success" onClick={submit} disabled={loading}>
-                {loading ? "Setting up…" : "Create My Shop →"}
-              </button>
+                <div className="ob-field">
+                  <label className="ob-field-label">Full name *</label>
+                  <input className="ob-field-input" placeholder="Your name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+                </div>
+                <div className="ob-field">
+                  <label className="ob-field-label">Email *</label>
+                  <input className="ob-field-input" placeholder="you@example.com" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+                </div>
+                <div className="ob-field">
+                  <label className="ob-field-label">Phone</label>
+                  <input className="ob-field-input" placeholder="Optional" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+                </div>
+                <div className="ob-field">
+                  <label className="ob-field-label">Notes (optional)</label>
+                  <textarea className="ob-field-input ob-field-textarea" placeholder="Any setup requirements?" value={form.message} onChange={(e) => set("message", e.target.value)} />
+                </div>
+
+                <div className="ob-actions">
+                  <button className="ob-btn ob-btn-back" onClick={back}>← Back</button>
+                  <button className="ob-btn ob-btn-go" onClick={submit} disabled={loading}>
+                    {loading ? "Setting up…" : "Create My Shop →"}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>
       </div>
-
-      <footer className="ob-footer">
-        Copyright {new Date().getFullYear()} Haappii Billing. All rights reserved.
-      </footer>
     </div>
   );
 }

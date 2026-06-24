@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import secrets
-import shutil
 from datetime import date, datetime
 from email.message import EmailMessage
 from mimetypes import guess_type
@@ -17,23 +16,25 @@ from fastapi.responses import FileResponse
 from typing import Literal, List, Dict
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import Numeric, cast, func, text
+from sqlalchemy import cast, func, text
 from sqlalchemy import Date
 
 from app.db import get_db
 from app.models.branch import Branch
 from app.models.platform_onboard_request import PlatformOnboardRequest
+from app.models.platform_payment import PlatformPayment
+from app.models.platform_team_profile import PlatformTeamProfile
 from app.models.platform_user import PlatformUser
 from app.models.roles import Role
 from app.models.shop_details import ShopDetails
 from app.models.support_ticket import SupportTicket
 from app.models.system_parameters import SystemParameters
 from app.models.users import User
-from app.models.invoice import Invoice
 from app.models.subscription_plan import SubscriptionPlan
 from app.utils.jwt_token import create_access_token
 from app.utils.passwords import encode_password, password_needs_upgrade, verify_password
 from app.utils.platform_owner_auth import PlatformOwnerOnly
+from app.utils.gcs_upload import upload_file, delete_file, url_to_gcs_path, generate_filename
 
 
 router = APIRouter(prefix="/platform", tags=["Platform Owner"])
@@ -163,6 +164,34 @@ def platform_login(payload: PlatformLoginIn, db: Session = Depends(get_db)):
     return {"access_token": token, "token_type": "bearer"}
 
 
+class PlatformChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=6, max_length=200)
+
+
+@router.post("/auth/change-password")
+def platform_change_password(
+    payload: PlatformChangePasswordIn,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    user = (
+        db.query(PlatformUser)
+        .filter(
+            PlatformUser.platform_user_id == owner.get("platform_user_id"),
+            PlatformUser.status == True,
+        )
+        .first()
+    )
+    if not user:
+        raise HTTPException(404, "User not found")
+    if not verify_password(payload.current_password, user.password):
+        raise HTTPException(403, "Current password is incorrect")
+    user.password = encode_password(payload.new_password)
+    db.commit()
+    return {"success": True, "message": "Password updated successfully"}
+
+
 def _get_param_value(db: Session, shop_id: int, key: str) -> str:
     row = (
         db.query(SystemParameters)
@@ -258,19 +287,13 @@ def update_about_contact(
         old_photo_url = _get_param_value(
             db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["photo_url"]
         )
-        if old_photo_url.startswith("/api/uploads/platform/"):
-            old_file = PLATFORM_UPLOADS_DIR / old_photo_url.split("/api/uploads/platform/")[-1]
-            if old_file.exists():
-                try:
-                    old_file.unlink()
-                except Exception:
-                    pass
+        old_gcs_path = url_to_gcs_path(old_photo_url)
+        if old_gcs_path:
+            delete_file(old_gcs_path)
 
-        filename = f"about_contact_{secrets.token_hex(8)}{ext}"
-        filepath = PLATFORM_UPLOADS_DIR / filename
-        with filepath.open("wb") as out:
-            shutil.copyfileobj(photo.file, out)
-        photo_url = f"/api/uploads/platform/{filename}"
+        filename = generate_filename("about_contact", ext)
+        destination = f"platform/{filename}"
+        photo_url = upload_file(photo.file, destination, content_type)
         _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, ABOUT_CONTACT_SETTING_KEYS["photo_url"], photo_url)
 
     db.commit()
@@ -536,6 +559,10 @@ def accept_onboard_request(
         db.refresh(branch)
 
         shop.head_office_branch_id = branch.branch_id
+        from datetime import timedelta
+        trial_end = (datetime.utcnow() + timedelta(days=30)).date()
+        shop.expires_on = trial_end
+        shop.paid_until = trial_end
         db.add(shop)
         db.commit()
         db.refresh(shop)
@@ -578,7 +605,11 @@ def accept_onboard_request(
             )
             if monthly_amount is not None:
                 content += f"Monthly Amount: ₹{monthly_amount}\n\n"
-            content += "Login at: https://haappiibilling.in\n\nAll features are enabled for your account.\n"
+            content += (
+                f"Your free trial is active until: {trial_end.strftime('%d %b %Y')}\n"
+                "All features are unlocked during your trial period.\n\n"
+                "Login at: https://haappiibilling.in\n"
+            )
 
             email_sent = _send_credentials_email(
                 to_email=recipient,
@@ -672,15 +703,8 @@ def platform_revenue(
 ):
     since = datetime.utcnow() - timedelta(days=int(days))
     amt = (
-        db.query(
-            func.coalesce(
-                func.sum(
-                    cast(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0), Numeric(12, 2))
-                ),
-                0,
-            )
-        )
-        .filter(Invoice.created_time >= since)
+        db.query(func.coalesce(func.sum(PlatformPayment.amount), 0))
+        .filter(PlatformPayment.paid_on >= since)
         .scalar()
         or 0
     )
@@ -694,25 +718,17 @@ def platform_revenue_daily(
     owner=Depends(PlatformOwnerOnly),
 ):
     since = datetime.utcnow() - timedelta(days=int(days))
-    amt = (
+    rows = (
         db.query(
-            cast(func.date(Invoice.created_time), Date).label("day"),
-            func.coalesce(
-                func.sum(
-                    cast(
-                        func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0),
-                        Numeric(12, 2),
-                    )
-                ),
-                0,
-            ).label("revenue"),
+            cast(func.date(PlatformPayment.paid_on), Date).label("day"),
+            func.coalesce(func.sum(PlatformPayment.amount), 0).label("revenue"),
         )
-        .filter(Invoice.created_time >= since)
-        .group_by(cast(func.date(Invoice.created_time), Date))
-        .order_by(cast(func.date(Invoice.created_time), Date))
+        .filter(PlatformPayment.paid_on >= since)
+        .group_by(cast(func.date(PlatformPayment.paid_on), Date))
+        .order_by(cast(func.date(PlatformPayment.paid_on), Date))
         .all()
     )
-    return [{"date": str(r.day), "revenue": float(r.revenue or 0)} for r in amt]
+    return [{"date": str(r.day), "revenue": float(r.revenue or 0)} for r in rows]
 
 
 @router.get("/plans")
@@ -842,22 +858,6 @@ def platform_list_shops(
     db: Session = Depends(get_db),
     owner=Depends(PlatformOwnerOnly),
 ):
-    # Revenue per shop (all-time)
-    rev_rows = (
-        db.query(
-            Invoice.shop_id.label("shop_id"),
-            func.coalesce(
-                func.sum(
-                    cast(func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.discounted_amt, 0), Numeric(12, 2))
-                ),
-                0,
-            ).label("revenue"),
-        )
-        .group_by(Invoice.shop_id)
-        .all()
-    )
-    rev_map = {int(r.shop_id): float(r.revenue or 0) for r in rev_rows if r and r.shop_id is not None}
-
     today = datetime.utcnow().date()
     shops = db.query(ShopDetails).order_by(ShopDetails.shop_id.desc()).all()
     out = []
@@ -889,7 +889,7 @@ def platform_list_shops(
                 "next_renewal": str(paid_until) if paid_until else None,
                 "total_paid": float(getattr(s, "total_paid", 0) or 0),
                 "status": status,
-                "revenue": float(rev_map.get(int(s.shop_id), 0)),
+                "revenue": float(getattr(s, "total_paid", 0) or 0),
             }
         )
     return out
@@ -966,11 +966,18 @@ def update_shop_payment(
         )
         if not plan_row:
             raise HTTPException(404, "Plan not found or inactive")
-        s.plan = (plan_row.name or "").strip().upper()[:30] or "PLAN"
+        plan_name = (plan_row.name or "").strip().upper()[:30] or "PLAN"
+        plan_price = float(plan_row.price or 0)
+        s.plan = plan_name
         days = int(plan_row.duration_months) * 30
         s.paid_until = today + timedelta(days=days)
-        s.total_paid = float(getattr(s, "total_paid", 0) or 0) + float(plan_row.price or 0)
+        s.total_paid = float(getattr(s, "total_paid", 0) or 0) + plan_price
         s.last_payment_on = today
+        if plan_price > 0:
+            db.add(PlatformPayment(
+                shop_id=shop_id, amount=plan_price,
+                plan_name=plan_name, note=f"Plan: {plan_name} ({plan_row.duration_months}mo)",
+            ))
     elif payload.plan:
         s.plan = (payload.plan or "").strip().upper()[:30] or s.plan
 
@@ -984,9 +991,14 @@ def update_shop_payment(
         base = s.paid_until if getattr(s, "paid_until", None) and s.paid_until > today else today
         s.paid_until = base + timedelta(days=int(payload.extend_days))
 
-    if payload.amount is not None:
-        s.total_paid = float(getattr(s, "total_paid", 0) or 0) + float(payload.amount or 0)
+    if payload.amount is not None and float(payload.amount or 0) > 0:
+        pay_amt = float(payload.amount)
+        s.total_paid = float(getattr(s, "total_paid", 0) or 0) + pay_amt
         s.last_payment_on = today
+        db.add(PlatformPayment(
+            shop_id=shop_id, amount=pay_amt,
+            plan_name=s.plan, note="Manual payment",
+        ))
 
     db.commit()
     db.refresh(s)
@@ -1422,3 +1434,148 @@ def direct_create_shop(
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Shop creation failed: {str(e)}")
+
+
+# ── Team Profiles ─────────────────────────────────────────────────────────────
+
+TEAM_UPLOADS_DIR = Path("uploads") / "team"
+TEAM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _profile_row(p: PlatformTeamProfile) -> dict:
+    return {
+        "profile_id": p.profile_id,
+        "name": p.name,
+        "role_title": p.role_title or "",
+        "bio": p.bio or "",
+        "photo_url": p.photo_url or "",
+        "display_order": p.display_order,
+        "is_active": p.is_active,
+        "created_at": str(p.created_at) if p.created_at else None,
+    }
+
+
+@router.get("/public/team-profiles")
+def public_team_profiles(db: Session = Depends(get_db)):
+    rows = (
+        db.query(PlatformTeamProfile)
+        .filter(PlatformTeamProfile.is_active == True)  # noqa: E712
+        .order_by(PlatformTeamProfile.display_order.asc(), PlatformTeamProfile.profile_id.asc())
+        .all()
+    )
+    return [_profile_row(p) for p in rows]
+
+
+@router.get("/team-profiles")
+def list_team_profiles(
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    rows = (
+        db.query(PlatformTeamProfile)
+        .order_by(PlatformTeamProfile.display_order.asc(), PlatformTeamProfile.profile_id.asc())
+        .all()
+    )
+    return [_profile_row(p) for p in rows]
+
+
+@router.post("/team-profiles")
+def create_team_profile(
+    name: str = Form(...),
+    role_title: str = Form(""),
+    bio: str = Form(""),
+    display_order: int = Form(0),
+    is_active: bool = Form(True),
+    photo: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name is required")
+
+    photo_url = None
+    if photo and (photo.filename or "").strip():
+        content_type = (photo.content_type or "").lower()
+        if not content_type.startswith("image/"):
+            raise HTTPException(400, "Photo must be an image")
+        ext = Path(photo.filename).suffix.lower() if photo.filename else ".jpg"
+        if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            ext = ".jpg"
+        filename = generate_filename("team", ext)
+        destination = f"team/{filename}"
+        photo_url = upload_file(photo.file, destination, content_type)
+
+    row = PlatformTeamProfile(
+        name=name,
+        role_title=(role_title or "").strip(),
+        bio=(bio or "").strip() or None,
+        photo_url=photo_url,
+        display_order=int(display_order),
+        is_active=bool(is_active),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _profile_row(row)
+
+
+@router.put("/team-profiles/{profile_id}")
+def update_team_profile(
+    profile_id: int,
+    name: str = Form(...),
+    role_title: str = Form(""),
+    bio: str = Form(""),
+    display_order: int = Form(0),
+    is_active: bool = Form(True),
+    photo: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == profile_id).first()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name is required")
+
+    if photo and (photo.filename or "").strip():
+        content_type = (photo.content_type or "").lower()
+        if not content_type.startswith("image/"):
+            raise HTTPException(400, "Photo must be an image")
+        ext = Path(photo.filename).suffix.lower() if photo.filename else ".jpg"
+        if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            ext = ".jpg"
+        old_gcs_path = url_to_gcs_path(row.photo_url)
+        if old_gcs_path:
+            delete_file(old_gcs_path)
+        filename = generate_filename("team", ext)
+        destination = f"team/{filename}"
+        row.photo_url = upload_file(photo.file, destination, content_type)
+
+    row.name = name
+    row.role_title = (role_title or "").strip()
+    row.bio = (bio or "").strip() or None
+    row.display_order = int(display_order)
+    row.is_active = bool(is_active)
+    db.commit()
+    db.refresh(row)
+    return _profile_row(row)
+
+
+@router.delete("/team-profiles/{profile_id}")
+def delete_team_profile(
+    profile_id: int,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == profile_id).first()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    old_gcs_path = url_to_gcs_path(row.photo_url)
+    if old_gcs_path:
+        delete_file(old_gcs_path)
+    db.delete(row)
+    db.commit()
+    return {"success": True, "profile_id": profile_id}
