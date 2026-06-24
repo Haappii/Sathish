@@ -1,7 +1,8 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -72,6 +73,7 @@ import app.models.table_billing
 import app.models.table_qr
 import app.models.platform_onboard_request
 import app.models.platform_user
+import app.models.platform_payment
 
 # ⭐ HOTEL FEATURE MODELS
 import app.models.kot
@@ -98,9 +100,16 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 # ======================================================
 # FASTAPI APP
 # ======================================================
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    _startup_db_init()
+    yield
+
+
 app = FastAPI(
     title="Shop Billing Application API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter
@@ -1060,21 +1069,96 @@ def legacy_categories_redirect():
     return RedirectResponse(url="/api/category/", status_code=307)
 
 
+import re as _re
+
+_BOT_PATTERN = _re.compile(
+    r"googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|applebot",
+    _re.IGNORECASE,
+)
+
+_SEO_PAGES = {
+    "": {
+        "title": "Haappii Billing — POS & Shop Management for Retail & Restaurants",
+        "description": "Cloud-based POS platform with GST billing, inventory management, multi-branch support, table ordering, kitchen display, and business analytics for retail shops and restaurants in India.",
+        "h1": "Make billing feel instant. Operations feel effortless.",
+        "content": "Haappii Billing brings checkout, stock visibility, branch control, and reporting into one workspace built for busy teams and growing shops. Fast counter billing, inventory tracking, multi-branch management, sales reports, table ordering, KOT system, QR ordering, employee management, and more. Available on Web, Windows Desktop, and Android.",
+    },
+    "about": {
+        "title": "About — Haappii Billing POS & Shop Management",
+        "description": "Learn about Haappii Billing — a cloud POS platform for retail stores and restaurants. GST billing, inventory, multi-branch, analytics. Download for Windows and Android.",
+        "h1": "Billing that feels instant. Operations that feel effortless.",
+        "content": "Haappii Billing is a complete POS and shop management platform. Core features include fast counter billing, inventory with context, branch-ready scaling, and clear readable reports. Available as a web app, Windows desktop installer, and Android APK. Built for retail counters and restaurant floors.",
+    },
+    "setup/onboard": {
+        "title": "Get Started Free — Haappii Billing Setup",
+        "description": "Set up your shop on Haappii Billing in minutes. Free onboarding for retail stores and restaurants. Get login credentials sent to your email.",
+        "h1": "Get started with Haappii Billing",
+        "content": "Start your free setup in minutes. Register your business, configure your shop, and get instant access with login credentials sent to your email. Works for retail stores, restaurants, and multi-branch businesses.",
+    },
+}
+
+
+def _render_seo_page(path: str) -> HTMLResponse | None:
+    page = _SEO_PAGES.get(path)
+    if not page:
+        return None
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{page["title"]}</title>
+<meta name="description" content="{page["description"]}">
+<link rel="canonical" href="https://haappiibilling.in/{path}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://haappiibilling.in/{path}">
+<meta property="og:title" content="{page["title"]}">
+<meta property="og:description" content="{page["description"]}">
+<meta property="og:site_name" content="Haappii Billing">
+<script type="application/ld+json">
+{{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Haappii Billing","applicationCategory":"BusinessApplication","operatingSystem":"Windows, Web, Android","url":"https://haappiibilling.in","description":"{page["description"]}","offers":{{"@type":"Offer","price":"0","priceCurrency":"INR"}},"featureList":"GST Billing, Inventory, Multi-Branch, Table Ordering, Kitchen Display, Analytics, Thermal Printing"}}
+</script>
+</head>
+<body>
+<header><h1>{page["h1"]}</h1></header>
+<main><p>{page["content"]}</p></main>
+<footer><p>Copyright 2026 Haappii Billing. All rights reserved.</p>
+<p><a href="https://haappiibilling.in/">Home</a> | <a href="https://haappiibilling.in/about">About</a> | <a href="https://haappiibilling.in/setup/onboard">Get Started</a> | <a href="https://haappiibilling.in/login">Login</a></p>
+</footer>
+</body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200)
+
+
+def _is_bot(request: Request) -> bool:
+    ua = request.headers.get("user-agent", "")
+    return bool(_BOT_PATTERN.search(ua))
+
+
 @app.get("/")
-def frontend_root():
+def frontend_root(request: Request):
+    if _is_bot(request):
+        seo = _render_seo_page("")
+        if seo:
+            return seo
     if _frontend_ready():
         return FileResponse(str(FRONTEND_INDEX))
     return {"status": "ok", "message": "Billing API is running (frontend not built)"}
 
 
 @app.get("/{full_path:path}")
-def frontend_spa(full_path: str):
+def frontend_spa(full_path: str, request: Request):
     if not _frontend_ready():
         raise HTTPException(404, "Frontend not built")
 
     p = (full_path or "").lstrip("/")
     if p.startswith("api/"):
         raise HTTPException(404, "Not found")
+
+    if _is_bot(request):
+        seo = _render_seo_page(p)
+        if seo:
+            return seo
 
     candidate = (FRONTEND_DIST_DIR / p) if p else FRONTEND_INDEX
     if p and candidate.exists() and candidate.is_file():
