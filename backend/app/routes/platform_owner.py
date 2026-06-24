@@ -169,6 +169,61 @@ class PlatformChangePasswordIn(BaseModel):
     new_password: str = Field(min_length=6, max_length=200)
 
 
+@router.delete("/admin/cleanup-shops")
+def cleanup_shops(
+    shop_ids: str = Query(..., description="Comma-separated shop IDs"),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    ids = [int(x.strip()) for x in shop_ids.split(",") if x.strip().isdigit()]
+    if not ids:
+        raise HTTPException(400, "No valid shop IDs")
+    if 1 in ids:
+        raise HTTPException(400, "Cannot delete shop 1 (primary shop)")
+
+    tables = [
+        "invoice_details", "invoice_archive", "invoice_due", "invoice_payment",
+        "invoice_discount", "invoice_draft", "invoice",
+        "sales_return_items", "sales_return", "sales_return_meta",
+        "kot_items", "kot", "order_items", "orders", "table_master",
+        "qr_order_items", "qr_orders", "table_qr_sessions", "table_qr_tokens",
+        "stock_ledger", "stock_audit", "date_wise_stock", "inventory", "item_lot",
+        "stock_transfer_items", "stock_transfers",
+        "branch_item_price", "item_prices", "recipe", "modifier", "items", "category",
+        "purchase_order_items", "purchase_order_attachments", "purchase_orders",
+        "supplier_ledger", "suppliers",
+        "advance_order_items", "advance_orders",
+        "gift_card_transactions", "gift_cards",
+        "coupon_usage", "coupons",
+        "loyalty_transactions", "loyalty_accounts",
+        "customer_wallet_transactions", "customers",
+        "cash_drawer", "branch_expenses", "day_close", "month_close",
+        "employee_attendance", "employee_settlements", "employees",
+        "online_orders", "delivery", "reservations", "feedback",
+        "bulk_import_log", "mail_scheduler", "audit_log", "system_parameters",
+        "role_permissions", "support_tickets", "platform_payments",
+        "users", "branch", "shop_details",
+    ]
+    deleted = {}
+    for sid in ids:
+        deleted[sid] = {}
+        for tbl in tables:
+            try:
+                r = db.execute(text(f"DELETE FROM {tbl} WHERE shop_id = :sid"), {"sid": sid})
+                if r.rowcount > 0:
+                    deleted[sid][tbl] = r.rowcount
+            except Exception:
+                db.rollback()
+        try:
+            r = db.execute(text("DELETE FROM platform_onboard_requests WHERE created_shop_id = :sid"), {"sid": sid})
+            if r.rowcount > 0:
+                deleted[sid]["platform_onboard_requests"] = r.rowcount
+        except Exception:
+            db.rollback()
+    db.commit()
+    return {"success": True, "deleted": deleted}
+
+
 @router.post("/auth/change-password")
 def platform_change_password(
     payload: PlatformChangePasswordIn,
