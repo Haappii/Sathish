@@ -501,6 +501,10 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
     """
     from datetime import timedelta
 
+    mobile_digits = "".join(ch for ch in str(payload.mobile or payload.requester_phone or "") if ch.isdigit())
+    if len(mobile_digits) < 10:
+        raise HTTPException(400, "A valid 10-digit mobile number is required")
+
     billing_type = _normalize_billing_type(payload.billing_type)
     admin_role = _ensure_admin_role(db)
     _ensure_manager_role(db)

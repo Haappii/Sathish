@@ -43,6 +43,8 @@ export default function SetupOnboard() {
     if (step === 1) {
       if (!form.name.trim()) return "Your name is required";
       if (!form.email.includes("@")) return "Enter a valid email";
+      const digits = (form.phone || "").replace(/\D/g, "");
+      if (digits.length < 10) return "Enter a valid 10-digit mobile number";
     }
     return null;
   };
@@ -312,8 +314,8 @@ export default function SetupOnboard() {
                   <input className="ob-inp" placeholder="Your name" value={form.name} onChange={(e) => set("name", e.target.value)} />
                 </div>
                 <div className="ob-fg">
-                  <label className="ob-label">Phone</label>
-                  <input className="ob-inp" placeholder="Optional" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+                  <label className="ob-label">Mobile number *</label>
+                  <input className="ob-inp" placeholder="10-digit mobile number" maxLength={10} keyboardtype="phone-pad" value={form.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))} />
                 </div>
               </div>
               <div className="ob-fg">
