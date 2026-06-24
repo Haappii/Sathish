@@ -805,6 +805,30 @@ export default function MainLayout({ hideSidebar = false }) {
             <span className="text-base sm:text-lg font-extrabold truncate" style={{ color: BLUE }}>
               {shopName}
             </span>
+            {(() => {
+              const expiresOn = shop?.expires_on || shop?.paid_until;
+              if (!expiresOn) return null;
+              const expDate = new Date(expiresOn);
+              const now = new Date();
+              now.setHours(0, 0, 0, 0);
+              const diff = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+              if (diff < 0) return (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-red-50 text-red-600 border-red-200 whitespace-nowrap flex-shrink-0">
+                  Trial expired
+                </span>
+              );
+              if (diff > 30) return null;
+              const urgent = diff <= 7;
+              return (
+                <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border whitespace-nowrap flex-shrink-0 ${
+                  urgent
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-indigo-50 text-indigo-600 border-indigo-200"
+                }`}>
+                  {diff === 0 ? "Trial ends today" : `${diff} day${diff !== 1 ? "s" : ""} left`}
+                </span>
+              );
+            })()}
           </div>
 
           {/* Right: controls */}
