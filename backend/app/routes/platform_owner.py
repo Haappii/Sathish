@@ -326,7 +326,7 @@ def _can_send_mail() -> bool:
     return bool(SENDER_EMAIL and SENDER_PASSWORD and SMTP_HOST and SMTP_PORT)
 
 
-def _send_credentials_email(*, to_email: str, subject: str, content: str) -> bool:
+def _send_credentials_email(*, to_email: str, subject: str, content: str, html_content: str | None = None) -> bool:
     if not _can_send_mail():
         return False
     to_addr = (to_email or "").strip()
@@ -338,6 +338,8 @@ def _send_credentials_email(*, to_email: str, subject: str, content: str) -> boo
     email["From"] = SENDER_EMAIL
     email["To"] = to_addr
     email.set_content(content)
+    if html_content:
+        email.add_alternative(html_content, subtype="html")
 
     try:
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
@@ -347,6 +349,52 @@ def _send_credentials_email(*, to_email: str, subject: str, content: str) -> boo
     except Exception as e:
         logging.getLogger("uvicorn.error").warning("Email send failed: %s", e)
         return False
+
+
+def _build_welcome_html(*, shop_name: str, shop_id: int, username: str, password: str, trial_ends: str) -> str:
+    return f"""<html><body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:30px;margin:0;">
+  <div style="max-width:520px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.1);">
+    <div style="background:linear-gradient(135deg,#4338ca,#6366f1,#7c3aed);padding:36px 32px;">
+      <div style="font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.7);text-transform:uppercase;margin-bottom:8px;">Welcome to</div>
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px;">Haappii Billing</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:6px;">Your shop is live and ready to use</div>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#374151;margin:0 0 20px;font-size:15px;line-height:1.6;">
+        Hi! Your shop <strong>{shop_name}</strong> has been activated with a <strong>30-day free trial</strong>. All features are unlocked.
+      </p>
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="padding:10px 0;color:#6b7280;border-bottom:1px solid #f3f4f6;">Shop ID</td>
+            <td style="padding:10px 0;text-align:right;font-weight:800;color:#111827;border-bottom:1px solid #f3f4f6;font-size:18px;">{shop_id}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;color:#6b7280;border-bottom:1px solid #f3f4f6;">Username</td>
+            <td style="padding:10px 0;text-align:right;font-weight:700;color:#111827;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:15px;">{username}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;color:#6b7280;">Password</td>
+            <td style="padding:10px 0;text-align:right;font-weight:700;color:#111827;font-family:monospace;font-size:15px;">{password}</td>
+          </tr>
+        </table>
+      </div>
+      <div style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1.5px solid #a7f3d0;border-radius:10px;padding:14px 18px;text-align:center;margin-bottom:24px;">
+        <span style="font-size:13px;font-weight:700;color:#059669;">&#127873; Free trial active until {trial_ends}</span>
+      </div>
+      <div style="text-align:center;">
+        <a href="https://haappiibilling.in/login" style="display:inline-block;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:15px;box-shadow:0 4px 16px rgba(99,102,241,0.3);">Login Now &rarr;</a>
+      </div>
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;">
+        <p style="color:#9ca3af;font-size:12px;margin:0 0 6px;">Available on:</p>
+        <p style="color:#6b7280;font-size:13px;margin:0;font-weight:600;">&#127760; Web &nbsp;&middot;&nbsp; &#128187; Windows Desktop &nbsp;&middot;&nbsp; &#128241; Android App</p>
+      </div>
+    </div>
+    <div style="background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+      <p style="color:#9ca3af;font-size:11px;margin:0;">This is an automated message from Haappii Billing &middot; <a href="https://haappiibilling.in" style="color:#6366f1;text-decoration:none;">haappiibilling.in</a></p>
+    </div>
+  </div>
+</body></html>"""
 
 
 class OnboardRequestIn(BaseModel):
@@ -513,20 +561,29 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
         recipient = (payload.requester_email or payload.mailid or "").strip()
         email_sent = False
         try:
-            content = (
+            trial_display = trial_end.strftime("%d %b %Y")
+            plain_content = (
                 "Welcome to Haappii Billing!\n\n"
                 "Your shop has been activated and is ready to use.\n\n"
                 f"Shop ID  : {shop.shop_id}\n"
                 f"Username : {admin_username}\n"
                 f"Password : {admin_password}\n\n"
-                f"Your free trial is active until: {trial_end.strftime('%d %b %Y')}\n"
+                f"Your free trial is active until: {trial_display}\n"
                 "All features are unlocked during your trial period.\n\n"
                 "Login at: https://haappiibilling.in\n"
             )
+            html_content = _build_welcome_html(
+                shop_name=payload.shop_name.strip(),
+                shop_id=shop.shop_id,
+                username=admin_username,
+                password=admin_password,
+                trial_ends=trial_display,
+            )
             email_sent = _send_credentials_email(
                 to_email=recipient,
-                subject="Your Haappii Billing shop is ready!",
-                content=content,
+                subject="Your Haappii Billing shop is ready! 🎉",
+                content=plain_content,
+                html_content=html_content,
             )
         except Exception:
             email_sent = False
