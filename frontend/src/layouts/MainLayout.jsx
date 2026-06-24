@@ -890,6 +890,16 @@ export default function MainLayout({ hideSidebar = false }) {
               </span>
             </button>
 
+            <a
+              href="/user-manual.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition text-[11px] font-semibold no-underline"
+              title="User Manual"
+            >
+              📖 Manual
+            </a>
+
             {/* Quick item enable/disable */}
             {canQuickToggleItems && (
               <div className="relative">

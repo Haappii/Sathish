@@ -409,6 +409,7 @@ export default function About() {
           </div>
         </div>
         <div className="ab-nav-links">
+          <a className="btn btn-ghost" href="/user-manual.html" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>📖 Manual</a>
           <Link className="btn btn-ghost" to="/setup/onboard">Setup</Link>
           <Link className="btn btn-primary" to="/login">Login</Link>
         </div>

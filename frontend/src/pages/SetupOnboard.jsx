@@ -188,7 +188,10 @@ export default function SetupOnboard() {
           <span className="ob-brand-mark" />
           <span className="ob-brand-name">Haappii Billing</span>
         </Link>
-        <Link className="ob-nav-link" to="/">← Back to home</Link>
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <a className="ob-nav-link" href="/user-manual.html" target="_blank" rel="noopener noreferrer">📖 Manual</a>
+          <Link className="ob-nav-link" to="/">← Back to home</Link>
+        </div>
       </nav>
 
       {/* HERO */}
