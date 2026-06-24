@@ -134,8 +134,25 @@ def login(request: Request, body: dict, db: Session = Depends(get_db)):
         "branch_type": branch.type if branch else "",
         "head_office_branch_id": head_office_branch_id,
         "login_status": user.login_status,
+        "must_change_password": bool(getattr(user, "must_change_password", False)),
         "app_date": get_business_date(db, user.shop_id),
     }
+
+
+@router.post("/change-password")
+def change_password(body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    old_password = (body.get("old_password") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    if not old_password or not new_password:
+        raise HTTPException(400, "Old and new passwords are required")
+    if len(new_password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    if not verify_password(old_password, current_user.password):
+        raise HTTPException(400, "Current password is incorrect")
+    current_user.password = encode_password(new_password)
+    current_user.must_change_password = False
+    db.commit()
+    return {"success": True, "message": "Password changed successfully"}
 
 
 @router.post("/logout")

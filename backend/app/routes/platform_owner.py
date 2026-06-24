@@ -600,6 +600,7 @@ def create_onboard_request(payload: OnboardRequestIn, db: Session = Depends(get_
             role=admin_role.role_id,
             status=True,
             branch_id=branch.branch_id,
+            must_change_password=True,
         )
         db.add(user)
         db.commit()

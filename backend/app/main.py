@@ -825,6 +825,16 @@ def _auto_migrate_advance_orders() -> None:
 
 
 
+def _auto_migrate_must_change_password() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;"))
+    except Exception as e:
+        logger.exception("Auto-migration (must_change_password) failed: %s", e)
+
+
 def _startup_db_init():
     """
     Initialize DB schema and seed defaults.
@@ -852,6 +862,7 @@ def _startup_db_init():
     _auto_migrate_advance_orders()
     _auto_migrate_shop_modules()
     _auto_migrate_branch_feedback_qr()
+    _auto_migrate_must_change_password()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.

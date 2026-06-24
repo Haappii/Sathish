@@ -17,6 +17,11 @@ export default function Login() {
 
   const navigate = useNavigate();
 
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changePwForm, setChangePwForm] = useState({ old_password: "", new_password: "", confirm: "" });
+  const [changePwError, setChangePwError] = useState("");
+  const [changePwLoading, setChangePwLoading] = useState(false);
+
   const [form, setForm] = useState({
     shop_id: "",
     username: "",
@@ -106,7 +111,12 @@ export default function Login() {
         console.warn("Failed to persist offline auth", err);
       }
 
-      navigate("/home", { replace: true });
+      if (res.data.must_change_password) {
+        setChangePwForm({ old_password: form.password, new_password: "", confirm: "" });
+        setShowChangePassword(true);
+      } else {
+        navigate("/home", { replace: true });
+      }
 
     } catch (err) {
       // Network/CORS error from offline bundle — try saved credentials
@@ -132,6 +142,29 @@ export default function Login() {
     }
 
     setLoading(false);
+  };
+
+  const submitPasswordChange = async () => {
+    setChangePwError("");
+    if (!changePwForm.new_password || changePwForm.new_password.length < 6) {
+      return setChangePwError("Password must be at least 6 characters");
+    }
+    if (changePwForm.new_password !== changePwForm.confirm) {
+      return setChangePwError("Passwords do not match");
+    }
+    setChangePwLoading(true);
+    try {
+      await api.post("/auth/change-password", {
+        old_password: changePwForm.old_password,
+        new_password: changePwForm.new_password,
+      });
+      setShowChangePassword(false);
+      navigate("/home", { replace: true });
+    } catch (err) {
+      setChangePwError(err?.response?.data?.detail || "Failed to change password");
+    } finally {
+      setChangePwLoading(false);
+    }
   };
 
   const onKey = e => e.key === "Enter" && submit();
@@ -322,6 +355,57 @@ export default function Login() {
           </p>
         </div>
       </div>
+
+      {/* Force Change Password Modal */}
+      {showChangePassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-3">🔐</div>
+              <h2 className="text-xl font-extrabold text-gray-900">Set Your New Password</h2>
+              <p className="text-sm text-gray-500 mt-1">Your temporary password must be changed before continuing.</p>
+            </div>
+
+            {changePwError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-600 font-medium">
+                {changePwError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Min 6 characters"
+                  value={changePwForm.new_password}
+                  onChange={e => setChangePwForm(p => ({ ...p, new_password: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Confirm Password</label>
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Re-enter password"
+                  value={changePwForm.confirm}
+                  onChange={e => setChangePwForm(p => ({ ...p, confirm: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && submitPasswordChange()}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={submitPasswordChange}
+              disabled={changePwLoading}
+              className="w-full mt-6 py-3.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg shadow-indigo-200"
+            >
+              {changePwLoading ? "Saving..." : "Set Password & Continue"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
