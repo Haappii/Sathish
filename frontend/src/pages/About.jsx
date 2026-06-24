@@ -94,7 +94,7 @@ export default function About() {
   const windowsAppUrl =
     import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
   const androidAppUrl =
-    import.meta.env.VITE_ANDROID_APP_URL || "/downloads/haappii-billing.apk";
+    import.meta.env.VITE_ANDROID_APP_URL || "https://storage.googleapis.com/haappiibilling-uploads/downloads/haappii-billing.apk";
   const contactInitial = (contactDetails.name || "H").trim().charAt(0).toUpperCase();
   const mailtoHref = `mailto:${contactDetails.email}?subject=${encodeURIComponent("Business Inquiry – Haappii Billing")}&body=${encodeURIComponent("Hello Sathish,\n\nI came across Haappii Billing and would like to connect for a business discussion.\n\nName: \nBusiness Name: \nContact Number: \nRequirement: \n\nRegards,")}`;
   const isWindows =
