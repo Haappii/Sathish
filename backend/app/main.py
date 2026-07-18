@@ -419,6 +419,30 @@ def _auto_migrate_branch_service_charge() -> None:
         logger.exception("Auto-migration (branch service charge) failed: %s", e)
 
 
+def _auto_migrate_stock_index() -> None:
+    """
+    Add the (shop_id, item_id, branch_id) index on `stock` for existing
+    Postgres databases — create_all() only applies it to fresh tables.
+    This is looked up once or twice per cart line item during bill
+    creation, so an unindexed lookup here compounds directly with the
+    per-item commit cost on the hot path.
+    """
+    try:
+        if engine.dialect.name != "postgresql":
+            return
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_stock_shop_item_branch
+                      ON stock (shop_id, item_id, branch_id);
+                    """
+                )
+            )
+    except Exception as e:
+        logger.exception("Auto-migration (stock index) failed: %s", e)
+
+
 def _auto_migrate_head_office_branch() -> None:
     """
     Add the preferred head-office branch pointer for existing Postgres databases.
@@ -919,6 +943,7 @@ def _startup_db_init():
     _auto_migrate_demo_expiry()
     _auto_migrate_table_billing()
     _auto_migrate_bulk_import_log()
+    _auto_migrate_stock_index()
     _auto_migrate_branch_service_charge()
     _auto_migrate_branch_service_charge_gst()
     _auto_migrate_head_office_branch()

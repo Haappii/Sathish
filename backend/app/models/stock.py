@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, Numeric
+from sqlalchemy import Column, Index, Integer, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 from app.db import Base
 
@@ -17,3 +17,9 @@ class Inventory(Base):
 
     item = relationship("Item")
     branch = relationship("Branch")
+
+    __table_args__ = (
+        # Every cart item during bill creation looks up its stock row by
+        # exactly this triple (ensure_stock_row/get_stock/adjust_stock).
+        Index("ix_stock_shop_item_branch", "shop_id", "item_id", "branch_id"),
+    )

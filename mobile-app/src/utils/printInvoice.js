@@ -210,7 +210,15 @@ function slugifyShopName(value) {
   return s || "shop";
 }
 
+// Resolving + re-encoding the logo as a data URI means a network fetch on
+// every single print. It rarely changes within a session, so cache the
+// result per shop/branch instead of redoing this work on every receipt.
+const _logoDataUriCache = new Map();
+
 async function getReceiptLogoUrl({ shop = {}, branch = {} } = {}) {
+  const cacheKey = `${shop?.shop_id ?? ""}:${branch?.branch_id ?? ""}`;
+  if (_logoDataUriCache.has(cacheKey)) return _logoDataUriCache.get(cacheKey);
+
   try {
     const candidates = [];
 
@@ -240,7 +248,10 @@ async function getReceiptLogoUrl({ shop = {}, branch = {} } = {}) {
 
     for (const uri of candidates) {
       const dataUri = await toDataUri(uri);
-      if (dataUri) return dataUri;
+      if (dataUri) {
+        _logoDataUriCache.set(cacheKey, dataUri);
+        return dataUri;
+      }
     }
 
     return "";

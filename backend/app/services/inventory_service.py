@@ -47,8 +47,10 @@ def ensure_stock_row(db: Session, shop_id: int, item_id: int, branch_id: int) ->
             min_stock=0
         )
         db.add(row)
-        db.commit()
-        db.refresh(row)
+        # flush (not commit) — caller commits once at the end of its own
+        # transaction; this just needs the row's PK assigned and visible
+        # within the current transaction.
+        db.flush()
 
     return row
 
@@ -103,8 +105,11 @@ def adjust_stock(
         reference_no=ref_no
     ))
 
-    db.commit()
-    db.refresh(row)
+    # flush (not commit) — this is called once per cart line item during
+    # bill creation; committing here turned every N-item bill into N+
+    # sequential DB round trips. Callers commit once when their own
+    # transaction is complete.
+    db.flush()
     return True
 
 
@@ -115,8 +120,7 @@ def update_min_stock(db: Session, shop_id: int, item_id: int, branch_id: int, mi
     item = db.query(Item).filter(Item.item_id == item_id, Item.shop_id == shop_id).first()
     if item:
         item.min_stock = min_stock
-        db.commit()
-        db.refresh(item)
+        db.flush()
     return item
 
 

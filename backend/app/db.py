@@ -43,9 +43,19 @@ sql_handler.setFormatter(logging.Formatter(
 ))
 
 sql_logger = logging.getLogger("sqlalchemy.engine")
-sql_logger.setLevel(logging.INFO)
-sql_logger.addHandler(sql_handler)
 sql_logger.propagate = False
+
+# Logging every SQL statement to disk on every request is a meaningful
+# amount of synchronous I/O under load. Keep it available for local
+# debugging, but off by default in production — opt back in per-deploy
+# with SQL_DEBUG_LOG=1 if needed.
+_sql_debug = (os.getenv("SQL_DEBUG_LOG") or "").strip().lower() in {"1", "true", "yes"}
+_app_env = (os.getenv("APP_ENV") or "development").strip().lower()
+if _sql_debug or _app_env != "production":
+    sql_logger.setLevel(logging.INFO)
+    sql_logger.addHandler(sql_handler)
+else:
+    sql_logger.setLevel(logging.WARNING)
 
 connect_args = {}
 if str(DATABASE_URL or "").startswith("postgresql"):
