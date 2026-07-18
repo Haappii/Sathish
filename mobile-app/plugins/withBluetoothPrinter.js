@@ -9,6 +9,7 @@ const BLUETOOTH_MODULE_KT = `package com.haappii.billing
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothSocket
 import com.facebook.react.bridge.*
+import com.facebook.react.bridge.Arguments
 import java.io.OutputStream
 import java.util.UUID
 
@@ -21,12 +22,12 @@ class BluetoothPrinterModule(reactContext: ReactApplicationContext) :
 
     private fun connectSocket(address: String): Pair<BluetoothSocket, OutputStream> {
         val adapter = BluetoothAdapter.getDefaultAdapter()
-            ?: throw Exception("BT_UNAVAILABLE: Bluetooth not available on this device")
+        if (adapter == null) throw Exception("BT_UNAVAILABLE: Bluetooth not available on this device")
         val cleanAddress = address.removePrefix("BT:").removePrefix("bt:").trim().uppercase()
         val device = try {
             adapter.getRemoteDevice(cleanAddress)
         } catch (e: IllegalArgumentException) {
-            throw Exception("INVALID_ADDRESS: Invalid Bluetooth address: $cleanAddress")
+            throw Exception("INVALID_ADDRESS: Invalid Bluetooth address: " + cleanAddress)
         }
         adapter.cancelDiscovery()
         val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
@@ -52,6 +53,33 @@ class BluetoothPrinterModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun listPairedDevices(promise: Promise) {
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter == null) {
+                promise.resolve(Arguments.createArray())
+                return
+            }
+            val devices = adapter.bondedDevices
+            val result = Arguments.createArray()
+            for (device in devices) {
+                val map = Arguments.createMap()
+                val dName = if (device.name != null) device.name else "Unknown"
+                val dAddr = if (device.address != null) device.address else ""
+                map.putString("name", dName)
+                map.putString("address", dAddr)
+                map.putString("target", "BT:" + dAddr)
+                map.putString("deviceName", dName)
+                result.pushMap(map)
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            val msg = if (e.message != null) e.message else "Failed to list devices"
+            promise.reject("BT_ERROR", msg)
+        }
+    }
+
+    @ReactMethod
     fun printText(address: String, text: String, promise: Promise) {
         Thread {
             var socket: BluetoothSocket? = null
@@ -66,7 +94,8 @@ class BluetoothPrinterModule(reactContext: ReactApplicationContext) :
                 Thread.sleep(800)
                 promise.resolve(null)
             } catch (e: Exception) {
-                promise.reject("PRINT_FAILED", e.message ?: "Bluetooth print failed")
+                val msg = if (e.message != null) e.message else "Bluetooth print failed"
+                promise.reject("PRINT_FAILED", msg)
             } finally {
                 try { socket?.close() } catch (_: Exception) {}
             }
@@ -91,7 +120,8 @@ class BluetoothPrinterModule(reactContext: ReactApplicationContext) :
                 Thread.sleep(1000)
                 promise.resolve(null)
             } catch (e: Exception) {
-                promise.reject("PRINT_FAILED", e.message ?: "Bluetooth print failed")
+                val msg = if (e.message != null) e.message else "Bluetooth print failed"
+                promise.reject("PRINT_FAILED", msg)
             } finally {
                 try { socket?.close() } catch (_: Exception) {}
             }

@@ -13,10 +13,13 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
 export default function DayCloseScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const branchId = session?.branch_id ?? null;
   const branchName = session?.branch_name || "";
@@ -192,46 +195,46 @@ export default function DayCloseScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 32 },
   section: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  headerSection: { backgroundColor: "#0c1228" },
+  headerSection: { backgroundColor: "#0a0f1e" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   dateLabel: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  branchLabel: { color: "#7a8fa8", fontSize: 13, fontWeight: "600" },
+  branchLabel: { color: "#4b5563", fontSize: 13, fontWeight: "600" },
   statusBadge: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, borderWidth: 2 },
   badgeOpen: { backgroundColor: "#dcfce7", borderColor: "#86efac" },
   badgeClosed: { backgroundColor: "#fee2e2", borderColor: "#fca5a5" },
   statusBadgeText: { fontWeight: "800", fontSize: 13 },
   badgeOpenText: { color: "#166534" },
   badgeClosedText: { color: "#991b1b" },
-  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.6 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.6 },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kpiCard: {
-    width: "47.5%", backgroundColor: "#f6f8fe", borderRadius: 14,
-    borderWidth: 1.5, borderColor: "#dde6f7", padding: 12, gap: 3,
+    width: "47.5%", backgroundColor: "#f8f9fd", borderRadius: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2", padding: 12, gap: 3,
   },
-  kpiLabel: { fontSize: 10, color: "#8896ae", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  kpiLabel: { fontSize: 10, color: "#9ca3af", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
   kpiValue: { fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
-  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 8, borderTopWidth: 1.5, borderTopColor: "#dde6f7" },
-  expenseLabel: { color: "#dc2626", fontWeight: "700" },
-  expenseValue: { color: "#dc2626", fontWeight: "800" },
+  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 8, borderTopWidth: 1.5, borderTopColor: "#e4e9f2" },
+  expenseLabel: { color: "#ef4444", fontWeight: "700" },
+  expenseValue: { color: "#ef4444", fontWeight: "800" },
   netRow: { flexDirection: "row", justifyContent: "space-between" },
-  netLabel: { color: "#059669", fontWeight: "700" },
-  netValue: { color: "#059669", fontWeight: "800", fontSize: 15 },
-  branchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f0f4ff" },
-  branchRowName: { color: "#4a5a78", fontWeight: "700" },
+  netLabel: { color: "#10b981", fontWeight: "700" },
+  netValue: { color: "#10b981", fontWeight: "800", fontSize: 15 },
+  branchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f4f6fb" },
+  branchRowName: { color: "#4b5563", fontWeight: "700" },
   miniStatus: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1.5 },
   miniStatusText: { fontWeight: "700", fontSize: 11 },
   closeBtn: {
-    backgroundColor: "#dc2626", borderRadius: 16, paddingVertical: 15, alignItems: "center",
-    shadowColor: "#dc2626", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    backgroundColor: "#ef4444", borderRadius: 16, paddingVertical: 15, alignItems: "center",
+    shadowColor: "#ef4444", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   closeBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
   btnDisabled: { opacity: 0.5 },

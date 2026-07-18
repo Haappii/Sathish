@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import authAxios from "../../api/authAxios";
 import { useToast } from "../../components/Toast";
 import { API_BASE } from "../../config/api";
+import { getItemImageUrl } from "../../utils/shopLogo";
 import BackButton from "../../components/BackButton";
 import { isHotelShop } from "../../utils/shopType";
 import { getSession } from "../../utils/auth";
@@ -549,7 +550,7 @@ export default function Items() {
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,_minmax(220px,_1fr))] gap-2.5">
                 {filteredItems.map(item => {
-                  const imgUrl = item.image_filename ? `${API_BASE}/item-images/${item.image_filename}` : "";
+                  const imgUrl = getItemImageUrl(item.image_filename);
                   const isSelected = editingId === item.item_id;
                   const catName =
                     categories.find(c => c.category_id === item.category_id)?.category_name
@@ -812,7 +813,7 @@ export default function Items() {
                     {imagePreviewUrl ? (
                       <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
                     ) : editingItem?.image_filename ? (
-                      <img src={`${API_BASE}/item-images/${editingItem.image_filename}`} alt={editingItem.item_name}
+                      <img src={getItemImageUrl(editingItem.image_filename)} alt={editingItem.item_name}
                         className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = "none"; }} />
                     ) : (
                       <span className="text-xl text-gray-200">📷</span>

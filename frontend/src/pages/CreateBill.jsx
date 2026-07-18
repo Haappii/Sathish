@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom";
 import authAxios from "../api/authAxios";
 import { API_BASE } from "../config/api";
+import { getItemImageUrl } from "../utils/shopLogo";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { buildBusinessDateTimeLabel, formatBusinessDate, getBusinessDate } from "../utils/businessDate";
@@ -631,10 +632,10 @@ const [customer, setCustomer] = useState({
   const grossTotal =
     gstEnabled && gstMode === "exclusive" ? subTotal + tax : subTotal;
 
-  const discountValue = Math.min(
+  const discountValue = Math.round(Math.min(
     grossTotal,
     Math.max(0, manualDiscountValue + Number(couponDiscount || 0))
-  );
+  ));
 
   const payable = Math.round(grossTotal - discountValue);
 
@@ -724,17 +725,17 @@ const [customer, setCustomer] = useState({
     if (shop.mobile) t += center(`Ph: ${shop.mobile}`) + "\n";
     if (shop.gst_number) t += center(`GSTIN: ${shop.gst_number}`) + "\n";
     t += line + "\n";
-    t += `Invoice No : ${invoiceNo}\n`;
-    t += `Date : ${formatBusinessDate(getBusinessDate(shop?.app_date), "en-IN", {
+    t += center(`Invoice No : ${invoiceNo}`) + "\n";
+    t += center(`Date : ${formatBusinessDate(getBusinessDate(shop?.app_date), "en-IN", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-    })}\n`;
+    })}`) + "\n";
     const isPlaceholder = customer.mobile === DEFAULT_MOBILE || /^9{9,}$/.test(customer.mobile);
     if (!isPlaceholder) {
-      t += `Customer : ${customer.name}\n`;
-      t += `Mobile : ${maskMobileForPrint(customer.mobile)}\n`;
-      if (customer.gst_number) t += `GSTIN : ${customer.gst_number}\n`;
+      t += center(`Customer : ${customer.name}`) + "\n";
+      t += center(`Mobile : ${maskMobileForPrint(customer.mobile)}`) + "\n";
+      if (customer.gst_number) t += center(`GSTIN : ${customer.gst_number}`) + "\n";
     }
     if (splitEnabled) {
       const parts = [
@@ -753,14 +754,14 @@ const [customer, setCustomer] = useState({
           ? `, Code ${String(giftCardCode || "").trim().toUpperCase()}`
           : "";
 
-      t += `Payment : Split (${parts.join(", ") || "0.00"})${codeTxt}\n`;
+      t += center(`Payment : Split (${parts.join(", ") || "0.00"})${codeTxt}`) + "\n";
     } else {
       const pm = String(paymentMode || "cash");
       const codeTxt =
         pm === "gift_card" && String(giftCardCode || "").trim()
           ? ` (${String(giftCardCode || "").trim().toUpperCase()})`
           : "";
-      t += `Payment : ${paymentModeLabel(pm)}${codeTxt}\n`;
+      t += center(`Payment : ${paymentModeLabel(pm)}${codeTxt}`) + "\n";
     }
     t += line + "\n";
     t +=
@@ -837,8 +838,8 @@ const [customer, setCustomer] = useState({
     t += center("Take Away") + "\n";
     if (categoryLabel) t += center(`[ ${categoryLabel} ]`) + "\n";
     t += line + "\n";
-    t += `Invoice : ${invoiceNumber || "N/A"}`.slice(0, WIDTH).padEnd(WIDTH) + "\n";
-    t += `Customer: ${(customerName || "N/A").slice(0, 22)}`.padEnd(WIDTH) + "\n";
+    t += center(`Invoice : ${invoiceNumber || "N/A"}`) + "\n";
+    t += center(`Customer: ${(customerName || "N/A").slice(0, 22)}`) + "\n";
     t += line + "\n";
     t += "Item Name".padEnd(NAME_COL) + rightCol("Item Count", COUNT_COL) + "\n";
     t += line + "\n";
@@ -1328,7 +1329,7 @@ const [customer, setCustomer] = useState({
                 const stock = getEffectiveStock(item.item_id);
                 const isRaw = Boolean(item?.is_raw_material);
                 const out = inventoryEnabled && (!isHotel || isRaw) && stock <= 0;
-                const imgUrl = item.image_filename ? `${API_BASE}/item-images/${item.image_filename}` : "";
+                const imgUrl = getItemImageUrl(item.image_filename);
                 const showStockLabel = inventoryEnabled && (isRaw || !isHotel);
                 const isSelected = selectedItemIds.has(item.item_id);
                 const cartEntry = cart.find(c => c.item_id === item.item_id);

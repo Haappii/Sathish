@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import secrets
 from datetime import date, datetime
 from email.message import EmailMessage
@@ -43,6 +44,8 @@ SUPPORT_UPLOADS_DIR = Path("uploads") / "support"
 SUPPORT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 PLATFORM_UPLOADS_DIR = Path("uploads") / "platform"
 PLATFORM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+PORTFOLIO_PARAM_KEY = "portfolio_config"
 
 ABOUT_CONTACT_SETTING_KEYS = {
     "name": "about_contact_name",
@@ -1247,9 +1250,11 @@ def update_shop_status(
     if status == "DISABLED":
         s.plan = "DISABLED"
         s.expires_on = today - timedelta(days=1)
+    elif status == "TRIAL":
+        s.plan = "TRIAL"
+        s.expires_on = today + timedelta(days=30)
     else:
         s.plan = "ACTIVE"
-        # Allow immediate access; keep paid_until untouched.
         s.expires_on = None
 
     db.commit()
@@ -1805,3 +1810,167 @@ def delete_team_profile(
     db.delete(row)
     db.commit()
     return {"success": True, "profile_id": profile_id}
+
+
+# ── Portfolio Configuration ───────────────────────────────────────────────────
+
+@router.get("/public/portfolio")
+def public_get_portfolio(db: Session = Depends(get_db)):
+    raw = _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, PORTFOLIO_PARAM_KEY)
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+@router.get("/portfolio")
+def get_portfolio(
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    raw = _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, PORTFOLIO_PARAM_KEY)
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+@router.put("/portfolio")
+def update_portfolio(
+    payload: dict,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    _set_param_value(
+        db, PLATFORM_SETTINGS_SHOP_ID, PORTFOLIO_PARAM_KEY, json.dumps(payload, ensure_ascii=False),
+    )
+    db.commit()
+    return {"success": True}
+
+
+@router.post("/portfolio/photo")
+def upload_portfolio_photo(
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    ext = Path(photo.filename).suffix.lower() if photo.filename else ".jpg"
+    filename = generate_filename("portfolio_photo", ext)
+    destination = f"platform/{filename}"
+    photo_url = upload_file(photo.file, destination, photo.content_type or "image/jpeg")
+    return {"success": True, "photo_url": photo_url}
+
+
+@router.post("/shops/{shop_id}/backup")
+def export_shop_backup(
+    shop_id: int,
+    payload: dict | None = None,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    from app.models.invoice import Invoice
+    from app.models.invoice_details import InvoiceDetail
+    from app.models.items import Item
+    from app.models.category import Category
+    from app.models.branch import Branch
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+
+    shop = db.query(ShopDetails).filter(ShopDetails.shop_id == shop_id).first()
+    if not shop:
+        raise HTTPException(404, "Shop not found")
+
+    wb = Workbook()
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="0B3C8C", end_color="0B3C8C", fill_type="solid")
+
+    def add_sheet(name, columns, rows):
+        ws = wb.create_sheet(title=name[:31])
+        ws.append(columns)
+        for col_idx in range(1, len(columns) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font = header_font
+            cell.fill = header_fill
+        for row in rows:
+            ws.append([str(v) if v is not None else "" for v in row])
+        for col in ws.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=10)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 3, 40)
+
+    # Shop Details
+    add_sheet("Shop", ["Shop ID", "Shop Name", "Owner", "Mobile", "Email", "GST No", "Plan", "Billing Type"],
+              [[shop.shop_id, shop.shop_name, shop.owner_name, shop.mobile, shop.mailid, shop.gst_number, shop.plan, shop.billing_type]])
+
+    # Branches
+    branches = db.query(Branch).filter(Branch.shop_id == shop_id).all()
+    add_sheet("Branches", ["ID", "Name", "Address", "City", "State", "Pincode", "Type", "Status"],
+              [[b.branch_id, b.branch_name, getattr(b, "address_line1", ""), getattr(b, "city", ""),
+                getattr(b, "state", ""), getattr(b, "pincode", ""), b.type, b.status] for b in branches])
+
+    # Categories
+    cats = db.query(Category).filter(Category.shop_id == shop_id).all()
+    add_sheet("Categories", ["ID", "Name", "Status"],
+              [[c.category_id, c.category_name, c.category_status] for c in cats])
+
+    # Items
+    items = db.query(Item).filter(Item.shop_id == shop_id).all()
+    add_sheet("Items", ["ID", "Name", "Category ID", "Price", "Buy Price", "MRP", "HSN", "GST Rate", "Unit", "Status"],
+              [[i.item_id, i.item_name, i.category_id, float(i.price or 0), float(i.buy_price or 0),
+                float(getattr(i, "mrp_price", 0) or 0), i.hsn_code, float(i.gst_rate or 0),
+                i.unit, i.item_status] for i in items])
+
+    # Invoices
+    invoices = db.query(Invoice).filter(Invoice.shop_id == shop_id).order_by(Invoice.created_time.desc()).limit(5000).all()
+    add_sheet("Invoices", ["ID", "Invoice No", "Branch ID", "Customer", "Mobile", "Total", "Discount", "Tax", "Payment", "Date"],
+              [[inv.invoice_id, inv.invoice_number, inv.branch_id, inv.customer_name, inv.mobile,
+                float(inv.total_amount or 0), float(inv.discounted_amt or 0), float(inv.tax_amt or 0),
+                inv.payment_mode, str(inv.created_time or "")] for inv in invoices])
+
+    # Invoice Details
+    inv_ids = [inv.invoice_id for inv in invoices]
+    if inv_ids:
+        details = db.query(InvoiceDetail).filter(InvoiceDetail.invoice_id.in_(inv_ids)).all()
+        add_sheet("Invoice Items", ["Invoice ID", "Item ID", "Item Name", "Qty", "Price", "Amount"],
+                  [[d.invoice_id, d.item_id, getattr(d, "item_name", ""), float(getattr(d, "quantity", 0) or 0),
+                    float(getattr(d, "price", 0) or 0), float(getattr(d, "amount", 0) or 0)] for d in details])
+
+    # Remove default empty sheet
+    if "Sheet" in wb.sheetnames:
+        del wb["Sheet"]
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    excel_bytes = buf.getvalue()
+
+    # Email if requested
+    send_email = (payload or {}).get("send_email", False)
+    if send_email and shop.mailid and _can_send_mail():
+        from email.mime.base import MIMEBase
+        from email import encoders
+
+        msg = EmailMessage()
+        msg["Subject"] = f"Shop Data Backup — {shop.shop_name}"
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = shop.mailid
+        msg.set_content(f"Hi,\n\nPlease find attached the data backup for {shop.shop_name}.\n\nRegards,\nHaappii Billing")
+        msg.add_attachment(excel_bytes, maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                          filename=f"backup_{shop.shop_name}_{date.today().isoformat()}.xlsx")
+        try:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+                server.login(SENDER_EMAIL, SENDER_PASSWORD)
+                server.send_message(msg)
+        except Exception:
+            pass
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="backup_{shop.shop_name}_{date.today().isoformat()}.xlsx"'},
+    )

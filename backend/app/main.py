@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -42,6 +43,7 @@ import app.models.purchase_order
 import app.models.onboard_codes
 import app.models.audit_log
 import app.models.support_ticket
+import app.models.public_menu_token
 import app.models.customer
 import app.models.invoice_due
 import app.models.invoice_payment
@@ -170,6 +172,7 @@ app.mount(
 # ======================================================
 # MIDDLEWARES (order matters — outermost first)
 # ======================================================
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 
@@ -835,6 +838,71 @@ def _auto_migrate_must_change_password() -> None:
         logger.exception("Auto-migration (must_change_password) failed: %s", e)
 
 
+def _data_fix_round_discounts() -> None:
+    """Round all decimal discounted_amt values and fix total_amount consistency."""
+    if engine.dialect.name != "postgresql":
+        return
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE invoice SET discounted_amt = ROUND(discounted_amt) "
+                "WHERE discounted_amt IS NOT NULL AND discounted_amt != ROUND(discounted_amt)"
+            ))
+            if result.rowcount > 0:
+                logger.info("Rounded discounted_amt on %d invoices", result.rowcount)
+
+            # Fix invoices where total_amount was stored as post-discount (payable)
+            # instead of pre-discount total. Detect: recalculate subtotal from items
+            # and compare. If total_amount + discounted_amt == item sum, it was stored
+            # as payable and needs correction.
+            fix = conn.execute(text("""
+                UPDATE invoice i
+                SET total_amount = total_amount + COALESCE(discounted_amt, 0)
+                WHERE discounted_amt > 0
+                  AND EXISTS (
+                    SELECT 1 FROM invoice_details d
+                    WHERE d.invoice_id = i.invoice_id
+                    GROUP BY d.invoice_id
+                    HAVING ABS(SUM(d.amount) - (i.total_amount + COALESCE(i.discounted_amt, 0))) < 1
+                       AND ABS(SUM(d.amount) - i.total_amount) >= 1
+                  )
+            """))
+            if fix.rowcount > 0:
+                logger.info("Fixed total_amount on %d invoices (was post-discount, now pre-discount)", fix.rowcount)
+    except Exception as e:
+        logger.exception("Data fix (round discounts) failed: %s", e)
+
+
+def _auto_migrate_public_menu_token() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public_menu_token (
+                    id SERIAL PRIMARY KEY,
+                    shop_id INTEGER NOT NULL REFERENCES shop_details(shop_id),
+                    branch_id INTEGER NOT NULL REFERENCES branch(branch_id),
+                    token VARCHAR(64) NOT NULL UNIQUE,
+                    active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMPTZ DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_public_menu_token_token ON public_menu_token(token);
+            """))
+    except Exception as e:
+        logger.exception("Auto-migration (public_menu_token) failed: %s", e)
+
+
+def _auto_migrate_system_param_value_text() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE system_parameters ALTER COLUMN param_value TYPE TEXT;"))
+    except Exception as e:
+        logger.exception("Auto-migration (system_param_value_text) failed: %s", e)
+
+
 def _startup_db_init():
     """
     Initialize DB schema and seed defaults.
@@ -863,6 +931,9 @@ def _startup_db_init():
     _auto_migrate_shop_modules()
     _auto_migrate_branch_feedback_qr()
     _auto_migrate_must_change_password()
+    _auto_migrate_system_param_value_text()
+    _auto_migrate_public_menu_token()
+    _data_fix_round_discounts()
 
     try:
         # Optional dev helper: wipe DB + seed sample data on restart.
@@ -942,6 +1013,7 @@ from app.routes.table_management import router as table_management_router
 from app.routes.table_category import router as table_category_router
 from app.routes.table_qr import router as table_qr_router
 from app.routes.public_qr import router as public_qr_router
+from app.routes.public_menu import router as public_menu_router
 from app.routes.public_reservation import router as public_reservation_router
 from app.routes.qr_orders import router as qr_orders_router
 
@@ -1017,6 +1089,7 @@ app.include_router(table_management_router, prefix="/api")
 app.include_router(table_category_router, prefix="/api")
 app.include_router(table_qr_router, prefix="/api")
 app.include_router(public_qr_router, prefix="/api")
+app.include_router(public_menu_router, prefix="/api")
 app.include_router(public_reservation_router, prefix="/api")
 app.include_router(qr_orders_router, prefix="/api")
 
@@ -1083,28 +1156,117 @@ def legacy_categories_redirect():
 import re as _re
 
 _BOT_PATTERN = _re.compile(
-    r"googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|applebot",
+    r"googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|applebot|seobility|semrush|ahrefs|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|ccbot|dataprovider|seznambot|sogou|exabot",
     _re.IGNORECASE,
 )
 
+_HEADER_NAV = """<nav><a href="https://haappiibilling.in/">Haappii Billing</a> | <a href="https://haappiibilling.in/about">About Us</a> | <a href="https://haappiibilling.in/setup/onboard">Free Setup</a> | <a href="https://haappiibilling.in/login">Shop Login</a></nav>"""
+_FOOTER_NAV = """<nav><a href="https://haappiibilling.in/">Home</a> | <a href="https://haappiibilling.in/about">About</a> | <a href="https://haappiibilling.in/setup/onboard">Get Started</a> | <a href="https://haappiibilling.in/login">Login</a> | <a href="https://haappiibilling.in/portfolio">Developer Portfolio</a> | <a href="https://en.wikipedia.org/wiki/Point_of_sale" rel="nofollow noopener">What is POS?</a></nav>"""
+
 _SEO_PAGES = {
     "": {
-        "title": "Haappii Billing — POS & Shop Management for Retail & Restaurants",
-        "description": "Cloud-based POS platform with GST billing, inventory management, multi-branch support, table ordering, kitchen display, and business analytics for retail shops and restaurants in India.",
-        "h1": "Make billing feel instant. Operations feel effortless.",
-        "content": "Haappii Billing brings checkout, stock visibility, branch control, and reporting into one workspace built for busy teams and growing shops. Fast counter billing, inventory tracking, multi-branch management, sales reports, table ordering, KOT system, QR ordering, employee management, and more. Available on Web, Windows Desktop, and Android.",
+        "title": "Haappii Billing — POS Software for Retail & Restaurants",
+        "description": "Cloud POS for retail shops and restaurants in India. GST billing, inventory, multi-branch, table ordering, and analytics. Free setup.",
+        "h1": "Haappii Billing — POS Software for Retail and Restaurants",
+        "sections": [
+            ("<h2>Billing That Feels Instant</h2>",
+             "<p>Haappii Billing is a cloud-based POS platform. "
+             "It brings checkout speed, stock visibility, branch control, and reporting into one workspace. "
+             "The software is built for busy retail counters and restaurant floors across India.</p>"
+             "<p>Shop owners can manage daily operations without switching between disconnected tools. "
+             "Whether you run a single retail store or a chain of restaurants, the platform adapts. "
+             "It supports role-based access, branch-level isolation, and real-time data sync across all locations.</p>"),
+            ("<h2>Key Features for Retail and Restaurants</h2>",
+             "<ul>"
+             "<li><strong>GST Billing</strong> — Generate compliant invoices with automatic tax calculation. Supports payment splits and 58mm thermal printing.</li>"
+             "<li><strong>Inventory Management</strong> — Track stock in real time. Get low-stock alerts, manage suppliers, create purchase orders, and transfer stock between branches.</li>"
+             "<li><strong>Multi-Branch Support</strong> — Manage multiple shops from one dashboard. Each branch has its own access control and reporting.</li>"
+             "<li><strong>Table Ordering</strong> — Use the table grid for restaurants. Send kitchen order tickets (KOT) and let customers scan QR codes to self-order.</li>"
+             "<li><strong>Sales Analytics</strong> — View daily reports and revenue trends. Run day-close procedures. Download PDF and Excel exports.</li>"
+             "<li><strong>Customer Management</strong> — Run loyalty programs and gift card campaigns. Track customer dues and manage wallet balances.</li>"
+             "</ul>"),
+            ("<h2>Available on Web, Windows, and Android</h2>",
+             "<p>Use Haappii Billing as a web app from any browser. "
+             "Download the Windows desktop installer for offline-capable billing. "
+             "Install the Android APK for mobile billing on the go.</p>"
+             "<p>All platforms sync to the same cloud backend. Your data stays consistent across devices and locations. "
+             "The platform also handles employee attendance, expense tracking, and kitchen display systems. "
+             "Restaurants can use delivery management and reservation handling features as well.</p>"),
+            ("<h2>How It Works</h2>",
+             "<p>Getting started is simple. Create your shop profile and add your products. "
+             "Start billing from day one. The setup wizard walks you through each step. "
+             "You can import items from Excel or add them manually.</p>"
+             "<p>Once your shop is live, your team logs in with their own credentials. "
+             "Cashiers see the billing screen. Managers see reports and inventory. Admins control everything. "
+             "Each role sees only what they need. No clutter, no confusion.</p>"
+             "<p>The dashboard shows daily revenue, pending orders, and stock alerts at a glance. "
+             "You can drill into any metric for details. Export reports as PDF or Excel with one click.</p>"),
+            ("<h2>Built for Indian Businesses</h2>",
+             "<p>Haappii Billing is designed for the Indian market. "
+             "It supports GST tax slabs, INR currency, and regional invoice formats. "
+             "Thermal printers, barcode scanners, and weighing scales work out of the box.</p>"
+             "<p>The platform runs on Google Cloud for fast response times across India. "
+             "Data is backed up automatically. You own your data and can export it anytime. "
+             "We take security seriously with encrypted connections and role-based access.</p>"),
+            ("<h2>Who Uses Haappii Billing</h2>",
+             "<p>Grocery stores, clothing shops, mobile accessories outlets, and stationery stores use Haappii Billing for retail. "
+             "Restaurants, cafes, bakeries, and cloud kitchens use it for food service. "
+             "The software works for single-counter setups and multi-branch chains alike.</p>"
+             "<p>Shop owners like the simple interface. Staff learn it in minutes. "
+             "Accountants appreciate the clean GST reports. Managers value the branch-level analytics. "
+             "The platform grows with your business without needing expensive upgrades.</p>"),
+            ("<h2>Pricing and Plans</h2>",
+             "<p>Setup is free. You can explore the full platform with no time limit on your trial. "
+             "Paid plans are available for shops that need premium features and priority support. "
+             "Contact us to discuss the right plan for your business size.</p>"
+             "<p>Every plan includes GST billing, inventory, analytics, and multi-platform access. "
+             "There are no hidden fees. You pay a simple monthly or annual subscription. "
+             "Cancel anytime with no lock-in contracts. "
+             "We also offer custom onboarding assistance for larger businesses. "
+             "Our support team helps you migrate data from your existing system. "
+             "Reach out through the contact form or call us directly to get started today. "
+             "We are happy to answer any questions about features, pricing, or integration.</p>"),
+            ("<h2>Get Started for Free</h2>",
+             "<p><a href='https://haappiibilling.in/setup/onboard'>Sign up now</a> and set up your shop in minutes. "
+             "No credit card required. You get instant login credentials sent to your email.</p>"
+             "<p>Join shop owners across India who use Haappii Billing every day. "
+             "Simplify your operations. Reduce billing errors. Grow your business with clear, actionable data. "
+             "Visit our <a href='https://haappiibilling.in/about'>about page</a> to learn more about the platform.</p>"),
+        ],
     },
     "about": {
-        "title": "About — Haappii Billing POS & Shop Management",
-        "description": "Learn about Haappii Billing — a cloud POS platform for retail stores and restaurants. GST billing, inventory, multi-branch, analytics. Download for Windows and Android.",
-        "h1": "Billing that feels instant. Operations that feel effortless.",
-        "content": "Haappii Billing is a complete POS and shop management platform. Core features include fast counter billing, inventory with context, branch-ready scaling, and clear readable reports. Available as a web app, Windows desktop installer, and Android APK. Built for retail counters and restaurant floors.",
+        "title": "About Haappii Billing — Cloud POS for Indian Businesses",
+        "description": "Haappii Billing is a cloud POS platform for retail and restaurants. GST billing, inventory, multi-branch, analytics. Free setup.",
+        "h1": "About Haappii Billing — Cloud POS for Indian Businesses",
+        "sections": [
+            ("<h2>Our Mission</h2>",
+             "<p>Haappii Billing is designed to make shop management effortless for small and medium businesses across India. From billing to inventory to analytics — everything works together in one platform. "
+             "We believe retail shops and restaurants deserve tools that are fast, reliable, and easy to learn without expensive training or complicated setup.</p>"),
+            ("<h2>What We Offer</h2>",
+             "<ul><li>Fast counter billing with GST compliance and thermal printing</li>"
+             "<li>Inventory tracking with context — see what moves, what is low, and what to reorder</li>"
+             "<li>Branch-ready scaling — run one outlet or many with shared visibility</li>"
+             "<li>Clear, readable sales reports that owners and managers can act on quickly</li>"
+             "<li>Restaurant features — table ordering, kitchen display, reservations, and delivery management</li></ul>"),
+            ("<h2>Platforms and Downloads</h2>",
+             "<p>Available as a <a href='https://haappiibilling.in/'>web application</a>, Windows desktop installer, and Android APK. <a href='https://haappiibilling.in/setup/onboard'>Get started free</a>.</p>"),
+        ],
     },
     "setup/onboard": {
-        "title": "Get Started Free — Haappii Billing Setup",
-        "description": "Set up your shop on Haappii Billing in minutes. Free onboarding for retail stores and restaurants. Get login credentials sent to your email.",
-        "h1": "Get started with Haappii Billing",
-        "content": "Start your free setup in minutes. Register your business, configure your shop, and get instant access with login credentials sent to your email. Works for retail stores, restaurants, and multi-branch businesses.",
+        "title": "Free Setup — Start Using Haappii Billing Today",
+        "description": "Set up your shop on Haappii Billing in minutes. Free onboarding for retail stores and restaurants. Instant login credentials.",
+        "h1": "Free Setup — Start Using Haappii Billing Today",
+        "sections": [
+            ("<h2>Quick Setup Process</h2>",
+             "<p>Register your business, configure your shop details, and get instant access with login credentials sent directly to your email. Works for retail stores, restaurants, and multi-branch businesses.</p>"),
+            ("<h2>What You Get</h2>",
+             "<ul><li>Full access to GST billing, inventory management, and sales reports</li>"
+             "<li>Multi-branch support with role-based access control</li>"
+             "<li>Restaurant features including table ordering and kitchen display</li>"
+             "<li>Available on web, Windows desktop, and Android</li></ul>"),
+            ("<h2>Already Have an Account?</h2>",
+             "<p><a href='https://haappiibilling.in/login'>Log in here</a> to access your dashboard. Learn more <a href='https://haappiibilling.in/about'>about Haappii Billing</a>.</p>"),
+        ],
     },
 }
 
@@ -1113,6 +1275,7 @@ def _render_seo_page(path: str) -> HTMLResponse | None:
     page = _SEO_PAGES.get(path)
     if not page:
         return None
+    body_sections = "\n".join(f"{heading}\n{content}" for heading, content in page["sections"])
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1129,12 +1292,20 @@ def _render_seo_page(path: str) -> HTMLResponse | None:
 <script type="application/ld+json">
 {{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Haappii Billing","applicationCategory":"BusinessApplication","operatingSystem":"Windows, Web, Android","url":"https://haappiibilling.in","description":"{page["description"]}","offers":{{"@type":"Offer","price":"0","priceCurrency":"INR"}},"featureList":"GST Billing, Inventory, Multi-Branch, Table Ordering, Kitchen Display, Analytics, Thermal Printing"}}
 </script>
+<link rel="icon" type="image/png" href="/assets/app_logo-BonRdco_.png">
+<link rel="apple-touch-icon" href="/assets/app_logo-BonRdco_.png">
 </head>
 <body>
-<header><h1>{page["h1"]}</h1></header>
-<main><p>{page["content"]}</p></main>
-<footer><p>Copyright 2026 Haappii Billing. All rights reserved.</p>
-<p><a href="https://haappiibilling.in/">Home</a> | <a href="https://haappiibilling.in/about">About</a> | <a href="https://haappiibilling.in/setup/onboard">Get Started</a> | <a href="https://haappiibilling.in/login">Login</a></p>
+<header>
+{_HEADER_NAV}
+<h1>{page["h1"]}</h1>
+</header>
+<main>
+{body_sections}
+</main>
+<footer>
+<p>&copy; 2026 Haappii Billing. All rights reserved.</p>
+{_FOOTER_NAV}
 </footer>
 </body>
 </html>"""
@@ -1146,19 +1317,87 @@ def _is_bot(request: Request) -> bool:
     return bool(_BOT_PATTERN.search(ua))
 
 
+def _www_redirect(request: Request) -> RedirectResponse | None:
+    host = (request.headers.get("host") or "").lower()
+    if host.startswith("www."):
+        target = str(request.url).replace("://www.", "://", 1)
+        return RedirectResponse(url=target, status_code=301)
+    return None
+
+
+# ======================================================
+# PORTFOLIO (static site at /portfolio)
+# ======================================================
+PORTFOLIO_DIR = PROJECT_ROOT / "backend" / "portfolio"
+PORTFOLIO_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _serve_portfolio_index():
+    idx = PORTFOLIO_DIR / "index.html"
+    if idx.exists():
+        return FileResponse(str(idx), media_type="text/html")
+    raise HTTPException(404, "Portfolio not found")
+
+
+def _serve_portfolio_asset(file_path: str):
+    candidate = PORTFOLIO_DIR / file_path
+    if candidate.exists() and candidate.is_file() and PORTFOLIO_DIR in candidate.resolve().parents:
+        media = None
+        ext = candidate.suffix.lower()
+        if ext == ".css":
+            media = "text/css"
+        elif ext == ".js":
+            media = "application/javascript"
+        return FileResponse(str(candidate), media_type=media)
+    raise HTTPException(404, "Not found")
+
+
+@app.get("/sathish_kumar_lakshman_portfolio", include_in_schema=False)
+def portfolio_named():
+    return _serve_portfolio_index()
+
+
+@app.get("/sathish_kumar_lakshman_portfolio/{file_path:path}", include_in_schema=False)
+def portfolio_named_assets(file_path: str):
+    return _serve_portfolio_asset(file_path)
+
+
+@app.get("/portfolio", include_in_schema=False)
+def portfolio_index():
+    return RedirectResponse(url="/sathish_kumar_lakshman_portfolio", status_code=301)
+
+
+@app.get("/portfolio/{file_path:path}", include_in_schema=False)
+def portfolio_assets(file_path: str):
+    return _serve_portfolio_asset(file_path)
+
+
 @app.get("/")
 def frontend_root(request: Request):
+    redir = _www_redirect(request)
+    if redir:
+        return redir
     if _is_bot(request):
         seo = _render_seo_page("")
         if seo:
             return seo
     if _frontend_ready():
-        return FileResponse(str(FRONTEND_INDEX))
+        return FileResponse(
+            str(FRONTEND_INDEX),
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
     return {"status": "ok", "message": "Billing API is running (frontend not built)"}
+
+
+_IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
+_STATIC_EXTS = {".js", ".css", ".woff", ".woff2", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".avif", ".ico", ".webmanifest"}
 
 
 @app.get("/{full_path:path}")
 def frontend_spa(full_path: str, request: Request):
+    redir = _www_redirect(request)
+    if redir:
+        return redir
     if not _frontend_ready():
         raise HTTPException(404, "Frontend not built")
 
@@ -1173,6 +1412,12 @@ def frontend_spa(full_path: str, request: Request):
 
     candidate = (FRONTEND_DIST_DIR / p) if p else FRONTEND_INDEX
     if p and candidate.exists() and candidate.is_file():
-        return FileResponse(str(candidate))
+        headers = {}
+        if candidate.suffix.lower() in _STATIC_EXTS and p.startswith("assets/"):
+            headers["Cache-Control"] = _IMMUTABLE_CACHE
+        return FileResponse(str(candidate), headers=headers)
 
-    return FileResponse(str(FRONTEND_INDEX))
+    return FileResponse(
+        str(FRONTEND_INDEX),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )

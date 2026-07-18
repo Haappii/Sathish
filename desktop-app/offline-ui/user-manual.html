@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haappii Billing — User Manual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,system-ui,sans-serif;color:#1e293b;background:#fff;line-height:1.7;font-size:14px}
+  @media print{body{font-size:11px}h1{font-size:28px!important}.no-print{display:none!important}.page-break{page-break-before:always}}
+
+  /* Cover */
+  .cover{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#4338ca,#6366f1 40%,#7c3aed 70%,#a855f7);color:#fff;text-align:center;padding:60px 32px}
+  .cover-logo{width:120px;height:120px;border-radius:32px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;margin-bottom:32px;border:2px solid rgba(255,255,255,.2)}
+  .cover h1{font-size:48px;font-weight:900;letter-spacing:-2px;margin-bottom:8px}
+  .cover h2{font-size:20px;font-weight:500;opacity:.8;margin-bottom:40px}
+  .cover-meta{font-size:13px;opacity:.6}
+
+  /* Layout */
+  .container{max-width:800px;margin:0 auto;padding:40px 32px}
+  .toc{padding:40px 32px;max-width:800px;margin:0 auto}
+  .toc h2{font-size:24px;font-weight:900;margin-bottom:24px;color:#4338ca}
+  .toc-list{list-style:none;counter-reset:toc}
+  .toc-list li{counter-increment:toc;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:15px}
+  .toc-list li::before{content:counter(toc) ". ";font-weight:800;color:#6366f1;margin-right:4px}
+  .toc-list a{color:#1e293b;text-decoration:none}
+  .toc-list a:hover{color:#6366f1}
+
+  /* Sections */
+  h1{font-size:32px;font-weight:900;color:#4338ca;margin-bottom:16px;letter-spacing:-1px;border-bottom:3px solid #e0e7ff;padding-bottom:12px}
+  h2{font-size:22px;font-weight:800;color:#1e293b;margin:32px 0 12px}
+  h3{font-size:16px;font-weight:700;color:#4338ca;margin:20px 0 8px}
+  p{margin-bottom:12px}
+  ul,ol{margin:8px 0 16px 24px}
+  li{margin-bottom:6px}
+  strong{color:#0f172a}
+
+  /* Cards */
+  .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 24px}
+  .feature-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}
+  .feature-card h4{font-size:14px;font-weight:800;color:#4338ca;margin-bottom:4px}
+  .feature-card p{font-size:12px;color:#64748b;margin:0}
+
+  /* Tips */
+  .tip{background:#eff6ff;border-left:4px solid #6366f1;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:13px}
+  .tip strong{color:#4338ca}
+  .warning{background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:13px}
+  .warning strong{color:#92400e}
+
+  /* Table */
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+  th{background:#f1f5f9;text-align:left;padding:10px 12px;font-weight:700;border-bottom:2px solid #e2e8f0}
+  td{padding:8px 12px;border-bottom:1px solid #f1f5f9}
+  tr:hover td{background:#f8fafc}
+
+  /* Print button */
+  .print-btn{position:fixed;bottom:24px;right:24px;background:#6366f1;color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 20px rgba(99,102,241,.4);z-index:100}
+  .print-btn:hover{background:#4338ca}
+
+  .section{margin-bottom:48px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;background:#e0e7ff;color:#4338ca;margin-left:6px}
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">📄 Save as PDF</button>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-logo">H</div>
+  <h1>Haappii Billing</h1>
+  <h2>User Manual & Feature Guide</h2>
+  <p style="max-width:500px;opacity:.7;margin-bottom:40px">Complete guide to using Haappii Billing — POS & Shop Management Platform for Retail Stores and Restaurants</p>
+  <div class="cover-meta">Version 2.3.0 · June 2026 · haappiibilling.in</div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc page-break">
+  <h2>Table of Contents</h2>
+  <ol class="toc-list">
+    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#dashboard">Dashboard & Home</a></li>
+    <li><a href="#billing">Sales Billing</a></li>
+    <li><a href="#table-billing">Table Billing (Hotels & Restaurants)</a></li>
+    <li><a href="#inventory">Inventory Management</a></li>
+    <li><a href="#customers">Customers & Dues</a></li>
+    <li><a href="#employees">Employees & Attendance</a></li>
+    <li><a href="#expenses">Expenses</a></li>
+    <li><a href="#reports">Reports & Analytics</a></li>
+    <li><a href="#loyalty">Loyalty, Gift Cards & Coupons</a></li>
+    <li><a href="#purchase-orders">Purchase Orders & Suppliers</a></li>
+    <li><a href="#advance-orders">Advance Orders</a></li>
+    <li><a href="#cash-drawer">Cash Drawer</a></li>
+    <li><a href="#setup">Shop Setup & Configuration</a></li>
+    <li><a href="#user-roles">User Roles & Permissions</a></li>
+    <li><a href="#printing">Printing & Thermal Printers</a></li>
+    <li><a href="#mobile-app">Mobile App</a></li>
+    <li><a href="#offline">Offline Mode</a></li>
+    <li><a href="#whatsapp">WhatsApp Integration</a></li>
+    <li><a href="#security">Security & Data Privacy</a></li>
+    <li><a href="#faq">FAQ & Troubleshooting</a></li>
+  </ol>
+</div>
+
+<!-- 1. GETTING STARTED -->
+<div class="container page-break">
+<div class="section" id="getting-started">
+  <h1>1. Getting Started</h1>
+
+  <h2>Registration</h2>
+  <p>Visit <strong>haappiibilling.in/setup/onboard</strong> to register your business. You'll receive:</p>
+  <ul>
+    <li><strong>Shop ID</strong> — Your unique shop identifier</li>
+    <li><strong>Username</strong> — Default is "admin"</li>
+    <li><strong>Temporary Password</strong> — You'll be asked to change it on first login</li>
+  </ul>
+  <p>All credentials are sent to your registered email. Your shop comes with a <strong>30-day free trial</strong> with all features unlocked.</p>
+
+  <h2>Login</h2>
+  <p>Go to <strong>haappiibilling.in/login</strong> and enter your Shop ID, Username, and Password. On first login, you'll be prompted to set a new password.</p>
+
+  <h2>Available Platforms</h2>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <h4>🌐 Web App</h4>
+      <p>Access from any browser at haappiibilling.in</p>
+    </div>
+    <div class="feature-card">
+      <h4>💻 Windows Desktop</h4>
+      <p>Dedicated counter app with offline support</p>
+    </div>
+    <div class="feature-card">
+      <h4>📱 Android App</h4>
+      <p>Mobile billing, printing & operations on the go</p>
+    </div>
+    <div class="feature-card">
+      <h4>🖨️ Thermal Printing</h4>
+      <p>Bluetooth & WiFi thermal receipt printing</p>
+    </div>
+  </div>
+</div>
+
+<!-- 2. DASHBOARD -->
+<div class="section" id="dashboard">
+  <h1>2. Dashboard & Home</h1>
+  <p>The home screen shows your shop name, branch, business date, and online/offline status. Quick action tiles give one-tap access to all features.</p>
+
+  <h3>Trial Period</h3>
+  <p>During your free trial, a badge in the header shows remaining days. When the trial expires, contact the Haappii Billing team to activate a subscription plan.</p>
+
+  <h3>Business Date</h3>
+  <p>The business date controls which day's transactions you're working on. It's set by the admin and can differ from the calendar date (useful for shops that operate past midnight).</p>
+
+  <h3>Theme</h3>
+  <p>Switch between <strong>Light</strong>, <strong>Dark</strong>, or <strong>System</strong> theme from the sidebar menu or settings.</p>
+</div>
+
+<!-- 3. BILLING -->
+<div class="section page-break" id="billing">
+  <h1>3. Sales Billing</h1>
+
+  <h2>Creating a Bill</h2>
+  <ol>
+    <li>Go to <strong>Sales Billing</strong> from the home menu</li>
+    <li>Select items from the category grid or search by name</li>
+    <li>Adjust quantities using +/- buttons</li>
+    <li>Enter customer name and mobile number (optional)</li>
+    <li>Select payment mode: <strong>Cash, Card, UPI, Credit, Gift Card, Coupon, Split, or Wallet</strong></li>
+    <li>Click <strong>Save & Print</strong> to create the invoice and print receipt</li>
+  </ol>
+
+  <h3>Payment Modes</h3>
+  <table>
+    <tr><th>Mode</th><th>Description</th></tr>
+    <tr><td>Cash</td><td>Standard cash payment</td></tr>
+    <tr><td>Card</td><td>Debit/credit card payment</td></tr>
+    <tr><td>UPI</td><td>Google Pay, PhonePe, Paytm, etc.</td></tr>
+    <tr><td>Credit</td><td>Recorded as due — customer pays later</td></tr>
+    <tr><td>Gift Card</td><td>Redeem a gift card code at checkout</td></tr>
+    <tr><td>Coupon</td><td>Apply discount coupon</td></tr>
+    <tr><td>Split</td><td>Split payment across multiple modes</td></tr>
+    <tr><td>Wallet</td><td>Pay from customer's stored wallet balance</td></tr>
+  </table>
+
+  <h3>Billing History</h3>
+  <p>View all past invoices filtered by date range (Today, 7 Days, 30 Days). From here you can:</p>
+  <ul>
+    <li>View invoice details</li>
+    <li>Print/reprint receipts</li>
+    <li>Edit invoice (modify items, customer, payment mode)</li>
+    <li>Delete invoice (admin only)</li>
+    <li>Share invoice via WhatsApp</li>
+  </ul>
+
+  <h3>GST Billing</h3>
+  <p>Enable GST from <strong>Setup → Shop Details</strong>. Configure:</p>
+  <ul>
+    <li><strong>GST Number</strong> — Your GSTIN</li>
+    <li><strong>GST Percentage</strong> — Default tax rate</li>
+    <li><strong>GST Mode</strong> — Inclusive (price includes tax) or Exclusive (tax added on top)</li>
+    <li><strong>HSN Codes</strong> — Set per item for detailed GST reporting</li>
+  </ul>
+
+  <div class="tip"><strong>Tip:</strong> Use the <strong>Hold</strong> feature to save a bill in progress and serve the next customer. Resume held bills from the <strong>Draft Bills</strong> section.</div>
+</div>
+
+<!-- 4. TABLE BILLING -->
+<div class="section page-break" id="table-billing">
+  <h1>4. Table Billing (Hotels & Restaurants)</h1>
+
+  <h2>Table Management</h2>
+  <p>Set up tables from <strong>Setup → Tables</strong>. Each table has a name, capacity, and status (Available, Running, Reserved).</p>
+
+  <h2>Order Flow</h2>
+  <ol>
+    <li>Open the <strong>Table Billing</strong> screen to see the table grid</li>
+    <li>Tap a table to start/view an order</li>
+    <li>Add items from the menu</li>
+    <li>Send to kitchen (generates KOT — Kitchen Order Ticket)</li>
+    <li>Add more items as needed</li>
+    <li>When ready, generate the final bill and collect payment</li>
+  </ol>
+
+  <h3>KOT (Kitchen Order Ticket)</h3>
+  <p>KOT management shows all pending kitchen orders. Kitchen staff can mark items as prepared. Track order status in real-time from the <strong>Order Live</strong> screen.</p>
+
+  <h3>QR Ordering</h3>
+  <p>Generate QR codes for each table. Customers scan the QR code, browse the menu on their phone, and place orders directly. Orders appear in the <strong>QR Orders</strong> section for staff to accept.</p>
+
+  <h3>Takeaway</h3>
+  <p>Create takeaway orders without assigning a table. These function like regular bills but are tagged as takeaway for reporting.</p>
+
+  <h3>Recipe Management</h3>
+  <p>Define recipes for menu items — link raw materials with quantities. When a dish is sold, raw material stock is automatically deducted based on the recipe.</p>
+</div>
+
+<!-- 5. INVENTORY -->
+<div class="section page-break" id="inventory">
+  <h1>5. Inventory Management</h1>
+
+  <h2>Items</h2>
+  <p>Add items from <strong>Setup → Items</strong> with:</p>
+  <ul>
+    <li>Item name, category, HSN code</li>
+    <li>Selling price, buy price, MRP</li>
+    <li>Unit (kg, g, ml, L, pcs)</li>
+    <li>Minimum stock level (for alerts)</li>
+    <li>Item image</li>
+    <li>GST rate per item</li>
+  </ul>
+
+  <h3>Branch-wise Pricing</h3>
+  <p>Enable <strong>Items Branch Wise</strong> from settings to set different prices for each branch. If not enabled, all branches share the same item prices.</p>
+
+  <h2>Stock Tracking</h2>
+  <p>View current stock levels from the <strong>Inventory</strong> screen. Stock is automatically adjusted when:</p>
+  <ul>
+    <li>A bill is created (stock decreases)</li>
+    <li>A bill is deleted (stock restored)</li>
+    <li>A purchase order is received (stock increases)</li>
+    <li>A return is processed (stock restored)</li>
+    <li>A stock audit is performed (manual adjustment)</li>
+  </ul>
+
+  <h3>Stock Audit</h3>
+  <p>Perform physical stock counts and reconcile differences with system stock. Adjustments are logged for accountability.</p>
+
+  <h3>Stock Transfers</h3>
+  <p>Transfer stock between branches. Create a transfer request, specify items and quantities, and the receiving branch confirms receipt.</p>
+
+  <h3>Item Lots (FIFO)</h3>
+  <p>Track purchase lots with different costs. When selling, the system can use FIFO (First In, First Out) costing for accurate profit calculation.</p>
+</div>
+
+<!-- 6. CUSTOMERS -->
+<div class="section page-break" id="customers">
+  <h1>6. Customers & Dues</h1>
+
+  <h2>Customer Management</h2>
+  <p>Customers are automatically created when you bill with a name and mobile number. View all customers, their purchase history, and outstanding dues from the <strong>Customers</strong> section.</p>
+
+  <h2>Dues & Receivables</h2>
+  <p>When a bill is created with <strong>Credit</strong> payment mode, it's recorded as a due. Track and collect dues from the <strong>Dues</strong> section. Record partial payments and view remaining balances.</p>
+
+  <h2>Customer Wallet</h2>
+  <p>Customers can maintain a wallet balance. Add money to the wallet, and customers can pay from their wallet at checkout.</p>
+</div>
+
+<!-- 7. EMPLOYEES -->
+<div class="section" id="employees">
+  <h1>7. Employees & Attendance</h1>
+
+  <h2>Employee Management</h2>
+  <p>Add employees with name, role, contact, salary, and joining date. Track employee settlements and advances.</p>
+
+  <h2>Attendance</h2>
+  <p>Mark daily attendance for employees. View attendance reports by month. Supports Present, Absent, Half-day, and Leave statuses.</p>
+</div>
+
+<!-- 8. EXPENSES -->
+<div class="section" id="expenses">
+  <h1>8. Expenses</h1>
+  <p>Track all business expenses — rent, electricity, salaries, supplies, etc. Each expense has a date, category, amount, and optional notes. View expense summaries in reports.</p>
+</div>
+
+<!-- 9. REPORTS -->
+<div class="section page-break" id="reports">
+  <h1>9. Reports & Analytics</h1>
+
+  <h2>Available Reports</h2>
+  <table>
+    <tr><th>Report</th><th>Description</th></tr>
+    <tr><td>Sales Summary</td><td>Total sales, tax, discount by date range</td></tr>
+    <tr><td>Item-wise Sales</td><td>Sales breakdown by item</td></tr>
+    <tr><td>Category-wise Sales</td><td>Sales by category</td></tr>
+    <tr><td>Payment Mode Report</td><td>Cash vs Card vs UPI breakdown</td></tr>
+    <tr><td>GST Report</td><td>CGST, SGST, IGST summary for filing</td></tr>
+    <tr><td>Day Close Report</td><td>End-of-day summary with cash reconciliation</td></tr>
+    <tr><td>Stock Report</td><td>Current stock levels with value</td></tr>
+    <tr><td>Profit Report</td><td>Revenue minus cost analysis</td></tr>
+    <tr><td>Employee Report</td><td>Attendance and settlement summary</td></tr>
+    <tr><td>Expense Report</td><td>Expense totals by category and date</td></tr>
+  </table>
+
+  <h2>Analytics Dashboard</h2>
+  <p>Visual charts showing sales trends, top-selling items, revenue patterns, and comparison across time periods.</p>
+
+  <h2>Trends</h2>
+  <p>View daily, weekly, and monthly sales trends with graphs. Compare current period vs previous period performance.</p>
+</div>
+
+<!-- 10. LOYALTY -->
+<div class="section" id="loyalty">
+  <h1>10. Loyalty, Gift Cards & Coupons</h1>
+
+  <h3>Loyalty Program</h3>
+  <p>Set up a points-based loyalty system. Customers earn points per purchase and redeem them for discounts. Configure points-per-rupee and redemption value.</p>
+
+  <h3>Gift Cards</h3>
+  <p>Create and sell gift cards with custom amounts. Gift cards have unique codes and optional expiry dates. Customers redeem at checkout by entering the code.</p>
+
+  <h3>Coupons</h3>
+  <p>Create discount coupons — flat amount or percentage. Set validity dates, minimum order value, and usage limits. Customers apply coupon codes during billing.</p>
+</div>
+
+<!-- 11. PURCHASE ORDERS -->
+<div class="section page-break" id="purchase-orders">
+  <h1>11. Purchase Orders & Suppliers</h1>
+
+  <h2>Suppliers</h2>
+  <p>Manage your supplier database with contact details, GST numbers, and payment terms. Track supplier ledger (payments in/out).</p>
+
+  <h2>Purchase Orders</h2>
+  <p>Create POs for suppliers with item lists, quantities, and prices. Track PO status: Draft → Ordered → Partially Received → Received. Receiving a PO automatically updates inventory stock.</p>
+
+  <h2>Supplier Ledger</h2>
+  <p>View complete payment history with each supplier. Track outstanding payables and record payments.</p>
+</div>
+
+<!-- 12. ADVANCE ORDERS -->
+<div class="section" id="advance-orders">
+  <h1>12. Advance Orders</h1>
+  <p>Accept advance bookings with partial payment. Track order status, delivery date, and remaining balance. Convert advance orders to regular invoices when fulfilled.</p>
+</div>
+
+<!-- 13. CASH DRAWER -->
+<div class="section" id="cash-drawer">
+  <h1>13. Cash Drawer</h1>
+  <p>Track physical cash in the register. Open the drawer with a starting amount, record cash in/out during the day, and close with denomination count at end of day. The system calculates expected vs actual cash for reconciliation.</p>
+</div>
+
+<!-- 14. SETUP -->
+<div class="section page-break" id="setup">
+  <h1>14. Shop Setup & Configuration</h1>
+
+  <h2>Shop Details</h2>
+  <p>Configure shop name, address, logo, GST settings, and contact information. This appears on printed receipts and invoices.</p>
+
+  <h2>Branches</h2>
+  <p>Add multiple branches under one shop. Each branch has its own address, inventory, and staff. The head office branch manages all branches.</p>
+
+  <h2>Categories</h2>
+  <p>Organize items into categories for easy navigation during billing. Categories appear as tabs on the billing screen.</p>
+
+  <h2>Items</h2>
+  <p>Add products/menu items with prices, images, and stock settings. Supports bulk import via Excel upload.</p>
+
+  <h2>Users</h2>
+  <p>Create login accounts for staff with assigned roles (Admin, Manager, Cashier, Waiter). Each user can be assigned to a specific branch.</p>
+
+  <h2>Tables</h2>
+  <p>Configure tables for hotel/restaurant billing. Set table names, sections, and capacity.</p>
+</div>
+
+<!-- 15. USER ROLES -->
+<div class="section" id="user-roles">
+  <h1>15. User Roles & Permissions</h1>
+
+  <table>
+    <tr><th>Role</th><th>Access Level</th></tr>
+    <tr><td><strong>Admin</strong></td><td>Full access — settings, reports, billing, employee management, delete invoices</td></tr>
+    <tr><td><strong>Manager</strong></td><td>Billing, reports, inventory, customer management (no settings/delete)</td></tr>
+    <tr><td><strong>Cashier</strong></td><td>Billing, sales history, basic inventory view</td></tr>
+    <tr><td><strong>Waiter</strong></td><td>Table orders, KOT management (no billing/reports)</td></tr>
+  </table>
+
+  <p>Admins can configure granular per-module permissions from <strong>Setup → Permissions</strong>.</p>
+</div>
+
+<!-- 16. PRINTING -->
+<div class="section page-break" id="printing">
+  <h1>16. Printing & Thermal Printers</h1>
+
+  <h2>Supported Printers</h2>
+  <ul>
+    <li><strong>Bluetooth Thermal Printers</strong> — Connect via Bluetooth for silent ESC/POS printing (58mm/80mm)</li>
+    <li><strong>WiFi/Network Printers</strong> — Connect to network printers via IP address</li>
+    <li><strong>System Print Dialog</strong> — Use any printer connected to your PC</li>
+  </ul>
+
+  <h2>Setup (Mobile App)</h2>
+  <ol>
+    <li>Go to <strong>Settings → Printer Settings</strong></li>
+    <li>Tap <strong>Scan Bluetooth</strong> to discover paired devices</li>
+    <li>Select your thermal printer from the list</li>
+    <li>Toggle <strong>Direct Thermal Printing</strong> to ON</li>
+    <li>Save settings</li>
+  </ol>
+
+  <div class="tip"><strong>Tip:</strong> The app auto-detects paired Bluetooth printers on launch. If a printer is found and none is configured, it will be automatically selected.</div>
+
+  <h2>Receipt Content</h2>
+  <p>Receipts include: shop name, address, GST number, invoice number, date, items with quantities and prices, tax breakdown, payment mode, and a QR code for digital invoice access.</p>
+</div>
+
+<!-- 17. MOBILE APP -->
+<div class="section" id="mobile-app">
+  <h1>17. Mobile App</h1>
+  <p>Download the Android app from the <strong>About</strong> page at haappiibilling.in. The mobile app supports:</p>
+  <ul>
+    <li>All billing features (takeaway & table billing)</li>
+    <li>Bluetooth thermal printing</li>
+    <li>Offline bill creation with auto-sync</li>
+    <li>Biometric/PIN lock for security</li>
+    <li>Dark/Light theme</li>
+    <li>All management features (inventory, customers, employees, etc.)</li>
+  </ul>
+</div>
+
+<!-- 18. OFFLINE -->
+<div class="section" id="offline">
+  <h1>18. Offline Mode</h1>
+  <p>The app works offline — bills created without internet are queued and automatically synced when connectivity returns.</p>
+  <ul>
+    <li>Items and categories are cached locally</li>
+    <li>Bills are stored in the offline queue</li>
+    <li>A banner shows the number of pending bills</li>
+    <li>Tap the banner to manually trigger sync</li>
+    <li>The system checks connectivity every 15 seconds</li>
+  </ul>
+  <div class="warning"><strong>Note:</strong> Sign in online at least once before using offline mode. Offline login uses cached credentials.</div>
+</div>
+
+<!-- 19. WHATSAPP -->
+<div class="section page-break" id="whatsapp">
+  <h1>19. WhatsApp Integration</h1>
+  <p>Send invoices to customers via WhatsApp automatically after billing. Requires Meta WhatsApp Business API setup.</p>
+
+  <h3>Features</h3>
+  <ul>
+    <li>Send invoice PDF as a WhatsApp document</li>
+    <li>Send invoice link as a text message (fallback)</li>
+    <li>Advance order receipts via WhatsApp</li>
+    <li>Per-branch enable/disable toggle</li>
+  </ul>
+
+  <h3>Enable WhatsApp</h3>
+  <p>Go to <strong>Settings</strong> on the mobile app or web app and toggle <strong>WhatsApp Invoice</strong> to enabled. The admin must configure the WhatsApp API credentials on the server.</p>
+</div>
+
+<!-- 20. SECURITY -->
+<div class="section" id="security">
+  <h1>20. Security & Data Privacy</h1>
+  <ul>
+    <li><strong>Encrypted passwords</strong> — All passwords are bcrypt-hashed</li>
+    <li><strong>JWT authentication</strong> — Secure token-based sessions</li>
+    <li><strong>Single session</strong> — Only one active login per user at a time</li>
+    <li><strong>Session timeout</strong> — Auto-logout after inactivity</li>
+    <li><strong>HTTPS only</strong> — All data encrypted in transit</li>
+    <li><strong>Biometric lock</strong> — PIN/fingerprint on mobile app</li>
+    <li><strong>Audit trail</strong> — All actions are logged with timestamps</li>
+    <li><strong>Role-based access</strong> — Users only see what their role permits</li>
+  </ul>
+</div>
+
+<!-- 21. FAQ -->
+<div class="section page-break" id="faq">
+  <h1>21. FAQ & Troubleshooting</h1>
+
+  <h3>I forgot my password</h3>
+  <p>Contact your shop admin to reset your password from <strong>Setup → Users</strong>.</p>
+
+  <h3>Bills are not syncing</h3>
+  <p>Check your internet connection. Go to <strong>Offline Sync</strong> and tap the sync button. If bills fail repeatedly, check if your session has expired and re-login.</p>
+
+  <h3>Printer not found</h3>
+  <p>Ensure Bluetooth is ON and the printer is paired in your phone's Bluetooth settings first. Then scan from the app's Printer Settings.</p>
+
+  <h3>GST not showing on bills</h3>
+  <p>Enable GST from <strong>Setup → Shop Details</strong>. Set the GST percentage and mode (inclusive/exclusive). Ensure individual items have GST rates assigned.</p>
+
+  <h3>Can't access certain features</h3>
+  <p>Your user role may not have permission. Ask the admin to check <strong>Setup → Permissions</strong> and enable the required modules for your role.</p>
+
+  <h3>Trial expired</h3>
+  <p>Contact the Haappii Billing team at <strong>haappiibilling@gmail.com</strong> or <strong>+91 79042 63246</strong> to activate a subscription plan.</p>
+
+  <h3>How to delete an invoice?</h3>
+  <p>Only admins can delete invoices. Go to <strong>Billing History</strong>, open the invoice, and click <strong>Delete</strong>. Deleted invoices are moved to the <strong>Deleted Invoices</strong> section for audit purposes.</p>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center;padding:40px 20px 60px;color:#94a3b8;font-size:12px;border-top:1px solid #f1f5f9">
+  <p><strong>Haappii Billing</strong> — POS & Shop Management Platform</p>
+  <p>haappiibilling.in · haappiibilling@gmail.com · +91 79042 63246</p>
+  <p style="margin-top:8px">© 2026 Haappii Billing. All rights reserved.</p>
+</div>
+
+</div>
+</body>
+</html>

@@ -12,6 +12,8 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
+
 
 const FLOW = ["ORDER_PLACED", "ORDER_PREPARING", "FOOD_PREPARED", "MOVED_TO_TABLE", "COMPLETED"];
 const FLOW_LABELS = ["Placed", "Preparing", "Ready", "At Table", "Done"];
@@ -25,9 +27,9 @@ const STATUS_COLORS = {
 };
 
 const SUMMARY_STATUSES = [
-  { key: "ORDER_PLACED",    label: "Order Placed",    color: "#2563eb", bg: "#eff4ff", border: "#bfdbfe" },
-  { key: "ORDER_PREPARING", label: "Order Preparing", color: "#d97706", bg: "#fffbeb", border: "#fcd34d" },
-  { key: "FOOD_PREPARED",   label: "Food Prepared",   color: "#059669", bg: "#ecfdf5", border: "#6ee7b7" },
+  { key: "ORDER_PLACED",    label: "Order Placed",    color: "#6366f1", bg: "#eff4ff", border: "#bfdbfe" },
+  { key: "ORDER_PREPARING", label: "Order Preparing", color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d" },
+  { key: "FOOD_PREPARED",   label: "Food Prepared",   color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7" },
   { key: "MOVED_TO_TABLE",  label: "Moved To Table",  color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" },
 ];
 
@@ -39,6 +41,7 @@ function fmtTime(v) {
 }
 
 export default function OrderLiveScreen() {
+  const { theme } = useTheme();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -302,30 +305,30 @@ export default function OrderLiveScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 24 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  header: { fontSize: 17, fontWeight: "900", color: "#0c1228", letterSpacing: -0.2 },
+  header: { fontSize: 17, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.2 },
   emptyBox: { alignItems: "center", paddingVertical: 50, gap: 10 },
   emptyIcon: { fontSize: 44 },
-  emptyText: { color: "#8896ae", fontSize: 15, fontWeight: "600" },
+  emptyText: { color: "#9ca3af", fontSize: 15, fontWeight: "600" },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     borderRadius: 18,
     padding: 14,
     gap: 10,
-    shadowColor: "#1a2463",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
   },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  title: { fontWeight: "900", color: "#0c1228", fontSize: 14, letterSpacing: -0.1 },
-  sub: { color: "#4a5a78", fontSize: 12, marginTop: 3 },
+  title: { fontWeight: "900", color: "#0a0f1e", fontSize: 14, letterSpacing: -0.1 },
+  sub: { color: "#4b5563", fontSize: 12, marginTop: 3 },
   statusBadge: {
     borderWidth: 1.5,
     borderRadius: 10,
@@ -333,38 +336,38 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   statusText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  timeText: { color: "#8896ae", fontSize: 11, fontWeight: "600" },
+  timeText: { color: "#9ca3af", fontSize: 11, fontWeight: "600" },
   itemsBox: {
-    backgroundColor: "#f6f8fe",
+    backgroundColor: "#f8f9fd",
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 10,
     gap: 5,
   },
-  itemsTitle: { fontSize: 11, fontWeight: "800", color: "#4a5a78", marginBottom: 3, letterSpacing: 0.5, textTransform: "uppercase" },
+  itemsTitle: { fontSize: 11, fontWeight: "800", color: "#4b5563", marginBottom: 3, letterSpacing: 0.5, textTransform: "uppercase" },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   kotDot: { width: 7, height: 7, borderRadius: 4 },
-  itemName: { flex: 1, fontSize: 13, color: "#0c1228", fontWeight: "600" },
-  itemQty: { fontSize: 12, fontWeight: "800", color: "#4a5a78" },
+  itemName: { flex: 1, fontSize: 13, color: "#0a0f1e", fontWeight: "600" },
+  itemQty: { fontSize: 12, fontWeight: "800", color: "#4b5563" },
   kotBox: { gap: 5 },
-  kotTitle: { fontSize: 11, fontWeight: "800", color: "#4a5a78", letterSpacing: 0.5, textTransform: "uppercase" },
+  kotTitle: { fontSize: 11, fontWeight: "800", color: "#4b5563", letterSpacing: 0.5, textTransform: "uppercase" },
   kotRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  kotNumber: { fontSize: 12, color: "#4a5a78", fontWeight: "600" },
+  kotNumber: { fontSize: 12, color: "#4b5563", fontWeight: "600" },
   kotStatus: { fontSize: 11, fontWeight: "800" },
   stepsContainer: { flexDirection: "row", justifyContent: "space-between" },
   stepItem: { alignItems: "center", gap: 4, flex: 1 },
   stepDot: { width: 16, height: 16, borderRadius: 8 },
-  stepDone: { backgroundColor: "#2563eb" },
-  stepTodo: { backgroundColor: "#dde6f7" },
-  stepLabel: { fontSize: 8, color: "#8896ae", textAlign: "center", fontWeight: "600" },
-  stepLabelDone: { color: "#2563eb", fontWeight: "700" },
+  stepDone: { backgroundColor: "#6366f1" },
+  stepTodo: { backgroundColor: "#e4e9f2" },
+  stepLabel: { fontSize: 8, color: "#9ca3af", textAlign: "center", fontWeight: "600" },
+  stepLabelDone: { color: "#6366f1", fontWeight: "700" },
   updateBtn: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#6366f1",
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
-    shadowColor: "#2563eb",
+    shadowColor: "#6366f1",
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -374,17 +377,17 @@ const styles = StyleSheet.create({
   // ── Tab toggle ──
   tabRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   tabBtn: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f8f9fd",
   },
-  tabBtnActive: { backgroundColor: "#0c1228", borderColor: "#0c1228" },
-  tabBtnText: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
+  tabBtnActive: { backgroundColor: "#0a0f1e", borderColor: "#0a0f1e" },
+  tabBtnText: { fontSize: 11, fontWeight: "700", color: "#4b5563" },
   tabBtnTextActive: { color: "#fff" },
   // ── Summary ──
   summaryCard: {
-    backgroundColor: "#fff", borderWidth: 1.5, borderRadius: 18,
+    backgroundColor: "#ffffff", borderWidth: 1.5, borderRadius: 18,
     overflow: "hidden", marginBottom: 4,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
   summaryHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -397,36 +400,36 @@ const styles = StyleSheet.create({
   summaryTotalsRow: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: "#f6f8fe", borderBottomWidth: 1, borderBottomColor: "#eef2ff",
+    backgroundColor: "#f8f9fd", borderBottomWidth: 1, borderBottomColor: "#eef2ff",
   },
-  summaryTotalsText: { fontSize: 12, color: "#8896ae", fontWeight: "600" },
-  summaryTotalsBold: { fontSize: 12, color: "#0c1228", fontWeight: "800" },
+  summaryTotalsText: { fontSize: 12, color: "#9ca3af", fontWeight: "600" },
+  summaryTotalsBold: { fontSize: 12, color: "#0a0f1e", fontWeight: "800" },
   summaryBreakdown: {
     paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8,
-    borderBottomWidth: 1, borderBottomColor: "#f0f4ff",
+    borderBottomWidth: 1, borderBottomColor: "#f4f6fb",
   },
   summaryBreakdownTitle: {
-    fontSize: 9, fontWeight: "800", color: "#8896ae",
+    fontSize: 9, fontWeight: "800", color: "#9ca3af",
     letterSpacing: 1, marginBottom: 7, textTransform: "uppercase",
   },
   summaryBreakdownRow: {
     flexDirection: "row", justifyContent: "space-between",
     alignItems: "center", paddingVertical: 3,
   },
-  summaryBreakdownName: { fontSize: 13, color: "#0c1228", flex: 1, paddingRight: 8, fontWeight: "600" },
+  summaryBreakdownName: { fontSize: 13, color: "#0a0f1e", flex: 1, paddingRight: 8, fontWeight: "600" },
   summaryBreakdownCount: { fontSize: 13, fontWeight: "800" },
   summaryEmpty: {
-    padding: 14, textAlign: "center", fontSize: 12, color: "#8896ae",
+    padding: 14, textAlign: "center", fontSize: 12, color: "#9ca3af",
   },
   summaryOrderRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 14, paddingVertical: 9,
-    borderBottomWidth: 1, borderBottomColor: "#f6f8fe",
+    borderBottomWidth: 1, borderBottomColor: "#f8f9fd",
   },
-  summaryOrderTitle: { fontSize: 13, fontWeight: "700", color: "#0c1228", flex: 1 },
+  summaryOrderTitle: { fontSize: 13, fontWeight: "700", color: "#0a0f1e", flex: 1 },
   summaryOrderBadge: {
     backgroundColor: "#eef2ff", borderRadius: 999,
-    paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "#dde6f7",
+    paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "#e4e9f2",
   },
-  summaryOrderBadgeText: { fontSize: 10, fontWeight: "700", color: "#4a5a78" },
+  summaryOrderBadgeText: { fontSize: 10, fontWeight: "700", color: "#4b5563" },
 });

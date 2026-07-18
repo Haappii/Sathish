@@ -33,6 +33,21 @@ export const resolveApiUrl = (path) => {
   return `${base}${v}`;
 };
 
+export const getItemImageUrl = (imageFilename) => {
+  const v = String(imageFilename || "").trim();
+  if (!v) return "";
+  if (isAbsoluteUrl(v) || v.startsWith("data:") || v.startsWith("/")) return v;
+  return `${API_BASE}/item-images/${v}`;
+};
+
+export const getUploadUrl = (urlOrPath) => {
+  const v = String(urlOrPath || "").trim();
+  if (!v) return "";
+  if (isAbsoluteUrl(v) || v.startsWith("data:")) return v;
+  if (v.startsWith("/")) return v;
+  return `${API_BASE}/uploads/${v}`;
+};
+
 export const getShopLogoUrl = (shop) => {
   const logoUrl = typeof shop?.logo_url === "string" ? shop.logo_url.trim() : "";
 

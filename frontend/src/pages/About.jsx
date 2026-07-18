@@ -35,6 +35,10 @@ const features = [
   },
 ];
 
+const teamCardColors = [
+  "#0f172a", "#334155", "#1a0a2e", "#0c4a6e", "#164e3f", "#7c2d12", "#1e1145", "#0f3d3e",
+];
+
 const stats = [
   { value: "< 2s", label: "Average bill time" },
   { value: "24/7", label: "Cloud uptime" },
@@ -45,7 +49,6 @@ const stats = [
 export default function About() {
   const { showToast } = useToast();
   const [teamProfiles, setTeamProfiles] = useState([]);
-  const [slideIndex, setSlideIndex] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -55,12 +58,6 @@ export default function About() {
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
-
-  useEffect(() => {
-    if (teamProfiles.length < 2) return;
-    const id = setInterval(() => setSlideIndex((i) => (i + 1) % teamProfiles.length), 4000);
-    return () => clearInterval(id);
-  }, [teamProfiles.length]);
 
   const [contactDetails, setContactDetails] = useState({
     name: import.meta.env.VITE_ABOUT_CONTACT_NAME || "Sathish Kumar Lakshman",
@@ -92,7 +89,7 @@ export default function About() {
   }, []);
 
   const windowsAppUrl =
-    import.meta.env.VITE_WINDOWS_APP_URL || "/downloads/poss-desktop-setup.exe";
+    import.meta.env.VITE_WINDOWS_APP_URL || "https://storage.googleapis.com/haappiibilling-uploads/downloads/poss-desktop-setup.exe";
   const androidAppUrl =
     import.meta.env.VITE_ANDROID_APP_URL || "https://storage.googleapis.com/haappiibilling-uploads/downloads/haappii-billing.apk";
   const contactInitial = (contactDetails.name || "H").trim().charAt(0).toUpperCase();
@@ -321,26 +318,18 @@ export default function About() {
 
         /* ---- TEAM / CONTACT (dark bg) ---- */
         .ab-section--team{background:linear-gradient(180deg,#0f172a,#1a0a2e)}
-        .ab-team-slider{position:relative;overflow:hidden;border-radius:24px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
-        .ab-team-track{display:flex;transition:transform .6s cubic-bezier(.4,0,.2,1)}
-        .ab-team-slide{min-width:100%;display:grid;grid-template-columns:minmax(220px,.45fr) 1fr;gap:0;align-items:stretch}
-        .ab-team-img{position:relative;overflow:hidden;min-height:360px;background:linear-gradient(135deg,#1e1145,#0f172a)}
+        .ab-team-grid{column-count:3;column-gap:24px}
+        .ab-team-card{break-inside:avoid;margin-bottom:24px;border-radius:20px;overflow:hidden;display:grid;grid-template-columns:minmax(110px,.4fr) 1fr;border:1px solid rgba(255,255,255,.08)}
+        .ab-team-img{position:relative;overflow:hidden;min-height:180px;background:linear-gradient(135deg,#1e1145,#0f172a)}
         .ab-team-img img{width:100%;height:100%;object-fit:cover;display:block}
-        .ab-team-img-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:360px;font-size:80px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--accent),#ff9a56)}
-        .ab-team-info{padding:40px 44px;display:flex;flex-direction:column;justify-content:center;gap:14px}
-        .ab-team-role{display:inline-flex;padding:6px 14px;border-radius:999px;background:rgba(243,109,79,.12);color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;width:fit-content}
-        .ab-team-name{font-family:Fraunces,serif;font-size:clamp(1.8rem,3vw,2.8rem);font-weight:800;letter-spacing:-.03em;line-height:1.05;color:#fff}
-        .ab-team-bio{color:rgba(255,255,255,.55);font-size:15px;line-height:1.75;margin:0}
-        .ab-team-contact-line{font-size:14px;color:rgba(255,255,255,.5)}
+        .ab-team-img-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:180px;font-size:48px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--accent),#ff9a56)}
+        .ab-team-info{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+        .ab-team-role{display:inline-flex;padding:4px 10px;border-radius:999px;background:rgba(243,109,79,.16);color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:fit-content}
+        .ab-team-name{font-family:Fraunces,serif;font-size:clamp(1.1rem,1.6vw,1.4rem);font-weight:800;letter-spacing:-.02em;line-height:1.1;color:#fff}
+        .ab-team-bio{color:rgba(255,255,255,.55);font-size:13px;line-height:1.6;margin:0}
+        .ab-team-contact-line{font-size:12px;color:rgba(255,255,255,.5)}
         .ab-team-contact-line a{color:rgba(255,255,255,.7);text-decoration:underline;text-decoration-color:rgba(255,255,255,.25)}
         .ab-team-contact-line a:hover{color:#fff;text-decoration-color:rgba(255,255,255,.5)}
-        .ab-team-dots{display:flex;justify-content:center;gap:8px;padding:24px 0 0}
-        .ab-team-dot{width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;transition:all .25s ease;background:rgba(255,255,255,.2)}
-        .ab-team-dot.active{width:28px;border-radius:4px;background:var(--accent)}
-        .ab-team-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(15,23,42,.7);backdrop-filter:blur(8px);cursor:pointer;font-size:16px;color:#fff;display:flex;align-items:center;justify-content:center;transition:all .18s ease;z-index:2}
-        .ab-team-nav:hover{background:rgba(15,23,42,.9);border-color:rgba(255,255,255,.2)}
-        .ab-team-nav.prev{left:14px}
-        .ab-team-nav.next{right:14px}
 
         /* ---- CONTACT FALLBACK ---- */
         .ab-contact-card{display:grid;grid-template-columns:minmax(260px,.4fr) 1fr;gap:0;border-radius:24px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
@@ -355,21 +344,20 @@ export default function About() {
         .ab-contact-value a:hover{text-decoration-color:rgba(255,255,255,.6)}
 
         /* ---- CTA ---- */
-        .ab-section--cta{background:#fff;padding:0 0 100px}
-        .ab-cta{padding:56px 48px;border-radius:32px;background:linear-gradient(135deg,#1e1145 0%,#0f172a 40%,#0a2f2a 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:40px;position:relative;overflow:hidden}
+        .ab-section--cta{background:#0f172a;padding:40px 0 0}
+        .ab-cta{padding:56px 48px;border-radius:32px;background:linear-gradient(135deg,#1e1145 0%,#0f172a 50%,#131325 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:40px;position:relative;overflow:hidden}
         .ab-cta-glow{position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(100px);opacity:.3;pointer-events:none;top:-100px;right:-50px;background:radial-gradient(circle,var(--accent),transparent 70%)}
         .ab-cta h3{font-family:Fraunces,serif;font-size:clamp(2rem,4vw,3.2rem);font-weight:800;line-height:1;letter-spacing:-.04em;margin:0 0 16px;max-width:14ch;position:relative;z-index:1}
         .ab-cta p{max-width:480px;color:rgba(255,255,255,.55);font-size:16px;line-height:1.8;margin:0;position:relative;z-index:1}
         .ab-cta .ab-hero-actions{position:relative;z-index:1}
 
         /* ---- FOOTER ---- */
-        .ab-footer{padding:40px 20px 50px;text-align:center;color:rgba(255,255,255,.35);font-size:13px;font-weight:500;background:#0f172a;border-top:1px solid rgba(255,255,255,.06)}
+        .ab-footer{padding:14px 20px;margin-top:0;text-align:center;color:rgba(255,255,255,.35);font-size:13px;font-weight:500;background:#080e1a;border-top:1px solid rgba(255,255,255,.08)}
 
         /* ---- RESPONSIVE ---- */
         @media (max-width:1080px){
           .ab-features,.ab-dl-grid{grid-template-columns:1fr}
-          .ab-team-slide{grid-template-columns:1fr}
-          .ab-team-img{min-height:240px}
+          .ab-team-grid{column-count:2}
           .ab-contact-card{grid-template-columns:1fr}
           .ab-cta{flex-direction:column;align-items:flex-start}
           .ab-stats{grid-template-columns:repeat(2,1fr)}
@@ -383,7 +371,10 @@ export default function About() {
           .ab-stat{border-right:none;border-bottom:1px solid rgba(255,255,255,.06)}
           .ab-stat:last-child{border-bottom:none}
           .ab-section{padding:60px 0}
-          .ab-team-info{padding:24px 20px}
+          .ab-team-grid{column-count:1}
+          .ab-team-card{grid-template-columns:1fr}
+          .ab-team-img{min-height:160px}
+          .ab-team-info{padding:20px}
           .ab-contact-list{grid-template-columns:1fr;padding:24px 20px}
           .ab-cta{padding:36px 28px}
         }
@@ -557,77 +548,48 @@ export default function About() {
           </div>
 
           {teamProfiles.length > 0 ? (
-            <>
-              <div className="ab-team-slider">
+            <div className="ab-team-grid">
+              {teamProfiles.map((p, i) => (
                 <div
-                  className="ab-team-track"
-                  style={{ transform: `translateX(-${slideIndex * 100}%)` }}
+                  className="ab-team-card"
+                  key={p.profile_id}
+                  style={{ background: teamCardColors[i % teamCardColors.length] }}
                 >
-                  {teamProfiles.map((p) => (
-                    <div className="ab-team-slide" key={p.profile_id}>
-                      <div className="ab-team-img">
-                        {p.photo_url ? (
-                          <img src={p.photo_url} alt={p.name} loading="lazy" />
-                        ) : (
-                          <div className="ab-team-img-fallback">
-                            {(p.name || "?").trim().charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                  <div className="ab-team-img">
+                    {p.photo_url ? (
+                      <img src={p.photo_url} alt={p.name} loading="lazy" />
+                    ) : (
+                      <div className="ab-team-img-fallback">
+                        {(p.name || "?").trim().charAt(0).toUpperCase()}
                       </div>
-                      <div className="ab-team-info">
-                        {p.role_title && <span className="ab-team-role">{p.role_title}</span>}
-                        <h3 className="ab-team-name">{p.name}</h3>
-                        {p.bio && <p className="ab-team-bio">{p.bio}</p>}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
-                          {contactDetails.mobile && (
-                            <span className="ab-team-contact-line">
-                              {contactDetails.mobile}
-                            </span>
-                          )}
-                          {contactDetails.email && (
-                            <span className="ab-team-contact-line">
-                              <a href={mailtoHref}>{contactDetails.email}</a>
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    )}
+                  </div>
+                  <div className="ab-team-info">
+                    {p.role_title && <span className="ab-team-role">{p.role_title}</span>}
+                    <h3 className="ab-team-name">
+                      {String(p.role_title || "").toLowerCase().includes("founder") ? (
+                        <a href="/sathish_kumar_lakshman_portfolio" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
+                          {p.name}
+                        </a>
+                      ) : p.name}
+                    </h3>
+                    {p.bio && <p className="ab-team-bio">{p.bio}</p>}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+                      {contactDetails.mobile && (
+                        <span className="ab-team-contact-line">
+                          {contactDetails.mobile}
+                        </span>
+                      )}
+                      {contactDetails.email && (
+                        <span className="ab-team-contact-line">
+                          <a href={mailtoHref}>{contactDetails.email}</a>
+                        </span>
+                      )}
                     </div>
-                  ))}
+                  </div>
                 </div>
-
-                {teamProfiles.length > 1 && (
-                  <>
-                    <button
-                      className="ab-team-nav prev"
-                      aria-label="Previous"
-                      onClick={() => setSlideIndex((i) => (i - 1 + teamProfiles.length) % teamProfiles.length)}
-                    >
-                      &#8249;
-                    </button>
-                    <button
-                      className="ab-team-nav next"
-                      aria-label="Next"
-                      onClick={() => setSlideIndex((i) => (i + 1) % teamProfiles.length)}
-                    >
-                      &#8250;
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {teamProfiles.length > 1 && (
-                <div className="ab-team-dots">
-                  {teamProfiles.map((_, i) => (
-                    <button
-                      key={i}
-                      className={`ab-team-dot${i === slideIndex ? " active" : ""}`}
-                      aria-label={`Slide ${i + 1}`}
-                      onClick={() => setSlideIndex(i)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+              ))}
+            </div>
           ) : (
             <div className="ab-contact-card">
               <div className="ab-contact-media">
@@ -640,7 +602,11 @@ export default function About() {
               <div className="ab-contact-list">
                 <div className="ab-contact-item">
                   <span className="ab-contact-label">Name</span>
-                  <span className="ab-contact-value">{contactDetails.name}</span>
+                  <span className="ab-contact-value">
+                    <a href="/sathish_kumar_lakshman_portfolio" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dashed currentColor" }}>
+                      {contactDetails.name}
+                    </a>
+                  </span>
                 </div>
                 <div className="ab-contact-item">
                   <span className="ab-contact-label">Mobile / WhatsApp</span>

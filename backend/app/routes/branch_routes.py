@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+import uuid
+
 from app.db import SessionLocal
 from app.models.branch import Branch
+from app.models.public_menu_token import PublicMenuToken
 from app.models.shop_details import ShopDetails
 from app.models.system_parameters import SystemParameter
 from app.schemas.branch_schema import BranchCreate, BranchUpdate, BranchOut
@@ -327,6 +330,10 @@ def _branch_out_with_discount(branch, pmap: dict[str, str]) -> dict:
             include_legacy_shop_fallback=True,
         )
     )
+
+    pm_key = f"branch:{bid}:public_menu_enabled"
+    out["public_menu_enabled"] = str(pmap.get(pm_key, "")).strip().upper() == "YES"
+
     return out
 
 
@@ -401,6 +408,21 @@ def get_branch(branch_id: int, db: Session = Depends(get_db), user=Depends(get_c
     safe = _branch_out_with_discount(branch, pmap)
     if not safe:
         raise HTTPException(500, "Invalid branch data")
+
+    token_row = (
+        db.query(PublicMenuToken)
+        .filter(PublicMenuToken.shop_id == user.shop_id, PublicMenuToken.branch_id == branch_id, PublicMenuToken.active == True)
+        .first()
+    )
+    safe["public_menu_token"] = token_row.token if token_row else None
+
+    if safe.get("public_menu_enabled") and token_row:
+        shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+        from app.routes.public_menu import _make_slug
+        safe["public_menu_slug"] = _make_slug(shop.shop_name or "", branch.branch_name or "") if shop else ""
+    else:
+        safe["public_menu_slug"] = ""
+
     return safe
 
 
@@ -573,3 +595,56 @@ def change_status(branch_id: int, status: str,
     )
 
     return {"message": "Updated", "status": status}
+
+
+@router.post("/{branch_id}/public-menu")
+def toggle_public_menu(
+    branch_id: int,
+    payload: dict,
+    user=Depends(AdminOnly),
+    db: Session = Depends(get_db),
+):
+    branch = db.query(Branch).filter(Branch.branch_id == branch_id, Branch.shop_id == user.shop_id).first()
+    if not branch:
+        raise HTTPException(404, "Branch not found")
+
+    enabled = bool(payload.get("enabled", False))
+    param_key = f"branch:{branch_id}:public_menu_enabled"
+    _upsert_param(db, shop_id=user.shop_id, key=param_key, value="YES" if enabled else "NO")
+
+    token_row = (
+        db.query(PublicMenuToken)
+        .filter(PublicMenuToken.shop_id == user.shop_id, PublicMenuToken.branch_id == branch_id)
+        .first()
+    )
+
+    if enabled:
+        if not token_row:
+            token_row = PublicMenuToken(
+                shop_id=user.shop_id,
+                branch_id=branch_id,
+                token=uuid.uuid4().hex,
+                active=True,
+            )
+            db.add(token_row)
+        else:
+            token_row.active = True
+    else:
+        if token_row:
+            token_row.active = False
+
+    db.commit()
+    if token_row:
+        db.refresh(token_row)
+
+    slug = ""
+    if enabled:
+        shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
+        from app.routes.public_menu import _make_slug
+        slug = _make_slug(shop.shop_name or "", branch.branch_name or "") if shop else ""
+
+    return {
+        "enabled": enabled,
+        "token": token_row.token if token_row and enabled else None,
+        "slug": slug,
+    }

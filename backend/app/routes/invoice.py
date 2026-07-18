@@ -53,6 +53,7 @@ from app.services.wallet_service import (
     as_money as wallet_money,
 )
 from app.utils.shop_type import get_shop_billing_type
+from app.services.branch_item_price_service import branch_price_map
 from app.models.recipe import Recipe
 from app.services.invoice_share_service import build_public_invoice_url, parse_invoice_share_token
 from app.services.whatsapp_service import (
@@ -425,7 +426,7 @@ def create_invoice(
     reverse_charge = False
 
     tax, total = calculate_gst(subtotal, shop)
-    discount = Decimal(str(payload.discounted_amt or 0))
+    discount = Decimal(str(payload.discounted_amt or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     if discount > total:
         raise HTTPException(400, "Discount cannot exceed invoice total")
     payable = (total - discount).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
@@ -502,7 +503,7 @@ def create_invoice(
 
     invoice.tax_amt = tax
     invoice.total_amount = total
-    invoice.discounted_amt = payload.discounted_amt
+    invoice.discounted_amt = float(Decimal(str(payload.discounted_amt or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
     db.add(invoice)
     db.commit()
@@ -516,6 +517,8 @@ def create_invoice(
             Item.shop_id == user.shop_id
         ).all()
     }
+
+    bp_overrides = branch_price_map(db, shop_id=user.shop_id, branch_id=branch_id, item_ids=item_ids) if branch_id else {}
 
     inv_enabled = is_inventory_enabled(db, user.shop_id)
     cost_method_row = (
@@ -574,7 +577,9 @@ def create_invoice(
 
     for it in payload.items:
         item = item_map.get(it.item_id)
-        buy_price = (item.buy_price if item else 0)
+        bp = bp_overrides.get(it.item_id)
+        buy_price = float(bp.buy_price) if bp and bp.buy_price is not None else (item.buy_price if item else 0)
+        line_mrp = float(bp.mrp_price) if bp and bp.mrp_price is not None else (item.mrp_price if item else 0)
 
         # Validate GST rate bounds (0-100)
         if item and getattr(item, "gst_rate", 0) is not None:
@@ -591,13 +596,12 @@ def create_invoice(
                         branch_id=branch_id,
                         item_id=int(it.item_id),
                         quantity=int(it.quantity or 0),
-                        fallback_unit_cost=(item.buy_price if item else 0),
+                        fallback_unit_cost=buy_price,
                         source_ref=invoice.invoice_number,
                     )
                 )
             except Exception:
-                # don't block sales if lot consumption fails
-                buy_price = (item.buy_price if item else 0)
+                pass
 
         amt_dec = Decimal(str(it.amount))
         rate_dec = Decimal(str(getattr(item, "gst_rate", 0) or getattr(shop, "gst_percent", 0) or 0))
@@ -645,7 +649,7 @@ def create_invoice(
             quantity=it.quantity,
             amount=it.amount,
             buy_price=buy_price,
-            mrp_price=(item.mrp_price if item else 0),
+            mrp_price=line_mrp,
             tax_rate=rate_dec,
             taxable_value=taxable_value,
             cgst_amt=cgst_amt,
@@ -987,6 +991,8 @@ def modify_invoice(
         ).all()
     }
 
+    mod_bp_overrides = branch_price_map(db, shop_id=user.shop_id, branch_id=invoice.branch_id, item_ids=item_ids) if invoice.branch_id else {}
+
     new_item_qty_pairs = [(int(it.item_id), int(it.quantity or 0)) for it in payload.items]
     new_recipe_requirements = (
         _add_raw_item_fallback(
@@ -1010,6 +1016,7 @@ def modify_invoice(
     for it in payload.items:
         subtotal += Decimal(it.amount)
         item = item_map.get(it.item_id)
+        bp = mod_bp_overrides.get(it.item_id)
 
         db.add(InvoiceDetail(
             invoice_id=invoice_id,
@@ -1018,8 +1025,8 @@ def modify_invoice(
             branch_id=invoice.branch_id,
             quantity=it.quantity,
             amount=it.amount,
-            buy_price=(item.buy_price if item else 0),
-            mrp_price=(item.mrp_price if item else 0)
+            buy_price=float(bp.buy_price) if bp and bp.buy_price is not None else (item.buy_price if item else 0),
+            mrp_price=float(bp.mrp_price) if bp and bp.mrp_price is not None else (item.mrp_price if item else 0)
         ))
 
         if inv_enabled and not is_hotel:
@@ -1049,7 +1056,7 @@ def modify_invoice(
     invoice.mobile = payload.mobile
     invoice.tax_amt = tax
     invoice.total_amount = total
-    invoice.discounted_amt = payload.discounted_amt
+    invoice.discounted_amt = float(Decimal(str(payload.discounted_amt or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     if payload.payment_mode is not None:
         invoice.payment_mode = payload.payment_mode
     if payload.payment_split is not None:

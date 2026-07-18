@@ -12,8 +12,11 @@ import {
 } from "react-native";
 import api from "../api/client";
 import { formatBusinessDateLabel, toBusinessYmd } from "../utils/businessDate";
+import { useTheme } from "../context/ThemeContext";
+
 
 export default function DashboardScreen() {
+  const { theme } = useTheme();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -127,21 +130,21 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: "#f0f4ff" },
+  safe:  { flex: 1, backgroundColor: "#f4f6fb" },
   scroll: { padding: 14, gap: 12, paddingBottom: 28 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  dateLabel: { color: "#8896ae", fontWeight: "700", fontSize: 12, marginBottom: 2, letterSpacing: 0.3 },
+  dateLabel: { color: "#9ca3af", fontWeight: "700", fontSize: 12, marginBottom: 2, letterSpacing: 0.3 },
   cardRow:   { flexDirection: "row", gap: 10 },
   card: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     padding: 14,
     paddingLeft: 18,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     overflow: "hidden",
-    shadowColor: "#1a2463", shadowOpacity: 0.08, shadowRadius: 14,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.08, shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
   cardAccentBar: {
@@ -149,27 +152,27 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
   },
   cardValue: { fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
-  cardLabel: { color: "#8896ae", marginTop: 3, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  cardLabel: { color: "#9ca3af", marginTop: 3, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
   section: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
-  sectionTitle: { fontWeight: "800", fontSize: 13, color: "#0c1228", textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionTitle: { fontWeight: "800", fontSize: 13, color: "#0a0f1e", textTransform: "uppercase", letterSpacing: 0.5 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f4ff",
+    borderBottomColor: "#f4f6fb",
   },
-  rowLabel: { fontWeight: "700", color: "#0c1228", maxWidth: "60%", fontSize: 13 },
-  rowSub:   { color: "#8896ae", fontSize: 12, marginTop: 2 },
-  rowValue: { color: "#4a5a78", fontSize: 13, fontWeight: "700" },
-  empty: { color: "#8896ae", fontWeight: "600" },
+  rowLabel: { fontWeight: "700", color: "#0a0f1e", maxWidth: "60%", fontSize: 13 },
+  rowSub:   { color: "#9ca3af", fontSize: 12, marginTop: 2 },
+  rowValue: { color: "#4b5563", fontSize: 13, fontWeight: "700" },
+  empty: { color: "#9ca3af", fontWeight: "600" },
 });

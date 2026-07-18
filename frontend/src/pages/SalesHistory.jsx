@@ -322,13 +322,13 @@ export default function SalesHistory() {
     if (shop.mobile) t += center(`Ph: ${shop.mobile}`) + "\n";
     if (shop.gst_number) t += center(`GSTIN: ${shop.gst_number}`) + "\n";
     t += line + "\n";
-    t += `Invoice No : ${activeBill.invoice_number}\n`;
+    t += center(`Invoice No : ${activeBill.invoice_number}`) + "\n";
     const phone = activeBill.mobile || "";
     const isPlaceholder = /^9{9,}$/.test(String(phone));
-    t += `Date : ${formatDisplayDate(activeBill.created_time, false)}\n`;
+    t += center(`Date : ${formatDisplayDate(activeBill.created_time, false)}`) + "\n";
     if (!isPlaceholder) {
-      t += `Customer : ${activeBill.customer_name || "Walk-in"}\n`;
-      t += `Mobile : ${maskMobileForPrint(phone)}\n`;
+      t += center(`Customer : ${activeBill.customer_name || "Walk-in"}`) + "\n";
+      t += center(`Mobile : ${maskMobileForPrint(phone)}`) + "\n";
     }
     if (activeBill.payment_mode === "split" || activeBill.payment_split) {
       const split = activeBill.payment_split || {};
@@ -337,9 +337,9 @@ export default function SalesHistory() {
         `Card ${Number(split.card || 0).toFixed(2)}`,
         `UPI ${Number(split.upi || 0).toFixed(2)}`
       ].join(", ");
-      t += `Payment : Split (${parts})\n`;
+      t += center(`Payment : Split (${parts})`) + "\n";
     } else {
-      t += `Payment : ${String(activeBill.payment_mode || "cash").toUpperCase()}\n`;
+      t += center(`Payment : ${String(activeBill.payment_mode || "cash").toUpperCase()}`) + "\n";
     }
     t += line + "\n";
     t +=

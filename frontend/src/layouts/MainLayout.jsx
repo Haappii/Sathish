@@ -697,7 +697,7 @@ export default function MainLayout({ hideSidebar = false }) {
   };
 
   return (
-    <div className="h-screen bg-white relative">
+    <div className="h-screen bg-white relative overflow-hidden">
 
       {/* ================= SIDEBAR ================= */}
       {sidebarEnabled && (
@@ -1115,7 +1115,13 @@ export default function MainLayout({ hideSidebar = false }) {
         </main>
 
         {/* FOOTER */}
-        <footer className="bg-white border-t px-4 sm:px-6 py-2 flex items-center justify-between gap-3">
+        <footer
+          className="px-4 sm:px-6 py-2 flex items-center justify-between gap-3"
+          style={{
+            background: themeMode === "dark" ? "#0f172a" : "#fff",
+            borderTop: `1px solid ${themeMode === "dark" ? "#1e293b" : "#e5e7eb"}`,
+          }}
+        >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: BLUE }}>
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -1123,15 +1129,15 @@ export default function MainLayout({ hideSidebar = false }) {
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-[12px] font-semibold text-gray-800 leading-tight truncate">{branchName || "No Branch Selected"}</p>
-              {branchAddress && <p className="text-[10px] text-gray-400 leading-tight truncate">{branchAddress}</p>}
+              <p className="text-[12px] font-semibold leading-tight truncate" style={{ color: themeMode === "dark" ? "#e2e8f0" : "#1f2937" }}>{branchName || "No Branch Selected"}</p>
+              {branchAddress && <p className="text-[10px] leading-tight truncate" style={{ color: themeMode === "dark" ? "#64748b" : "#9ca3af" }}>{branchAddress}</p>}
             </div>
           </div>
 
           <button
             onClick={() => setChatOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition hover:bg-gray-50 flex-shrink-0"
-            style={{ color: BLUE, borderColor: "#d1d5db" }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition flex-shrink-0"
+            style={{ color: BLUE, borderColor: themeMode === "dark" ? "#334155" : "#d1d5db" }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />

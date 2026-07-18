@@ -2,14 +2,14 @@
   "expo": {
     "name": "Haappii Billing",
     "slug": "haappii-billing-mobile",
-    "version": "2.2.0",
-    "icon": "./assets/app_logo.png",
+    "version": "2.3.0",
+    "icon": "./assets/app_icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/app_logo.png",
+      "image": "./assets/app_icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1d4ed8"
+      "backgroundColor": "#050810"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -20,10 +20,10 @@
     },
     "android": {
       "package": "com.haappii.billing",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app_logo.png",
-        "backgroundColor": "#1d4ed8"
+        "foregroundImage": "./assets/app_icon.png",
+        "backgroundColor": "#050810"
       },
       "permissions": [
         "INTERNET",

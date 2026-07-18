@@ -13,6 +13,8 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const fmtCount = (n) => String(Number(n || 0));
@@ -28,6 +30,7 @@ function KpiCard({ label, value, sub, accent }) {
 }
 
 export default function AnalyticsScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
   const nDaysBeforeBiz = useCallback((n) => {
@@ -244,43 +247,43 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   rangeBar: { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 12, paddingBottom: 4, gap: 8 },
   rangeBtn: {
-    flex: 1, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
-    paddingVertical: 8, alignItems: "center", backgroundColor: "#fff",
+    flex: 1, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 999,
+    paddingVertical: 8, alignItems: "center", backgroundColor: "#ffffff",
   },
-  rangeBtnActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  rangeTxt: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  rangeBtnActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  rangeTxt: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
   rangeTxtActive: { color: "#fff" },
   container: { padding: 14, gap: 12, paddingBottom: 36 },
   section: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 12,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 12,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.5 },
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kpiCard: {
-    width: "47.5%", backgroundColor: "#f6f8fe", borderRadius: 14, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 12, gap: 3,
+    width: "47.5%", backgroundColor: "#f8f9fd", borderRadius: 14, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 12, gap: 3,
   },
-  kpiLabel: { fontSize: 9, color: "#8896ae", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  kpiLabel: { fontSize: 9, color: "#9ca3af", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   kpiValue: { fontSize: 20, fontWeight: "900", letterSpacing: -0.5 },
-  kpiSub: { fontSize: 10, color: "#8896ae", fontWeight: "600" },
+  kpiSub: { fontSize: 10, color: "#9ca3af", fontWeight: "600" },
   payRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  payLabel: { width: 76, fontSize: 12, fontWeight: "700", color: "#4a5a78" },
-  barOuter: { flex: 1, height: 9, backgroundColor: "#dde6f7", borderRadius: 5, overflow: "hidden" },
+  payLabel: { width: 76, fontSize: 12, fontWeight: "700", color: "#4b5563" },
+  barOuter: { flex: 1, height: 9, backgroundColor: "#e4e9f2", borderRadius: 5, overflow: "hidden" },
   barInner: { height: 9, borderRadius: 5 },
-  payAmt: { width: 76, textAlign: "right", fontSize: 12, fontWeight: "800", color: "#0c1228" },
+  payAmt: { width: 76, textAlign: "right", fontSize: 12, fontWeight: "800", color: "#0a0f1e" },
   topRow: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f4ff",
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f4f6fb",
   },
-  topRank: { width: 24, textAlign: "center", color: "#8896ae", fontWeight: "800", fontSize: 13 },
-  topName: { fontWeight: "800", color: "#0c1228", fontSize: 13 },
-  topMeta: { color: "#8896ae", fontSize: 11 },
-  topAmt: { fontSize: 14, fontWeight: "900", color: "#059669" },
+  topRank: { width: 24, textAlign: "center", color: "#9ca3af", fontWeight: "800", fontSize: 13 },
+  topName: { fontWeight: "800", color: "#0a0f1e", fontSize: 13 },
+  topMeta: { color: "#9ca3af", fontSize: 11 },
+  topAmt: { fontSize: 14, fontWeight: "900", color: "#10b981" },
 });

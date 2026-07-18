@@ -745,7 +745,7 @@ def checkout_order(
 
     shop = db.query(ShopDetails).filter(ShopDetails.shop_id == user.shop_id).first()
     tax_amt, total = calculate_gst(subtotal, shop)
-    discount_amt = Decimal(str(payload.discounted_amt or 0))
+    discount_amt = Decimal(str(payload.discounted_amt or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     if discount_amt < 0:
         discount_amt = Decimal("0")
     gross_total = (total + service_charge + service_charge_gst)
@@ -775,7 +775,7 @@ def checkout_order(
         branch_id=order.branch_id,
         created_user=user.user_id,
         created_time=business_dt,
-        total_amount=grand_total,
+        total_amount=float(total),
         tax_amt=tax_amt,
         discounted_amt=float(discount_amt),
 

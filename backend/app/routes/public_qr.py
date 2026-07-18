@@ -15,6 +15,7 @@ from app.models.shop_details import ShopDetails
 from app.models.table_billing import TableMaster
 from app.models.table_qr import TableQrSession, TableQrToken, QrOrder, QrOrderItem
 from app.utils.shop_type import ensure_hotel_billing_type
+from app.services.branch_item_price_service import branch_price_map
 
 
 router = APIRouter(prefix="/public/qr", tags=["Public QR"])
@@ -408,6 +409,8 @@ def public_qr_create_order(
     if len(item_map) != len(item_ids):
         raise HTTPException(400, "One or more items are invalid")
 
+    qr_bp_overrides = branch_price_map(db, shop_id=tok.shop_id, branch_id=tok.branch_id, item_ids=item_ids) if tok.branch_id else {}
+
     order = QrOrder(
         shop_id=tok.shop_id,
         branch_id=tok.branch_id,
@@ -425,13 +428,15 @@ def public_qr_create_order(
 
     for it in req_items:
         item = item_map.get(int(it.item_id))
+        bp = qr_bp_overrides.get(item.item_id)
+        unit_price = Decimal(str(bp.price)).quantize(Decimal("0.01")) if bp and bp.price is not None else Decimal(str(item.price or 0)).quantize(Decimal("0.01"))
         db.add(
             QrOrderItem(
                 shop_id=tok.shop_id,
                 qr_order_id=order.qr_order_id,
                 item_id=item.item_id,
                 item_name=item.item_name,
-                unit_price=Decimal(str(item.price or 0)).quantize(Decimal("0.01")),
+                unit_price=unit_price,
                 quantity=int(it.quantity),
             )
         )

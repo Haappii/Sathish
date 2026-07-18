@@ -13,6 +13,8 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
+
 
 const PROVIDERS = ["ALL", "SWIGGY", "ZOMATO"];
 const STATUSES = ["ALL", "NEW", "ACCEPTED", "PREPARING", "READY", "DISPATCHED", "DELIVERED", "CANCELLED"];
@@ -46,6 +48,7 @@ const fmtDateTime = (v) => {
 };
 
 export default function OnlineOrdersScreen() {
+  const { theme } = useTheme();
   const [provider, setProvider] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -209,44 +212,44 @@ export default function OnlineOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   filterBar: { flexDirection: "row", padding: 14, paddingBottom: 6, gap: 8 },
   statusBar: { paddingHorizontal: 14, paddingBottom: 10, flexGrow: 0 },
   chip: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
-    paddingHorizontal: 13, paddingVertical: 7, marginRight: 6, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 999,
+    paddingHorizontal: 13, paddingVertical: 7, marginRight: 6, backgroundColor: "#f8f9fd",
   },
-  chipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  chipText: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
+  chipActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  chipText: { fontSize: 11, fontWeight: "700", color: "#4b5563" },
   chipTextActive: { color: "#fff" },
   list: { padding: 14, paddingTop: 4, gap: 10, paddingBottom: 24 },
   card: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   cardTop: { flexDirection: "row", gap: 10 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  orderId: { fontWeight: "900", color: "#0c1228", fontSize: 14 },
+  orderId: { fontWeight: "900", color: "#0a0f1e", fontSize: 14 },
   providerBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   providerText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  orderMeta: { color: "#4a5a78", fontSize: 12, marginTop: 2, fontWeight: "600" },
-  itemsList: { color: "#8896ae", fontSize: 11, marginTop: 3, lineHeight: 16 },
+  orderMeta: { color: "#4b5563", fontSize: 12, marginTop: 2, fontWeight: "600" },
+  itemsList: { color: "#9ca3af", fontSize: 11, marginTop: 3, lineHeight: 16 },
   rightCol: { alignItems: "flex-end", gap: 6 },
-  orderAmt: { fontSize: 15, fontWeight: "900", color: "#059669" },
+  orderAmt: { fontSize: 15, fontWeight: "900", color: "#10b981" },
   statusBadge: { borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 10, fontWeight: "800" },
   nextBtn: {
-    backgroundColor: "#2563eb", borderRadius: 13, paddingVertical: 12,
+    backgroundColor: "#6366f1", borderRadius: 13, paddingVertical: 12,
     alignItems: "center", justifyContent: "center",
-    shadowColor: "#2563eb", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    shadowColor: "#6366f1", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   nextBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   btnDisabled: { opacity: 0.5 },
   emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
   emptyIcon: { fontSize: 48 },
-  emptyTitle: { color: "#8896ae", fontSize: 16, fontWeight: "800" },
-  emptyMsg: { color: "#8896ae", fontSize: 13 },
+  emptyTitle: { color: "#9ca3af", fontSize: 16, fontWeight: "800" },
+  emptyMsg: { color: "#9ca3af", fontSize: 13 },
 });

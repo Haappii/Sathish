@@ -35,6 +35,10 @@ class Settings:
     # Deployment environment: "production" triggers stricter checks.
     ENV: str = os.getenv("APP_ENV", "development").lower()
 
+    # Google Cloud Storage — file uploads
+    GCS_BUCKET: str = os.getenv("GCS_BUCKET", "")
+    GCS_CREDENTIALS_PATH: str = os.getenv("GCS_CREDENTIALS_PATH", "")
+
     def validate(self) -> None:
         """
         Warn loudly about insecure defaults.

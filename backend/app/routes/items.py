@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Query
+from io import BytesIO
 from pathlib import Path
-import shutil
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from app.utils.permissions import require_permission
 from app.utils.shop_type import get_shop_billing_type
 from app.services.branch_item_price_service import upsert_branch_item_price
 from app.routes.invoice import resolve_branch_optional
+from app.utils.gcs_upload import upload_bytes, delete_file, url_to_gcs_path
 
 
 class ItemBulkRow(BaseModel):
@@ -575,6 +576,18 @@ def update_item(
                 if float(getattr(item, "mrp_price", 0) or 0) <= 0:
                     raise HTTPException(400, "MRP is required for items")
 
+    if branch_id is not None and not is_raw:
+        upsert_branch_item_price(
+            db,
+            shop_id=user.shop_id,
+            branch_id=branch_id,
+            item_id=item.item_id,
+            price=float(item.price or 0),
+            buy_price=float(item.buy_price or 0),
+            mrp_price=float(item.mrp_price or 0),
+            item_status=bool(item.item_status),
+        )
+
     db.commit()
     db.refresh(item)
 
@@ -642,17 +655,14 @@ def upload_item_image(
     old_filename = item.image_filename
     input_ext = _resolve_image_ext(file)
 
-    ITEM_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Always delete any existing image for this item (including old extensions)
-    for p in ITEM_IMAGES_DIR.glob(f"{item_id}.*"):
-        try:
-            p.unlink()
-        except:
-            pass
+    # Delete old image from GCS (or local)
+    if old_filename:
+        for ext_try in (".jpg", ".jpeg", ".png", ".webp"):
+            old_path = url_to_gcs_path(f"/api/item-images/{item_id}{ext_try}")
+            if old_path:
+                delete_file(old_path)
 
     try:
-        # Pillow is required for compression/resizing.
         from PIL import Image, ImageOps
     except ImportError:
         raise HTTPException(
@@ -660,7 +670,7 @@ def upload_item_image(
             "Image compression requires Pillow. Install it in backend: pip install Pillow"
         )
 
-    dest = None
+    dest_filename = None
 
     try:
         with Image.open(file.file) as img_in:
@@ -669,21 +679,20 @@ def upload_item_image(
             resample = getattr(Image, "Resampling", Image).LANCZOS
             img.thumbnail((MAX_IMAGE_DIM, MAX_IMAGE_DIM), resample)
 
-            # Keep PNG only if it actually needs alpha; otherwise convert to JPEG for smaller size.
             has_alpha = (
                 img.mode in ("RGBA", "LA")
                 or (img.mode == "P" and "transparency" in img.info)
             )
 
+            buf = BytesIO()
             if input_ext == ".png" and has_alpha:
-                dest = ITEM_IMAGES_DIR / f"{item_id}.png"
-                # Ensure correct mode for PNG output
+                dest_filename = f"{item_id}.png"
                 if img.mode == "P":
                     img = img.convert("RGBA")
-                img.save(dest, format="PNG", optimize=True, compress_level=9)
+                img.save(buf, format="PNG", optimize=True, compress_level=9)
+                content_type = "image/png"
             else:
-                dest = ITEM_IMAGES_DIR / f"{item_id}.jpg"
-                # JPEG doesn't support alpha
+                dest_filename = f"{item_id}.jpg"
                 if img.mode in ("RGBA", "LA", "P"):
                     if img.mode != "RGBA":
                         img = img.convert("RGBA")
@@ -692,14 +701,10 @@ def upload_item_image(
                     img = bg
                 else:
                     img = img.convert("RGB")
+                img.save(buf, format="JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
+                content_type = "image/jpeg"
 
-                img.save(
-                    dest,
-                    format="JPEG",
-                    quality=JPEG_QUALITY,
-                    optimize=True,
-                    progressive=True
-                )
+            image_url = upload_bytes(buf.getvalue(), f"items/{dest_filename}", content_type)
     except HTTPException:
         raise
     except Exception:
@@ -710,7 +715,7 @@ def upload_item_image(
         except:
             pass
 
-    item.image_filename = dest.name
+    item.image_filename = image_url
     db.commit()
     db.refresh(item)
 

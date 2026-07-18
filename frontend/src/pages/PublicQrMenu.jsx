@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../config/api";
+import { getItemImageUrl } from "../utils/shopLogo";
 import { useToast } from "../components/Toast";
 
 const publicApi = axios.create({ baseURL: API_BASE });
@@ -168,7 +169,7 @@ function ItemCard({ item, qty, onInc, onDec }) {
         {item.image_filename ? (
           <img
             alt={item.item_name}
-            src={`${String(API_BASE).replace(/\/api\/?$/, "")}/api/item-images/${item.image_filename}`}
+            src={getItemImageUrl(item.image_filename)}
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.parentElement.innerHTML =

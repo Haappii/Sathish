@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /setup/onboard
+
+Disallow: /login
+Disallow: /home
+Disallow: /platform
+Disallow: /api/
+
+Sitemap: https://haappiibilling.in/sitemap.xml

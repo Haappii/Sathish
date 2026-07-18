@@ -15,10 +15,13 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const fmt = (n) => Number(n || 0).toFixed(2);
 
 export default function InventoryScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const branchId = session?.branch_id ?? null;
 
@@ -211,19 +214,19 @@ export default function InventoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   searchBar: { padding: 14, paddingBottom: 4 },
   searchInput: {
     borderWidth: 1.5,
-    borderColor: "#d0dcf0",
+    borderColor: "#e4e9f2",
     borderRadius: 14,
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: "#0c1228",
+    color: "#0a0f1e",
     fontSize: 14,
-    shadowColor: "#1a2463",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
@@ -231,15 +234,15 @@ const styles = StyleSheet.create({
   catBar: { paddingHorizontal: 14, paddingVertical: 10, flexGrow: 0 },
   chip: {
     borderWidth: 1.5,
-    borderColor: "#d0dcf0",
+    borderColor: "#e4e9f2",
     borderRadius: 999,
     paddingHorizontal: 13,
     paddingVertical: 8,
     marginRight: 8,
-    backgroundColor: "#f6f8fe",
+    backgroundColor: "#f8f9fd",
   },
-  chipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  chipText: { color: "#4a5a78", fontSize: 12, fontWeight: "700" },
+  chipActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  chipText: { color: "#4b5563", fontSize: 12, fontWeight: "700" },
   chipTextActive: { color: "#fff" },
   warningBanner: {
     backgroundColor: "#fffbeb",
@@ -254,54 +257,54 @@ const styles = StyleSheet.create({
   warningText: { color: "#92400e", fontSize: 12, fontWeight: "700" },
   list: { padding: 14, gap: 10, paddingBottom: 28 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 14,
     gap: 10,
-    shadowColor: "#1a2463",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.07,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
   cardTop: { flexDirection: "row", alignItems: "flex-start" },
-  itemName: { fontWeight: "800", color: "#0c1228", fontSize: 15 },
-  itemMeta: { color: "#8896ae", fontSize: 12, marginTop: 3, fontWeight: "600" },
+  itemName: { fontWeight: "800", color: "#0a0f1e", fontSize: 15 },
+  itemMeta: { color: "#9ca3af", fontSize: 12, marginTop: 3, fontWeight: "600" },
   stockBadge: { alignItems: "flex-end" },
-  stockText: { fontSize: 22, fontWeight: "900", color: "#059669", letterSpacing: -0.5 },
-  stockTextZero: { color: "#dc2626" },
-  stockLabel: { fontSize: 10, color: "#8896ae", fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  stockText: { fontSize: 22, fontWeight: "900", color: "#10b981", letterSpacing: -0.5 },
+  stockTextZero: { color: "#ef4444" },
+  stockLabel: { fontSize: 10, color: "#9ca3af", fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   stockRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   qtyInput: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: "#d0dcf0",
+    borderColor: "#e4e9f2",
     borderRadius: 11,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#0c1228",
-    backgroundColor: "#f6f8fe",
+    color: "#0a0f1e",
+    backgroundColor: "#f8f9fd",
     fontSize: 14,
   },
   addBtn: {
-    backgroundColor: "#059669",
+    backgroundColor: "#10b981",
     borderRadius: 11,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    shadowColor: "#059669",
+    shadowColor: "#10b981",
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   subBtn: {
-    backgroundColor: "#dc2626",
+    backgroundColor: "#ef4444",
     borderRadius: 11,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    shadowColor: "#dc2626",
+    shadowColor: "#ef4444",
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -310,5 +313,5 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
   emptyIcon: { fontSize: 48 },
-  emptyTitle: { color: "#8896ae", fontSize: 17, fontWeight: "700" },
+  emptyTitle: { color: "#9ca3af", fontSize: 17, fontWeight: "700" },
 });

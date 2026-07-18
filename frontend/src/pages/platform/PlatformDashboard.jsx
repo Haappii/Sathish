@@ -64,6 +64,133 @@ export default function PlatformDashboard() {
   const [aboutPhotoFile, setAboutPhotoFile] = useState(null);
   const [aboutSaving, setAboutSaving] = useState(false);
 
+  // Portfolio editor state
+  const BLANK_PORTFOLIO = {
+    visible_sections: {
+      hero: true, stats: true, tech_marquee: true, about: true,
+      experience: true, projects: true, education: true, certification: true, contact: true,
+    },
+    hero_badge: "Available for opportunities",
+    hero_title_line1: "More Than Just",
+    hero_title_line2: "Queries & Code",
+    hero_subtitle: "",
+    photo_url: "",
+    profile_summary: "",
+    profile_detail_1: "",
+    profile_detail_2: "",
+    phone: "",
+    email: "",
+    location: "",
+    linkedin_url: "",
+    github_url: "",
+    stats: [
+      { number: "3", suffix: "+", label: "Years of Experience" },
+      { number: "40", suffix: "+", label: "REST API Endpoints" },
+      { number: "50", suffix: "+", label: "Database Schemas" },
+      { number: "30", suffix: "%", label: "Turnaround Improvement" },
+    ],
+    tech_stack: ["PostgreSQL", "FastAPI", "Python", "SQLAlchemy", "Oracle", "PL/SQL", "AWS EC2", "REST APIs", "MySQL", "Git", "Linux", "Pydantic"],
+    skill_categories: [
+      { title: "Databases", tags: ["PostgreSQL", "Oracle", "MySQL", "MS SQL Server"] },
+      { title: "Programming", tags: ["SQL", "PL/SQL", "Python"] },
+      { title: "Backend & APIs", tags: ["FastAPI", "SQLAlchemy", "REST APIs", "Pydantic"] },
+      { title: "Data & Integration", tags: ["ETL Concepts", "Data Migration", "Data Validation"] },
+      { title: "Tools & Cloud", tags: ["AWS EC2", "Linux", "Git", "pgAdmin", "SSMS"] },
+    ],
+    experiences: [
+      {
+        title: "Data Support Engineer / Backend Support Engineer",
+        company: "VSoft Technologies Pvt Ltd, Hyderabad",
+        projects: "Wings Core Banking Application, ECCS Application",
+        date: "Nov 2022 — Present",
+        points: [
+          "Designed and implemented complex SQL/PLSQL functions for backend reporting",
+          "Automated bulk data correction queries, improving turnaround time by 30%",
+          "Performed root cause analysis and developed corrective SQL scripts",
+          "Optimized database queries and improved PostgreSQL performance",
+        ],
+      },
+    ],
+    projects: [
+      {
+        icon: "monitor",
+        type: "Full-Stack",
+        title: "Shop Billing & POS Application",
+        description: "A comprehensive billing and point-of-sale system with 40+ REST API endpoints.",
+        features: [
+          "JWT authentication with role-based access control",
+          "50+ PostgreSQL schemas for invoices, stock, suppliers",
+          "Complete billing workflows: GST/tax, discounts, returns",
+          "Multi-tenant architecture with isolated data",
+        ],
+        tech: ["FastAPI", "PostgreSQL", "SQLAlchemy", "Pydantic", "REST APIs"],
+      },
+      {
+        icon: "server",
+        type: "DevOps",
+        title: "AWS EC2 Hosting & Server Management",
+        description: "Production-grade deployment on AWS EC2 with secure Linux configuration.",
+        features: [
+          "Hosted FastAPI + PostgreSQL on EC2",
+          "Managed full EC2 lifecycle",
+          "Server monitoring and log analysis",
+          "Security: key-based SSH and port control",
+        ],
+        tech: ["AWS EC2", "Linux", "FastAPI", "PostgreSQL"],
+      },
+    ],
+    education: [
+      { year: "2017 — 2021", title: "B.E: Electronics and Communication Engineering", school: "Sri Krishna College of Technology, Coimbatore", score: "GPA: 7.58" },
+      { year: "2015 — 2017", title: "Intermediate: MPC", school: "Sri Chaitanya Junior College, Tirupati", score: "Percentage: 80.2%" },
+      { year: "2015", title: "Secondary Education", school: "Gowtham School, Tirupati", score: "GPA: 8.2" },
+    ],
+  };
+  const [portfolio, setPortfolio] = useState(BLANK_PORTFOLIO);
+  const [portfolioBusy, setPortfolioBusy] = useState(false);
+  const [portfolioSection, setPortfolioSection] = useState("hero");
+
+  const pf = (field, val) => setPortfolio((p) => ({ ...p, [field]: val }));
+
+  const savePortfolio = async () => {
+    setPortfolioBusy(true);
+    try {
+      await platformAxios.put("/platform/portfolio", portfolio);
+      showToast("Portfolio saved", "success");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to save portfolio", "error");
+    } finally {
+      setPortfolioBusy(false);
+    }
+  };
+
+  const downloadPortfolio = () => {
+    const data = JSON.stringify(portfolio, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "portfolio-config.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importPortfolio = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        setPortfolio({ ...BLANK_PORTFOLIO, ...data });
+        showToast("Portfolio config imported", "success");
+      } catch {
+        showToast("Invalid JSON file", "error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   const [pwForm, setPwForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
   const [pwBusy, setPwBusy] = useState(false);
 
@@ -116,6 +243,12 @@ export default function PlatformDashboard() {
         setTeamProfiles(Array.isArray(teamRes.data) ? teamRes.data : []);
       } catch {
         // optional — ignore if not yet deployed
+      }
+      try {
+        const pfRes = await platformAxios.get("/platform/portfolio");
+        if (pfRes?.data) setPortfolio((prev) => ({ ...prev, ...pfRes.data }));
+      } catch {
+        // optional — use defaults if not deployed
       }
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to load platform data", "error");
@@ -320,19 +453,57 @@ export default function PlatformDashboard() {
     }
   };
 
+  const [enableModal, setEnableModal] = useState(null);
+
   const toggleShopStatus = async (shopId, currentStatus) => {
     if (busyId) return;
-    const next = currentStatus === "DISABLED" ? "ACTIVE" : "DISABLED";
+    if (currentStatus === "DISABLED") {
+      setEnableModal({ shopId });
+      return;
+    }
     setBusyId(shopId);
     try {
-      await platformAxios.post(`/platform/shops/${shopId}/status`, { status: next });
-      showToast(`Shop ${next === "DISABLED" ? "disabled" : "enabled"}`, "success");
+      await platformAxios.post(`/platform/shops/${shopId}/status`, { status: "DISABLED" });
+      showToast("Shop disabled", "success");
       await load();
       if (selectedShopId === shopId) await loadShopDetail(shopId);
     } catch (e) {
       showToast(e?.response?.data?.detail || "Update failed", "error");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const confirmEnable = async (status) => {
+    if (!enableModal) return;
+    const { shopId } = enableModal;
+    setEnableModal(null);
+    setBusyId(shopId);
+    try {
+      await platformAxios.post(`/platform/shops/${shopId}/status`, { status });
+      showToast(`Shop enabled as ${status}`, "success");
+      await load();
+      if (selectedShopId === shopId) await loadShopDetail(shopId);
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Update failed", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadBackup = async (shopId, shopName, sendEmail = false) => {
+    try {
+      showToast("Generating backup...", "info");
+      const res = await platformAxios.post(`/platform/shops/${shopId}/backup`, { send_email: sendEmail }, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup_${shopName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(sendEmail ? "Backup downloaded & emailed" : "Backup downloaded", "success");
+    } catch (e) {
+      showToast("Backup failed", "error");
     }
   };
 
@@ -528,6 +699,7 @@ export default function PlatformDashboard() {
     { id: "DEMO",      label: "Demo",      icon: "🎬", badge: openDemoTickets.length || null },
     { id: "SUPPORT",   label: "Support",   icon: "🎧", badge: openSupportTickets.length || null },
     { id: "SECURITY",  label: "Security",  icon: "🔒", badge: null },
+    { id: "PORTFOLIO", label: "Portfolio", icon: "🎨", badge: null },
   ];
 
   return (
@@ -759,6 +931,14 @@ export default function PlatformDashboard() {
                               }`}
                             >
                               {statusKey === "DISABLED" ? "Enable" : "Disable"}
+                            </button>
+                            <button
+                              onClick={() => downloadBackup(s.shop_id, s.shop_name, false)}
+                              disabled={busyId === s.shop_id}
+                              className="px-2.5 py-1.5 bg-blue-500/60 hover:bg-blue-500 rounded-lg text-[11px] transition disabled:opacity-50"
+                              title="Download backup"
+                            >
+                              💾
                             </button>
                           </div>
                         </td>
@@ -1369,12 +1549,477 @@ export default function PlatformDashboard() {
               </button>
             </div>
           </div>
+        ) : tab === "PORTFOLIO" ? (
+          <div className="space-y-6">
+            {/* Portfolio sub-nav + actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "sections", label: "⚙ Sections" },
+                  { id: "hero", label: "Hero" },
+                  { id: "stats", label: "Stats & Tech" },
+                  { id: "about", label: "About & Skills" },
+                  { id: "experience", label: "Experience" },
+                  { id: "projects", label: "Projects" },
+                  { id: "education", label: "Education" },
+                  { id: "contact", label: "Contact" },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setPortfolioSection(s.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                      portfolioSection === s.id
+                        ? "bg-purple-600 text-white"
+                        : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <label className="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition">
+                  Import JSON
+                  <input type="file" accept=".json" className="hidden" onChange={importPortfolio} />
+                </label>
+                <button onClick={downloadPortfolio} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition">
+                  Export JSON
+                </button>
+                <button
+                  onClick={savePortfolio}
+                  disabled={portfolioBusy}
+                  className="px-5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50"
+                >
+                  {portfolioBusy ? "Saving…" : "💾 Save All"}
+                </button>
+              </div>
+            </div>
+
+            {/* Sections visibility */}
+            {portfolioSection === "sections" && (
+              <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                <h3 className="text-base font-semibold text-white">Show / Hide Sections</h3>
+                <p className="text-xs text-slate-400">Toggle which sections appear on your portfolio page.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { key: "hero", label: "Hero Banner", icon: "🏠" },
+                    { key: "stats", label: "Statistics", icon: "📊" },
+                    { key: "tech_marquee", label: "Tech Stack Marquee", icon: "🔧" },
+                    { key: "about", label: "About & Skills", icon: "👤" },
+                    { key: "experience", label: "Work Experience", icon: "💼" },
+                    { key: "projects", label: "Projects", icon: "🚀" },
+                    { key: "education", label: "Education", icon: "🎓" },
+                    { key: "certification", label: "Certification", icon: "🏅" },
+                    { key: "contact", label: "Contact Form", icon: "✉️" },
+                  ].map((sec) => {
+                    const vis = portfolio.visible_sections || {};
+                    const on = vis[sec.key] !== false;
+                    return (
+                      <button
+                        key={sec.key}
+                        onClick={() => pf("visible_sections", { ...vis, [sec.key]: !on })}
+                        className={`flex items-center gap-3 p-4 rounded-xl border text-left transition ${
+                          on
+                            ? "bg-purple-600/15 border-purple-500/30 text-white"
+                            : "bg-white/3 border-white/10 text-slate-500"
+                        }`}
+                      >
+                        <span className="text-xl">{sec.icon}</span>
+                        <div className="flex-1">
+                          <span className="text-sm font-medium block">{sec.label}</span>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider ${on ? "text-purple-400" : "text-slate-600"}`}>
+                            {on ? "Visible" : "Hidden"}
+                          </span>
+                        </div>
+                        <div className={`w-10 h-5 rounded-full flex items-center transition-colors ${on ? "bg-purple-600 justify-end" : "bg-slate-700 justify-start"}`}>
+                          <div className="w-4 h-4 rounded-full bg-white mx-0.5 shadow" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Hero section editor */}
+            {portfolioSection === "hero" && (
+              <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-5">
+                <h3 className="text-base font-semibold text-white">Hero Section</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Badge Text</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.hero_badge} onChange={(e) => pf("hero_badge", e.target.value)} placeholder="Available for opportunities" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Profile Photo</label>
+                    <div className="mt-1 flex items-center gap-3">
+                      {portfolio.photo_url && (
+                        <img src={portfolio.photo_url} alt="" className="w-12 h-12 rounded-full object-cover border border-white/20" />
+                      )}
+                      <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-slate-900/80 border border-white/10 text-sm text-slate-400 hover:text-white hover:border-purple-500/50 transition">
+                        {portfolio.photo_url ? "Change Photo" : "Upload Photo"}
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const fd = new FormData();
+                          fd.append("photo", file);
+                          try {
+                            const res = await platformAxios.post("/platform/portfolio/photo", fd);
+                            if (res.data?.photo_url) pf("photo_url", res.data.photo_url);
+                            showToast("Photo uploaded", "success");
+                          } catch (err) {
+                            showToast(err?.response?.data?.detail || "Upload failed", "error");
+                          }
+                          e.target.value = "";
+                        }} />
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Title Line 1</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.hero_title_line1} onChange={(e) => pf("hero_title_line1", e.target.value)} placeholder="More Than Just" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Title Line 2 (Gradient)</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.hero_title_line2} onChange={(e) => pf("hero_title_line2", e.target.value)} placeholder="Queries & Code" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Subtitle / Tagline</label>
+                    <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[80px]"
+                      value={portfolio.hero_subtitle} onChange={(e) => pf("hero_subtitle", e.target.value)} placeholder="Data-focused Software Engineer specializing in..." />
+                  </div>
+                </div>
+                {/* Live preview */}
+                <div className="border border-white/10 rounded-xl p-6 bg-slate-950/60">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Preview</p>
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-slate-400 mb-3">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full" /> {portfolio.hero_badge || "Badge text"}
+                  </div>
+                  <h2 className="text-2xl font-bold text-white leading-tight">{portfolio.hero_title_line1 || "Line 1"}<br/>
+                    <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">{portfolio.hero_title_line2 || "Line 2"}</span>
+                  </h2>
+                  <p className="text-sm text-slate-400 mt-2 max-w-lg">{portfolio.hero_subtitle || "Your subtitle here..."}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Stats & Tech Stack editor */}
+            {portfolioSection === "stats" && (
+              <div className="space-y-6">
+                <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                  <h3 className="text-base font-semibold text-white">Statistics</h3>
+                  <div className="space-y-3">
+                    {portfolio.stats.map((stat, i) => (
+                      <div key={i} className="grid grid-cols-[80px_60px_1fr_40px] gap-2 items-center">
+                        <input className="rounded-lg px-2 py-2 bg-slate-900/80 border border-white/10 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={stat.number} onChange={(e) => {
+                            const s = [...portfolio.stats]; s[i] = { ...s[i], number: e.target.value }; pf("stats", s);
+                          }} placeholder="40" />
+                        <input className="rounded-lg px-2 py-2 bg-slate-900/80 border border-white/10 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={stat.suffix} onChange={(e) => {
+                            const s = [...portfolio.stats]; s[i] = { ...s[i], suffix: e.target.value }; pf("stats", s);
+                          }} placeholder="+" />
+                        <input className="rounded-lg px-2 py-2 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={stat.label} onChange={(e) => {
+                            const s = [...portfolio.stats]; s[i] = { ...s[i], label: e.target.value }; pf("stats", s);
+                          }} placeholder="Label" />
+                        <button onClick={() => { const s = [...portfolio.stats]; s.splice(i, 1); pf("stats", s); }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition">✕</button>
+                      </div>
+                    ))}
+                    <button onClick={() => pf("stats", [...portfolio.stats, { number: "", suffix: "+", label: "" }])}
+                      className="text-xs text-purple-400 hover:text-purple-300 transition">+ Add Stat</button>
+                  </div>
+                </div>
+
+                <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                  <h3 className="text-base font-semibold text-white">Tech Stack Marquee</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {portfolio.tech_stack.map((tech, i) => (
+                      <span key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 border border-white/10 rounded-full text-sm text-slate-300">
+                        {tech}
+                        <button onClick={() => { const t = [...portfolio.tech_stack]; t.splice(i, 1); pf("tech_stack", t); }}
+                          className="text-red-400 hover:text-red-300 text-xs ml-1">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input id="newTech" className="flex-1 rounded-xl px-3 py-2 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      placeholder="Add technology..." onKeyDown={(e) => {
+                        if (e.key === "Enter" && e.target.value.trim()) {
+                          pf("tech_stack", [...portfolio.tech_stack, e.target.value.trim()]); e.target.value = "";
+                        }
+                      }} />
+                    <button onClick={() => {
+                      const inp = document.getElementById("newTech");
+                      if (inp?.value.trim()) { pf("tech_stack", [...portfolio.tech_stack, inp.value.trim()]); inp.value = ""; }
+                    }} className="px-4 py-2 rounded-xl bg-purple-600/30 text-purple-300 text-sm hover:bg-purple-600/50 transition">Add</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* About & Skills editor */}
+            {portfolioSection === "about" && (
+              <div className="space-y-6">
+                <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                  <h3 className="text-base font-semibold text-white">About Me</h3>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Lead Paragraph</label>
+                    <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[80px]"
+                      value={portfolio.profile_summary} onChange={(e) => pf("profile_summary", e.target.value)} placeholder="I'm a Data-focused Software Engineer..." />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Second Paragraph</label>
+                    <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[80px]"
+                      value={portfolio.profile_detail_1} onChange={(e) => pf("profile_detail_1", e.target.value)} placeholder="My expertise lies in..." />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Third Paragraph</label>
+                    <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[80px]"
+                      value={portfolio.profile_detail_2} onChange={(e) => pf("profile_detail_2", e.target.value)} placeholder="Beyond my professional work..." />
+                  </div>
+                </div>
+
+                <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-5">
+                  <h3 className="text-base font-semibold text-white">Skill Categories</h3>
+                  {portfolio.skill_categories.map((cat, ci) => (
+                    <div key={ci} className="border border-white/10 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <input className="flex-1 rounded-lg px-3 py-2 bg-slate-900/80 border border-white/10 text-sm text-white font-semibold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={cat.title} onChange={(e) => {
+                            const c = [...portfolio.skill_categories]; c[ci] = { ...c[ci], title: e.target.value }; pf("skill_categories", c);
+                          }} placeholder="Category name" />
+                        <button onClick={() => { const c = [...portfolio.skill_categories]; c.splice(ci, 1); pf("skill_categories", c); }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition">✕</button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {cat.tags.map((tag, ti) => (
+                          <span key={ti} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-white/10 rounded-full text-xs text-slate-300">
+                            {tag}
+                            <button onClick={() => {
+                              const c = [...portfolio.skill_categories]; const tags = [...c[ci].tags]; tags.splice(ti, 1); c[ci] = { ...c[ci], tags }; pf("skill_categories", c);
+                            }} className="text-red-400 hover:text-red-300 text-[10px]">✕</button>
+                          </span>
+                        ))}
+                      </div>
+                      <input className="w-full rounded-lg px-3 py-1.5 bg-slate-900/60 border border-white/5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        placeholder="Type skill + Enter" onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.target.value.trim()) {
+                            const c = [...portfolio.skill_categories]; c[ci] = { ...c[ci], tags: [...c[ci].tags, e.target.value.trim()] }; pf("skill_categories", c); e.target.value = "";
+                          }
+                        }} />
+                    </div>
+                  ))}
+                  <button onClick={() => pf("skill_categories", [...portfolio.skill_categories, { title: "", tags: [] }])}
+                    className="text-xs text-purple-400 hover:text-purple-300 transition">+ Add Category</button>
+                </div>
+              </div>
+            )}
+
+            {/* Experience editor */}
+            {portfolioSection === "experience" && (
+              <div className="space-y-4">
+                {portfolio.experiences.map((exp, ei) => (
+                  <div key={ei} className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-base font-semibold text-white">Experience #{ei + 1}</h3>
+                      <button onClick={() => { const e = [...portfolio.experiences]; e.splice(ei, 1); pf("experiences", e); }}
+                        className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Job Title</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={exp.title} onChange={(e) => { const x = [...portfolio.experiences]; x[ei] = { ...x[ei], title: e.target.value }; pf("experiences", x); }} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Company</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={exp.company} onChange={(e) => { const x = [...portfolio.experiences]; x[ei] = { ...x[ei], company: e.target.value }; pf("experiences", x); }} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Date Range</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={exp.date} onChange={(e) => { const x = [...portfolio.experiences]; x[ei] = { ...x[ei], date: e.target.value }; pf("experiences", x); }} placeholder="Nov 2022 — Present" />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Projects Worked On</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={exp.projects} onChange={(e) => { const x = [...portfolio.experiences]; x[ei] = { ...x[ei], projects: e.target.value }; pf("experiences", x); }} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Key Points (one per line)</label>
+                        <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[120px]"
+                          value={(exp.points || []).join("\n")} onChange={(e) => {
+                            const x = [...portfolio.experiences]; x[ei] = { ...x[ei], points: e.target.value.split("\n") }; pf("experiences", x);
+                          }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => pf("experiences", [...portfolio.experiences, { title: "", company: "", projects: "", date: "", points: [""] }])}
+                  className="w-full py-3 rounded-xl border border-dashed border-white/20 text-sm text-slate-400 hover:text-white hover:border-purple-500/50 transition">+ Add Experience</button>
+              </div>
+            )}
+
+            {/* Projects editor */}
+            {portfolioSection === "projects" && (
+              <div className="space-y-4">
+                {portfolio.projects.map((proj, pi) => (
+                  <div key={pi} className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-base font-semibold text-white">Project #{pi + 1}</h3>
+                      <button onClick={() => { const p = [...portfolio.projects]; p.splice(pi, 1); pf("projects", p); }}
+                        className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Project Title</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={proj.title} onChange={(e) => { const p = [...portfolio.projects]; p[pi] = { ...p[pi], title: e.target.value }; pf("projects", p); }} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Type Label</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={proj.type} onChange={(e) => { const p = [...portfolio.projects]; p[pi] = { ...p[pi], type: e.target.value }; pf("projects", p); }} placeholder="Full-Stack / DevOps" />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Description</label>
+                        <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[60px]"
+                          value={proj.description} onChange={(e) => { const p = [...portfolio.projects]; p[pi] = { ...p[pi], description: e.target.value }; pf("projects", p); }} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Features (one per line)</label>
+                        <textarea className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[100px]"
+                          value={(proj.features || []).join("\n")} onChange={(e) => {
+                            const p = [...portfolio.projects]; p[pi] = { ...p[pi], features: e.target.value.split("\n") }; pf("projects", p);
+                          }} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Tech Stack (comma separated)</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={(proj.tech || []).join(", ")} onChange={(e) => {
+                            const p = [...portfolio.projects]; p[pi] = { ...p[pi], tech: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) }; pf("projects", p);
+                          }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => pf("projects", [...portfolio.projects, { icon: "monitor", type: "", title: "", description: "", features: [""], tech: [] }])}
+                  className="w-full py-3 rounded-xl border border-dashed border-white/20 text-sm text-slate-400 hover:text-white hover:border-purple-500/50 transition">+ Add Project</button>
+              </div>
+            )}
+
+            {/* Education editor */}
+            {portfolioSection === "education" && (
+              <div className="space-y-4">
+                {portfolio.education.map((edu, ei) => (
+                  <div key={ei} className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-base font-semibold text-white">Education #{ei + 1}</h3>
+                      <button onClick={() => { const e = [...portfolio.education]; e.splice(ei, 1); pf("education", e); }}
+                        className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Year / Period</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={edu.year} onChange={(e) => { const ed = [...portfolio.education]; ed[ei] = { ...ed[ei], year: e.target.value }; pf("education", ed); }} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Score / GPA</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={edu.score} onChange={(e) => { const ed = [...portfolio.education]; ed[ei] = { ...ed[ei], score: e.target.value }; pf("education", ed); }} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Degree / Title</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={edu.title} onChange={(e) => { const ed = [...portfolio.education]; ed[ei] = { ...ed[ei], title: e.target.value }; pf("education", ed); }} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">School / College</label>
+                        <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          value={edu.school} onChange={(e) => { const ed = [...portfolio.education]; ed[ei] = { ...ed[ei], school: e.target.value }; pf("education", ed); }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={() => pf("education", [...portfolio.education, { year: "", title: "", school: "", score: "" }])}
+                  className="w-full py-3 rounded-xl border border-dashed border-white/20 text-sm text-slate-400 hover:text-white hover:border-purple-500/50 transition">+ Add Education</button>
+              </div>
+            )}
+
+            {/* Contact editor */}
+            {portfolioSection === "contact" && (
+              <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-4">
+                <h3 className="text-base font-semibold text-white">Contact Information</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Email</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.email} onChange={(e) => pf("email", e.target.value)} placeholder="you@example.com" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Phone</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.phone} onChange={(e) => pf("phone", e.target.value)} placeholder="+91 7904263246" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Location</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.location} onChange={(e) => pf("location", e.target.value)} placeholder="Tirupati, India" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">LinkedIn URL</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.linkedin_url} onChange={(e) => pf("linkedin_url", e.target.value)} placeholder="https://linkedin.com/in/..." />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">GitHub URL</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.github_url} onChange={(e) => pf("github_url", e.target.value)} placeholder="https://github.com/..." />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="bg-white/5 rounded-2xl border border-white/10 p-10 text-center text-slate-400">
             Use the tabs above to manage shops, onboarding, demos and support.
           </div>
         )}
       </div>
+
+      {/* ── ENABLE MODAL ── */}
+      {enableModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setEnableModal(null)}>
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white">Enable Shop</h3>
+            <p className="text-sm text-slate-400">How would you like to enable this shop?</p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => confirmEnable("TRIAL")}
+                className="w-full py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-200 text-sm font-semibold transition"
+              >
+                ⏱ Enable as Trial (30 days)
+              </button>
+              <button
+                onClick={() => confirmEnable("ACTIVE")}
+                className="w-full py-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-200 text-sm font-semibold transition"
+              >
+                ✅ Enable as Active
+              </button>
+            </div>
+            <button onClick={() => setEnableModal(null)} className="w-full py-2 text-sm text-slate-500 hover:text-white transition">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── SHOP DETAIL PANEL ── */}
       {selectedShopId && (

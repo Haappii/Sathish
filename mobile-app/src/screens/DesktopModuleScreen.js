@@ -54,24 +54,24 @@ export default function DesktopModuleScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff", alignItems: "center", justifyContent: "center", padding: 16 },
+  safe: { flex: 1, backgroundColor: "#f4f6fb", alignItems: "center", justifyContent: "center", padding: 16 },
   card: {
     width: "100%",
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 16,
     gap: 12,
-    shadowColor: "#1a2463", shadowOpacity: 0.08, shadowRadius: 14,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.08, shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
-  title: { fontSize: 17, fontWeight: "900", color: "#0c1228", letterSpacing: -0.2 },
-  sub: { color: "#4a5a78", fontWeight: "600", fontSize: 13 },
-  url: { color: "#2563eb", fontSize: 12, fontWeight: "600" },
+  title: { fontSize: 17, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.2 },
+  sub: { color: "#4b5563", fontWeight: "600", fontSize: 13 },
+  url: { color: "#6366f1", fontSize: 12, fontWeight: "600" },
   btn: {
     marginTop: 4,
-    backgroundColor: "#2563eb",
+    backgroundColor: "#6366f1",
     borderRadius: 14,
     paddingVertical: 13,
     alignItems: "center",

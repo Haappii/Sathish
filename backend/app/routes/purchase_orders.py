@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from pathlib import Path
 import uuid
-import shutil
 
 from app.db import get_db
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
@@ -26,6 +25,8 @@ from app.services.inventory_service import adjust_stock
 from app.services.audit_service import log_action
 from app.utils.permissions import require_permission
 from app.utils.shop_type import get_shop_billing_type
+from app.services.branch_item_price_service import branch_price_map
+from app.utils.gcs_upload import upload_file, delete_file, stored_path_to_url
 from sqlalchemy import func
 
 router = APIRouter(prefix="/purchase-orders", tags=["Purchase Orders"])
@@ -142,6 +143,8 @@ def create_po(
     )
 
     total = 0
+    po_item_ids = [it.item_id for it in payload.items]
+    po_bp_overrides = branch_price_map(db, shop_id=user.shop_id, branch_id=bid, item_ids=po_item_ids) if bid else {}
     for it in payload.items:
         item = db.query(Item).filter(
             Item.item_id == it.item_id,
@@ -158,9 +161,10 @@ def create_po(
         if qty <= 0:
             raise HTTPException(400, "Qty must be > 0")
 
-        unit_cost = float(it.unit_cost) if it.unit_cost is not None else float(item.buy_price or 0)
-        sell_price = float(it.sell_price) if it.sell_price is not None else float(item.price or 0)
-        mrp_price = float(it.mrp_price) if it.mrp_price is not None else float(item.mrp_price or 0)
+        bp = po_bp_overrides.get(it.item_id)
+        unit_cost = float(it.unit_cost) if it.unit_cost is not None else (float(bp.buy_price) if bp and bp.buy_price is not None else float(item.buy_price or 0))
+        sell_price = float(it.sell_price) if it.sell_price is not None else (float(bp.price) if bp and bp.price is not None else float(item.price or 0))
+        mrp_price = float(it.mrp_price) if it.mrp_price is not None else (float(bp.mrp_price) if bp and bp.mrp_price is not None else float(item.mrp_price or 0))
         line_total = qty * unit_cost
         total += line_total
 
@@ -526,7 +530,7 @@ def list_attachments(
             "mime_type": a.mime_type,
             "size_bytes": a.size_bytes,
             "uploaded_at": a.uploaded_at.strftime("%Y-%m-%d %H:%M") if a.uploaded_at else None,
-            "url": f"/api/uploads/{a.stored_path}",
+            "url": stored_path_to_url(a.stored_path),
         }
         for a in rows
     ]
@@ -553,29 +557,24 @@ def upload_attachment(
 
     ext = Path(file.filename).suffix.lower()
     safe_name = f"{uuid.uuid4().hex}{ext}"
+    destination = f"purchase_orders/{user.shop_id}/{po_id}/{safe_name}"
+    content_type = file.content_type or "application/octet-stream"
 
-    dir_path = PO_ATTACH_ROOT / str(user.shop_id) / str(po_id)
-    dir_path.mkdir(parents=True, exist_ok=True)
-
-    dest = dir_path / safe_name
     try:
-        with dest.open("wb") as f:
-            shutil.copyfileobj(file.file, f)
+        upload_file(file.file, destination, content_type)
     finally:
         try:
             file.file.close()
         except Exception:
             pass
 
-    stored_rel = f"purchase_orders/{user.shop_id}/{po_id}/{safe_name}"
-
     row = PurchaseOrderAttachment(
         shop_id=user.shop_id,
         po_id=po_id,
         original_filename=file.filename,
-        stored_path=stored_rel,
-        mime_type=file.content_type,
-        size_bytes=dest.stat().st_size if dest.exists() else None,
+        stored_path=destination,
+        mime_type=content_type,
+        size_bytes=None,
         uploaded_by=user.user_id,
     )
     db.add(row)
@@ -602,7 +601,7 @@ def upload_attachment(
         "stored_path": row.stored_path,
         "mime_type": row.mime_type,
         "size_bytes": row.size_bytes,
-        "url": f"/api/uploads/{row.stored_path}",
+        "url": stored_path_to_url(row.stored_path),
     }
 
 
@@ -634,13 +633,7 @@ def delete_attachment(
     if not row:
         raise HTTPException(404, "Attachment not found")
 
-    # Best-effort delete file
-    try:
-        abs_path = UPLOAD_ROOT / Path(row.stored_path)
-        if abs_path.exists():
-            abs_path.unlink()
-    except Exception:
-        pass
+    delete_file(row.stored_path)
 
     db.delete(row)
     db.commit()

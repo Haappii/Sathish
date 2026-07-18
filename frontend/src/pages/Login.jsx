@@ -12,6 +12,7 @@ import {
   rememberOfflineAuth,
   tryOfflineAuth,
 } from "../utils/offlineAuth";
+import { cacheMasterData } from "../utils/offlineCache";
 
 export default function Login() {
 
@@ -111,6 +112,19 @@ export default function Login() {
         console.warn("Failed to persist offline auth", err);
       }
 
+      // Prime offline cache in background so billing works even if network drops immediately
+      Promise.all([
+        api.get("/shop/details").then((r) => cacheMasterData({ shop: r.data })).catch(() => {}),
+        api.get("/category").then((r) => cacheMasterData({ categories: Array.isArray(r.data) ? r.data : r.data?.categories || [] })).catch(() => {}),
+        api.get("/items").then((r) => cacheMasterData({ items: Array.isArray(r.data) ? r.data : r.data?.items || [] })).catch(() => {}),
+        sessionPayload.branch_id
+          ? api.get(`/branch/${sessionPayload.branch_id}`).then((r) => cacheMasterData({ branch: r.data, branchId: sessionPayload.branch_id })).catch(() => {})
+          : Promise.resolve(),
+        sessionPayload.branch_id
+          ? api.get(`/inventory/stock?branch_id=${sessionPayload.branch_id}`).then((r) => cacheMasterData({ stock: Array.isArray(r.data) ? r.data : [], branchId: sessionPayload.branch_id })).catch(() => {})
+          : Promise.resolve(),
+      ]).catch(() => {});
+
       if (res.data.must_change_password) {
         setChangePwForm({ old_password: form.password, new_password: "", confirm: "" });
         setShowChangePassword(true);
@@ -170,7 +184,7 @@ export default function Login() {
   const onKey = e => e.key === "Enter" && submit();
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#0B3C8C] via-[#1a4fa8] to-[#2563eb] relative overflow-hidden">
+    <div className="h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#0B3C8C] via-[#1a4fa8] to-[#2563eb] relative overflow-hidden">
 
       {/* Background circles */}
       <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-white opacity-5" />

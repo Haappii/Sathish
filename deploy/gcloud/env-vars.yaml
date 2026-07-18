@@ -1,0 +1,8 @@
+APP_ENV: production
+ALLOWED_ORIGINS: "https://haappiibilling.in,https://www.haappiibilling.in,https://shop-billing-backend-316182685030.asia-southeast1.run.app"
+JWT_ALGORITHM: HS256
+ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+SUPPORT_EMAIL_ENABLED: "true"
+SUPPORT_SENDER_EMAIL: haappiibilling@gmail.com
+SUPPORT_SMTP_HOST: smtp.gmail.com
+SUPPORT_SMTP_PORT: "465"

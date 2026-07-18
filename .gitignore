@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 venv/
 .env
+.env.production
 config.txt
 config.example.txt
 
@@ -32,6 +33,7 @@ mobile-app/.idea/
 mobile-app/android/
 mobile-app/dist/
 mobile-app/web-build/
+mobile-app/.env.production
 
 # OS
 .DS_Store

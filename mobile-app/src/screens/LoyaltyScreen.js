@@ -13,8 +13,11 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
+
 
 export default function LoyaltyScreen() {
+  const { theme } = useTheme();
   const [mobile, setMobile] = useState("");
   const [account, setAccount] = useState(null);
   const [txns, setTxns] = useState([]);
@@ -233,40 +236,40 @@ export default function LoyaltyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   container: { padding: 14, gap: 12, paddingBottom: 36 },
   section: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.5 },
-  hint: { color: "#8896ae", fontSize: 12 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.5 },
+  hint: { color: "#9ca3af", fontSize: 12 },
   lookupRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   input: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12, backgroundColor: "#f6f8fe",
-    paddingHorizontal: 13, paddingVertical: 12, color: "#0c1228", fontSize: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12, backgroundColor: "#f8f9fd",
+    paddingHorizontal: 13, paddingVertical: 12, color: "#0a0f1e", fontSize: 14,
   },
   lookupBtn: {
-    backgroundColor: "#2563eb", borderRadius: 12, paddingHorizontal: 18,
+    backgroundColor: "#6366f1", borderRadius: 12, paddingHorizontal: 18,
     paddingVertical: 12, alignItems: "center", justifyContent: "center",
-    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   lookupBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  accountCard: { backgroundColor: "#0c1228", borderColor: "#0c1228" },
+  accountCard: { backgroundColor: "#0a0f1e", borderColor: "#0a0f1e" },
   accountName: { color: "#fff", fontSize: 18, fontWeight: "900", letterSpacing: -0.3 },
-  accountMobile: { color: "#7a8fa8", fontSize: 13, fontWeight: "600", marginTop: 2 },
+  accountMobile: { color: "#4b5563", fontSize: 13, fontWeight: "600", marginTop: 2 },
   balanceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   balanceItem: {},
-  balanceLabel: { color: "#7a8fa8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  balanceLabel: { color: "#4b5563", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   balanceValue: { color: "#4a8ef5", fontSize: 32, fontWeight: "900", letterSpacing: -1 },
   tierBadge: {
     backgroundColor: "#f0a820", borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 5,
   },
   tierText: { color: "#78350f", fontWeight: "800", fontSize: 12 },
-  valueLine: { color: "#7a8fa8", fontSize: 12, fontWeight: "600" },
+  valueLine: { color: "#4b5563", fontSize: 12, fontWeight: "600" },
   adjustBtn: {
     backgroundColor: "#0891b2", borderRadius: 14, paddingVertical: 13, alignItems: "center",
     shadowColor: "#0891b2", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
@@ -280,11 +283,11 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   txnRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: "#f0f4ff",
+    borderBottomWidth: 1, borderBottomColor: "#f4f6fb",
   },
-  txnDesc: { fontWeight: "700", color: "#0c1228", fontSize: 13 },
-  txnDate: { color: "#8896ae", fontSize: 11, marginTop: 2 },
+  txnDesc: { fontWeight: "700", color: "#0a0f1e", fontSize: 13 },
+  txnDate: { color: "#9ca3af", fontSize: 11, marginTop: 2 },
   txnPoints: { fontSize: 15, fontWeight: "900" },
-  txnPos: { color: "#059669" },
-  txnNeg: { color: "#dc2626" },
+  txnPos: { color: "#10b981" },
+  txnNeg: { color: "#ef4444" },
 });

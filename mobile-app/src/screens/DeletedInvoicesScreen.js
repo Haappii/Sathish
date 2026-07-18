@@ -14,6 +14,8 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const fmtMoney = (v) => `Rs. ${Number(v || 0).toFixed(2)}`;
 
@@ -24,6 +26,7 @@ function displayDate(v) {
 }
 
 export default function DeletedInvoicesScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -215,54 +218,54 @@ export default function DeletedInvoicesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 24 },
   section: {
-    borderRadius: 18, backgroundColor: "#fff", borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    borderRadius: 18, backgroundColor: "#ffffff", borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0c1228" },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0a0f1e" },
   input: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#f6f8fe",
-    color: "#0c1228", fontSize: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#f8f9fd",
+    color: "#0a0f1e", fontSize: 14,
   },
   refreshBtn: {
-    backgroundColor: "#2563eb", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, alignItems: "center",
-    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    backgroundColor: "#6366f1", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, alignItems: "center",
+    shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   refreshTxt: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  empty: { color: "#8896ae", fontSize: 14, textAlign: "center", paddingVertical: 24, fontWeight: "600" },
+  empty: { color: "#9ca3af", fontSize: 14, textAlign: "center", paddingVertical: 24, fontWeight: "600" },
   row: {
-    borderWidth: 1.5, borderColor: "#dde6f7", borderRadius: 16, padding: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 16, padding: 14,
     marginVertical: 4, flexDirection: "row", alignItems: "center",
-    backgroundColor: "#fff",
-    shadowColor: "#1a2463", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    backgroundColor: "#ffffff",
+    shadowColor: "#0a0f1e", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  invNo: { fontSize: 14, fontWeight: "800", color: "#0c1228" },
-  sub: { fontSize: 12, color: "#8896ae", marginTop: 2 },
-  deletedBy: { fontSize: 11, color: "#dc2626", marginTop: 4, fontWeight: "700" },
-  amount: { fontSize: 14, fontWeight: "800", color: "#2563eb", marginLeft: 8 },
-  modalSafe: { flex: 1, backgroundColor: "#f0f4ff" },
+  invNo: { fontSize: 14, fontWeight: "800", color: "#0a0f1e" },
+  sub: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
+  deletedBy: { fontSize: 11, color: "#ef4444", marginTop: 4, fontWeight: "700" },
+  amount: { fontSize: 14, fontWeight: "800", color: "#6366f1", marginLeft: 8 },
+  modalSafe: { flex: 1, backgroundColor: "#f4f6fb" },
   modalHead: {
-    backgroundColor: "#0c1228",
+    backgroundColor: "#0a0f1e",
     paddingHorizontal: 16, paddingVertical: 14,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
   modalTitle: { fontSize: 16, fontWeight: "800", color: "#fff" },
   close: { fontSize: 14, color: "#93c5fd", fontWeight: "700" },
   modalBody: { padding: 16, gap: 10, paddingBottom: 24 },
-  detailLine: { fontSize: 13, color: "#4a5a78", marginVertical: 4, fontWeight: "600" },
-  totalLine: { fontSize: 13, color: "#4a5a78", marginVertical: 4, fontWeight: "700" },
-  totalBig: { fontSize: 16, fontWeight: "900", color: "#0c1228", marginVertical: 10 },
+  detailLine: { fontSize: 13, color: "#4b5563", marginVertical: 4, fontWeight: "600" },
+  totalLine: { fontSize: 13, color: "#4b5563", marginVertical: 4, fontWeight: "700" },
+  totalBig: { fontSize: 16, fontWeight: "900", color: "#0a0f1e", marginVertical: 10 },
   actions: { gap: 10, marginTop: 18 },
   restoreBtn: {
-    backgroundColor: "#059669", borderRadius: 14,
+    backgroundColor: "#10b981", borderRadius: 14,
     paddingHorizontal: 16, paddingVertical: 14, alignItems: "center",
-    shadowColor: "#059669", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    shadowColor: "#10b981", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   restoreBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
   disabledBtn: { opacity: 0.6 },

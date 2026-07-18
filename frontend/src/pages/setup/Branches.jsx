@@ -65,6 +65,9 @@ export default function Branches() {
       order_live_tracking_enabled: true,
       invoice_whatsapp_enabled: false,
       invoice_whatsapp_country_code: "91",
+      public_menu_enabled: false,
+      public_menu_token: null,
+      public_menu_slug: "",
       paper_size: "58mm",
       fssai_number: "",
       service_charge_required: false,
@@ -120,6 +123,9 @@ export default function Branches() {
         order_live_tracking_enabled: branch?.order_live_tracking_enabled !== false,
         invoice_whatsapp_enabled: Boolean(branch?.invoice_whatsapp_enabled),
         invoice_whatsapp_country_code: String(branch?.invoice_whatsapp_country_code || "91"),
+        public_menu_enabled: Boolean(branch?.public_menu_enabled),
+        public_menu_token: branch?.public_menu_token || null,
+        public_menu_slug: branch?.public_menu_slug || "",
         paper_size: branch?.paper_size || "58mm",
         fssai_number: branch?.fssai_number || "",
         service_charge_required: normalizedServiceChargeRequired,
@@ -654,6 +660,95 @@ export default function Branches() {
               <div className="text-[11px] text-slate-500">
                 Provider credentials remain server-level settings. This branch setting controls whether invoice WhatsApp sending is used for this branch and which default country code is applied to 10-digit customer mobile numbers.
               </div>
+            </FormSection>
+
+            <FormSection
+              icon={<FaStore size={14} />}
+              title="Public Menu"
+              subtitle="Share a read-only menu link for this branch"
+            >
+              <ToggleRow
+                label="Enable public menu URL"
+                hint="Generate a shareable link that shows your menu without login."
+                checked={Boolean(form.public_menu_enabled)}
+                onChange={async (checked) => {
+                  if (!editingId) {
+                    showToast("Save the branch first, then enable public menu.", "error");
+                    return;
+                  }
+                  try {
+                    const res = await api.post(`/branch/${editingId}/public-menu`, { enabled: checked });
+                    setField("public_menu_enabled", res.data?.enabled ?? checked);
+                    setField("public_menu_token", res.data?.token || null);
+                    setField("public_menu_slug", res.data?.slug || "");
+                    showToast(checked ? "Public menu enabled" : "Public menu disabled", "success");
+                  } catch (err) {
+                    showToast(err?.response?.data?.detail || "Failed to toggle public menu", "error");
+                  }
+                }}
+              />
+              {form.public_menu_enabled && form.public_menu_token && (() => {
+                const menuSlug = form.public_menu_slug || "";
+                const menuUrl = menuSlug
+                  ? `${window.location.origin}/menu/${menuSlug}/${form.public_menu_token}`
+                  : `${window.location.origin}/menu/${form.public_menu_token}`;
+                return (
+                  <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-4 mt-2 space-y-3">
+                    <div>
+                      <p className="text-[11px] text-blue-600 font-semibold uppercase tracking-wider mb-1">Public Menu URL</p>
+                      <p className="text-[13px] font-mono text-blue-800 break-all select-all">{menuUrl}</p>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <canvas
+                        className="rounded-lg border border-blue-200"
+                        ref={(el) => {
+                          if (!el) return;
+                          import("qrcode").then((QRCode) => {
+                            QRCode.toCanvas(el, menuUrl, { width: 160, margin: 2, color: { dark: "#0B3C8C" } });
+                          }).catch(() => {});
+                        }}
+                      />
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          className="text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition"
+                          onClick={() => {
+                            navigator.clipboard.writeText(menuUrl);
+                            showToast("URL copied!", "success");
+                          }}
+                        >
+                          📋 Copy Link
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[11px] font-semibold text-blue-700 bg-white border border-blue-300 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
+                          onClick={() => {
+                            import("qrcode").then((QRCode) => {
+                              QRCode.toDataURL(menuUrl, { width: 512, margin: 2, color: { dark: "#0B3C8C" } }, (err, url) => {
+                                if (err) return;
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `menu-qr-${form.public_menu_slug || form.public_menu_token}.png`;
+                                a.click();
+                              });
+                            }).catch(() => showToast("QR generation failed", "error"));
+                          }}
+                        >
+                          ⬇ Download QR
+                        </button>
+                        <a
+                          href={menuUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-semibold text-blue-700 bg-white border border-blue-300 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition text-center"
+                        >
+                          🔗 Open Menu
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </FormSection>
 
             {hotelShop && (

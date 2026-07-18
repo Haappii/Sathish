@@ -394,11 +394,11 @@ export default function AdvanceOrdersScreen() {
                 </View>
                 <View style={styles.amtBlock}>
                   <Text style={styles.amtLabel}>ADVANCE</Text>
-                  <Text style={[styles.amtValue, { color: "#059669" }]}>{fmt(o.advance_amount)}</Text>
+                  <Text style={[styles.amtValue, { color: theme.success }]}>{fmt(o.advance_amount)}</Text>
                 </View>
                 <View style={styles.amtBlock}>
                   <Text style={styles.amtLabel}>DUE</Text>
-                  <Text style={[styles.amtValue, { color: "#dc2626" }]}>{fmt(toDue(o))}</Text>
+                  <Text style={[styles.amtValue, { color: theme.danger }]}>{fmt(toDue(o))}</Text>
                 </View>
                 {o.advance_payment_mode ? (
                   <View style={styles.amtBlock}>
@@ -448,7 +448,7 @@ export default function AdvanceOrdersScreen() {
                     </Pressable>
                   ))}
                   <Pressable onPress={() => setStatusPicker(null)}>
-                    <Text style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>Cancel</Text>
+                    <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 4 }}>Cancel</Text>
                   </Pressable>
                 </View>
               )}
@@ -748,139 +748,139 @@ export default function AdvanceOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  filterBar: { backgroundColor: "#fff", padding: 14, borderBottomWidth: 1.5, borderBottomColor: "#dde6f7", gap: 10 },
+  filterBar: { backgroundColor: "#ffffff", padding: 14, borderBottomWidth: 1.5, borderBottomColor: "#e4e9f2", gap: 10 },
   filterGroup: { gap: 5 },
-  filterLabel: { fontSize: 9, fontWeight: "800", color: "#8896ae", letterSpacing: 0.7, textTransform: "uppercase" },
+  filterLabel: { fontSize: 9, fontWeight: "800", color: "#9ca3af", letterSpacing: 0.7, textTransform: "uppercase" },
   filterInput: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: "#0c1228",
-    backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: "#0a0f1e",
+    backgroundColor: "#f8f9fd",
   },
   statusRow: { flexDirection: "row", gap: 8 },
   statusChip: {
     paddingHorizontal: 12, paddingVertical: 5,
-    borderRadius: 999, borderWidth: 1.5, borderColor: "#d0dcf0",
-    backgroundColor: "#f6f8fe",
+    borderRadius: 999, borderWidth: 1.5, borderColor: "#e4e9f2",
+    backgroundColor: "#f8f9fd",
   },
-  statusChipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  statusChipText: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
+  statusChipActive: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
+  statusChipText: { fontSize: 11, fontWeight: "700", color: "#4b5563" },
   statusChipTextActive: { color: "#fff" },
-  actionBar: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1.5, borderBottomColor: "#dde6f7" },
+  actionBar: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#ffffff", borderBottomWidth: 1.5, borderBottomColor: "#e4e9f2" },
   newBtn: {
-    backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 12, alignItems: "center",
+    backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 12, alignItems: "center",
     shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   newBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   list: { padding: 14, gap: 12, paddingBottom: 36 },
-  empty: { textAlign: "center", color: "#8896ae", marginTop: 44, fontSize: 14, fontWeight: "600" },
+  empty: { textAlign: "center", color: "#9ca3af", marginTop: 44, fontSize: 14, fontWeight: "600" },
   card: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5, borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5, borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  cardName: { fontWeight: "900", fontSize: 15, color: "#0c1228" },
-  cardPhone: { fontSize: 12, color: "#8896ae", marginTop: 2 },
-  cardDate: { fontSize: 12, color: "#4a5a78", marginTop: 2 },
+  cardName: { fontWeight: "900", fontSize: 15, color: "#0a0f1e" },
+  cardPhone: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
+  cardDate: { fontSize: 12, color: "#4b5563", marginTop: 2 },
   badge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 },
   badgeText: { fontSize: 10, fontWeight: "800" },
   cardAmounts: { flexDirection: "row", gap: 18 },
   amtBlock: { gap: 2 },
-  amtLabel: { fontSize: 9, fontWeight: "800", color: "#8896ae", letterSpacing: 0.5, textTransform: "uppercase" },
-  amtValue: { fontSize: 15, fontWeight: "900", color: "#0c1228" },
-  cardNotes: { fontSize: 12, color: "#8896ae", fontStyle: "italic" },
-  paymentStatus: { fontSize: 11, color: "#4a5a78", fontWeight: "700" },
+  amtLabel: { fontSize: 9, fontWeight: "800", color: "#9ca3af", letterSpacing: 0.5, textTransform: "uppercase" },
+  amtValue: { fontSize: 15, fontWeight: "900", color: "#0a0f1e" },
+  cardNotes: { fontSize: 12, color: "#9ca3af", fontStyle: "italic" },
+  paymentStatus: { fontSize: 11, color: "#4b5563", fontWeight: "700" },
   cardActions: { flexDirection: "row", gap: 8 },
   actionBtn: {
-    flex: 1, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingVertical: 8, alignItems: "center", backgroundColor: "#f6f8fe",
+    flex: 1, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingVertical: 8, alignItems: "center", backgroundColor: "#f8f9fd",
   },
-  actionBtnPrimary: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  actionBtnText: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  actionBtnPrimary: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
+  actionBtnText: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
   printBtn: {
     marginTop: 4, borderWidth: 1.5, borderColor: "#93c5fd", borderRadius: 12,
     paddingVertical: 9, alignItems: "center", backgroundColor: "#eff6ff",
   },
-  printBtnText: { fontSize: 12, fontWeight: "700", color: "#1d4ed8" },
+  printBtnText: { fontSize: 12, fontWeight: "700", color: "#6366f1" },
   statusPickerBar: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 6 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: {
-    backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: "#ffffff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
     maxHeight: "92%", paddingBottom: 36,
-    shadowColor: "#0c1228", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1.5, borderBottomColor: "#dde6f7",
+    borderBottomWidth: 1.5, borderBottomColor: "#e4e9f2",
   },
-  modalTitle: { fontSize: 17, fontWeight: "900", color: "#0c1228", letterSpacing: -0.3 },
-  modalClose: { fontSize: 18, color: "#8896ae", fontWeight: "700" },
+  modalTitle: { fontSize: 17, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.3 },
+  modalClose: { fontSize: 18, color: "#9ca3af", fontWeight: "700" },
   modalBody: { padding: 18, gap: 4, paddingBottom: 18 },
-  fieldLabel: { fontSize: 11, fontWeight: "700", color: "#4a5a78", marginBottom: 4, marginTop: 10, textTransform: "uppercase", letterSpacing: 0.4 },
+  fieldLabel: { fontSize: 11, fontWeight: "700", color: "#4b5563", marginBottom: 4, marginTop: 10, textTransform: "uppercase", letterSpacing: 0.4 },
   fieldInput: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingHorizontal: 13, paddingVertical: 11, fontSize: 14, color: "#0c1228",
-    backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingHorizontal: 13, paddingVertical: 11, fontSize: 14, color: "#0a0f1e",
+    backgroundColor: "#f8f9fd",
   },
   row2: { flexDirection: "row", alignItems: "flex-start" },
   pmRow: { flexDirection: "row", gap: 8, marginVertical: 6 },
   pmChip: {
-    flex: 1, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingVertical: 9, alignItems: "center", backgroundColor: "#f6f8fe",
+    flex: 1, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingVertical: 9, alignItems: "center", backgroundColor: "#f8f9fd",
   },
-  pmChipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  pmChipText: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  pmChipActive: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
+  pmChipText: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
   pmChipTextActive: { color: "#fff" },
   itemsPicker: {
-    maxHeight: 140, borderWidth: 1.5, borderColor: "#d0dcf0",
-    borderRadius: 12, backgroundColor: "#fff", marginTop: 4,
+    maxHeight: 140, borderWidth: 1.5, borderColor: "#e4e9f2",
+    borderRadius: 12, backgroundColor: "#ffffff", marginTop: 4,
   },
   itemPickRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 12, paddingVertical: 9,
-    borderBottomWidth: 1, borderBottomColor: "#f0f4ff",
+    borderBottomWidth: 1, borderBottomColor: "#e4e9f2",
   },
-  itemPickThumb: { width: 32, height: 32, borderRadius: 8, marginRight: 10, backgroundColor: "#f0f4ff" },
+  itemPickThumb: { width: 32, height: 32, borderRadius: 8, marginRight: 10, backgroundColor: "#f4f6fb" },
   itemPickThumbFallback: { alignItems: "center", justifyContent: "center" },
-  itemPickThumbFallbackText: { fontSize: 8, fontWeight: "700", color: "#8896ae" },
-  itemPickName: { fontSize: 12, color: "#0c1228", fontWeight: "700", flex: 1, paddingRight: 8 },
-  itemPickRate: { fontSize: 12, color: "#2563eb", fontWeight: "800" },
+  itemPickThumbFallbackText: { fontSize: 8, fontWeight: "700", color: "#9ca3af" },
+  itemPickName: { fontSize: 12, color: "#0a0f1e", fontWeight: "700", flex: 1, paddingRight: 8 },
+  itemPickRate: { fontSize: 12, color: "#6366f1", fontWeight: "800" },
   selectedItemsWrap: { marginTop: 10, gap: 10 },
   selectedItemCard: {
-    borderWidth: 1.5, borderColor: "#dde6f7", borderRadius: 14, backgroundColor: "#f6f8fe", padding: 12,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 14, backgroundColor: "#f8f9fd", padding: 12,
   },
   selectedItemHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-  selectedItemName: { fontSize: 12, color: "#0c1228", fontWeight: "800", flex: 1, paddingRight: 8 },
-  removeItemText: { fontSize: 11, color: "#dc2626", fontWeight: "700" },
+  selectedItemName: { fontSize: 12, color: "#0a0f1e", fontWeight: "800", flex: 1, paddingRight: 8 },
+  removeItemText: { fontSize: 11, color: "#ef4444", fontWeight: "700" },
   smallInput: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 9, fontSize: 12, color: "#0c1228", backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 9, fontSize: 12, color: "#0a0f1e", backgroundColor: "#ffffff",
   },
   amountPill: {
     borderWidth: 1.5, borderColor: "#6ee7b7", borderRadius: 10,
     paddingHorizontal: 8, paddingVertical: 9, backgroundColor: "#ecfdf5", alignItems: "center",
   },
-  amountPillText: { fontSize: 11, color: "#059669", fontWeight: "900" },
-  readOnlyText: { fontSize: 13, color: "#0c1228", fontWeight: "700", marginBottom: 4 },
+  amountPillText: { fontSize: 11, color: "#10b981", fontWeight: "900" },
+  readOnlyText: { fontSize: 13, color: "#0a0f1e", fontWeight: "700", marginBottom: 4 },
   checkRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
   checkBox: {
-    width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: "#d0dcf0",
-    alignItems: "center", justifyContent: "center", backgroundColor: "#f6f8fe",
+    width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: "#e4e9f2",
+    alignItems: "center", justifyContent: "center", backgroundColor: "#f8f9fd",
   },
-  checkBoxActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
+  checkBoxActive: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
   checkMark: { color: "#fff", fontSize: 12, fontWeight: "900" },
-  checkLabel: { fontSize: 12, color: "#4a5a78", fontWeight: "700" },
+  checkLabel: { fontSize: 12, color: "#4b5563", fontWeight: "700" },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 18 },
   cancelBtn: {
-    flex: 1, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 14,
-    paddingVertical: 13, alignItems: "center", backgroundColor: "#f6f8fe",
+    flex: 1, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 14,
+    paddingVertical: 13, alignItems: "center", backgroundColor: "#f8f9fd",
   },
-  cancelBtnText: { fontSize: 13, fontWeight: "700", color: "#4a5a78" },
+  cancelBtnText: { fontSize: 13, fontWeight: "700", color: "#4b5563" },
   saveBtn: {
-    flex: 1, backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 13, alignItems: "center",
+    flex: 1, backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 13, alignItems: "center",
     shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   saveBtnText: { fontSize: 13, fontWeight: "800", color: "#fff" },
@@ -892,13 +892,13 @@ const styles = StyleSheet.create({
   upiQrBox: { marginTop: 10, gap: 10 },
   upiQrTabs: { flexDirection: "row", gap: 8 },
   upiQrTab: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
-    paddingHorizontal: 13, paddingVertical: 6, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
+    paddingHorizontal: 13, paddingVertical: 6, backgroundColor: "#f8f9fd",
   },
-  upiQrTabActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  upiQrTabText: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  upiQrTabActive: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
+  upiQrTabText: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
   upiQrTabTextActive: { color: "#fff" },
   upiQrCenter: { alignItems: "center", gap: 8, paddingVertical: 8 },
-  upiQrId: { fontSize: 12, color: "#8896ae", fontWeight: "600" },
+  upiQrId: { fontSize: 12, color: "#9ca3af", fontWeight: "600" },
   btnDisabled: { opacity: 0.5 },
 });

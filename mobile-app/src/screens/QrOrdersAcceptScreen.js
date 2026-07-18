@@ -14,6 +14,8 @@ import {
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { printKotTokenSlip } from "../utils/printInvoice";
+import { useTheme } from "../context/ThemeContext";
+
 
 function dt(value) {
   const d = new Date(value);
@@ -22,6 +24,7 @@ function dt(value) {
 }
 
 export default function QrOrdersAcceptScreen({ navigation }) {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -162,50 +165,50 @@ export default function QrOrdersAcceptScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 24 },
-  header: { fontWeight: "900", fontSize: 17, color: "#0c1228", letterSpacing: -0.2 },
-  empty: { color: "#8896ae", fontSize: 14, fontWeight: "600" },
+  header: { fontWeight: "900", fontSize: 17, color: "#0a0f1e", letterSpacing: -0.2 },
+  empty: { color: "#9ca3af", fontSize: 14, fontWeight: "600" },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 16,
     gap: 8,
-    shadowColor: "#1a2463",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
   },
-  title: { fontWeight: "900", color: "#0c1228", fontSize: 15 },
-  meta: { color: "#4a5a78", fontSize: 13 },
+  title: { fontWeight: "900", color: "#0a0f1e", fontSize: 15 },
+  meta: { color: "#4b5563", fontSize: 13 },
   itemBox: {
     marginTop: 6,
     gap: 5,
-    backgroundColor: "#f6f8fe",
+    backgroundColor: "#f8f9fd",
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 10,
   },
   itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  itemName: { color: "#0c1228", flex: 1, paddingRight: 8, fontSize: 13, fontWeight: "600" },
-  itemQty: { color: "#4a5a78", fontWeight: "800", fontSize: 13 },
+  itemName: { color: "#0a0f1e", flex: 1, paddingRight: 8, fontSize: 13, fontWeight: "600" },
+  itemQty: { color: "#4b5563", fontWeight: "800", fontSize: 13 },
   btnRow: { marginTop: 10, flexDirection: "row", gap: 10 },
   btn: { flex: 1, alignItems: "center", paddingVertical: 13, borderRadius: 13 },
   rejectBtn: {
-    backgroundColor: "#dc2626",
-    shadowColor: "#dc2626",
+    backgroundColor: "#ef4444",
+    shadowColor: "#ef4444",
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   acceptBtn: {
-    backgroundColor: "#2563eb",
-    shadowColor: "#2563eb",
+    backgroundColor: "#6366f1",
+    shadowColor: "#6366f1",
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,

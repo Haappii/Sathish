@@ -615,7 +615,7 @@ export default function HeldInvoicesScreen() {
                     <Text style={styles.payableLine}>GST ({gstPercent}%): {fmt(processGst)}</Text>
                   )}
                   {processDiscountValue > 0 && (
-                    <Text style={[styles.payableLine, { color: "#dc2626" }]}>Discount: − {fmt(processDiscountValue)}</Text>
+                    <Text style={[styles.payableLine, { color: theme.danger }]}>Discount: − {fmt(processDiscountValue)}</Text>
                   )}
                   <Text style={styles.payableRow}>
                     Payable: <Text style={styles.payableAmt}>{fmt(processPayable)}</Text>
@@ -776,12 +776,12 @@ export default function HeldInvoicesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { color: "#8896ae", fontSize: 14, fontWeight: "600" },
+  loadingText: { color: "#9ca3af", fontSize: 14, fontWeight: "600" },
 
   header: {
-    backgroundColor: "#0c1228",
+    backgroundColor: "#0a0f1e",
     paddingHorizontal: 18,
     paddingVertical: 16,
     flexDirection: "row",
@@ -789,10 +789,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   headerTitle: { color: "#fff", fontSize: 19, fontWeight: "900", letterSpacing: -0.3 },
-  headerDate: { color: "#7a8fa8", fontSize: 13, fontWeight: "700" },
+  headerDate: { color: "#4b5563", fontSize: 13, fontWeight: "700" },
 
   countLabel: {
-    color: "#8896ae",
+    color: "#9ca3af",
     fontSize: 12,
     fontWeight: "600",
     paddingHorizontal: 4,
@@ -802,13 +802,13 @@ const styles = StyleSheet.create({
   list: { padding: 14, gap: 12, paddingBottom: 28 },
 
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 14,
     gap: 12,
-    shadowColor: "#1a2463",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 },
@@ -830,14 +830,14 @@ const styles = StyleSheet.create({
     borderColor: "#fcd34d",
   },
   tokenText: { color: "#92400e", fontWeight: "900", fontSize: 13, letterSpacing: 0.3 },
-  totalText: { fontSize: 16, fontWeight: "900", color: "#059669" },
-  customerText: { color: "#0c1228", fontWeight: "800", fontSize: 15 },
-  itemsText: { color: "#8896ae", fontSize: 12, marginTop: 3, lineHeight: 18 },
+  totalText: { fontSize: 16, fontWeight: "900", color: "#10b981" },
+  customerText: { color: "#0a0f1e", fontWeight: "800", fontSize: 15 },
+  itemsText: { color: "#9ca3af", fontSize: 12, marginTop: 3, lineHeight: 18 },
 
   actionsRow: { flexDirection: "row", gap: 10 },
   processBtn: {
     flex: 1,
-    backgroundColor: "#059669",
+    backgroundColor: "#10b981",
     borderRadius: 13,
     paddingVertical: 13,
     alignItems: "center",
@@ -857,7 +857,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#fca5a5",
   },
-  cancelBtnText: { color: "#dc2626", fontWeight: "800", fontSize: 14 },
+  cancelBtnText: { color: "#ef4444", fontWeight: "800", fontSize: 14 },
   btnDisabled: { opacity: 0.5 },
 
   emptyWrap: {
@@ -867,8 +867,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyIcon: { fontSize: 52 },
-  emptyTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", letterSpacing: -0.3 },
-  emptyMsg: { color: "#8896ae", textAlign: "center", fontSize: 14, lineHeight: 22 },
+  emptyTitle: { fontSize: 20, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.3 },
+  emptyMsg: { color: "#9ca3af", textAlign: "center", fontSize: 14, lineHeight: 22 },
 
   // ── Modal ──────────────────────────────────────────────────────────────────
   modalBackdrop: {
@@ -880,17 +880,17 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxHeight: "93%",
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     overflow: "hidden",
-    shadowColor: "#0c1228",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.2,
     shadowRadius: 24,
     elevation: 16,
   },
   modalHeader: {
-    backgroundColor: "#0c1228",
+    backgroundColor: "#0a0f1e",
     paddingHorizontal: 18,
     paddingVertical: 16,
     flexDirection: "row",
@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   modalTitle: { color: "#fff", fontSize: 18, fontWeight: "900", flex: 1, letterSpacing: -0.2 },
-  modalSubtitle: { color: "#7a8fa8", fontSize: 13, fontWeight: "700" },
+  modalSubtitle: { color: "#4b5563", fontSize: 13, fontWeight: "700" },
   modalCloseBtn: {
     width: 30, height: 30, borderRadius: 15,
     backgroundColor: "rgba(255,255,255,0.15)",
@@ -907,14 +907,14 @@ const styles = StyleSheet.create({
   modalCloseTxt: { color: "#fff", fontWeight: "900", fontSize: 15 },
   modalBody: { padding: 16, gap: 14, paddingBottom: 36 },
   modalSection: {
-    backgroundColor: "#f6f8fe",
+    backgroundColor: "#f8f9fd",
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 14,
     gap: 10,
   },
-  modalSectionTitle: { fontSize: 12, fontWeight: "800", color: "#0c1228", marginBottom: 2, letterSpacing: 0.6, textTransform: "uppercase" },
+  modalSectionTitle: { fontSize: 12, fontWeight: "800", color: "#0a0f1e", marginBottom: 2, letterSpacing: 0.6, textTransform: "uppercase" },
 
   // Items summary
   itemSummaryRow: {
@@ -922,9 +922,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 4,
   },
-  itemSummaryName: { flex: 1, fontSize: 13, color: "#4a5a78", fontWeight: "600" },
-  itemSummaryQty: { fontSize: 12, color: "#8896ae", marginHorizontal: 10, fontWeight: "700" },
-  itemSummaryAmt: { fontSize: 14, fontWeight: "800", color: "#0c1228" },
+  itemSummaryName: { flex: 1, fontSize: 13, color: "#4b5563", fontWeight: "600" },
+  itemSummaryQty: { fontSize: 12, color: "#9ca3af", marginHorizontal: 10, fontWeight: "700" },
+  itemSummaryAmt: { fontSize: 14, fontWeight: "800", color: "#0a0f1e" },
   summaryDivider: {
     height: 1,
     backgroundColor: "#dde6f7",
@@ -938,34 +938,34 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     marginTop: 4,
   },
-  itemSummaryTotalLabel: { fontSize: 13, fontWeight: "800", color: "#0c1228" },
-  itemSummaryTotalAmt: { fontSize: 16, fontWeight: "900", color: "#059669" },
+  itemSummaryTotalLabel: { fontSize: 13, fontWeight: "800", color: "#0a0f1e" },
+  itemSummaryTotalAmt: { fontSize: 16, fontWeight: "900", color: "#10b981" },
 
   // Payment mode
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   modeBtn: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
-    paddingHorizontal: 11, paddingVertical: 7, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
+    paddingHorizontal: 11, paddingVertical: 7, backgroundColor: "#f8f9fd",
   },
-  modeBtnActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  modeTxt: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
+  modeBtnActive: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
+  modeTxt: { fontSize: 11, fontWeight: "700", color: "#4b5563" },
   modeTxtActive: { color: "#fff" },
 
-  fieldLabel: { fontSize: 12, fontWeight: "700", color: "#4a5a78", marginTop: 4, letterSpacing: 0.4, textTransform: "uppercase" },
+  fieldLabel: { fontSize: 12, fontWeight: "700", color: "#4b5563", marginTop: 4, letterSpacing: 0.4, textTransform: "uppercase" },
 
   input: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    backgroundColor: "#fff", paddingHorizontal: 13, paddingVertical: 12,
-    color: "#0c1228", fontSize: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    backgroundColor: "#ffffff", paddingHorizontal: 13, paddingVertical: 12,
+    color: "#0a0f1e", fontSize: 14,
   },
 
   payableSummary: { gap: 4, marginTop: 6 },
-  payableLine: { fontSize: 13, color: "#8896ae", fontWeight: "600" },
-  payableRow: { fontSize: 14, fontWeight: "700", color: "#4a5a78", marginTop: 3 },
-  payableAmt: { fontSize: 18, fontWeight: "900", color: "#059669" },
+  payableLine: { fontSize: 13, color: "#9ca3af", fontWeight: "600" },
+  payableRow: { fontSize: 14, fontWeight: "700", color: "#4b5563", marginTop: 3 },
+  payableAmt: { fontSize: 18, fontWeight: "900", color: "#10b981" },
 
   printBtn: {
-    backgroundColor: "#2563eb", borderRadius: 14,
+    backgroundColor: "#6366f1", borderRadius: 14,
     paddingVertical: 15, alignItems: "center",
     shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
   },
@@ -973,41 +973,41 @@ const styles = StyleSheet.create({
 
   saveOnlyBtn: {
     borderWidth: 1.5, borderColor: "#2563eb", borderRadius: 14,
-    paddingVertical: 13, alignItems: "center", backgroundColor: "#eff4ff",
+    paddingVertical: 13, alignItems: "center", backgroundColor: "#eef2ff",
   },
-  saveOnlyBtnTxt: { color: "#2563eb", fontWeight: "800", fontSize: 15 },
+  saveOnlyBtnTxt: { color: "#6366f1", fontWeight: "800", fontSize: 15 },
 
   // ── UPI Modal ──────────────────────────────────────────────────────────────
   upiModal: {
-    backgroundColor: "#fff", borderRadius: 24, padding: 20,
-    shadowColor: "#0c1228", shadowOpacity: 0.18, shadowRadius: 20,
+    backgroundColor: "#ffffff", borderRadius: 24, padding: 20,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.18, shadowRadius: 20,
     elevation: 10, gap: 12,
   },
-  upiModalTitle: { fontSize: 18, fontWeight: "900", color: "#0c1228", textAlign: "center" },
+  upiModalTitle: { fontSize: 18, fontWeight: "900", color: "#0a0f1e", textAlign: "center" },
   upiNoId: { alignItems: "center", padding: 16 },
-  upiNoIdText: { color: "#8896ae", fontSize: 14 },
+  upiNoIdText: { color: "#9ca3af", fontSize: 14 },
   upiTabRow: { flexDirection: "row", gap: 8, marginBottom: 8, justifyContent: "center" },
   upiTab: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
-    paddingHorizontal: 16, paddingVertical: 7, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 7, backgroundColor: "#f8f9fd",
   },
   upiTabActive: { backgroundColor: "#7c3aed", borderColor: "#7c3aed" },
-  upiTabText: { fontSize: 12, fontWeight: "700", color: "#4a5a78" },
+  upiTabText: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
   upiTabTextActive: { color: "#fff" },
   upiQrWrap: {
     alignItems: "center", padding: 14, gap: 8,
-    backgroundColor: "#f6f8fe", borderRadius: 16,
-    borderWidth: 1.5, borderColor: "#dde6f7",
+    backgroundColor: "#f8f9fd", borderRadius: 16,
+    borderWidth: 1.5, borderColor: "#e4e9f2",
   },
-  upiIdLabel: { fontSize: 13, fontWeight: "700", color: "#4a5a78" },
-  upiAmtLabel: { fontSize: 15, fontWeight: "900", color: "#059669" },
-  upiFieldLabel: { fontSize: 12, fontWeight: "700", color: "#4a5a78", letterSpacing: 0.4, textTransform: "uppercase" },
+  upiIdLabel: { fontSize: 13, fontWeight: "700", color: "#4b5563" },
+  upiAmtLabel: { fontSize: 15, fontWeight: "900", color: "#10b981" },
+  upiFieldLabel: { fontSize: 12, fontWeight: "700", color: "#4b5563", letterSpacing: 0.4, textTransform: "uppercase" },
   upiModalBtns: { flexDirection: "row", gap: 10, marginTop: 6 },
   upiCancelBtn: {
-    flex: 1, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingVertical: 13, alignItems: "center", backgroundColor: "#f6f8fe",
+    flex: 1, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingVertical: 13, alignItems: "center", backgroundColor: "#f8f9fd",
   },
-  upiCancelTxt: { color: "#4a5a78", fontWeight: "700" },
+  upiCancelTxt: { color: "#4b5563", fontWeight: "700" },
   upiDoneBtn: {
     flex: 2, backgroundColor: "#7c3aed", borderRadius: 12,
     paddingVertical: 13, alignItems: "center",

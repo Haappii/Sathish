@@ -19,36 +19,17 @@ import {
 } from "../utils/printerSettings";
 import { useTheme } from "../context/ThemeContext";
 
-const printerModule = (() => {
-  try {
-    return require("react-native-esc-pos-printer");
-  } catch {
-    return null;
-  }
-})();
-
 export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(DEFAULT_PRINTER_SETTINGS);
-  const discovery = printerModule?.usePrintersDiscovery?.() || {
-    printers: [],
-    isDiscovering: false,
-    start: () => {},
-    stop: () => {},
-    printerError: null,
-  };
-  const { printers, isDiscovering, start, stop, printerError } = discovery;
-  const autoScanOnceRef = useRef(false);
+  const [printers, setPrinters] = useState([]);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
   useEffect(() => {
-    if (!visible) {
-      autoScanOnceRef.current = false;
-      stop();
-      return;
-    }
-
+    if (!visible) return;
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -56,25 +37,9 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
       if (mounted) setForm(saved);
       setLoading(false);
     })();
-
-    if (printerModule?.DiscoveryFilterOption && !autoScanOnceRef.current) {
-      autoScanOnceRef.current = true;
-      start({
-        timeout: 12000,
-        filterOption: {
-          portType: printerModule.DiscoveryFilterOption.PORTTYPE_BLUETOOTH,
-          bondedDevices: printerModule.DiscoveryFilterOption.TRUE,
-        },
-      });
-    }
-
-    return () => {
-      mounted = false;
-      stop();
-    };
+    return () => { mounted = false; };
   }, [visible]);
 
-  // Auto-select first discovered printer when no target is set
   useEffect(() => {
     if (!printers?.length || form.target) return;
     const first = printers[0];
@@ -83,33 +48,35 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
     if (first.deviceName) update("deviceName", String(first.deviceName));
   }, [printers]);
 
-  const errorText = useMemo(() => {
-    if (!printerModule) return "Printer discovery module unavailable in this build.";
-    if (!printerError) return "";
-    return String(printerError?.message || "Printer discovery failed");
-  }, [printerError]);
-
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
-  const scanBluetooth = () => {
-    if (!printerModule?.DiscoveryFilterOption) return;
-    start({
-      timeout: 12000,
-      filterOption: {
-        portType: printerModule.DiscoveryFilterOption.PORTTYPE_BLUETOOTH,
-        bondedDevices: printerModule.DiscoveryFilterOption.TRUE,
-      },
-    });
+  const scanBluetooth = async () => {
+    setIsDiscovering(true);
+    setErrorText("");
+    try {
+      const { NativeModules, PermissionsAndroid, Platform } = require("react-native");
+      if (Platform.OS === "android") {
+        await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        ]).catch(() => {});
+      }
+      const btModule = NativeModules?.BluetoothPrinterModule;
+      if (btModule?.listPairedDevices) {
+        const devices = await btModule.listPairedDevices();
+        setPrinters(Array.isArray(devices) ? devices : []);
+      } else {
+        setErrorText("Bluetooth printer module not available. Enter the address manually.");
+      }
+    } catch (e) {
+      setErrorText(String(e?.message || "Bluetooth scan failed"));
+    } finally {
+      setIsDiscovering(false);
+    }
   };
 
   const scanLan = () => {
-    if (!printerModule?.DiscoveryFilterOption) return;
-    start({
-      timeout: 12000,
-      filterOption: {
-        portType: printerModule.DiscoveryFilterOption.PORTTYPE_TCP,
-      },
-    });
+    setErrorText("LAN discovery not available. Enter printer IP manually in the URL field.");
   };
 
   const save = async () => {
@@ -186,15 +153,17 @@ export default function PrinterSettingsModal({ visible, onClose, onSaved }) {
             <View style={[styles.card, { borderColor: theme.cardBorder, backgroundColor: theme.card }]}>
               <Text style={[styles.label, { color: theme.text }]}>Discover Printers</Text>
               <View style={styles.actionsRow}>
-                <Pressable style={[styles.scanBtn, { backgroundColor: theme.accent }]} onPress={scanBluetooth} disabled={!printerModule || isDiscovering}>
+                <Pressable style={[styles.scanBtn, { backgroundColor: theme.accent }]} onPress={scanBluetooth} disabled={isDiscovering}>
                   <Text style={styles.scanBtnText}>Scan Bluetooth</Text>
                 </Pressable>
-                <Pressable style={[styles.scanBtn, { backgroundColor: theme.accent }]} onPress={scanLan} disabled={!printerModule || isDiscovering}>
+                <Pressable style={[styles.scanBtn, { backgroundColor: theme.accent }]} onPress={scanLan} disabled={isDiscovering}>
                   <Text style={styles.scanBtnText}>Scan LAN</Text>
                 </Pressable>
-                <Pressable style={[styles.stopBtn, { backgroundColor: theme.surface }]} onPress={stop}>
-                  <Text style={[styles.stopBtnText, { color: theme.textSub }]}>Stop</Text>
-                </Pressable>
+                {isDiscovering && (
+                  <Pressable style={[styles.stopBtn, { backgroundColor: theme.surface }]} onPress={() => setIsDiscovering(false)}>
+                    <Text style={[styles.stopBtnText, { color: theme.textSub }]}>Stop</Text>
+                  </Pressable>
+                )}
               </View>
 
               {isDiscovering ? <Text style={[styles.help, { color: theme.textSub }]}>Scanning...</Text> : null}

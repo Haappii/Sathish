@@ -22,6 +22,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "Permissions-Policy",
             "geolocation=(), microphone=(), camera=()",
         )
+        # Prevent browsers from caching API responses
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+
         # Only send HSTS on production (avoid breaking local dev with HTTP)
         from app.config import settings
         if settings.ENV == "production":

@@ -13,6 +13,8 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const fmtDate = (v) => {
@@ -23,6 +25,7 @@ const fmtDate = (v) => {
 const PAYMENT_MODES_FILTER = ["all", "cash", "card", "upi", "credit"];
 
 export default function ReportsScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const bizDate = session?.app_date || new Date().toISOString().split("T")[0];
   const thirtyAgoBiz = () => {
@@ -167,60 +170,60 @@ function SumItem({ label, value, color }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   filterCard: {
-    backgroundColor: "#fff", margin: 14, borderRadius: 18,
-    borderWidth: 1.5, borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", margin: 14, borderRadius: 18,
+    borderWidth: 1.5, borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   dateRow: { flexDirection: "row", gap: 10 },
-  label: { fontSize: 11, fontWeight: "700", color: "#8896ae", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
+  label: { fontSize: 11, fontWeight: "700", color: "#9ca3af", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
   dateInput: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    backgroundColor: "#f6f8fe", paddingHorizontal: 12, paddingVertical: 10, color: "#0c1228", fontSize: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    backgroundColor: "#f8f9fd", paddingHorizontal: 12, paddingVertical: 10, color: "#0a0f1e", fontSize: 14,
   },
   modeRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   chip: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 999,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f8f9fd",
   },
-  chipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  chipText: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
+  chipActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  chipText: { fontSize: 11, fontWeight: "700", color: "#4b5563" },
   chipTextActive: { color: "#fff" },
   runBtn: {
-    backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 13,
+    backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 13,
     alignItems: "center", justifyContent: "center", minHeight: 44,
-    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   runBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   btnDisabled: { opacity: 0.5 },
   summaryCard: {
-    backgroundColor: "#fff", marginHorizontal: 14, borderRadius: 18,
-    borderWidth: 1.5, borderColor: "#dde6f7", padding: 14, gap: 8,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
+    backgroundColor: "#ffffff", marginHorizontal: 14, borderRadius: 18,
+    borderWidth: 1.5, borderColor: "#e4e9f2", padding: 14, gap: 8,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
   summaryRow: { flexDirection: "row", justifyContent: "space-between" },
   sumItem: { alignItems: "center", gap: 3 },
-  sumLabel: { fontSize: 10, color: "#8896ae", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  sumLabel: { fontSize: 10, color: "#9ca3af", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   sumValue: { fontSize: 18, fontWeight: "900" },
-  taxLine: { color: "#8896ae", fontSize: 12, textAlign: "center", fontWeight: "600" },
+  taxLine: { color: "#9ca3af", fontSize: 12, textAlign: "center", fontWeight: "600" },
   list: { padding: 14, paddingTop: 8, gap: 8, paddingBottom: 24 },
   row: {
-    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 12, flexDirection: "row", alignItems: "center",
-    shadowColor: "#1a2463", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    backgroundColor: "#ffffff", borderRadius: 16, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 12, flexDirection: "row", alignItems: "center",
+    shadowColor: "#0a0f1e", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  invNo: { fontWeight: "800", color: "#0c1228", fontSize: 14 },
-  rowMeta: { color: "#4a5a78", fontSize: 12, marginTop: 2 },
+  invNo: { fontWeight: "800", color: "#0a0f1e", fontSize: 14 },
+  rowMeta: { color: "#4b5563", fontSize: 12, marginTop: 2 },
   modeBadge: {
-    marginTop: 4, backgroundColor: "#eff4ff", borderRadius: 8,
+    marginTop: 4, backgroundColor: "#eef2ff", borderRadius: 8,
     paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start",
     borderWidth: 1, borderColor: "#bfdbfe",
   },
-  modeBadgeText: { color: "#2563eb", fontSize: 10, fontWeight: "800" },
-  rowAmt: { fontSize: 15, fontWeight: "900", color: "#059669", marginLeft: 8 },
+  modeBadgeText: { color: "#6366f1", fontSize: 10, fontWeight: "800" },
+  rowAmt: { fontSize: 15, fontWeight: "900", color: "#10b981", marginLeft: 8 },
   emptyWrap: { alignItems: "center", paddingTop: 50, gap: 10 },
   emptyIcon: { fontSize: 44 },
-  emptyTitle: { color: "#8896ae", fontSize: 15, fontWeight: "700" },
+  emptyTitle: { color: "#9ca3af", fontSize: 15, fontWeight: "700" },
 });

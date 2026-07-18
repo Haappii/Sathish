@@ -15,8 +15,11 @@ import {
   View,
 } from "react-native";
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
+
 
 export default function CashDrawerScreen() {
+  const { theme } = useTheme();
   const [drawer, setDrawer]     = useState(null);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -131,7 +134,7 @@ export default function CashDrawerScreen() {
                   <Text style={styles.btnText}>Open Drawer</Text>
                 </Pressable>
               ) : (
-                <Pressable style={[styles.btn, { backgroundColor: "#b91c1c" }]} onPress={() => setCloseModal(true)}>
+                <Pressable style={[styles.btn, { backgroundColor: theme.danger }]} onPress={() => setCloseModal(true)}>
                   <Text style={styles.btnText}>Close Drawer</Text>
                 </Pressable>
               )}
@@ -175,8 +178,8 @@ export default function CashDrawerScreen() {
               autoFocus
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: "#f0f4ff", flex: 1 }]} onPress={() => setOpenModal(false)}>
-                <Text style={[styles.btnText, { color: "#4a5a78" }]}>Cancel</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: theme.background, flex: 1 }]} onPress={() => setOpenModal(false)}>
+                <Text style={[styles.btnText, { color: theme.textSub }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalBtn, { backgroundColor: "#16a34a", flex: 1 }]} onPress={openDrawer} disabled={saving}>
                 <Text style={styles.btnText}>{saving ? "Opening…" : "Open"}</Text>
@@ -203,10 +206,10 @@ export default function CashDrawerScreen() {
               autoFocus
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable style={[styles.modalBtn, { backgroundColor: "#f0f4ff", flex: 1 }]} onPress={() => setCloseModal(false)}>
-                <Text style={[styles.btnText, { color: "#4a5a78" }]}>Cancel</Text>
+              <Pressable style={[styles.modalBtn, { backgroundColor: theme.background, flex: 1 }]} onPress={() => setCloseModal(false)}>
+                <Text style={[styles.btnText, { color: theme.textSub }]}>Cancel</Text>
               </Pressable>
-              <Pressable style={[styles.modalBtn, { backgroundColor: "#b91c1c", flex: 1 }]} onPress={closeDrawer} disabled={saving}>
+              <Pressable style={[styles.modalBtn, { backgroundColor: theme.danger, flex: 1 }]} onPress={closeDrawer} disabled={saving}>
                 <Text style={styles.btnText}>{saving ? "Closing…" : "Close"}</Text>
               </Pressable>
             </View>
@@ -219,9 +222,9 @@ export default function CashDrawerScreen() {
 
 function AmountBox({ label, value, highlight }) {
   return (
-    <View style={[styles.amountBox, highlight && { backgroundColor: "#eff4ff", borderColor: "#93c5fd" }]}>
+    <View style={[styles.amountBox, highlight && { backgroundColor: theme.accentLight, borderColor: "#93c5fd" }]}>
       <Text style={styles.amountLabel}>{label}</Text>
-      <Text style={[styles.amountValue, highlight && { color: "#2563eb" }]}>₹{fmt(value)}</Text>
+      <Text style={[styles.amountValue, highlight && { color: theme.accent }]}>₹{fmt(value)}</Text>
     </View>
   );
 }
@@ -236,79 +239,79 @@ function fmtTime(dt) {
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f0f4ff" },
+  safe:   { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   statusCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     gap: 12,
-    shadowColor: "#1a2463", shadowOpacity: 0.08, shadowRadius: 14,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.08, shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
-  statusLabel: { fontWeight: "800", fontSize: 16, color: "#0c1228" },
+  statusLabel: { fontWeight: "800", fontSize: 16, color: "#0a0f1e" },
   statusRow:   { flexDirection: "row", alignItems: "center", gap: 10 },
   statusBadge: { fontWeight: "800", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, overflow: "hidden" },
-  statusTime:  { color: "#8896ae", fontSize: 13, fontWeight: "600" },
+  statusTime:  { color: "#9ca3af", fontSize: 13, fontWeight: "600" },
   amountGrid:  { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   amountBox: {
     width: "47%",
-    backgroundColor: "#f6f8fe",
+    backgroundColor: "#f8f9fd",
     borderRadius: 14,
     padding: 12,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
   },
-  amountLabel: { color: "#8896ae", fontSize: 10, marginBottom: 3, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
-  amountValue: { fontWeight: "800", color: "#0c1228", fontSize: 16 },
-  noDrawer:    { color: "#8896ae", textAlign: "center", paddingVertical: 12, fontWeight: "600" },
+  amountLabel: { color: "#9ca3af", fontSize: 10, marginBottom: 3, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  amountValue: { fontWeight: "800", color: "#0a0f1e", fontSize: 16 },
+  noDrawer:    { color: "#9ca3af", textAlign: "center", paddingVertical: 12, fontWeight: "600" },
   actionRow:   { flexDirection: "row" },
   btn:         { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: "center", shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
   btnText:     { color: "#fff", fontWeight: "800", fontSize: 14 },
   section: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     gap: 8,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
   },
-  sectionTitle: { fontWeight: "800", fontSize: 14, color: "#0c1228" },
+  sectionTitle: { fontWeight: "800", fontSize: 14, color: "#0a0f1e" },
   txnRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f4ff",
+    borderBottomColor: "#f4f6fb",
   },
-  txnDesc:   { fontWeight: "700", color: "#0c1228", fontSize: 13 },
-  txnTime:   { color: "#8896ae", fontSize: 12, marginTop: 2 },
+  txnDesc:   { fontWeight: "700", color: "#0a0f1e", fontSize: 13 },
+  txnTime:   { color: "#9ca3af", fontSize: 12, marginTop: 2 },
   txnAmount: { fontWeight: "800", fontSize: 15 },
   overlay:   { flex: 1, justifyContent: "flex-end" },
   overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   modal: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 22,
     paddingBottom: 44,
     gap: 12,
-    shadowColor: "#0c1228", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
-  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", letterSpacing: -0.3 },
-  fieldLabel: { color: "#4a5a78", fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.3 },
+  fieldLabel: { color: "#4b5563", fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
     borderWidth: 1.5,
-    borderColor: "#d0dcf0",
+    borderColor: "#e4e9f2",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: "#f6f8fe",
-    color: "#0c1228",
+    backgroundColor: "#f8f9fd",
+    color: "#0a0f1e",
     fontSize: 20,
     fontWeight: "700",
   },

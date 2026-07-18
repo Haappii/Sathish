@@ -15,6 +15,7 @@ from app.db import get_db
 from app.models.support_ticket import SupportTicket
 from app.models.shop_details import ShopDetails
 from app.utils.auth_user import AdminOnly, get_current_user
+from app.utils.gcs_upload import upload_bytes
 
 router = APIRouter(prefix="/support", tags=["Support Chat"])
 
@@ -62,13 +63,13 @@ async def _save_attachment(file: UploadFile | None) -> tuple[str | None, str | N
     safe = _safe_name(file.filename)
     stamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     out_name = f"{stamp}_{uuid.uuid4().hex}_{safe}"
-    out_path = SUPPORT_UPLOADS_DIR / out_name
+    destination = f"support/{out_name}"
+    content_type = file.content_type or "application/octet-stream"
 
     data = await file.read()
-    with open(out_path, "wb") as f:
-        f.write(data)
+    url = upload_bytes(data, destination, content_type)
 
-    return safe, str(out_path), data
+    return safe, url, data
 
 
 def _send_mail(subject: str, content: str, file: UploadFile | None = None, file_data: bytes | None = None) -> None:

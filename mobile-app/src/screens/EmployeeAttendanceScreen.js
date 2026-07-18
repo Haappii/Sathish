@@ -13,6 +13,8 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const STATUSES = ["PRESENT", "ABSENT", "HALF_DAY", "LEAVE"];
 
@@ -24,6 +26,7 @@ const STATUS_COLOR = {
 };
 
 export default function EmployeeAttendanceScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
   const [attendanceDate, setAttendanceDate] = useState(businessDate);
@@ -223,61 +226,61 @@ export default function EmployeeAttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   topBar: { paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", gap: 10 },
   dateInput: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, color: "#0c1228", width: 136,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    backgroundColor: "#ffffff", paddingHorizontal: 12, paddingVertical: 10, color: "#0a0f1e", width: 136,
   },
   searchInput: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    backgroundColor: "#fff", paddingHorizontal: 13, paddingVertical: 10, color: "#0c1228",
-    shadowColor: "#1a2463", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    backgroundColor: "#ffffff", paddingHorizontal: 13, paddingVertical: 10, color: "#0a0f1e",
+    shadowColor: "#0a0f1e", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
   list: { padding: 14, gap: 10, paddingBottom: 28 },
   card: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 12,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 12,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: "#eef2ff",
     alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: "#dde6f7",
+    borderWidth: 2, borderColor: "#e4e9f2",
   },
-  avatarText: { color: "#2563eb", fontSize: 17, fontWeight: "900" },
-  empName: { fontWeight: "800", color: "#0c1228", fontSize: 14 },
-  empMeta: { color: "#8896ae", fontSize: 12, marginTop: 2 },
+  avatarText: { color: "#6366f1", fontSize: 17, fontWeight: "900" },
+  empName: { fontWeight: "800", color: "#0a0f1e", fontSize: 14 },
+  empMeta: { color: "#9ca3af", fontSize: 12, marginTop: 2 },
   unitsInput: {
-    width: 52, borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
+    width: 52, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
     paddingHorizontal: 6, paddingVertical: 8, textAlign: "center",
-    color: "#0c1228", backgroundColor: "#f6f8fe", fontSize: 14, fontWeight: "700",
+    color: "#0a0f1e", backgroundColor: "#f8f9fd", fontSize: 14, fontWeight: "700",
   },
-  unitsLabel: { color: "#8896ae", fontSize: 12, fontWeight: "700" },
+  unitsLabel: { color: "#9ca3af", fontSize: 12, fontWeight: "700" },
   statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statusBtn: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#f8f9fd",
   },
-  statusTxt: { fontSize: 11, fontWeight: "700", color: "#4a5a78" },
+  statusTxt: { fontSize: 11, fontWeight: "700", color: "#4b5563" },
   saveBtn: {
-    margin: 14, backgroundColor: "#2563eb", borderRadius: 14,
+    margin: 14, backgroundColor: "#6366f1", borderRadius: 14,
     paddingVertical: 15, alignItems: "center",
-    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   saveBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
   btnDisabled: { opacity: 0.5 },
   emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
   emptyIcon: { fontSize: 44 },
-  emptyTitle: { color: "#8896ae", fontSize: 16, fontWeight: "700" },
+  emptyTitle: { color: "#9ca3af", fontSize: 16, fontWeight: "700" },
   alreadySavedWrap: {
     flex: 1, alignItems: "center", justifyContent: "center",
     paddingHorizontal: 32, gap: 14,
   },
   alreadySavedIcon: { fontSize: 56 },
-  alreadySavedTitle: { fontSize: 18, fontWeight: "900", color: "#059669", textAlign: "center" },
-  alreadySavedMsg: { fontSize: 14, color: "#8896ae", textAlign: "center", lineHeight: 22 },
+  alreadySavedTitle: { fontSize: 18, fontWeight: "900", color: "#10b981", textAlign: "center" },
+  alreadySavedMsg: { fontSize: 14, color: "#9ca3af", textAlign: "center", lineHeight: 22 },
 });

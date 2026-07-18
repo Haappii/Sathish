@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import QRCode from "qrcode";
 import api from "../utils/apiClient";
 import { API_BASE } from "../config/api";
+import { getItemImageUrl } from "../utils/shopLogo";
 import { useToast } from "../components/Toast";
 import { getSession } from "../utils/auth";
 import { buildBusinessDateTimeLabel, getBusinessDate } from "../utils/businessDate";
@@ -388,18 +389,18 @@ export default function TableOrder() {
     if (shop.gst_number) t += center(`GSTIN: ${shop.gst_number}`) + "\n";
 
     t += line + "\n";
-    t += `Invoice No : ${invoiceNumber}\n`;
-    t += `Date       : ${
+    t += center(`Invoice No : ${invoiceNumber}`) + "\n";
+    t += center(`Date : ${
       invoiceCreatedAt
         ? formatDisplayDate(invoiceCreatedAt, false)
         : buildBusinessDateTimeLabel(getBusinessDate(shop?.app_date), {
             timeOptions: { hour: "2-digit", minute: "2-digit" },
           })
-    }\n`;
+    }`) + "\n";
     const isPlaceholder = /^9{9,}$/.test(String(customer.mobile || ""));
     if (!isPlaceholder) {
-      t += `Customer   : ${customer.name || "Walk-in"}\n`;
-      t += `Mobile     : ${maskMobileForPrint(customer.mobile || "")}\n`;
+      t += center(`Customer : ${customer.name || "Walk-in"}`) + "\n";
+      t += center(`Mobile : ${maskMobileForPrint(customer.mobile || "")}`) + "\n";
     }
     if (splitEnabled) {
       const parts = [
@@ -407,9 +408,9 @@ export default function TableOrder() {
         `Card ${Number(split.card || 0).toFixed(2)}`,
         `UPI ${Number(split.upi || 0).toFixed(2)}`
       ].join(", ");
-      t += `Payment   : Split (${parts})\n`;
+      t += center(`Payment : Split (${parts})`) + "\n";
     } else {
-      t += `Payment   : ${String(paymentMode || "cash").toUpperCase()}\n`;
+      t += center(`Payment : ${String(paymentMode || "cash").toUpperCase()}`) + "\n";
     }
     t += line + "\n";
 
@@ -866,7 +867,7 @@ export default function TableOrder() {
             {filteredItems.length ? (
               <div className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-1">
                 {filteredItems.map(item => {
-                  const imgUrl = item.image_filename ? `${API_BASE}/item-images/${item.image_filename}` : "";
+                  const imgUrl = getItemImageUrl(item.image_filename);
                   const inOrder = orderItems.some(o => o.item_id === item.item_id);
                   const orderQty = orderItems.find(o => o.item_id === item.item_id)?.quantity || 0;
                   return (

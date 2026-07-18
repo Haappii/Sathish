@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 16,
     gap: 6,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   sectionTitle: { fontSize: 15, fontWeight: "800" },

@@ -14,11 +14,14 @@ import {
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+
 
 const money = (n) => `₹${Number(n || 0).toFixed(2)}`;
 const MODES = ["cash", "upi", "card", "bank"];
 
 export default function SupplierLedgerScreen() {
+  const { theme } = useTheme();
   const { session } = useAuth();
   const roleLower = String(session?.role_name || session?.role || "").toLowerCase();
   const isAdmin = roleLower === "admin";
@@ -412,63 +415,63 @@ export default function SupplierLedgerScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 30 },
   card: {
-    backgroundColor: "#fff", borderRadius: 18, borderWidth: 1.5,
-    borderColor: "#dde6f7", padding: 14, gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,
+    borderColor: "#e4e9f2", padding: 14, gap: 10,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 16, fontWeight: "900", color: "#0c1228", letterSpacing: -0.3 },
-  totalDue: { color: "#dc2626", fontWeight: "800", fontSize: 13, marginTop: 2 },
+  title: { fontSize: 16, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.3 },
+  totalDue: { color: "#ef4444", fontWeight: "800", fontSize: 13, marginTop: 2 },
   refreshBtn: {
-    borderWidth: 1.5, borderColor: "#dde6f7", backgroundColor: "#f0f4ff",
+    borderWidth: 1.5, borderColor: "#e4e9f2", backgroundColor: "#f4f6fb",
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
   },
-  refreshTxt: { color: "#2563eb", fontWeight: "700", fontSize: 12 },
-  section: { fontSize: 11, fontWeight: "800", color: "#4a5a78", textTransform: "uppercase", letterSpacing: 0.5 },
-  subSection: { fontSize: 11, fontWeight: "700", color: "#8896ae", marginTop: 6 },
-  empty: { color: "#8896ae", fontSize: 12, paddingVertical: 8 },
+  refreshTxt: { color: "#6366f1", fontWeight: "700", fontSize: 12 },
+  section: { fontSize: 11, fontWeight: "800", color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.5 },
+  subSection: { fontSize: 11, fontWeight: "700", color: "#9ca3af", marginTop: 6 },
+  empty: { color: "#9ca3af", fontSize: 12, paddingVertical: 8 },
   chips: { flexDirection: "row", gap: 8, paddingVertical: 6 },
   chip: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", backgroundColor: "#f8f9fd",
     borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
   },
-  chipOn: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  chipTxt: { color: "#4a5a78", fontWeight: "700", fontSize: 11 },
+  chipOn: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  chipTxt: { color: "#4b5563", fontWeight: "700", fontSize: 11 },
   chipTxtOn: { color: "#fff" },
   row: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    borderWidth: 1.5, borderColor: "#dde6f7", borderRadius: 14, padding: 10, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 14, padding: 10, backgroundColor: "#f8f9fd",
   },
-  rowActive: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
-  rowName: { color: "#0c1228", fontWeight: "800", fontSize: 12 },
-  rowMeta: { color: "#8896ae", fontSize: 11, marginTop: 2 },
-  rowDue: { color: "#dc2626", fontWeight: "900", fontSize: 13 },
-  supplierNote: { color: "#4a5a78", fontSize: 12, fontWeight: "700" },
+  rowActive: { borderColor: "#6366f1", backgroundColor: "#eff6ff" },
+  rowName: { color: "#0a0f1e", fontWeight: "800", fontSize: 12 },
+  rowMeta: { color: "#9ca3af", fontSize: 11, marginTop: 2 },
+  rowDue: { color: "#ef4444", fontWeight: "900", fontSize: 13 },
+  supplierNote: { color: "#4b5563", fontSize: 12, fontWeight: "700" },
   input: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12, backgroundColor: "#f6f8fe",
-    paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: "#0c1228",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12, backgroundColor: "#f8f9fd",
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: "#0a0f1e",
   },
   saveBtn: {
-    backgroundColor: "#059669", borderRadius: 14, paddingVertical: 13, alignItems: "center",
-    shadowColor: "#059669", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    backgroundColor: "#10b981", borderRadius: 14, paddingVertical: 13, alignItems: "center",
+    shadowColor: "#10b981", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   saveBtnOff: { opacity: 0.6 },
   saveTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
   poRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    borderBottomWidth: 1, borderBottomColor: "#f0f4ff", paddingVertical: 9,
+    borderBottomWidth: 1, borderBottomColor: "#f4f6fb", paddingVertical: 9,
   },
   stRow: {
     flexDirection: "row", alignItems: "flex-start", gap: 10,
-    borderBottomWidth: 1, borderBottomColor: "#f0f4ff", paddingVertical: 9,
+    borderBottomWidth: 1, borderBottomColor: "#f4f6fb", paddingVertical: 9,
   },
-  debit: { color: "#dc2626", fontSize: 12, fontWeight: "800" },
-  credit: { color: "#059669", fontSize: 12, fontWeight: "800" },
-  errorTitle: { fontSize: 16, fontWeight: "900", color: "#dc2626" },
-  errorSub: { marginTop: 8, color: "#8896ae", fontSize: 13 },
+  debit: { color: "#ef4444", fontSize: 12, fontWeight: "800" },
+  credit: { color: "#10b981", fontSize: 12, fontWeight: "800" },
+  errorTitle: { fontSize: 16, fontWeight: "900", color: "#ef4444" },
+  errorSub: { marginTop: 8, color: "#9ca3af", fontSize: 13 },
 });

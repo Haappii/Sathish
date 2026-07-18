@@ -156,8 +156,10 @@ def save_shop_details(
 
     db.add(shop)
 
-    # Keep logo filename aligned with shop_name changes
-    if prev_shop_name and shop.shop_name and prev_shop_name.strip() != shop.shop_name.strip():
+    # Keep logo filename aligned with shop_name changes (local filesystem only)
+    current_logo = (shop.logo_url or "").strip()
+    is_remote_logo = current_logo.startswith("http://") or current_logo.startswith("https://")
+    if not is_remote_logo and prev_shop_name and shop.shop_name and prev_shop_name.strip() != shop.shop_name.strip():
         try:
             SHOP_LOGOS_DIR.mkdir(parents=True, exist_ok=True)
             new_filename = build_logo_filename(shop.shop_name, shop.shop_id)

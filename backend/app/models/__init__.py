@@ -20,3 +20,4 @@ from .invoice_draft import InvoiceDraft, InvoiceDraftItem
 from .online_order import OnlineOrder, OnlineOrderItem, OnlineOrderEvent
 from .employee import Employee, EmployeeAttendance, EmployeeWagePayment
 from .subscription_plan import SubscriptionPlan
+from .platform_team_profile import PlatformTeamProfile

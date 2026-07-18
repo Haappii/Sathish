@@ -12,6 +12,8 @@ import {
 } from "react-native";
 
 import api from "../api/client";
+import { useTheme } from "../context/ThemeContext";
+
 
 const STATUS_COLORS = {
   PENDING: "#d97706",
@@ -29,6 +31,7 @@ const NEXT_STATUS = {
 };
 
 export default function KotManagementScreen() {
+  const { theme } = useTheme();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -149,41 +152,41 @@ export default function KotManagementScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14, gap: 12, paddingBottom: 24 },
-  header: { fontSize: 17, fontWeight: "900", color: "#0c1228", letterSpacing: -0.2 },
-  empty: { color: "#8896ae", fontSize: 14, fontWeight: "600" },
+  header: { fontSize: 17, fontWeight: "900", color: "#0a0f1e", letterSpacing: -0.2 },
+  empty: { color: "#9ca3af", fontSize: 14, fontWeight: "600" },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     borderRadius: 18,
     padding: 14,
     gap: 10,
-    shadowColor: "#1a2463",
+    shadowColor: "#0a0f1e",
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
   },
   headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  title: { fontWeight: "900", color: "#0c1228", fontSize: 15 },
+  title: { fontWeight: "900", color: "#0a0f1e", fontSize: 15 },
   badge: { fontWeight: "800", fontSize: 12, letterSpacing: 0.5 },
-  sub: { color: "#4a5a78", fontSize: 13 },
+  sub: { color: "#4b5563", fontSize: 13 },
   itemsWrap: {
     gap: 6,
-    backgroundColor: "#f6f8fe",
+    backgroundColor: "#f8f9fd",
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     padding: 10,
   },
   infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   section: { gap: 5 },
   orderTypeBadge: {
-    backgroundColor: "#eff4ff",
-    color: "#2563eb",
+    backgroundColor: "#eef2ff",
+    color: "#6366f1",
     fontSize: 10,
     fontWeight: "800",
     paddingHorizontal: 10,
@@ -193,22 +196,22 @@ const styles = StyleSheet.create({
     borderColor: "#bfdbfe",
     overflow: "hidden",
   },
-  itemNotes: { color: "#8896ae", fontSize: 11, fontStyle: "italic", flex: 1 },
+  itemNotes: { color: "#9ca3af", fontSize: 11, fontStyle: "italic", flex: 1 },
   itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  itemName: { color: "#0c1228", flex: 1, paddingRight: 8, fontSize: 13, fontWeight: "600" },
-  itemQty: { color: "#4a5a78", fontWeight: "800", fontSize: 13 },
+  itemName: { color: "#0a0f1e", flex: 1, paddingRight: 8, fontSize: 13, fontWeight: "600" },
+  itemQty: { color: "#4b5563", fontWeight: "800", fontSize: 13 },
   btn: {
     marginTop: 4,
     borderRadius: 13,
-    backgroundColor: "#2563eb",
+    backgroundColor: "#6366f1",
     paddingVertical: 13,
     alignItems: "center",
-    shadowColor: "#2563eb",
+    shadowColor: "#6366f1",
     shadowOpacity: 0.3,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
   },
-  btnDisabled: { backgroundColor: "#8896ae", shadowColor: "transparent", elevation: 0 },
+  btnDisabled: { backgroundColor: "#9ca3af", shadowColor: "transparent", elevation: 0 },
   btnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
 });

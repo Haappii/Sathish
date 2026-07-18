@@ -16,10 +16,13 @@ import {
 } from "react-native";
 import api from "../api/client";
 import { formatBusinessDateLabel, toBusinessYmd } from "../utils/businessDate";
+import { useTheme } from "../context/ThemeContext";
+
 
 const CATEGORIES = ["Food", "Maintenance", "Salary", "Utilities", "Rent", "Other"];
 
 export default function ExpensesScreen() {
+  const { theme } = useTheme();
   const [expenses, setExpenses]   = useState([]);
   const [total, setTotal]         = useState(0);
   const [loading, setLoading]     = useState(true);
@@ -159,8 +162,8 @@ export default function ExpensesScreen() {
             />
 
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-              <Pressable style={[styles.btn, { backgroundColor: "#f0f4ff", flex: 1, borderWidth: 1.5, borderColor: "#dde6f7" }]} onPress={() => setAddModal(false)}>
-                <Text style={[styles.btnText, { color: "#4a5a78" }]}>Cancel</Text>
+              <Pressable style={[styles.btn, { backgroundColor: theme.background, flex: 1, borderWidth: 1.5, borderColor: theme.cardBorder }]} onPress={() => setAddModal(false)}>
+                <Text style={[styles.btnText, { color: theme.textSub }]}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.btn, { flex: 1 }]} onPress={saveExpense} disabled={saving}>
                 <Text style={styles.btnText}>{saving ? "Saving…" : "Save"}</Text>
@@ -178,58 +181,58 @@ function fmt(n) {
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: "#f0f4ff" },
+  safe:     { flex: 1, backgroundColor: "#f4f6fb" },
   center:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   topBar: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: "#0c1228",
+    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: "#0a0f1e",
   },
-  topLabel: { color: "#7a8fa8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  topLabel: { color: "#4b5563", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   bizDate:  { color: "#93c5fd", fontSize: 11, fontWeight: "700", marginTop: 2 },
   topTotal: { fontSize: 24, fontWeight: "900", color: "#f0a820", marginTop: 2 },
   addBtn: {
-    backgroundColor: "#2563eb", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10,
-    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 5,
+    backgroundColor: "#6366f1", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10,
+    shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   card: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "#fff", borderRadius: 18, padding: 14,
-    borderWidth: 1.5, borderColor: "#dde6f7",
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    backgroundColor: "#ffffff", borderRadius: 18, padding: 14,
+    borderWidth: 1.5, borderColor: "#e4e9f2",
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   cardLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  catBadge: { backgroundColor: "#fef3c7", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#fde68a" },
-  catText:  { color: "#b45309", fontWeight: "700", fontSize: 12 },
-  description: { fontWeight: "700", color: "#0c1228", maxWidth: 200, fontSize: 13 },
-  meta:     { color: "#8896ae", fontSize: 12, marginTop: 2 },
-  amount:   { fontWeight: "900", color: "#dc2626", fontSize: 16 },
+  catBadge: { backgroundColor: "#fffbeb", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#fde68a" },
+  catText:  { color: "#d97706", fontWeight: "700", fontSize: 12 },
+  description: { fontWeight: "700", color: "#0a0f1e", maxWidth: 200, fontSize: 13 },
+  meta:     { color: "#9ca3af", fontSize: 12, marginTop: 2 },
+  amount:   { fontWeight: "900", color: "#ef4444", fontSize: 16 },
   overlay:  { flex: 1, justifyContent: "flex-end" },
   overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   modal: {
-    backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: "#ffffff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 22, paddingBottom: 44,
-    shadowColor: "#0c1228", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
-  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0c1228", marginBottom: 16, letterSpacing: -0.3 },
-  fieldLabel: { color: "#4a5a78", fontSize: 11, marginBottom: 6, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  modalTitle: { fontSize: 20, fontWeight: "900", color: "#0a0f1e", marginBottom: 16, letterSpacing: -0.3 },
+  fieldLabel: { color: "#4b5563", fontSize: 11, marginBottom: 6, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 12,
-    paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#f6f8fe",
-    color: "#0c1228", fontSize: 14, marginBottom: 12,
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#f8f9fd",
+    color: "#0a0f1e", fontSize: 14, marginBottom: 12,
   },
   catChip: {
-    borderWidth: 1.5, borderColor: "#d0dcf0", borderRadius: 999,
-    paddingHorizontal: 13, paddingVertical: 7, marginRight: 8, backgroundColor: "#f6f8fe",
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 999,
+    paddingHorizontal: 13, paddingVertical: 7, marginRight: 8, backgroundColor: "#f8f9fd",
   },
-  catChipActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  catChipText:   { color: "#4a5a78", fontWeight: "700", fontSize: 12 },
+  catChipActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
+  catChipText:   { color: "#4b5563", fontWeight: "700", fontSize: 12 },
   catChipTextActive: { color: "#fff" },
   btn: {
-    backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 14, alignItems: "center",
-    shadowColor: "#2563eb", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 14, alignItems: "center",
+    shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
   },
   btnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
-  empty:   { color: "#8896ae", fontSize: 14 },
+  empty:   { color: "#9ca3af", fontSize: 14 },
 });

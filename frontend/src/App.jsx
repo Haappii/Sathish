@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 /** Redirects to /home if the shop's billing_type doesn't match the required type. */
 function ShopTypeGuard({ requireHotel, children }) {
@@ -54,82 +54,82 @@ function OrderLiveGuard({ children }) {
 }
 
 import MainLayout from "./layouts/MainLayout";
-
-import Login from "./pages/Login";
-import Home from "./pages/Home";
-import Trends from "./pages/Trends";
-import Analytics from "./pages/Analytics";
-import DayClose from "./pages/DayClose";
-import CreateBill from "./pages/CreateBill";
-import SalesHistory from "./pages/SalesHistory";
-import EditBill from "./pages/EditBill";
-import Inventory from "./pages/Inventory";
-import Dues from "./pages/Dues";
-import Returns from "./pages/Returns";
-import StockTransfers from "./pages/StockTransfers";
-import Drafts from "./pages/Drafts";
-import Customers from "./pages/Customers";
-
-import SupportTickets from "./pages/SupportTickets";
-import Alerts from "./pages/Alerts";
-import CashDrawer from "./pages/CashDrawer";
-import Loyalty from "./pages/Loyalty";
-import GiftCards from "./pages/GiftCards";
-import Labels from "./pages/Labels";
-import Coupons from "./pages/Coupons";
-import SupplierLedger from "./pages/SupplierLedger";
-import StockAudit from "./pages/StockAudit";
-import ItemLots from "./pages/ItemLots";
-import OfflineSync from "./pages/OfflineSync";
-import Expenses from "./pages/Expenses";
-import OnlineOrders from "./pages/OnlineOrders";
-import Employees from "./pages/Employees";
-import EmployeeAttendance from "./pages/EmployeeAttendance";
-
-import TableGrid from "./pages/TableGrid";
-import TableOrder from "./pages/TableOrder";
-import QrOrders from "./pages/QrOrders";
-import PublicQrMenu from "./pages/PublicQrMenu";
-import OrderLiveTracking from "./pages/OrderLiveTracking";
-
-// ⭐ HOTEL FEATURES
-import KitchenDisplay from "./pages/KitchenDisplay";
-import Reservations from "./pages/Reservations";
-import RecipeManagement from "./pages/RecipeManagement";
-import DeliveryManagement from "./pages/DeliveryManagement";
-
-import Setup from "./pages/Setup";
-import Categories from "./pages/setup/Categories";
-import Items from "./pages/setup/Items";
-import ShopDetails from "./pages/setup/ShopDetails";
-import Users from "./pages/setup/Users";
-import Branches from "./pages/setup/Branches";
-import ManageTables from "./pages/setup/ManageTables";
-import Suppliers from "./pages/setup/Suppliers";
-import PurchaseOrders from "./pages/setup/PurchaseOrders";
-import Permissions from "./pages/setup/Permissions";
-import OnlineOrderSetup from "./pages/setup/OnlineOrderSetup";
-import ExcelUpload from "./pages/setup/ExcelUpload";
-import MailScheduler from "./pages/setup/MailScheduler";
-import CashDenominationSetup from "./pages/setup/CashDenominationSetup";
-import SetupOnboard from "./pages/SetupOnboard";
 import About from "./pages/About";
+import Login from "./pages/Login";
+import SetupOnboard from "./pages/SetupOnboard";
 
-import PlatformLogin from "./pages/platform/PlatformLogin";
-import PlatformDashboard from "./pages/platform/PlatformDashboard";
-import SupportDesk from "./pages/platform/SupportDesk";
+const Home = lazy(() => import("./pages/Home"));
+const Trends = lazy(() => import("./pages/Trends"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const DayClose = lazy(() => import("./pages/DayClose"));
+const CreateBill = lazy(() => import("./pages/CreateBill"));
+const SalesHistory = lazy(() => import("./pages/SalesHistory"));
+const EditBill = lazy(() => import("./pages/EditBill"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Dues = lazy(() => import("./pages/Dues"));
+const Returns = lazy(() => import("./pages/Returns"));
+const StockTransfers = lazy(() => import("./pages/StockTransfers"));
+const Drafts = lazy(() => import("./pages/Drafts"));
+const Customers = lazy(() => import("./pages/Customers"));
 
-import Reports from "./pages/reports/Reports";
-import PublicReservation from "./pages/PublicReservation";
-import PublicPayment from "./pages/PublicPayment";
+const SupportTickets = lazy(() => import("./pages/SupportTickets"));
+const Alerts = lazy(() => import("./pages/Alerts"));
+const CashDrawer = lazy(() => import("./pages/CashDrawer"));
+const Loyalty = lazy(() => import("./pages/Loyalty"));
+const GiftCards = lazy(() => import("./pages/GiftCards"));
+const Labels = lazy(() => import("./pages/Labels"));
+const Coupons = lazy(() => import("./pages/Coupons"));
+const SupplierLedger = lazy(() => import("./pages/SupplierLedger"));
+const StockAudit = lazy(() => import("./pages/StockAudit"));
+const ItemLots = lazy(() => import("./pages/ItemLots"));
+const OfflineSync = lazy(() => import("./pages/OfflineSync"));
+const Expenses = lazy(() => import("./pages/Expenses"));
+const OnlineOrders = lazy(() => import("./pages/OnlineOrders"));
+const Employees = lazy(() => import("./pages/Employees"));
+const EmployeeAttendance = lazy(() => import("./pages/EmployeeAttendance"));
 
-import DeletedInvoices from "./pages/DeletedInvoices"; // ✅ OUTSIDE REPORTS
-import PublicFeedback from "./pages/PublicFeedback";
-import PublicInvoice from "./pages/PublicInvoice";
-import FeedbackReview from "./pages/FeedbackReview";
+const TableGrid = lazy(() => import("./pages/TableGrid"));
+const TableOrder = lazy(() => import("./pages/TableOrder"));
+const QrOrders = lazy(() => import("./pages/QrOrders"));
+const PublicQrMenu = lazy(() => import("./pages/PublicQrMenu"));
+const PublicBranchMenu = lazy(() => import("./pages/PublicBranchMenu"));
+const OrderLiveTracking = lazy(() => import("./pages/OrderLiveTracking"));
 
-import AdvanceOrders from "./pages/AdvanceOrders";
-import NotFound from "./pages/NotFound";
+const KitchenDisplay = lazy(() => import("./pages/KitchenDisplay"));
+const Reservations = lazy(() => import("./pages/Reservations"));
+const RecipeManagement = lazy(() => import("./pages/RecipeManagement"));
+const DeliveryManagement = lazy(() => import("./pages/DeliveryManagement"));
+
+const Setup = lazy(() => import("./pages/Setup"));
+const Categories = lazy(() => import("./pages/setup/Categories"));
+const Items = lazy(() => import("./pages/setup/Items"));
+const ShopDetails = lazy(() => import("./pages/setup/ShopDetails"));
+const Users = lazy(() => import("./pages/setup/Users"));
+const Branches = lazy(() => import("./pages/setup/Branches"));
+const ManageTables = lazy(() => import("./pages/setup/ManageTables"));
+const Suppliers = lazy(() => import("./pages/setup/Suppliers"));
+const PurchaseOrders = lazy(() => import("./pages/setup/PurchaseOrders"));
+const Permissions = lazy(() => import("./pages/setup/Permissions"));
+const OnlineOrderSetup = lazy(() => import("./pages/setup/OnlineOrderSetup"));
+const ExcelUpload = lazy(() => import("./pages/setup/ExcelUpload"));
+const MailScheduler = lazy(() => import("./pages/setup/MailScheduler"));
+const CashDenominationSetup = lazy(() => import("./pages/setup/CashDenominationSetup"));
+
+const PlatformLogin = lazy(() => import("./pages/platform/PlatformLogin"));
+const PlatformDashboard = lazy(() => import("./pages/platform/PlatformDashboard"));
+const SupportDesk = lazy(() => import("./pages/platform/SupportDesk"));
+
+const Reports = lazy(() => import("./pages/reports/Reports"));
+const PublicReservation = lazy(() => import("./pages/PublicReservation"));
+const PublicPayment = lazy(() => import("./pages/PublicPayment"));
+
+const DeletedInvoices = lazy(() => import("./pages/DeletedInvoices"));
+const PublicFeedback = lazy(() => import("./pages/PublicFeedback"));
+const PublicInvoice = lazy(() => import("./pages/PublicInvoice"));
+const FeedbackReview = lazy(() => import("./pages/FeedbackReview"));
+
+const AdvanceOrders = lazy(() => import("./pages/AdvanceOrders"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 import { ToastProvider } from "./components/Toast";
 import api from "./utils/apiClient";
@@ -146,6 +146,7 @@ export default function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
+        <Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0f172a",color:"#94a3b8",fontSize:"14px"}}>Loading...</div>}>
         <Routes>
 
           {/* PUBLIC */}
@@ -163,6 +164,8 @@ export default function App() {
           <Route path="/platform/dashboard" element={<PlatformDashboard />} />
           <Route path="/platform/support" element={<SupportDesk />} />
           <Route path="/qr/:token" element={<PublicQrMenu />} />
+          <Route path="/menu/:slug/:token" element={<PublicBranchMenu />} />
+          <Route path="/menu/:token" element={<PublicBranchMenu />} />
           <Route path="/book" element={<PublicReservation />} />
           <Route path="/pay" element={<PublicPayment />} />
           <Route path="/feedback" element={<PublicFeedback />} />
@@ -286,6 +289,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
 
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </ToastProvider>
   );

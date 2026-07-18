@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -20,28 +21,37 @@ import { useTheme } from "../context/ThemeContext";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 import { getPendingCount } from "../offline/queue";
 import { syncOfflineQueue } from "../offline/sync";
+let autoDetectPrinter = () => {};
+try { autoDetectPrinter = require("../utils/printerAutoDetect").autoDetectPrinter; } catch {}
 import appLogo from "../../assets/app_logo.png";
 
-const TILE_ACCENT = {
-  sales_billing: "#2563eb",
-  billing_history: "#2563eb",
-  customers: "#0891b2",
-  table_billing: "#0d9488",
-  order_live: "#0d9488",
-  kot_management: "#0d9488",
-  qr_order_accept: "#7c3aed",
-  held_invoices: "#b45309",
-  inventory: "#059669",
-  dues: "#b45309",
-  returns: "#c2410c",
-  expenses: "#dc2626",
-  loyalty: "#be185d",
-  employees: "#6d28d9",
-  employee_settlements: "#5b21b6",
-  employee_attendance: "#6d28d9",
-  analytics: "#c2410c",
-  supplier_ledger: "#4338ca",
-  advance_orders: "#0369a1",
+const TILE_COLORS = {
+  sales_billing:     { bg: "#eef2ff", accent: "#6366f1", icon: "🧾" },
+  billing_history:   { bg: "#f5f3ff", accent: "#8b5cf6", icon: "📋" },
+  customers:         { bg: "#ecfeff", accent: "#06b6d4", icon: "👥" },
+  table_billing:     { bg: "#ecfdf5", accent: "#10b981", icon: "🍽️" },
+  order_live:        { bg: "#ecfdf5", accent: "#10b981", icon: "🔔" },
+  kot_management:    { bg: "#f0fdfa", accent: "#14b8a6", icon: "🎫" },
+  qr_order_accept:   { bg: "#faf5ff", accent: "#a855f7", icon: "📱" },
+  held_invoices:     { bg: "#fffbeb", accent: "#f59e0b", icon: "📌" },
+  inventory:         { bg: "#ecfdf5", accent: "#10b981", icon: "📦" },
+  dues:              { bg: "#fff7ed", accent: "#f97316", icon: "💳" },
+  returns:           { bg: "#fef2f2", accent: "#ef4444", icon: "↩️" },
+  expenses:          { bg: "#fef2f2", accent: "#ef4444", icon: "💸" },
+  loyalty:           { bg: "#fdf2f8", accent: "#ec4899", icon: "🎁" },
+  employees:         { bg: "#f5f3ff", accent: "#8b5cf6", icon: "👔" },
+  employee_settlements: { bg: "#f5f3ff", accent: "#7c3aed", icon: "💰" },
+  employee_attendance:  { bg: "#f5f3ff", accent: "#8b5cf6", icon: "📝" },
+  analytics:         { bg: "#fff7ed", accent: "#f97316", icon: "📈" },
+  supplier_ledger:   { bg: "#eef2ff", accent: "#6366f1", icon: "🚚" },
+  advance_orders:    { bg: "#ecfeff", accent: "#06b6d4", icon: "📋" },
+  cash_drawer:       { bg: "#fffbeb", accent: "#f59e0b", icon: "🏧" },
+  day_close:         { bg: "#f8fafc", accent: "#64748b", icon: "🌙" },
+  reports:           { bg: "#ecfeff", accent: "#06b6d4", icon: "📊" },
+  online_orders:     { bg: "#ecfdf5", accent: "#10b981", icon: "🛒" },
+  deleted_invoices:  { bg: "#fef2f2", accent: "#ef4444", icon: "🗑️" },
+  dashboard:         { bg: "#eef2ff", accent: "#6366f1", icon: "📊" },
+  settings:          { bg: "#f8fafc", accent: "#64748b", icon: "⚙️" },
 };
 
 const formatBizDate = (dateStr) => {
@@ -50,35 +60,17 @@ const formatBizDate = (dateStr) => {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
 };
-
 const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
-
-const slugifyShopName = (value) => {
-  const s = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]+/g, "")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return s || "shop";
-};
-
-const resolveShopLogoUrl = (shop) => {
-  const logoUrl = String(shop?.logo_url || "").trim();
-  if (logoUrl) {
-    if (isAbsoluteUrl(logoUrl) || logoUrl.startsWith("data:")) return logoUrl;
+const slugify = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]+/g, "").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "shop";
+const resolveLogoUrl = (shop) => {
+  const logo = String(shop?.logo_url || "").trim();
+  if (logo) {
+    if (isAbsoluteUrl(logo) || logo.startsWith("data:")) return logo;
     const base = String(WEB_APP_BASE || "").replace(/\/+$/, "");
-    return logoUrl.startsWith("/") ? `${base}${logoUrl}` : `${base}/${logoUrl}`;
+    return logo.startsWith("/") ? `${base}${logo}` : `${base}/${logo}`;
   }
-
-  const shopId = shop?.shop_id;
-  const shopName = shop?.shop_name;
-  if (!shopId || !shopName) return "";
-
-  const filename = `logo_${slugifyShopName(shopName)}_${shopId}.png`;
-  const base = String(WEB_APP_BASE || "").replace(/\/+$/, "");
-  return `${base}/shop-logos/${filename}`;
+  if (!shop?.shop_id || !shop?.shop_name) return "";
+  return `${String(WEB_APP_BASE || "").replace(/\/+$/, "")}/shop-logos/logo_${slugify(shop.shop_name)}_${shop.shop_id}.png`;
 };
 
 export default function HomeScreen({ navigation }) {
@@ -86,50 +78,37 @@ export default function HomeScreen({ navigation }) {
   const { theme, preference, setPreference } = useTheme();
   const { isOnline } = useOnlineStatus();
 
-  const [shopName, setShopName]         = useState("Haappii Billing");
-  const [isHotel, setIsHotel]           = useState(false);
+  const [shopName, setShopName] = useState("Haappii Billing");
+  const [trialDays, setTrialDays] = useState(null);
+  const [isHotel, setIsHotel] = useState(false);
   const [permsEnabled, setPermsEnabled] = useState(false);
-  const [permMap, setPermMap]           = useState(null);
-  const [enabledModules, setEnabledModules] = useState(null); // null = unrestricted
-  const [loading, setLoading]           = useState(true);
+  const [permMap, setPermMap] = useState(null);
+  const [enabledModules, setEnabledModules] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
-  const [syncing, setSyncing]           = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [shopLogoUri, setShopLogoUri] = useState("");
 
-  const roleLower      = String(session?.role_name || session?.role || "").toLowerCase();
-  const branchName     = String(session?.branch_name || "").trim();
-  const shopBranchLabel = branchName ? `${shopName} - ${branchName}` : shopName;
-  const bizDateLabel   = formatBizDate(session?.app_date);
-
-  const themeButtonLabel =
-    preference === "light" ? "Theme: Light" : preference === "dark" ? "Theme: Dark" : "Theme: System";
-
-  const openThemePicker = () => {
-    Alert.alert("Select Theme", "Choose app appearance", [
-      { text: "Light", onPress: () => setPreference("light") },
-      { text: "Dark", onPress: () => setPreference("dark") },
-      { text: "System", onPress: () => setPreference("system") },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
+  const roleLower = String(session?.role_name || session?.role || "").toLowerCase();
+  const branchName = String(session?.branch_name || "").trim();
+  const shopLabel = branchName ? `${shopName} · ${branchName}` : shopName;
+  const bizDate = formatBizDate(session?.app_date);
+  const themeLabels = { light: "Light", dark: "Dark", system: "System" };
 
   useLayoutEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
-        <Pressable
-          style={[styles.headerMenuBtn, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}
-          onPress={() => setSidebarVisible(true)}
-        >
-          <Text style={[styles.headerMenuText, { color: theme.accent }]}>☰</Text>
+        <Pressable style={[st.navBtn, { borderColor: "rgba(255,255,255,0.1)" }]} onPress={() => setSidebarVisible(true)}>
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800" }}>☰</Text>
         </Pressable>
       ),
       headerRight: () => null,
     });
-  }, [navigation, theme]);
+  }, [navigation]);
 
   useEffect(() => {
-    let mounted = true;
+    let alive = true;
     (async () => {
       setLoading(true);
       try {
@@ -138,425 +117,277 @@ export default function HomeScreen({ navigation }) {
           api.get("/permissions/my"),
           api.get("/shop/modules").catch(() => null),
         ]);
-        if (!mounted) return;
-        const shopData = shopRes?.data || {};
-        setShopName(shopData.shop_name || "Haappii Billing");
-        setShopLogoUri(resolveShopLogoUrl(shopData));
-        const billingType = String(shopData.billing_type || shopData.shop_type || "").toLowerCase();
-        setIsHotel(billingType === "hotel");
+        if (!alive) return;
+        const sd = shopRes?.data || {};
+        setShopName(sd.shop_name || "Haappii Billing");
+        setShopLogoUri(resolveLogoUrl(sd));
+        setIsHotel(String(sd.billing_type || sd.shop_type || "").toLowerCase() === "hotel");
+        const expiresOn = sd.expires_on || sd.paid_until;
+        if (expiresOn) {
+          const exp = new Date(expiresOn);
+          const now = new Date(); now.setHours(0,0,0,0);
+          const diff = Math.ceil((exp - now) / (1000*60*60*24));
+          if (diff <= 30) setTrialDays(diff);
+        }
         setPermsEnabled(Boolean(permRes?.data?.enabled));
         setPermMap(modulesToPermMap(permRes?.data?.modules));
-        if (modulesRes?.data?.configured) {
-          setEnabledModules(new Set(modulesRes.data.enabled_modules || []));
-        } else {
-          setEnabledModules(null); // unrestricted
-        }
-        const count = await getPendingCount();
-        setPendingCount(count);
+        if (modulesRes?.data?.configured) setEnabledModules(new Set(modulesRes.data.enabled_modules || []));
+        else setEnabledModules(null);
+        setPendingCount(await getPendingCount());
       } catch (err) {
-        if (!mounted) return;
+        if (!alive) return;
         setPermMap({});
         Alert.alert("Error", String(err?.response?.data?.detail || "Failed to load home"));
-      } finally {
-        if (mounted) setLoading(false);
-      }
+      } finally { if (alive) setLoading(false); }
     })();
-    return () => { mounted = false; };
+    autoDetectPrinter();
+    return () => { alive = false; };
   }, []);
 
-  const menus = useMemo(
-    () => buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel }),
-    [roleLower, permsEnabled, permMap, isHotel]
-  );
+  const menus = useMemo(() => buildMobileMenu({ roleLower, permsEnabled, permMap, isHotel }), [roleLower, permsEnabled, permMap, isHotel]);
 
-  // Premium modules to advertise when shop is on free tier (modules configured but locked)
-  const PREMIUM_LOCKED_TILES = [
-    { key: "customers",       title: "Customers & Dues",      icon: "👥" },
-    { key: "loyalty",         title: "Loyalty & Coupons",     icon: "🎁" },
-    { key: "employees",       title: "Employees",             icon: "👔" },
-    { key: "expenses",        title: "Expenses",              icon: "💸" },
-    { key: "returns",         title: "Returns",               icon: "↩️" },
-    { key: "reports",         title: "Reports",               icon: "📊" },
-    { key: "analytics",       title: "Analytics",             icon: "📈" },
-    { key: "cash_drawer",     title: "Cash Drawer",           icon: "💰" },
-    { key: "table_billing",   title: "Table Billing",         icon: "🍽️" },
-    { key: "online_orders",   title: "Online Orders",         icon: "🛒" },
-    { key: "advance_orders",  title: "Advance Orders",        icon: "📋" },
-    { key: "supplier_ledger", title: "Suppliers",             icon: "🚚" },
+  const PREMIUM_LOCKED = [
+    { key: "customers", title: "Customers & Dues", icon: "👥" },
+    { key: "loyalty", title: "Loyalty & Coupons", icon: "🎁" },
+    { key: "employees", title: "Employees", icon: "👔" },
+    { key: "expenses", title: "Expenses", icon: "💸" },
+    { key: "returns", title: "Returns", icon: "↩️" },
+    { key: "reports", title: "Reports", icon: "📊" },
+    { key: "analytics", title: "Analytics", icon: "📈" },
+    { key: "cash_drawer", title: "Cash Drawer", icon: "💰" },
+    { key: "table_billing", title: "Table Billing", icon: "🍽️" },
+    { key: "online_orders", title: "Online Orders", icon: "🛒" },
+    { key: "advance_orders", title: "Advance Orders", icon: "📋" },
+    { key: "supplier_ledger", title: "Suppliers", icon: "🚚" },
   ];
-
-  const lockedTiles = useMemo(() => {
-    if (!enabledModules) return []; // unrestricted — no locked tiles
-    return PREMIUM_LOCKED_TILES.filter((m) => !enabledModules.has(m.key));
-  }, [enabledModules]);
+  const lockedTiles = useMemo(() => enabledModules ? PREMIUM_LOCKED.filter((m) => !enabledModules.has(m.key)) : [], [enabledModules]);
 
   const handleSync = async () => {
     if (syncing || !isOnline) return;
     setSyncing(true);
     try {
-      const result = await syncOfflineQueue();
-      const remaining = await getPendingCount();
-      setPendingCount(remaining);
-      if (result.synced > 0) Alert.alert("Synced", `${result.synced} offline bill(s) uploaded.`);
-    } finally {
-      setSyncing(false);
-    }
+      const r = await syncOfflineQueue();
+      setPendingCount(await getPendingCount());
+      if (r.synced > 0) Alert.alert("Synced", `${r.synced} offline bill(s) uploaded.`);
+    } finally { setSyncing(false); }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.accent} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (loading) return (
+    <SafeAreaView style={[st.safe, { backgroundColor: theme.background }]}>
+      <View style={st.center}><ActivityIndicator size="large" color={theme.accent} /></View>
+    </SafeAreaView>
+  );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      {/* Banners */}
+    <SafeAreaView style={[st.safe, { backgroundColor: theme.background }]}>
       {!isOnline && (
-        <View style={styles.bannerOffline}>
-          <Text style={styles.bannerText}>Offline Mode - bills sync when reconnected</Text>
+        <View style={st.bannerOff}>
+          <View style={st.bannerDot} /><Text style={st.bannerTxt}>Offline — bills sync when reconnected</Text>
         </View>
       )}
       {isOnline && pendingCount > 0 && (
-        <Pressable style={styles.bannerSync} onPress={handleSync} disabled={syncing}>
-          <Text style={styles.bannerText}>
-            {syncing ? "Syncing..." : `${pendingCount} pending bill(s) - tap to sync`}
-          </Text>
+        <Pressable style={st.bannerSync} onPress={handleSync} disabled={syncing}>
+          <Text style={st.bannerTxt}>{syncing ? "Syncing..." : `${pendingCount} pending bill(s) — tap to sync`}</Text>
         </Pressable>
       )}
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header Card */}
-        <View style={styles.header}>
-          <View style={styles.headerGlowA} />
-          <View style={styles.headerGlowB} />
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={styles.shopName} numberOfLines={1}>{shopBranchLabel}</Text>
-              <View style={styles.userRow}>
-                <Text style={styles.userText}>{session?.user_name || "User"}</Text>
-                <View style={styles.roleBadge}>
-                  <Text style={styles.roleText}>
-                    {(session?.role_name || session?.role || "").toUpperCase()}
-                  </Text>
+      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+        {/* Hero */}
+        <View style={st.hero}>
+          <View style={st.heroGlow1} />
+          <View style={st.heroGlow2} />
+          <View style={st.heroTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={st.heroShop} numberOfLines={1}>{shopLabel}</Text>
+              <View style={st.heroMeta}>
+                <Text style={st.heroUser}>{session?.user_name || "User"}</Text>
+                <View style={st.heroBadge}>
+                  <Text style={st.heroBadgeText}>{(session?.role_name || session?.role || "").toUpperCase()}</Text>
                 </View>
               </View>
             </View>
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerFooter}>
-            <View>
-              <Text style={styles.bizDateLabel}>BUSINESS DATE</Text>
-              <Text style={styles.bizDateValue}>{bizDateLabel}</Text>
+            <View style={[st.statusChip, isOnline ? st.statusOn : st.statusOff]}>
+              <View style={[st.statusDot, { backgroundColor: isOnline ? "#34d399" : "#f87171" }]} />
+              <Text style={[st.statusText, { color: isOnline ? "#34d399" : "#f87171" }]}>{isOnline ? "Online" : "Offline"}</Text>
             </View>
-            <View style={[styles.statusPill, isOnline ? styles.statusOnline : styles.statusOffline]}>
-              <View style={[styles.statusDot, { backgroundColor: isOnline ? "#4ade80" : "#f87171" }]} />
-              <Text style={styles.statusText}>{isOnline ? "Online" : "Offline"}</Text>
+          </View>
+          {trialDays !== null && (
+            <View style={[st.trialBadge, trialDays <= 7 ? st.trialUrgent : st.trialNormal]}>
+              <Text style={[st.trialText, trialDays <= 7 ? st.trialTextUrgent : st.trialTextNormal]}>
+                {trialDays < 0 ? "Trial expired" : trialDays === 0 ? "Trial ends today" : `${trialDays} day${trialDays !== 1 ? "s" : ""} left in trial`}
+              </Text>
+            </View>
+          )}
+          <View style={st.heroDivider} />
+          <View style={st.heroBottom}>
+            <View>
+              <Text style={st.heroDateLabel}>BUSINESS DATE</Text>
+              <Text style={st.heroDateValue}>{bizDate}</Text>
             </View>
           </View>
         </View>
 
-        {/* Menu Grid */}
+        {/* Quick Actions */}
+        {menus.length > 0 && <Text style={st.sectionTitle}>Quick Actions</Text>}
+
         {menus.length === 0 ? (
-          <Text style={styles.empty}>No menus available for your role.</Text>
+          <Text style={st.empty}>No menus available for your role.</Text>
         ) : (
-          <View style={styles.grid}>
+          <View style={st.grid}>
             {menus.map((m) => {
-              const accent = TILE_ACCENT[m.key] || "#6366f1";
+              const tc = TILE_COLORS[m.key] || { bg: "#eef2ff", accent: "#6366f1", icon: "📋" };
               return (
-                <Pressable
-                  key={m.key}
-                  style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
-                  onPress={() => navigation.navigate(m.route, m.params || undefined)}
-                >
-                  <View style={[styles.tileAccentBar, { backgroundColor: accent }]} />
-                  <View style={[styles.iconWrap, { backgroundColor: accent + "20", borderColor: accent + "40" }]}>
-                    <Text style={styles.tileIcon}>{m.icon || "Menu"}</Text>
+                <Pressable key={m.key} style={({ pressed }) => [st.tile, pressed && st.tilePressed]}
+                  onPress={() => navigation.navigate(m.route, m.params || undefined)}>
+                  <View style={[st.tileIconBox, { backgroundColor: tc.bg }]}>
+                    <Text style={st.tileIconText}>{m.icon || tc.icon}</Text>
                   </View>
-                  <Text style={styles.tileLabel}>{m.title}</Text>
+                  <Text style={st.tileName} numberOfLines={2}>{m.title}</Text>
+                  <View style={[st.tileBar, { backgroundColor: tc.accent }]} />
                 </Pressable>
               );
             })}
           </View>
         )}
 
-        {/* Locked premium tiles — upgrade CTA for free tier shops */}
+        {/* Locked */}
         {lockedTiles.length > 0 && (
-          <View style={styles.lockedSection}>
-            <View style={styles.lockedHeader}>
-              <Text style={styles.lockedHeaderText}>🔒  Upgrade to Unlock</Text>
-            </View>
-            <View style={styles.grid}>
+          <>
+            <Text style={[st.sectionTitle, { color: "#f59e0b" }]}>Upgrade to Unlock</Text>
+            <View style={st.grid}>
               {lockedTiles.map((m) => (
-                <View key={m.key} style={styles.lockedTile}>
-                  <View style={[styles.tileAccentBar, { backgroundColor: "#d1d5db" }]} />
-                  <View style={styles.lockedIconWrap}>
-                    <Text style={styles.tileIcon}>{m.icon}</Text>
+                <View key={m.key} style={[st.tile, { opacity: 0.45 }]}>
+                  <View style={[st.tileIconBox, { backgroundColor: "#f3f4f6" }]}>
+                    <Text style={st.tileIconText}>{m.icon}</Text>
                   </View>
-                  <Text style={styles.lockedLabel}>{m.title}</Text>
-                  <View style={styles.lockedBadge}>
-                    <Text style={styles.lockedBadgeText}>PRO</Text>
-                  </View>
+                  <Text style={[st.tileName, { color: "#9ca3af" }]} numberOfLines={2}>{m.title}</Text>
+                  <View style={st.proBadge}><Text style={st.proText}>PRO</Text></View>
                 </View>
               ))}
             </View>
-          </View>
+          </>
         )}
-
       </ScrollView>
 
+      {/* Sidebar */}
       <Modal visible={sidebarVisible} animationType="fade" transparent onRequestClose={() => setSidebarVisible(false)}>
-        <View style={styles.sidebarOverlay}>
-          <View style={[styles.sidebarPanel, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-            <View style={styles.sidebarHead}>
-              <Image source={shopLogoUri ? { uri: shopLogoUri } : appLogo} style={styles.sidebarLogo} resizeMode="contain" />
+        <View style={StyleSheet.absoluteFill}>
+          <View style={st.sidebar}>
+            <View style={st.sideHead}>
+              <View style={st.sideLogoBox}>
+                <Image source={shopLogoUri ? { uri: shopLogoUri } : appLogo} style={st.sideLogo} resizeMode="contain" />
+              </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.sidebarShopName, { color: theme.text }]} numberOfLines={1}>
-                  {shopName || "Haappii Billing"}
-                </Text>
-                <Text style={[styles.sidebarMeta, { color: theme.textSub }]} numberOfLines={1}>
-                  {session?.branch_name || "Main Branch"}
-                </Text>
-                <Text style={[styles.sidebarMeta, { color: theme.textSub }]} numberOfLines={1}>
-                  {session?.user_name || "User"}
-                </Text>
+                <Text style={st.sideShop} numberOfLines={1}>{shopName}</Text>
+                <Text style={st.sideMeta}>{session?.branch_name || "Main Branch"}</Text>
+                <Text style={st.sideMeta2}>{session?.user_name || "User"}</Text>
               </View>
             </View>
+            <View style={st.sideDivider} />
 
-            <View style={styles.sidebarDivider} />
+            {[
+              { label: "⚙️  Settings", action: () => { setSidebarVisible(false); navigation.navigate("Settings"); } },
+              { label: `🎨  Theme: ${themeLabels[preference]}`, action: () => { setSidebarVisible(false); Alert.alert("Theme", "Choose appearance", [
+                { text: "Light", onPress: () => setPreference("light") },
+                { text: "Dark", onPress: () => setPreference("dark") },
+                { text: "System", onPress: () => setPreference("system") },
+                { text: "Cancel", style: "cancel" },
+              ]); } },
+            ].map((item) => (
+              <Pressable key={item.label} style={st.sideBtn} onPress={item.action}>
+                <Text style={st.sideBtnText}>{item.label}</Text>
+              </Pressable>
+            ))}
 
-            <Pressable
-              style={[styles.sidebarAction, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}
-              onPress={() => {
-                setSidebarVisible(false);
-                navigation.navigate("Settings");
-              }}
-            >
-              <Text style={[styles.sidebarActionText, { color: theme.text }]}>Settings</Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.sidebarAction, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}
-              onPress={() => {
-                setSidebarVisible(false);
-                openThemePicker();
-              }}
-            >
-              <Text style={[styles.sidebarActionText, { color: theme.text }]}>{themeButtonLabel}</Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.sidebarAction, { borderColor: "#fecaca", backgroundColor: "#fef2f2" }]}
-              onPress={() => {
-                setSidebarVisible(false);
-                logout();
-              }}
-            >
-              <Text style={[styles.sidebarActionText, { color: "#b91c1c" }]}>Logout</Text>
+            <Pressable style={[st.sideBtn, { borderColor: "rgba(239,68,68,0.2)", backgroundColor: "rgba(239,68,68,0.06)" }]}
+              onPress={() => { setSidebarVisible(false); logout(); }}>
+              <Text style={[st.sideBtnText, { color: "#ef4444" }]}>🚪  Logout</Text>
             </Pressable>
           </View>
-          <Pressable style={styles.sidebarBackdrop} onPress={() => setSidebarVisible(false)} />
+          <Pressable style={st.sideBackdrop} onPress={() => setSidebarVisible(false)} />
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: "#f0f4ff" },
+const st = StyleSheet.create({
+  safe: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  scroll: { padding: 16, gap: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 44 },
+  navBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)" },
 
   // Banners
-  bannerOffline: { backgroundColor: "#7c2d12", paddingVertical: 11, paddingHorizontal: 16, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 },
-  bannerSync:    { backgroundColor: "#1d4ed8", paddingVertical: 11, paddingHorizontal: 16, alignItems: "center" },
-  bannerText:    { color: "#fff", fontWeight: "700", fontSize: 13, letterSpacing: 0.2 },
+  bannerOff: { backgroundColor: "#7f1d1d", paddingVertical: 12, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  bannerSync: { backgroundColor: "#4338ca", paddingVertical: 12, paddingHorizontal: 16, alignItems: "center" },
+  bannerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fca5a5" },
+  bannerTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-  // Header — deep premium card
-  header: {
-    backgroundColor: "#08111f",
-    borderRadius: 28,
-    padding: 20,
-    shadowColor: "#020810",
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 16,
-    borderWidth: 1,
-    borderColor: "#1a2a42",
-    overflow: "hidden",
+  // Hero
+  hero: {
+    backgroundColor: "#0c1220", borderRadius: 28, padding: 24, marginBottom: 24,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", overflow: "hidden",
+    shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 12,
   },
-  headerGlowA: {
-    position: "absolute",
-    right: -30,
-    top: -20,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "#1e3560",
-    opacity: 0.6,
-  },
-  headerGlowB: {
-    position: "absolute",
-    left: -40,
-    bottom: -50,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: "#152a4e",
-    opacity: 0.5,
-  },
-  headerRow:     { flexDirection: "row", alignItems: "flex-start" },
-  shopName:      { color: "#ffffff", fontSize: 20, fontWeight: "900", marginBottom: 8, letterSpacing: -0.3 },
-  userRow:       { flexDirection: "row", alignItems: "center", gap: 8 },
-  userText:      { color: "#7a8fa8", fontSize: 13, fontWeight: "600" },
-  roleBadge:     { backgroundColor: "#162848", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: "#1e3a60" },
-  roleText:      { color: "#6aaef5", fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
-  headerMenuBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerMenuText: { fontSize: 16, fontWeight: "900" },
-  headerDivider: { height: 1, backgroundColor: "#192840", marginVertical: 16 },
-  headerFooter:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bizDateLabel:  { color: "#4a5a72", fontSize: 10, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
-  bizDateValue:  { color: "#ccdeff", fontSize: 16, fontWeight: "800", marginTop: 4, letterSpacing: -0.2 },
-  statusPill:    { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 20, paddingHorizontal: 13, paddingVertical: 7, borderWidth: 1 },
-  statusOnline:  { backgroundColor: "#042b15", borderColor: "#065c28" },
-  statusOffline: { backgroundColor: "#2d1010", borderColor: "#5c1a1a" },
-  statusDot:     { width: 7, height: 7, borderRadius: 4 },
-  statusText:    { color: "#ffffff", fontSize: 12, fontWeight: "700" },
+  heroGlow1: { position: "absolute", right: -50, top: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: "#6366f1", opacity: 0.08 },
+  heroGlow2: { position: "absolute", left: -60, bottom: -70, width: 200, height: 200, borderRadius: 100, backgroundColor: "#a855f7", opacity: 0.05 },
+  heroTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  heroShop: { color: "#fff", fontSize: 22, fontWeight: "900", letterSpacing: -0.3, marginBottom: 10 },
+  heroMeta: { flexDirection: "row", alignItems: "center", gap: 10 },
+  heroUser: { color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: "600" },
+  heroBadge: { backgroundColor: "rgba(99,102,241,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(99,102,241,0.2)" },
+  heroBadgeText: { color: "#818cf8", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  statusChip: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1 },
+  statusOn: { backgroundColor: "rgba(52,211,153,0.08)", borderColor: "rgba(52,211,153,0.2)" },
+  statusOff: { backgroundColor: "rgba(248,113,113,0.08)", borderColor: "rgba(248,113,113,0.2)" },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: 11, fontWeight: "700" },
+  trialBadge: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, marginTop: 14, borderWidth: 1 },
+  trialNormal: { backgroundColor: "rgba(99,102,241,0.1)", borderColor: "rgba(99,102,241,0.2)" },
+  trialUrgent: { backgroundColor: "rgba(245,158,11,0.1)", borderColor: "rgba(245,158,11,0.2)" },
+  trialText: { fontSize: 12, fontWeight: "700" },
+  trialTextNormal: { color: "#818cf8" },
+  trialTextUrgent: { color: "#f59e0b" },
+  heroDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginVertical: 18 },
+  heroBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  heroDateLabel: { color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
+  heroDateValue: { color: "#fff", fontSize: 20, fontWeight: "800", marginTop: 4, letterSpacing: -0.3 },
+
+  // Section
+  sectionTitle: { color: "#64748b", fontSize: 13, fontWeight: "800", letterSpacing: 0.8, marginBottom: 14, marginTop: 8, paddingHorizontal: 4 },
 
   // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   tile: {
-    width: "23%",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    paddingLeft: 10,
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: "#dde6f7",
-    shadowColor: "#1a2463",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
-    overflow: "hidden",
-    position: "relative",
+    width: "23%", backgroundColor: "#fff", borderRadius: 20, paddingTop: 18, paddingBottom: 14, paddingHorizontal: 8,
+    alignItems: "center", gap: 10,
+    shadowColor: "#0f172a", shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3,
+    overflow: "hidden", position: "relative",
   },
-  tilePressed:   { opacity: 0.82, transform: [{ scale: 0.96 }] },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-  },
-  tileIcon:      { fontSize: 24 },
-  tileLabel:     { fontWeight: "800", color: "#0c1228", textAlign: "center", fontSize: 10, lineHeight: 13, letterSpacing: 0.1 },
-  tileAccentBar: { position: "absolute", top: 0, left: 0, bottom: 0, width: 3, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 },
+  tilePressed: { transform: [{ scale: 0.94 }], opacity: 0.85 },
+  tileIconBox: { width: 52, height: 52, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  tileIconText: { fontSize: 26 },
+  tileName: { fontWeight: "700", color: "#1e293b", textAlign: "center", fontSize: 10, lineHeight: 14 },
+  tileBar: { position: "absolute", top: 0, left: 12, right: 12, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
+  proBadge: { position: "absolute", top: 6, right: 4, backgroundColor: "#fef3c7", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: "#fcd34d" },
+  proText: { fontSize: 7, fontWeight: "900", color: "#b45309", letterSpacing: 0.5 },
 
-  sidebarOverlay:  { ...StyleSheet.absoluteFillObject, flexDirection: "row" },
-  sidebarBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-  sidebarPanel: {
-    width: "78%",
-    maxWidth: 320,
-    borderRightWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 28,
-    paddingBottom: 24,
-    gap: 12,
+  // Sidebar
+  sidebar: {
+    width: "78%", maxWidth: 320, backgroundColor: "#0f1729", height: "100%",
+    paddingHorizontal: 20, paddingTop: 48, paddingBottom: 28, gap: 12,
+    borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.06)",
   },
-  sidebarHead: { flexDirection: "row", alignItems: "center", gap: 12 },
-  sidebarLogo: { width: 54, height: 54, borderRadius: 14 },
-  sidebarShopName: { fontSize: 15, fontWeight: "900", letterSpacing: -0.2 },
-  sidebarMeta: { fontSize: 12, fontWeight: "600", marginTop: 2 },
-  sidebarDivider: { height: 1, backgroundColor: "#e2e8f0", marginVertical: 4 },
-  sidebarAction: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-  },
-  sidebarActionText: { fontSize: 14, fontWeight: "700" },
+  sideBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", zIndex: -1 },
+  sideHead: { flexDirection: "row", alignItems: "center", gap: 14 },
+  sideLogoBox: { width: 52, height: 52, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  sideLogo: { width: 44, height: 44 },
+  sideShop: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  sideMeta: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "600", marginTop: 3 },
+  sideMeta2: { color: "rgba(255,255,255,0.3)", fontSize: 11, fontWeight: "500", marginTop: 1 },
+  sideDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginVertical: 8 },
+  sideBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, backgroundColor: "rgba(255,255,255,0.03)" },
+  sideBtnText: { color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: "600" },
 
-  // Locked premium tiles
-  lockedSection: { gap: 12 },
-  lockedHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 4,
-  },
-  lockedHeaderText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#b87008",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  lockedTile: {
-    width: "23%",
-    backgroundColor: "#f9fafb",
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    paddingLeft: 10,
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: "#e9ecef",
-    opacity: 0.72,
-    overflow: "hidden",
-    position: "relative",
-  },
-  lockedIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f0f2f5",
-    borderWidth: 1.5,
-    borderColor: "#e2e8f0",
-  },
-  lockedLabel: {
-    fontWeight: "700",
-    color: "#9ca3af",
-    textAlign: "center",
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  lockedBadge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#fef3c7",
-    borderRadius: 7,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "#fcd34d",
-  },
-  lockedBadgeText: {
-    fontSize: 9,
-    fontWeight: "900",
-    color: "#b87008",
-    letterSpacing: 0.8,
-  },
-
-  empty: { color: "#8896ae", textAlign: "center", padding: 20, fontSize: 14 },
+  empty: { color: "#94a3b8", textAlign: "center", padding: 24, fontSize: 14 },
 });

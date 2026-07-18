@@ -13,6 +13,8 @@ import {
 
 import api from "../api/client";
 import { formatBusinessDateLabel } from "../utils/businessDate";
+import { useTheme } from "../context/ThemeContext";
+
 
 const MODULE_NOTES = {
   trends: "Trends data is available in this native module shell.",
@@ -47,6 +49,7 @@ const MODULE_NOTES = {
 };
 
 export default function NativeModuleScreen({ route }) {
+  const { theme } = useTheme();
   const title = route?.params?.title || "Module";
   const moduleKey = String(route?.params?.moduleKey || "").trim();
 
@@ -120,29 +123,29 @@ export default function NativeModuleScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f0f4ff" },
+  safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 14 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderWidth: 1.5,
-    borderColor: "#dde6f7",
+    borderColor: "#e4e9f2",
     borderRadius: 18,
     padding: 16,
     gap: 10,
-    shadowColor: "#1a2463", shadowOpacity: 0.07, shadowRadius: 12,
+    shadowColor: "#0a0f1e", shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  title: { fontSize: 16, fontWeight: "900", color: "#0c1228" },
-  sub: { color: "#4a5a78", fontWeight: "600" },
-  meta: { color: "#8896ae", fontSize: 12, fontWeight: "600" },
+  title: { fontSize: 16, fontWeight: "900", color: "#0a0f1e" },
+  sub: { color: "#4b5563", fontWeight: "600" },
+  meta: { color: "#9ca3af", fontSize: 12, fontWeight: "600" },
   refreshBtn: {
     marginTop: 8,
-    backgroundColor: "#2563eb",
+    backgroundColor: "#6366f1",
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
-    shadowColor: "#2563eb", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    shadowColor: "#6366f1", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   refreshTxt: { color: "#fff", fontWeight: "800" },
 });
