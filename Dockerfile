@@ -31,6 +31,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend source
 COPY backend/app/ ./app/
 
+# Copy static portfolio site (served at /sathish_kumar_lakshman_portfolio)
+# PORTFOLIO_DIR = PROJECT_ROOT / "backend" / "portfolio" = /backend/portfolio
+COPY backend/portfolio/ /backend/portfolio/
+
 # Copy built frontend to /frontend/dist (main.py resolves to this path)
 # PROJECT_ROOT = parents[2] of /app/app/main.py = /
 # FRONTEND_DIST_DIR = / / "frontend" / "dist" = /frontend/dist
