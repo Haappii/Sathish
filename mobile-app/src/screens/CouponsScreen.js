@@ -17,7 +17,7 @@ import {
 
 import api from "../api/client";
 
-const BLANK = { code: "", name: "", discount_type: "PERCENT", value: "", min_bill_amount: "", max_discount: "", start_date: "", end_date: "" };
+const BLANK = { code: "", name: "", discount_type: "FLAT", value: "", min_bill_amount: "", max_discount: "", start_date: "", end_date: "", active: true };
 const fmtDate = (v) => (v ? String(v).split("T")[0] : "-");
 
 export default function CouponsScreen() {
@@ -60,6 +60,7 @@ export default function CouponsScreen() {
         max_discount: form.max_discount ? Number(form.max_discount) : null,
         start_date: form.start_date || null,
         end_date: form.end_date || null,
+        active: Boolean(form.active),
       });
       setModalOpen(false);
       setForm(BLANK);
@@ -95,7 +96,8 @@ export default function CouponsScreen() {
     setValidateResult(null);
     try {
       const res = await api.get(`/coupons/validate/${validateCode.trim().toUpperCase()}`, { params: { amount: validateAmount } });
-      setValidateResult(res.data);
+      const data = res.data || {};
+      setValidateResult(data.valid ? data : { error: data.message || "Invalid coupon" });
     } catch (err) {
       setValidateResult({ error: err?.response?.data?.detail || "Invalid coupon" });
     } finally {
@@ -104,6 +106,7 @@ export default function CouponsScreen() {
   };
 
   const isExpired = (c) => c.end_date && new Date(c.end_date) < new Date();
+  const activeCount = rows.filter((r) => Boolean(r.active)).length;
 
   const renderItem = ({ item }) => {
     const expired = isExpired(item);
@@ -132,6 +135,21 @@ export default function CouponsScreen() {
 
   return (
     <SafeAreaView style={st.safe}>
+      <View style={st.statRow}>
+        <View style={st.statCard}>
+          <Text style={st.statValue}>{rows.length}</Text>
+          <Text style={st.statLabel}>Total</Text>
+        </View>
+        <View style={st.statCard}>
+          <Text style={[st.statValue, { color: "#10b981" }]}>{activeCount}</Text>
+          <Text style={st.statLabel}>Active</Text>
+        </View>
+        <View style={st.statCard}>
+          <Text style={[st.statValue, { color: "#94a3b8" }]}>{rows.length - activeCount}</Text>
+          <Text style={st.statLabel}>Inactive</Text>
+        </View>
+      </View>
+
       <View style={st.validateCard}>
         <Text style={st.validateTitle}>Validate Coupon</Text>
         <View style={st.validateRow}>
@@ -187,6 +205,12 @@ export default function CouponsScreen() {
               <TextInput style={[st.input, { flex: 1 }]} placeholder="Start (YYYY-MM-DD)" placeholderTextColor="#94a3b8" value={form.start_date} onChangeText={(v) => setForm((p) => ({ ...p, start_date: v }))} />
               <TextInput style={[st.input, { flex: 1 }]} placeholder="End (YYYY-MM-DD)" placeholderTextColor="#94a3b8" value={form.end_date} onChangeText={(v) => setForm((p) => ({ ...p, end_date: v }))} />
             </View>
+            <Pressable style={st.activeRow} onPress={() => setForm((p) => ({ ...p, active: !p.active }))}>
+              <Text style={st.activeLabel}>Active immediately</Text>
+              <View style={[st.toggleTrack, form.active && st.toggleTrackOn]}>
+                <View style={[st.toggleThumb, form.active && st.toggleThumbOn]} />
+              </View>
+            </Pressable>
             <View style={st.modalActions}>
               <Pressable style={st.cancelBtn} onPress={() => { setModalOpen(false); setForm(BLANK); }}>
                 <Text style={st.cancelBtnText}>Cancel</Text>
@@ -205,6 +229,16 @@ export default function CouponsScreen() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  statRow: { flexDirection: "row", gap: 10, paddingHorizontal: 14, paddingTop: 14 },
+  statCard: { flex: 1, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1.5, borderColor: "#e4e9f2", paddingVertical: 12, alignItems: "center" },
+  statValue: { fontSize: 20, fontWeight: "900", color: "#0a0f1e" },
+  statLabel: { fontSize: 10, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", marginTop: 2 },
+  activeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginTop: 4 },
+  activeLabel: { fontSize: 13, fontWeight: "600", color: "#0a0f1e" },
+  toggleTrack: { width: 40, height: 22, borderRadius: 11, backgroundColor: "#e2e8f0", padding: 2, justifyContent: "center" },
+  toggleTrackOn: { backgroundColor: "#6366f1" },
+  toggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#fff" },
+  toggleThumbOn: { transform: [{ translateX: 18 }] },
   validateCard: { backgroundColor: "#fff", margin: 14, marginBottom: 8, borderRadius: 16, borderWidth: 1.5, borderColor: "#e4e9f2", padding: 12, gap: 8 },
   validateTitle: { fontSize: 12, fontWeight: "800", color: "#6b7280", textTransform: "uppercase" },
   validateRow: { flexDirection: "row", gap: 8 },

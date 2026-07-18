@@ -33,8 +33,10 @@ export default function KitchenDisplayScreen({ navigation }) {
       const flat = [];
       orders.forEach((order) => {
         (order.kots || order.kot_list || []).forEach((kot) => {
+          if (String(kot.status || "").toUpperCase() === "COMPLETED") return;
           flat.push({
             ...kot,
+            tableId: order.table_id || order.tableId,
             tableName: order.table_name || order.tableName,
             tokenNumber: order.token_number || order.tokenNumber,
             orderType: order.order_type || order.orderType,
@@ -84,22 +86,40 @@ export default function KitchenDisplayScreen({ navigation }) {
         </View>
       </View>
       <Text style={st.meta}>{item.tableName || `Token ${item.tokenNumber}` || item.orderType}</Text>
-      {(item.items || []).map((it, i) => (
+      {(item.items || []).slice(0, 5).map((it, i) => (
         <Text key={i} style={st.itemLine}>• {it.item_name} × {it.quantity}</Text>
       ))}
-      {STATUS_FLOW[item.status] && (
-        <Pressable
-          style={[st.advanceBtn, { backgroundColor: STATUS_COLOR[item.status] }]}
-          disabled={busyId === (item.kot_id || item.kotNumber)}
-          onPress={() => advance(item)}
-        >
-          {busyId === (item.kot_id || item.kotNumber)
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={st.advanceBtnText}>{STATUS_LABEL[item.status]}</Text>}
-        </Pressable>
+      {(item.items || []).length > 5 && (
+        <Text style={st.moreLine}>+ {(item.items || []).length - 5} more items</Text>
       )}
+      <View style={st.actionsRow}>
+        {item.tableId && String(item.orderType || "").toUpperCase() !== "TAKEAWAY" && (
+          <Pressable
+            style={st.openBtn}
+            onPress={() => navigation.navigate("TableOrder", { table: { table_id: item.tableId, table_name: item.tableName } })}
+          >
+            <Text style={st.openBtnText}>Open</Text>
+          </Pressable>
+        )}
+        {STATUS_FLOW[item.status] && (
+          <Pressable
+            style={[st.advanceBtn, { backgroundColor: STATUS_COLOR[item.status] }]}
+            disabled={busyId === (item.kot_id || item.kotNumber)}
+            onPress={() => advance(item)}
+          >
+            {busyId === (item.kot_id || item.kotNumber)
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={st.advanceBtnText}>{STATUS_LABEL[item.status]}</Text>}
+          </Pressable>
+        )}
+      </View>
     </View>
   );
+
+  const counts = STATUS_ORDER.reduce((acc, s) => {
+    acc[s] = kots.filter((k) => k.status === s).length;
+    return acc;
+  }, {});
 
   return (
     <SafeAreaView style={st.safe}>
@@ -108,6 +128,13 @@ export default function KitchenDisplayScreen({ navigation }) {
         <Pressable style={st.liveLink} onPress={() => navigation.navigate("OrderLive")}>
           <Text style={st.liveLinkText}>Order Live ›</Text>
         </Pressable>
+      </View>
+      <View style={st.countsRow}>
+        {STATUS_ORDER.filter((s) => s !== "COMPLETED").map((s) => (
+          <View key={s} style={st.countChip}>
+            <Text style={st.countChipText}>{s}: {counts[s] || 0}</Text>
+          </View>
+        ))}
       </View>
       {loading ? (
         <View style={st.center}><ActivityIndicator size="large" color="#6366f1" /></View>
@@ -140,8 +167,15 @@ const st = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: "800" },
   meta: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
   itemLine: { fontSize: 12, color: "#374151", marginTop: 2 },
-  advanceBtn: { marginTop: 8, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
+  moreLine: { fontSize: 11, color: "#9ca3af", marginTop: 2, fontWeight: "600" },
+  actionsRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 8 },
+  openBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: "#e4e9f2", backgroundColor: "#f8f9fd" },
+  openBtnText: { color: "#374151", fontWeight: "700", fontSize: 12 },
+  advanceBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignItems: "center" },
   advanceBtnText: { color: "#fff", fontWeight: "800", fontSize: 12 },
+  countsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 14, paddingTop: 8 },
+  countChip: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#e4e9f2", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  countChipText: { fontSize: 10, fontWeight: "700", color: "#4b5563" },
   emptyWrap: { alignItems: "center", paddingTop: 50, gap: 10 },
   emptyIcon: { fontSize: 44 },
   emptyTitle: { color: "#9ca3af", fontSize: 15, fontWeight: "700" },

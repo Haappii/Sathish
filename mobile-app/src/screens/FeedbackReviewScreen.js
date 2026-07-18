@@ -39,7 +39,7 @@ export default function FeedbackReviewScreen() {
         api.get("/feedback/list", { params }),
       ]);
       setSummary(summaryRes?.data || null);
-      setRows(Array.isArray(listRes?.data) ? listRes.data : []);
+      setRows(Array.isArray(listRes?.data?.items) ? listRes.data.items : []);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load feedback");
     } finally {

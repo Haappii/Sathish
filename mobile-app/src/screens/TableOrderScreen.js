@@ -433,6 +433,34 @@ export default function TableOrderScreen({ route, navigation }) {
     ]);
   };
 
+  const clearOrder = () => {
+    if (!order?.order_id || !(order?.items?.length || 0)) return;
+    Alert.alert(
+      "Clear Order",
+      `Clear all ${order.items.length} item${order.items.length > 1 ? "s" : ""} from this table?`,
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Clear Order",
+          style: "destructive",
+          onPress: async () => {
+            setSending(true);
+            try {
+              await api.post(`/table-billing/order/clear/${order.order_id}`);
+              setCart({});
+              Alert.alert("Cleared", "Order items cleared.");
+              load(true);
+            } catch (err) {
+              Alert.alert("Error", err?.response?.data?.detail || "Failed to clear order");
+            } finally {
+              setSending(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const destinationTables = tables.filter(
     (t) => Number(t.table_id) !== Number(table.table_id) && !t.order_id
   );
@@ -537,6 +565,11 @@ export default function TableOrderScreen({ route, navigation }) {
             >
               <Text style={styles.transferBtnText}>Transfer</Text>
             </Pressable>
+            {(order?.items?.length || 0) > 0 && (
+              <Pressable style={styles.clearOrderBtn} onPress={clearOrder}>
+                <Text style={styles.clearOrderBtnText}>Clear</Text>
+              </Pressable>
+            )}
             <Pressable style={styles.cancelTableBtn} onPress={cancelTable}>
               <Text style={styles.cancelTableBtnText}>Cancel</Text>
             </Pressable>
@@ -949,6 +982,8 @@ const styles = StyleSheet.create({
   transferBtnText: { color: "#3730a3", fontWeight: "800" },
   cancelTableBtn: { backgroundColor: "#fee2e2", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   cancelTableBtnText: { color: "#ef4444", fontWeight: "800" },
+  clearOrderBtn: { backgroundColor: "#fef3c7", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  clearOrderBtnText: { color: "#b45309", fontWeight: "800" },
   search: {
     backgroundColor: "#ffffff",
     borderRadius: 10,

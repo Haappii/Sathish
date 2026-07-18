@@ -23,6 +23,7 @@ export default function CategoriesScreen() {
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async (isRefresh) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -66,6 +67,10 @@ export default function CategoriesScreen() {
     }
   };
 
+  const filteredRows = rows.filter((r) =>
+    (r.category_name || "").toLowerCase().includes(search.toLowerCase())
+  );
+
   const renderItem = ({ item }) => (
     <View style={st.row}>
       <Pressable style={{ flex: 1 }} onPress={() => openEdit(item)}>
@@ -79,16 +84,25 @@ export default function CategoriesScreen() {
 
   return (
     <SafeAreaView style={st.safe}>
+      <View style={st.searchWrap}>
+        <TextInput
+          style={st.searchInput}
+          placeholder="Search categories…"
+          placeholderTextColor="#94a3b8"
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
       {loading ? (
         <View style={st.center}><ActivityIndicator size="large" color="#6366f1" /></View>
       ) : (
         <FlatList
-          data={rows}
+          data={filteredRows}
           keyExtractor={(r, i) => String(r.category_id || i)}
           renderItem={renderItem}
           contentContainerStyle={st.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
-          ListEmptyComponent={<View style={st.emptyWrap}><Text style={st.emptyIcon}>🗂️</Text><Text style={st.emptyTitle}>No categories yet</Text></View>}
+          ListEmptyComponent={<View style={st.emptyWrap}><Text style={st.emptyIcon}>🗂️</Text><Text style={st.emptyTitle}>{search ? "No categories match your search" : "No categories yet"}</Text></View>}
         />
       )}
       <Pressable style={st.fab} onPress={openNew}><Text style={st.fabText}>+ New Category</Text></Pressable>
@@ -97,7 +111,7 @@ export default function CategoriesScreen() {
         <Pressable style={st.modalBackdrop} onPress={() => setModalOpen(false)}>
           <Pressable style={st.modalSheet} onPress={(e) => e.stopPropagation()}>
             <Text style={st.modalTitle}>{editingId ? "Edit Category" : "New Category"}</Text>
-            <TextInput style={st.input} placeholder="Category name" placeholderTextColor="#94a3b8" autoCapitalize="characters" value={name} onChangeText={setName} />
+            <TextInput style={st.input} placeholder="Category name" placeholderTextColor="#94a3b8" autoCapitalize="characters" value={name} onChangeText={(t) => setName(t.toUpperCase())} />
             <View style={st.modalActions}>
               <Pressable style={st.cancelBtn} onPress={() => setModalOpen(false)}><Text style={st.cancelBtnText}>Cancel</Text></Pressable>
               <Pressable style={st.saveBtn} disabled={saving} onPress={save}>
@@ -114,6 +128,8 @@ export default function CategoriesScreen() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  searchWrap: { paddingHorizontal: 14, paddingTop: 12 },
+  searchInput: { borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12, backgroundColor: "#fff", paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, color: "#0a0f1e" },
   list: { padding: 14, paddingBottom: 90, gap: 8 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 14, borderWidth: 1.5, borderColor: "#e4e9f2", padding: 14 },
   name: { fontSize: 14, fontWeight: "700", color: "#0a0f1e" },

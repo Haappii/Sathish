@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -35,6 +36,9 @@ export default function InventoryScreen() {
   const [search, setSearch] = useState("");
   const [qtyInput, setQtyInput] = useState({});
   const [saving, setSaving] = useState(null);
+  const [historyItem, setHistoryItem] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyRows, setHistoryRows] = useState([]);
 
   const getStock = (id) =>
     stockData.find((s) => Number(s.item_id) === Number(id))?.quantity ?? 0;
@@ -101,9 +105,24 @@ export default function InventoryScreen() {
     }
   };
 
+  const openHistory = async (item) => {
+    setHistoryItem(item);
+    setHistoryLoading(true);
+    setHistoryRows([]);
+    try {
+      const res = await api.get("/inventory/history", { params: { item_id: item.item_id, branch_id: branchId } });
+      setHistoryRows(res?.data || []);
+    } catch (err) {
+      Alert.alert("Error", err?.response?.data?.detail || "Failed to load history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const renderItem = ({ item }) => {
     const stock = getStock(item.item_id);
     const isBusy = saving === item.item_id;
+    const isLow = item.min_stock > 0 ? stock < item.min_stock : false;
     return (
       <View style={styles.card}>
         <View style={styles.cardTop}>
@@ -113,11 +132,22 @@ export default function InventoryScreen() {
               {item.category_name || ""}{item.unit ? ` · ${item.unit}` : ""}
             </Text>
           </View>
+          <Pressable onPress={() => openHistory(item)} style={styles.historyBtn}>
+            <Text style={styles.historyBtnText}>🕒</Text>
+          </Pressable>
           <View style={styles.stockBadge}>
-            <Text style={[styles.stockText, stock <= 0 && styles.stockTextZero]}>
+            <Text style={[styles.stockText, (stock <= 0 || isLow) && styles.stockTextZero]}>
               {fmt(stock)}{item.unit ? ` ${item.unit}` : ""}
             </Text>
             <Text style={styles.stockLabel}>in stock</Text>
+            {isLow && (
+              <View style={styles.lowBadge}>
+                <Text style={styles.lowBadgeText}>LOW STOCK</Text>
+              </View>
+            )}
+            {item.min_stock > 0 && (
+              <Text style={styles.minStockText}>Min: {item.min_stock}{item.unit ? ` ${item.unit}` : ""}</Text>
+            )}
           </View>
         </View>
         {inventoryEnabled && (
@@ -209,6 +239,47 @@ export default function InventoryScreen() {
           </View>
         }
       />
+
+      <Modal
+        visible={!!historyItem}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setHistoryItem(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalSubtitle}>Stock History</Text>
+                <Text style={styles.modalTitle} numberOfLines={1}>{historyItem?.item_name}</Text>
+              </View>
+              <Pressable style={styles.modalCloseBtn} onPress={() => setHistoryItem(null)}>
+                <Text style={styles.modalCloseBtnText}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.historyList}>
+              {historyLoading && <Text style={styles.historyEmpty}>Loading…</Text>}
+              {!historyLoading && !historyRows.length && (
+                <Text style={styles.historyEmpty}>No history</Text>
+              )}
+              {!historyLoading && historyRows.map((h, i) => (
+                <View key={i} style={styles.historyRow}>
+                  <View style={styles.historyRowTop}>
+                    <View style={[styles.historyModeBadge, h.mode === "ADD" ? styles.historyModeAdd : styles.historyModeRemove]}>
+                      <Text style={[styles.historyModeText, h.mode === "ADD" ? styles.historyModeTextAdd : styles.historyModeTextRemove]}>
+                        {h.mode}
+                      </Text>
+                    </View>
+                    <Text style={styles.historyTime}>{h.created_time}</Text>
+                  </View>
+                  <Text style={styles.historyQty}>Qty: {h.qty}</Text>
+                  {h.ref_no ? <Text style={styles.historyRef}>Ref: {h.ref_no}</Text> : null}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -314,4 +385,71 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", paddingTop: 64, gap: 10 },
   emptyIcon: { fontSize: 48 },
   emptyTitle: { color: "#9ca3af", fontSize: 17, fontWeight: "700" },
+  historyBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+    marginRight: 4,
+  },
+  historyBtnText: { fontSize: 14 },
+  lowBadge: {
+    backgroundColor: "#fee2e2",
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 3,
+  },
+  lowBadgeText: { color: "#dc2626", fontSize: 8, fontWeight: "800", letterSpacing: 0.3 },
+  minStockText: { color: "#9ca3af", fontSize: 9, fontWeight: "600", marginTop: 2 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(10,15,30,0.45)", justifyContent: "flex-end" },
+  modalCard: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    maxHeight: "75%",
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eef1f7",
+  },
+  modalSubtitle: { color: "#9ca3af", fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
+  modalTitle: { color: "#0a0f1e", fontSize: 16, fontWeight: "800", marginTop: 2 },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCloseBtnText: { fontSize: 14, color: "#4b5563", fontWeight: "700" },
+  historyList: { paddingHorizontal: 16, paddingTop: 12 },
+  historyEmpty: { textAlign: "center", color: "#9ca3af", fontSize: 13, paddingVertical: 32 },
+  historyRow: {
+    backgroundColor: "#f8f9fd",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#eef1f7",
+    padding: 12,
+    marginBottom: 8,
+    gap: 4,
+  },
+  historyRowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  historyModeBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  historyModeAdd: { backgroundColor: "#d1fae5" },
+  historyModeRemove: { backgroundColor: "#fee2e2" },
+  historyModeText: { fontSize: 10, fontWeight: "800" },
+  historyModeTextAdd: { color: "#059669" },
+  historyModeTextRemove: { color: "#dc2626" },
+  historyTime: { color: "#9ca3af", fontSize: 11 },
+  historyQty: { color: "#0a0f1e", fontSize: 14, fontWeight: "700" },
+  historyRef: { color: "#6b7280", fontSize: 12 },
 });

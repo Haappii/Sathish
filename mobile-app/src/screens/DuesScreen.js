@@ -33,6 +33,9 @@ export default function DuesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
+  const [branches, setBranches] = useState([]);
+  const [branchId, setBranchId] = useState("");
+  const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [paying, setPaying] = useState(null); // invoice_number being paid
   const [payAmount, setPayAmount] = useState("");
   const [payMode, setPayMode] = useState("cash");
@@ -46,6 +49,7 @@ export default function DuesScreen() {
     try {
       const params = {};
       if (search) params.q = search;
+      if (isAdmin && branchId) params.branch_id = Number(branchId);
       const res = await api.get("/dues/open", { params });
       setRows(res?.data || []);
     } catch (err) {
@@ -55,9 +59,14 @@ export default function DuesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [search]);
+  }, [search, isAdmin, branchId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get("/branch/active").then((res) => setBranches(res?.data || [])).catch(() => {});
+  }, [isAdmin]);
+
+  useEffect(() => { load(); }, [branchId]);
 
   const openPay = (row) => {
     setPaying(row.invoice_number);
@@ -132,6 +141,15 @@ export default function DuesScreen() {
           onSubmitEditing={() => load()}
           returnKeyType="search"
         />
+        {isAdmin && (
+          <Pressable style={styles.branchFilterBtn} onPress={() => setBranchPickerOpen(true)}>
+            <Text style={styles.branchFilterTxt}>
+              {branchId
+                ? (branches.find((b) => String(b.branch_id) === String(branchId))?.branch_name || "Branch")
+                : "All Branches"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {loading ? (
@@ -156,6 +174,30 @@ export default function DuesScreen() {
           }
         />
       )}
+
+      {/* Branch Picker Modal */}
+      <Modal transparent visible={branchPickerOpen} animationType="fade" onRequestClose={() => setBranchPickerOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setBranchPickerOpen(false)}>
+          <View style={styles.branchModalCard}>
+            <Text style={styles.modalTitle}>Filter by Branch</Text>
+            <Pressable
+              style={styles.branchOption}
+              onPress={() => { setBranchId(""); setBranchPickerOpen(false); }}
+            >
+              <Text style={styles.branchOptionText}>All Branches</Text>
+            </Pressable>
+            {branches.map((b) => (
+              <Pressable
+                key={b.branch_id}
+                style={styles.branchOption}
+                onPress={() => { setBranchId(String(b.branch_id)); setBranchPickerOpen(false); }}
+              >
+                <Text style={styles.branchOptionText}>{b.branch_name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Pay Modal */}
       <Modal transparent visible={!!paying} animationType="slide" onRequestClose={() => setPaying(null)}>
@@ -320,12 +362,23 @@ const styles = StyleSheet.create({
     shadowColor: "#ef4444", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   summaryText: { color: "#fff", fontWeight: "800", fontSize: 13, letterSpacing: 0.2 },
-  searchBar: { padding: 14, paddingBottom: 8 },
+  searchBar: { padding: 14, paddingBottom: 8, gap: 8 },
   searchInput: {
     borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 14,
     backgroundColor: "#ffffff", paddingHorizontal: 14, paddingVertical: 12, color: "#0a0f1e",
     fontSize: 14, shadowColor: "#0a0f1e", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
+  branchFilterBtn: {
+    alignSelf: "flex-start", borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    backgroundColor: "#ffffff", paddingHorizontal: 14, paddingVertical: 9,
+  },
+  branchFilterTxt: { color: "#6366f1", fontWeight: "700", fontSize: 12 },
+  branchModalCard: {
+    backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 18, gap: 4, width: "100%",
+  },
+  branchOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f4f6fb" },
+  branchOptionText: { fontSize: 14, fontWeight: "600", color: "#0a0f1e" },
   list: { padding: 14, gap: 10, paddingTop: 0, paddingBottom: 28 },
   card: {
     backgroundColor: "#ffffff", borderRadius: 18, borderWidth: 1.5,

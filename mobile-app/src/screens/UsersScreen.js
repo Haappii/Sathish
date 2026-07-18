@@ -8,7 +8,6 @@ import {
   RefreshControl,
   SafeAreaView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -17,7 +16,7 @@ import {
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
-const BLANK = { user_name: "", password: "", name: "", role: "", branch_id: "" };
+const BLANK = { user_name: "", password: "", name: "", role: "", branch_id: "", status: true };
 
 export default function UsersScreen() {
   const { session } = useAuth();
@@ -61,7 +60,14 @@ export default function UsersScreen() {
   };
   const openEdit = (u) => {
     setEditingId(u.user_id);
-    setForm({ user_name: u.user_name || "", password: "", name: u.name || "", role: String(u.role ?? ""), branch_id: String(u.branch_id ?? "") });
+    setForm({
+      user_name: u.user_name || "",
+      password: "",
+      name: u.name || "",
+      role: String(u.role ?? ""),
+      branch_id: String(isAdmin ? (u.branch_id ?? "") : (session?.branch_id ?? u.branch_id ?? "")),
+      status: u.status ?? true,
+    });
     setModalOpen(true);
   };
 
@@ -72,9 +78,11 @@ export default function UsersScreen() {
     if (!editingId && !form.password) return Alert.alert("Validation", "Password is required for new users");
     setSaving(true);
     try {
+      const forcedBranchId = isAdmin ? form.branch_id : (session?.branch_id ?? form.branch_id);
       const payload = {
         user_name: form.user_name.trim(), name: form.name.trim(),
-        role: Number(form.role), branch_id: form.branch_id ? Number(form.branch_id) : null,
+        role: Number(form.role) || null, status: form.status,
+        branch_id: Number(forcedBranchId) || null,
       };
       if (form.password) payload.password = form.password;
       if (editingId) await api.put(`/users/${editingId}`, payload);
@@ -107,21 +115,38 @@ export default function UsersScreen() {
     ]);
   };
 
-  const renderItem = ({ item }) => (
-    <View style={st.card}>
-      <View style={st.cardTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={st.name}>{item.name || item.user_name}</Text>
-          <Text style={st.meta}>@{item.user_name} · {roles.find((r) => r.role_id === item.role)?.role_name || `Role #${item.role}`}</Text>
+  const renderItem = ({ item }) => {
+    const roleName = roles.find((r) => r.role_id === item.role)?.role_name || `Role #${item.role}`;
+    const branchName = branches.find((b) => b.branch_id === item.branch_id)?.branch_name || "—";
+    return (
+      <View style={st.card}>
+        <View style={st.cardTop}>
+          <View style={st.avatar}><Text style={st.avatarText}>{(item.user_name || "?").charAt(0).toUpperCase()}</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.name}>{item.user_name}</Text>
+            <Text style={st.meta}>{item.name || "—"}</Text>
+          </View>
         </View>
-        <Switch value={!!item.status} onValueChange={() => toggleStatus(item)} trackColor={{ true: "#6366f1" }} />
-      </View>
-      <View style={st.actionsRow}>
-        <Pressable style={st.editBtn} onPress={() => openEdit(item)}><Text style={st.editBtnText}>Edit</Text></Pressable>
+        <View style={st.badgeRow}>
+          <View style={st.roleBadge}><Text style={st.roleBadgeText}>{roleName}</Text></View>
+          <View style={st.branchBadge}><Text style={st.branchBadgeText}>{branchName}</Text></View>
+          <View style={[st.loginBadge, !item.login_status && st.loginBadgeOut]}>
+            <Text style={[st.loginBadgeText, !item.login_status && st.loginBadgeTextOut]}>{item.login_status ? "Logged In" : "Logged Out"}</Text>
+          </View>
+          <View style={[st.statusBadge, !item.status && st.statusBadgeInactive]}>
+            <Text style={[st.statusBadgeText, !item.status && st.statusBadgeTextInactive]}>{item.status ? "Active" : "Inactive"}</Text>
+          </View>
+        </View>
+        <View style={st.actionsRow}>
+          <Pressable style={st.editBtn} onPress={() => openEdit(item)}><Text style={st.editBtnText}>Edit</Text></Pressable>
+          <Pressable style={item.status ? st.disableBtn : st.enableBtn} onPress={() => toggleStatus(item)}>
+            <Text style={item.status ? st.disableBtnText : st.enableBtnText}>{item.status ? "Disable" : "Enable"}</Text>
+          </Pressable>
+        </View>
         <Pressable style={st.resetBtn} onPress={() => resetLogin(item)}><Text style={st.resetBtnText}>Reset Login</Text></Pressable>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={st.safe}>
@@ -183,14 +208,33 @@ const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   list: { padding: 14, paddingBottom: 90, gap: 10 },
-  card: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "#e4e9f2", padding: 12, gap: 4 },
-  cardTop: { flexDirection: "row", alignItems: "center", gap: 8 },
+  card: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "#e4e9f2", padding: 12, gap: 8 },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  avatar: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#eef2ff", alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#6366f1", fontSize: 16, fontWeight: "800" },
   name: { fontSize: 14, fontWeight: "800", color: "#0a0f1e" },
   meta: { fontSize: 11, color: "#6b7280" },
-  actionsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
-  editBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: "#eef2ff" },
+  badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  roleBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: "#eef2ff", borderWidth: 1, borderColor: "#c7d2fe" },
+  roleBadgeText: { color: "#4338ca", fontSize: 10, fontWeight: "700" },
+  branchBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#fde68a" },
+  branchBadgeText: { color: "#b45309", fontSize: 10, fontWeight: "700" },
+  loginBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: "#f5f3ff", borderWidth: 1, borderColor: "#ddd6fe" },
+  loginBadgeOut: { backgroundColor: "#f3f4f6", borderColor: "#d1d5db" },
+  loginBadgeText: { color: "#6d28d9", fontSize: 10, fontWeight: "700" },
+  loginBadgeTextOut: { color: "#6b7280" },
+  statusBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: "#ecfdf5", borderWidth: 1, borderColor: "#6ee7b7" },
+  statusBadgeInactive: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
+  statusBadgeText: { color: "#047857", fontSize: 10, fontWeight: "700" },
+  statusBadgeTextInactive: { color: "#dc2626" },
+  actionsRow: { flexDirection: "row", gap: 8 },
+  editBtn: { flex: 1, alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: "#eef2ff" },
   editBtnText: { color: "#6366f1", fontSize: 11, fontWeight: "800" },
-  resetBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: "#fff7ed" },
+  disableBtn: { flex: 1, alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: "#fef2f2" },
+  disableBtnText: { color: "#dc2626", fontSize: 11, fontWeight: "800" },
+  enableBtn: { flex: 1, alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: "#ecfdf5" },
+  enableBtnText: { color: "#047857", fontSize: 11, fontWeight: "800" },
+  resetBtn: { alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: "#fff7ed" },
   resetBtnText: { color: "#f97316", fontSize: 11, fontWeight: "800" },
   emptyWrap: { alignItems: "center", paddingTop: 50, gap: 10 },
   emptyIcon: { fontSize: 44 },

@@ -18,7 +18,7 @@ import {
 import api from "../api/client";
 
 const STATUS_FILTERS = ["", "ACTIVE", "REDEEMED", "VOID"];
-const BLANK_CREATE = { amount: "", expires_on: "", customer_name: "", mobile: "", note: "" };
+const BLANK_CREATE = { amount: "", expires_on: "", customer_name: "", mobile: "", customer_email: "", note: "" };
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
 export default function GiftCardsScreen() {
@@ -59,16 +59,18 @@ export default function GiftCardsScreen() {
     if (!createForm.amount) return Alert.alert("Validation", "Enter an amount");
     setCreating(true);
     try {
-      await api.post("/gift-cards/create", {
+      const res = await api.post("/gift-cards/create", {
         amount: Number(createForm.amount),
         expires_on: createForm.expires_on || null,
         customer_name: createForm.customer_name.trim() || null,
         mobile: createForm.mobile.trim() || null,
+        customer_email: createForm.customer_email.trim() || null,
         note: createForm.note.trim() || null,
       });
       setCreateOpen(false);
       setCreateForm(BLANK_CREATE);
-      Alert.alert("Success", "Gift card created");
+      const emailMsg = createForm.customer_email.trim() ? ` • Email sent to ${createForm.customer_email.trim()}` : "";
+      Alert.alert("Success", `Gift card created: ${res?.data?.code || ""}${emailMsg}`);
       load();
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to create gift card");
@@ -81,7 +83,7 @@ export default function GiftCardsScreen() {
     if (!redeemCode.trim() || !redeemAmount) return Alert.alert("Validation", "Enter code and amount");
     setRedeeming(true);
     try {
-      const res = await api.post("/gift-cards/redeem", { code: redeemCode.trim().toUpperCase(), amount: Number(redeemAmount) });
+      const res = await api.post("/gift-cards/redeem", { code: redeemCode.trim().toUpperCase(), amount: Number(redeemAmount), ref_type: "MANUAL" });
       Alert.alert("Redeemed", `Balance remaining: ${fmt(res?.data?.balance_amount)}`);
       setRedeemOpen(false);
       setRedeemCode(""); setRedeemAmount("");
@@ -156,6 +158,7 @@ export default function GiftCardsScreen() {
             <TextInput style={st.input} placeholder="Expires On (YYYY-MM-DD, optional)" placeholderTextColor="#94a3b8" value={createForm.expires_on} onChangeText={(v) => setCreateForm((p) => ({ ...p, expires_on: v }))} />
             <TextInput style={st.input} placeholder="Customer Name (optional)" placeholderTextColor="#94a3b8" value={createForm.customer_name} onChangeText={(v) => setCreateForm((p) => ({ ...p, customer_name: v }))} />
             <TextInput style={st.input} placeholder="Mobile (optional)" placeholderTextColor="#94a3b8" keyboardType="phone-pad" value={createForm.mobile} onChangeText={(v) => setCreateForm((p) => ({ ...p, mobile: v }))} />
+            <TextInput style={st.input} placeholder="Customer Email (sends gift card)" placeholderTextColor="#94a3b8" keyboardType="email-address" autoCapitalize="none" value={createForm.customer_email} onChangeText={(v) => setCreateForm((p) => ({ ...p, customer_email: v }))} />
             <TextInput style={st.input} placeholder="Note (optional)" placeholderTextColor="#94a3b8" value={createForm.note} onChangeText={(v) => setCreateForm((p) => ({ ...p, note: v }))} />
             <View style={st.modalActions}>
               <Pressable style={st.cancelBtn} onPress={() => setCreateOpen(false)}><Text style={st.cancelBtnText}>Cancel</Text></Pressable>

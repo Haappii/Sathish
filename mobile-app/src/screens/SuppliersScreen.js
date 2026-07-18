@@ -16,7 +16,7 @@ import {
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
-const BLANK = { supplier_name: "", phone: "", email: "", gstin: "", address_line1: "", city: "", state: "", pincode: "", contact_person: "", credit_terms_days: "" };
+const BLANK = { supplier_name: "", phone: "", email: "", gstin: "", address_line1: "", address_line2: "", city: "", state: "", pincode: "", contact_person: "", credit_terms_days: "" };
 
 export default function SuppliersScreen() {
   const { session } = useAuth();
@@ -58,7 +58,7 @@ export default function SuppliersScreen() {
     setEditingId(s.supplier_id);
     setForm({
       supplier_name: s.supplier_name || "", phone: s.phone || "", email: s.email || "", gstin: s.gstin || "",
-      address_line1: s.address_line1 || "", city: s.city || "", state: s.state || "", pincode: s.pincode || "",
+      address_line1: s.address_line1 || "", address_line2: s.address_line2 || "", city: s.city || "", state: s.state || "", pincode: s.pincode || "",
       contact_person: s.contact_person || "", credit_terms_days: String(s.credit_terms_days ?? ""),
     });
     setModalOpen(true);
@@ -68,7 +68,11 @@ export default function SuppliersScreen() {
     if (!form.supplier_name.trim()) return Alert.alert("Validation", "Supplier name is required");
     setSaving(true);
     try {
-      const payload = { ...form, credit_terms_days: form.credit_terms_days ? Number(form.credit_terms_days) : 0 };
+      const payload = {
+        ...form,
+        credit_terms_days: form.credit_terms_days ? Number(form.credit_terms_days) : 0,
+        branch_id: isAdmin ? Number(branchId || session?.branch_id) : undefined,
+      };
       if (editingId) await api.put(`/suppliers/${editingId}`, payload);
       else await api.post("/suppliers/", payload);
       setModalOpen(false);
@@ -149,7 +153,8 @@ export default function SuppliersScreen() {
                 <TextInput style={st.input} placeholder="Phone" placeholderTextColor="#94a3b8" keyboardType="phone-pad" value={form.phone} onChangeText={(v) => setForm((p) => ({ ...p, phone: v }))} />
                 <TextInput style={st.input} placeholder="Email" placeholderTextColor="#94a3b8" keyboardType="email-address" value={form.email} onChangeText={(v) => setForm((p) => ({ ...p, email: v }))} />
                 <TextInput style={st.input} placeholder="GSTIN" placeholderTextColor="#94a3b8" value={form.gstin} onChangeText={(v) => setForm((p) => ({ ...p, gstin: v }))} />
-                <TextInput style={st.input} placeholder="Address" placeholderTextColor="#94a3b8" value={form.address_line1} onChangeText={(v) => setForm((p) => ({ ...p, address_line1: v }))} />
+                <TextInput style={st.input} placeholder="Address Line 1" placeholderTextColor="#94a3b8" value={form.address_line1} onChangeText={(v) => setForm((p) => ({ ...p, address_line1: v }))} />
+                <TextInput style={st.input} placeholder="Address Line 2" placeholderTextColor="#94a3b8" value={form.address_line2} onChangeText={(v) => setForm((p) => ({ ...p, address_line2: v }))} />
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <TextInput style={[st.input, { flex: 1 }]} placeholder="City" placeholderTextColor="#94a3b8" value={form.city} onChangeText={(v) => setForm((p) => ({ ...p, city: v }))} />
                   <TextInput style={[st.input, { flex: 1 }]} placeholder="State" placeholderTextColor="#94a3b8" value={form.state} onChangeText={(v) => setForm((p) => ({ ...p, state: v }))} />

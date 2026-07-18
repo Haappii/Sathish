@@ -58,9 +58,9 @@ export default function LoyaltyScreen() {
     setSavingAdjust(true);
     try {
       await api.post("/loyalty/adjust", {
-        customer_id: account.customer_id,
-        points: pts,
-        notes: adjustNote || "Manual adjustment",
+        mobile: account.mobile || mobile,
+        points: Math.trunc(pts),
+        notes: adjustNote || undefined,
       });
       setAdjustPoints("");
       setAdjustNote("");
@@ -82,9 +82,9 @@ export default function LoyaltyScreen() {
     setSavingRedeem(true);
     try {
       await api.post("/loyalty/redeem", {
-        customer_id: account.customer_id,
-        points: pts,
-        notes: redeemNote || "Manual redemption",
+        mobile: account.mobile || mobile,
+        points: Math.trunc(pts),
+        notes: redeemNote || undefined,
       });
       setRedeemPoints("");
       setRedeemNote("");
@@ -216,10 +216,12 @@ export default function LoyaltyScreen() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Recent Transactions</Text>
                 {txns.slice(0, 20).map((t, i) => (
-                  <View key={String(t.id || i)} style={styles.txnRow}>
+                  <View key={String(t.txn_id || t.id || i)} style={styles.txnRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.txnDesc}>{t.description || t.notes || t.txn_type || "Transaction"}</Text>
+                      <Text style={styles.txnDesc}>{t.txn_type || "Transaction"}</Text>
                       <Text style={styles.txnDate}>{fmtDate(t.created_at || t.date)}</Text>
+                      {!!t.invoice_id && <Text style={styles.txnDate}>Invoice: {t.invoice_id}</Text>}
+                      {!!t.notes && <Text style={styles.txnDate}>{t.notes}</Text>}
                     </View>
                     <Text style={[styles.txnPoints, Number(t.points) < 0 ? styles.txnNeg : styles.txnPos]}>
                       {Number(t.points) > 0 ? "+" : ""}{t.points}

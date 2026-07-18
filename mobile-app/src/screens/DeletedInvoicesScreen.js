@@ -25,6 +25,8 @@ function displayDate(v) {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+const pad = (n) => String(n).padStart(2, "0");
+
 export default function DeletedInvoicesScreen() {
   const { theme } = useTheme();
   const { session } = useAuth();
@@ -34,6 +36,24 @@ export default function DeletedInvoicesScreen() {
   const [restoring, setRestoring] = useState(false);
   const [deletedInvoices, setDeletedInvoices] = useState([]);
   const [selectedArchive, setSelectedArchive] = useState(null);
+  const [appDateYMD, setAppDateYMD] = useState("");
+
+  const toYMD = (v) => {
+    if (!v) return "";
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  };
+  const isToday = (v) => !!appDateYMD && toYMD(v) === appDateYMD;
+
+  useEffect(() => {
+    api.get("/shop/details")
+      .then((r) => {
+        const d = r?.data?.app_date;
+        if (d) setAppDateYMD(String(d).slice(0, 10));
+      })
+      .catch(() => {});
+  }, []);
 
   const loadDeletedInvoices = useCallback(async (withLoader = true) => {
     if (withLoader) setLoading(true);
@@ -41,7 +61,8 @@ export default function DeletedInvoicesScreen() {
 
     try {
       const res = await api.get("/invoice/archive/list");
-      setDeletedInvoices(res?.data || []);
+      const rows = Array.isArray(res?.data) ? res.data : [];
+      setDeletedInvoices(rows.filter((r) => r?.delete_reason === "Deleted"));
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to load deleted invoices";
       Alert.alert("Error", String(msg));
@@ -66,6 +87,10 @@ export default function DeletedInvoicesScreen() {
 
   const handleRestore = async (archiveId) => {
     if (!selectedArchive) return;
+    if (!isToday(selectedArchive.created_time)) {
+      Alert.alert("Not Allowed", "This invoice can only be restored on the same business date it was deleted.");
+      return;
+    }
 
     Alert.alert(
       "Restore Invoice",
@@ -144,6 +169,11 @@ export default function DeletedInvoicesScreen() {
                 <Text style={styles.deletedBy}>
                   Deleted by: {r.deleted_by || "Unknown"}
                 </Text>
+                {!isToday(r.created_time) && (
+                  <View style={styles.pastDatePill}>
+                    <Text style={styles.pastDatePillText}>Past Date</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.amount}>{fmtMoney(r.total_amount)}</Text>
             </Pressable>
@@ -199,15 +229,23 @@ export default function DeletedInvoicesScreen() {
               </Text>
 
               <View style={styles.actions}>
-                <Pressable
-                  style={[styles.restoreBtn, restoring && styles.disabledBtn]}
-                  disabled={restoring}
-                  onPress={() => handleRestore(selectedArchive.archive_id)}
-                >
-                  <Text style={styles.restoreBtnText}>
-                    {restoring ? "Restoring..." : "Restore Invoice"}
-                  </Text>
-                </Pressable>
+                {isToday(selectedArchive.created_time) ? (
+                  <Pressable
+                    style={[styles.restoreBtn, restoring && styles.disabledBtn]}
+                    disabled={restoring}
+                    onPress={() => handleRestore(selectedArchive.archive_id)}
+                  >
+                    <Text style={styles.restoreBtnText}>
+                      {restoring ? "Restoring..." : "Restore Invoice"}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.pastDateBanner}>
+                    <Text style={styles.pastDateBannerText}>
+                      Restore is only available on the same business date the invoice was deleted.
+                    </Text>
+                  </View>
+                )}
               </View>
             </ScrollView>
           ) : null}
@@ -248,6 +286,16 @@ const styles = StyleSheet.create({
   invNo: { fontSize: 14, fontWeight: "800", color: "#0a0f1e" },
   sub: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
   deletedBy: { fontSize: 11, color: "#ef4444", marginTop: 4, fontWeight: "700" },
+  pastDatePill: {
+    alignSelf: "flex-start", backgroundColor: "#f1f5f9", borderRadius: 999,
+    paddingHorizontal: 9, paddingVertical: 2, marginTop: 5,
+  },
+  pastDatePillText: { fontSize: 10, fontWeight: "700", color: "#64748b" },
+  pastDateBanner: {
+    backgroundColor: "#f8f9fd", borderWidth: 1.5, borderColor: "#e4e9f2",
+    borderRadius: 14, padding: 14,
+  },
+  pastDateBannerText: { color: "#6b7280", fontSize: 13, fontWeight: "600", textAlign: "center" },
   amount: { fontSize: 14, fontWeight: "800", color: "#6366f1", marginLeft: 8 },
   modalSafe: { flex: 1, backgroundColor: "#f4f6fb" },
   modalHead: {

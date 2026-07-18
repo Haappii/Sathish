@@ -32,6 +32,7 @@ function KpiCard({ label, value, sub, accent }) {
 export default function AnalyticsScreen() {
   const { theme } = useTheme();
   const { session } = useAuth();
+  const isAdmin = String(session?.role_name || session?.role || "").toLowerCase() === "admin";
   const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
   const nDaysBeforeBiz = useCallback((n) => {
     const d = new Date(businessDate);
@@ -46,6 +47,8 @@ export default function AnalyticsScreen() {
   ], [businessDate, nDaysBeforeBiz]);
 
   const [rangeIdx, setRangeIdx] = useState(0);
+  const [branches, setBranches] = useState([]);
+  const [branchId, setBranchId] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,15 +56,21 @@ export default function AnalyticsScreen() {
 
   const range = RANGES[rangeIdx];
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get("/branch/active").then((res) => setBranches(res?.data || [])).catch(() => setBranches([]));
+  }, [isAdmin]);
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
       const from = range.from();
       const to = range.to();
+      const branchParam = isAdmin && branchId ? Number(branchId) : undefined;
       const [summaryRes, topItemsRes] = await Promise.all([
-        api.get("/analytics/summary", { params: { from_date: from, to_date: to } }).catch(() => ({ data: null })),
-        api.get("/reports/sales/items", { params: { from_date: from, to_date: to } }).catch(() => ({ data: [] })),
+        api.get("/analytics/summary", { params: { from_date: from, to_date: to, branch_id: branchParam } }).catch(() => ({ data: null })),
+        api.get("/reports/sales/items", { params: { from_date: from, to_date: to, branch_id: branchParam } }).catch(() => ({ data: [] })),
       ]);
 
       const itemsRows = Array.isArray(topItemsRes?.data) ? topItemsRes.data : [];
@@ -83,7 +92,7 @@ export default function AnalyticsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [rangeIdx]);
+  }, [rangeIdx, isAdmin, branchId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -157,6 +166,24 @@ export default function AnalyticsScreen() {
         ))}
       </View>
 
+      {/* Branch Selector (admin) */}
+      {isAdmin && branches.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.branchBar} contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}>
+          <Pressable style={[styles.rangeBtn, { flex: 0, paddingHorizontal: 14 }, !branchId && styles.rangeBtnActive]} onPress={() => setBranchId("")}>
+            <Text style={[styles.rangeTxt, !branchId && styles.rangeTxtActive]}>All Branches</Text>
+          </Pressable>
+          {branches.map((b) => (
+            <Pressable
+              key={b.branch_id}
+              style={[styles.rangeBtn, { flex: 0, paddingHorizontal: 14 }, String(branchId) === String(b.branch_id) && styles.rangeBtnActive]}
+              onPress={() => setBranchId(String(b.branch_id))}
+            >
+              <Text style={[styles.rangeTxt, String(branchId) === String(b.branch_id) && styles.rangeTxtActive]}>{b.branch_name}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
       ) : (
@@ -198,6 +225,18 @@ export default function AnalyticsScreen() {
                 value={fmt(openDues.outstanding)}
                 sub={`${fmtCount(openDues.count)} invoices`}
                 accent="#991b1b"
+              />
+            </View>
+          </View>
+
+          {/* Inventory */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Inventory</Text>
+            <View style={styles.kpiGrid}>
+              <KpiCard
+                label={data?.billing_type === "hotel" ? "Raw Material Stock" : "Stock Valuation"}
+                value={fmt(stock.valuation)}
+                accent="#2563eb"
               />
             </View>
           </View>
@@ -250,6 +289,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f4f6fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   rangeBar: { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 12, paddingBottom: 4, gap: 8 },
+  branchBar: { paddingVertical: 8, flexGrow: 0 },
   rangeBtn: {
     flex: 1, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 999,
     paddingVertical: 8, alignItems: "center", backgroundColor: "#ffffff",

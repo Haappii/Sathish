@@ -137,7 +137,7 @@ const NO_USER_FILTER_KEYS = new Set([
 ]);
 
 const PAYMENT_MODE_KEYS = new Set(["sales/summary", "sales/invoice-details"]);
-const PAYMENT_MODES = ["cash", "card", "upi", "credit"];
+const PAYMENT_MODES = ["cash", "card", "upi", "split"];
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 const daysAgoStr = (n, from) => {
@@ -275,6 +275,7 @@ export default function ReportsScreen() {
   const [shop, setShop] = useState({});
   const [branch, setBranch] = useState({});
   const [users, setUsers] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
   const [expandedGroup, setExpandedGroup] = useState(null);
 
@@ -282,6 +283,8 @@ export default function ReportsScreen() {
   const [toDate, setToDate] = useState(bizDate);
   const [userId, setUserId] = useState("");
   const [userPickerOpen, setUserPickerOpen] = useState(false);
+  const [branchId, setBranchId] = useState("");
+  const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState("");
   const [customerNumber, setCustomerNumber] = useState("");
 
@@ -300,6 +303,10 @@ export default function ReportsScreen() {
     api.get("/users/").then((r) => {
       if (!alive) return;
       setUsers(Array.isArray(r.data) ? r.data : []);
+    }).catch(() => {});
+    api.get("/branch/active").then((r) => {
+      if (!alive) return;
+      setBranches(Array.isArray(r.data) ? r.data : []);
     }).catch(() => {});
     if (session?.branch_id) {
       api.get(`/branch/${session.branch_id}`).then((r) => {
@@ -337,12 +344,15 @@ export default function ReportsScreen() {
   const selectedUserName = users.find((u) => String(u.user_id ?? u.id) === String(userId))?.user_name
     || users.find((u) => String(u.user_id ?? u.id) === String(userId))?.name
     || "All Users";
+  const selectedBranchName = branches.find((b) => String(b.branch_id) === String(branchId))?.branch_name
+    || "All Branches";
 
   const selectReport = (r) => {
     setActiveReport(r);
     setData([]);
     setLoaded(false);
     setUserId("");
+    setBranchId("");
     setPaymentMode("");
     setCustomerNumber("");
   };
@@ -374,6 +384,7 @@ export default function ReportsScreen() {
         params.to_date = toDate;
       }
       if (showUserFilter && userId) params.user_id = userId;
+      if (branchId) params.branch_id = branchId;
       if (showPaymentMode && paymentMode) params.payment_mode = paymentMode;
       if (showCustomerNumber) params.customer_number = customerNumber.trim();
 
@@ -381,7 +392,7 @@ export default function ReportsScreen() {
 
       if (key === "employees/wages-summary" || key === "employees/due-list") {
         const asOf = toDate || fromDate || bizDate;
-        const r = await api.get("/employees/wages/summary", { params: { as_of_date: asOf } });
+        const r = await api.get("/employees/wages/summary", { params: { branch_id: params.branch_id, as_of_date: asOf } });
         const wageRows = Array.isArray(r?.data?.rows) ? r.data.rows : [];
         rows = key === "employees/due-list"
           ? wageRows.filter((row) => Number(row.due_till_as_of || 0) > 0)
@@ -599,6 +610,15 @@ export default function ReportsScreen() {
             </View>
           )}
 
+          {branches.length > 0 && (
+            <View>
+              <Text style={st.label}>Branch</Text>
+              <Pressable style={st.pickerBtn} onPress={() => setBranchPickerOpen(true)}>
+                <Text style={st.pickerBtnText}>{selectedBranchName}</Text>
+              </Pressable>
+            </View>
+          )}
+
           {showPaymentMode && (
             <View>
               <Text style={st.label}>Payment Mode</Text>
@@ -698,6 +718,24 @@ export default function ReportsScreen() {
                   </Pressable>
                 );
               })}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={branchPickerOpen} transparent animationType="fade" onRequestClose={() => setBranchPickerOpen(false)}>
+        <Pressable style={st.modalBackdrop} onPress={() => setBranchPickerOpen(false)}>
+          <View style={st.modalSheet}>
+            <Text style={st.modalTitle}>Select Branch</Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              <Pressable style={st.modalRow} onPress={() => { setBranchId(""); setBranchPickerOpen(false); }}>
+                <Text style={st.modalRowText}>All Branches</Text>
+              </Pressable>
+              {branches.map((b) => (
+                <Pressable key={b.branch_id} style={st.modalRow} onPress={() => { setBranchId(String(b.branch_id)); setBranchPickerOpen(false); }}>
+                  <Text style={st.modalRowText}>{b.branch_name}</Text>
+                </Pressable>
+              ))}
             </ScrollView>
           </View>
         </Pressable>

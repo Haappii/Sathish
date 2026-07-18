@@ -332,6 +332,7 @@ export default function HeldInvoicesScreen() {
                   {row?.draft_number ? row.draft_number : `#${orderId || index + 1}`}
                 </Text>
               </View>
+              <Text style={styles.itemCountBadge}>{itemsList.length} item{itemsList.length !== 1 ? "s" : ""}</Text>
             </View>
             <Text style={styles.customerText}>
               {row?.customer_name || "Walk-in"}
@@ -830,6 +831,7 @@ const styles = StyleSheet.create({
     borderColor: "#fcd34d",
   },
   tokenText: { color: "#92400e", fontWeight: "900", fontSize: 13, letterSpacing: 0.3 },
+  itemCountBadge: { color: "#9ca3af", fontSize: 11, fontWeight: "700" },
   totalText: { fontSize: 16, fontWeight: "900", color: "#10b981" },
   customerText: { color: "#0a0f1e", fontWeight: "800", fontSize: 15 },
   itemsText: { color: "#9ca3af", fontSize: 12, marginTop: 3, lineHeight: 18 },

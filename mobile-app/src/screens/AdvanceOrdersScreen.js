@@ -102,6 +102,8 @@ export default function AdvanceOrdersScreen() {
   const { session } = useAuth();
   const { theme } = useTheme();
   const today = session?.app_date || new Date().toISOString().split("T")[0];
+  const roleLower = String(session?.role_name || session?.role || "").toLowerCase();
+  const canDelete = roleLower === "admin" || roleLower === "manager";
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -308,6 +310,25 @@ export default function AdvanceOrdersScreen() {
     }
   };
 
+  const handleDelete = (orderId) => {
+    Alert.alert("Delete Advance Order", "Are you sure you want to delete this order?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.delete(`/advance-orders/${orderId}`);
+            Alert.alert("Deleted", "Order deleted.");
+            load(true);
+          } catch (err) {
+            Alert.alert("Error", err?.response?.data?.detail || "Cannot delete");
+          }
+        },
+      },
+    ]);
+  };
+
   const handlePrintAdvance = async (order) => {
     setPrintingId(order?.order_id || null);
     try {
@@ -424,6 +445,11 @@ export default function AdvanceOrdersScreen() {
                   <Pressable style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={() => setStatusPicker(o.order_id)}>
                     <Text style={[styles.actionBtnText, { color: "#fff" }]}>Update Status</Text>
                   </Pressable>
+                  {canDelete ? (
+                    <Pressable style={styles.deleteActionBtn} onPress={() => handleDelete(o.order_id)}>
+                      <Text style={styles.deleteActionBtnText}>Delete</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               )}
 
@@ -799,6 +825,11 @@ const styles = StyleSheet.create({
   },
   actionBtnPrimary: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
   actionBtnText: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
+  deleteActionBtn: {
+    flex: 1, borderWidth: 1.5, borderColor: "#fecaca", borderRadius: 12,
+    paddingVertical: 8, alignItems: "center", backgroundColor: "#fef2f2",
+  },
+  deleteActionBtnText: { fontSize: 12, fontWeight: "700", color: "#dc2626" },
   printBtn: {
     marginTop: 4, borderWidth: 1.5, borderColor: "#93c5fd", borderRadius: 12,
     paddingVertical: 9, alignItems: "center", backgroundColor: "#eff6ff",

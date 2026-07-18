@@ -49,7 +49,7 @@ export default function MailSchedulerScreen() {
 
   const openNew = () => { setEditingId(null); setForm(BLANK); setModalOpen(true); };
   const openEdit = (r) => {
-    setEditingId(r.schedule_id);
+    setEditingId(r.id);
     setForm({ name: r.name || "", report_type: r.report_type || "daily_sales", send_time: r.send_time || "09:00", recipient_email: r.recipient_email || "" });
     setModalOpen(true);
   };
@@ -71,7 +71,7 @@ export default function MailSchedulerScreen() {
 
   const toggleActive = async (r) => {
     try {
-      await api.put(`/mail-scheduler/${r.schedule_id}`, { is_active: !r.is_active });
+      await api.put(`/mail-scheduler/${r.id}`, { is_active: !r.is_active });
       load();
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to update");
@@ -82,7 +82,7 @@ export default function MailSchedulerScreen() {
     Alert.alert("Delete Schedule", `Delete "${r.name}"?`, [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
-        try { await api.delete(`/mail-scheduler/${r.schedule_id}`); load(); }
+        try { await api.delete(`/mail-scheduler/${r.id}`); load(); }
         catch (err) { Alert.alert("Error", err?.response?.data?.detail || "Failed to delete"); }
       }},
     ]);
@@ -110,7 +110,7 @@ export default function MailSchedulerScreen() {
       ) : (
         <FlatList
           data={rows}
-          keyExtractor={(r, i) => String(r.schedule_id || i)}
+          keyExtractor={(r, i) => String(r.id || i)}
           renderItem={renderItem}
           contentContainerStyle={st.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}

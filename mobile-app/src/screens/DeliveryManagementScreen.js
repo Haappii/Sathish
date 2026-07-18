@@ -41,17 +41,21 @@ export default function DeliveryManagementScreen() {
   const [assignNotes, setAssignNotes] = useState("");
   const [assigning, setAssigning] = useState(false);
 
+  const [allAssignments, setAllAssignments] = useState([]);
+
   const load = useCallback(async (isRefresh) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
-      const [aRes, bRes] = await Promise.all([
+      const [aRes, bRes, allRes] = await Promise.all([
         api.get("/delivery/assignments", { params }),
         api.get("/delivery/boys"),
+        api.get("/delivery/assignments"),
       ]);
       setAssignments(Array.isArray(aRes.data) ? aRes.data : []);
       setBoys(Array.isArray(bRes.data) ? bRes.data : []);
+      setAllAssignments(Array.isArray(allRes.data) ? allRes.data : []);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load delivery data");
     } finally {
@@ -59,6 +63,12 @@ export default function DeliveryManagementScreen() {
       setRefreshing(false);
     }
   }, [statusFilter]);
+
+  const tabCounts = STATUS_TABS.reduce((acc, s) => {
+    if (!s) return acc;
+    acc[s] = allAssignments.filter((a) => a.status === s).length;
+    return acc;
+  }, {});
 
   useEffect(() => { load(); }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -143,6 +153,12 @@ export default function DeliveryManagementScreen() {
       <Text style={st.meta}>{item.mobile}</Text>
       <Text style={st.meta} numberOfLines={2}>{item.address}</Text>
       <Text style={st.meta}>Rider: {item.delivery_boy_name || "—"}{item.delivery_boy_mobile ? ` (${item.delivery_boy_mobile})` : ""}</Text>
+      {item.notes ? <Text style={st.notesText}>📝 {item.notes}</Text> : null}
+      <Text style={st.timeMeta}>
+        Assigned: {item.assigned_at ? new Date(item.assigned_at).toLocaleTimeString() : "—"}
+        {item.picked_up_at ? ` · Picked: ${new Date(item.picked_up_at).toLocaleTimeString()}` : ""}
+        {item.delivered_at ? ` · Delivered: ${new Date(item.delivered_at).toLocaleTimeString()}` : ""}
+      </Text>
       <View style={st.actionsRow}>
         {STATUS_FLOW[item.status] && (
           <Pressable style={[st.actionBtn, { backgroundColor: `${STATUS_COLOR[item.status]}18` }]} disabled={busyId === item.assignment_id} onPress={() => advanceStatus(item)}>
@@ -164,7 +180,9 @@ export default function DeliveryManagementScreen() {
         <View style={st.chipRow}>
           {STATUS_TABS.map((s) => (
             <Pressable key={s || "all"} style={[st.chip, statusFilter === s && st.chipActive]} onPress={() => setStatusFilter(s)}>
-              <Text style={[st.chipText, statusFilter === s && st.chipTextActive]}>{s || "All"}</Text>
+              <Text style={[st.chipText, statusFilter === s && st.chipTextActive]}>
+                {s || "All"}{s ? ` (${tabCounts[s] || 0})` : ""}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -264,6 +282,8 @@ const st = StyleSheet.create({
   badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
   badgeText: { fontSize: 10, fontWeight: "800" },
   meta: { fontSize: 12, color: "#6b7280" },
+  notesText: { fontSize: 11, color: "#d97706", fontWeight: "600" },
+  timeMeta: { fontSize: 10, color: "#9ca3af", fontWeight: "600" },
   actionsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
   actionBtnText: { fontSize: 11, fontWeight: "800" },

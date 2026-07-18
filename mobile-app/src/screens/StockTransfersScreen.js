@@ -24,11 +24,15 @@ const STATUS_COLOR = {
 
 export default function StockTransfersScreen() {
   const { session } = useAuth();
-  const isAdmin = String(session?.role_name || session?.role || "").toLowerCase() === "admin";
+  const roleLower = String(session?.role_name || session?.role || "").toLowerCase();
+  const isAdmin = roleLower === "admin";
+  const isManager = roleLower === "manager";
+  const currentBranchId = Number(session?.branch_id || 0);
 
   const [rows, setRows] = useState([]);
   const [branches, setBranches] = useState([]);
   const [items, setItems] = useState([]);
+  const [isHotel, setIsHotel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState(null);
@@ -56,7 +60,17 @@ export default function StockTransfersScreen() {
   useEffect(() => {
     const branchEndpoint = isAdmin ? "/branch/list" : "/branch/active";
     api.get(branchEndpoint).then((r) => setBranches(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-    api.get("/items/").then((r) => setItems(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    api.get("/shop/details").then((r) => {
+      const shopData = r?.data || {};
+      const hotel = String(shopData?.billing_type || shopData?.shop_type || "").toLowerCase() === "hotel";
+      setIsHotel(hotel);
+      api.get("/items/").then((ir) => {
+        const allItems = Array.isArray(ir.data) ? ir.data : [];
+        setItems(hotel ? allItems.filter((it) => !!it?.is_raw_material) : allItems.filter((it) => !it?.is_raw_material));
+      }).catch(() => {});
+    }).catch(() => {
+      api.get("/items/").then((r) => setItems(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    });
   }, [isAdmin]);
 
   useEffect(() => { load(); }, [load]);
@@ -100,13 +114,17 @@ export default function StockTransfersScreen() {
 
   const actionsFor = (t) => {
     const actions = [];
-    if (t.status === "REQUESTED") {
-      if (isAdmin) actions.push({ key: "approve", label: "Approve", color: "#059669" }, { key: "reject", label: "Reject", color: "#dc2626" });
-      actions.push({ key: "cancel", label: "Cancel", color: "#9ca3af" });
-    } else if (t.status === "APPROVED") {
-      actions.push({ key: "dispatch", label: "Dispatch", color: "#0ea5e9" }, { key: "cancel", label: "Cancel", color: "#9ca3af" });
-    } else if (t.status === "DISPATCHED") {
+    if (isAdmin && t.status === "REQUESTED") {
+      actions.push({ key: "approve", label: "Approve", color: "#059669" }, { key: "reject", label: "Reject", color: "#dc2626" });
+    }
+    if ((isAdmin || (isManager && Number(t.from_branch_id) === currentBranchId)) && t.status === "APPROVED") {
+      actions.push({ key: "dispatch", label: "Dispatch", color: "#0ea5e9" });
+    }
+    if ((isAdmin || (isManager && Number(t.to_branch_id) === currentBranchId)) && t.status === "DISPATCHED") {
       actions.push({ key: "receive", label: "Receive", color: "#059669" });
+    }
+    if (isAdmin && ["REQUESTED", "APPROVED"].includes(t.status)) {
+      actions.push({ key: "cancel", label: "Cancel", color: "#9ca3af" });
     }
     return actions;
   };
@@ -177,7 +195,7 @@ export default function StockTransfersScreen() {
               <View style={{ gap: 10, marginBottom: 6 }}>
                 <Text style={st.sectionLabel}>To Branch</Text>
                 <View style={st.chipRow}>
-                  {branches.map((b) => (
+                  {branches.filter((b) => Number(b.branch_id) !== currentBranchId).map((b) => (
                     <Pressable key={b.branch_id} style={[st.chip, String(toBranchId) === String(b.branch_id) && st.chipActive]} onPress={() => setToBranchId(String(b.branch_id))}>
                       <Text style={[st.chipText, String(toBranchId) === String(b.branch_id) && st.chipTextActive]}>{b.branch_name}</Text>
                     </Pressable>

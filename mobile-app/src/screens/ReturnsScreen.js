@@ -16,15 +16,16 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
 
-const RETURN_TYPES = ["REFUND", "EXCHANGE", "STORE_CREDIT"];
-const REFUND_MODES = ["CASH", "UPI", "CARD", "BANK"];
-const REASON_CODES = ["DAMAGED", "WRONG_ITEM", "QUALITY", "CUSTOMER_CHANGE", "OTHER"];
+const RETURN_TYPES = ["REFUND", "EXCHANGE"];
+const REFUND_MODES = ["CASH", "CARD", "UPI", "STORE_CREDIT"];
+const REASON_CODES = ["DAMAGED", "WRONG_ITEM", "EXPIRED", "CUSTOMER_CHANGED_MIND", "OTHER"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
 export default function ReturnsScreen() {
   const { theme } = useTheme();
   const { session } = useAuth();
   const businessDate = session?.app_date || new Date().toISOString().split("T")[0];
+  const [isHotel, setIsHotel] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoice, setInvoice] = useState(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
@@ -32,11 +33,21 @@ export default function ReturnsScreen() {
 
   const [returnType, setReturnType] = useState("REFUND");
   const [refundMode, setRefundMode] = useState("CASH");
-  const [reasonCode, setReasonCode] = useState("OTHER");
+  const [reasonCode, setReasonCode] = useState("");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [qty, setQty] = useState({});
+  const [condition, setCondition] = useState({});
   const [recentReturns, setRecentReturns] = useState([]);
+
+  useEffect(() => {
+    api.get("/shop/details")
+      .then((res) => {
+        const t = String(res?.data?.billing_type || res?.data?.shop_type || "").toLowerCase();
+        setIsHotel(t === "hotel");
+      })
+      .catch(() => setIsHotel(false));
+  }, []);
 
   const loadRecentReturns = async () => {
     try {
@@ -64,6 +75,7 @@ export default function ReturnsScreen() {
     setLoadingInvoice(true);
     setInvoice(null);
     setQty({});
+    setCondition({});
     try {
       const res = await api.get(`/invoice/by-number/${invoiceNumber.trim()}`);
       setInvoice(res?.data || null);
@@ -77,26 +89,33 @@ export default function ReturnsScreen() {
   const submit = async () => {
     if (!invoice?.invoice_number) return Alert.alert("Error", "Load an invoice first");
     const items = (invoice.items || [])
-      .map((i) => ({
-        item_id: i.item_id,
-        quantity: Number(qty[i.item_id] || 0),
-        condition: "GOOD",
-        restock: Number(qty[i.item_id] || 0) > 0,
-      }))
+      .map((i) => {
+        const cond = condition[i.item_id] || "GOOD";
+        const restock = isHotel ? false : cond !== "DAMAGED";
+        return {
+          item_id: i.item_id,
+          quantity: Number(qty[i.item_id] || 0),
+          condition: isHotel ? (cond === "GOOD" ? "GOOD" : "DAMAGED") : cond,
+          restock,
+        };
+      })
       .filter((i) => i.quantity > 0);
 
     if (!items.length) return Alert.alert("Validation", "Enter return quantity for at least one item");
 
+    if (refundMode === "STORE_CREDIT" && /^9{9,}$/.test(String(invoice.mobile || ""))) {
+      return Alert.alert("Validation", "Valid customer mobile required for store credit");
+    }
+
     setSaving(true);
     try {
-      const isStoreCredit = returnType === "STORE_CREDIT";
       const payload = {
         invoice_number: invoice.invoice_number,
-        return_type: isStoreCredit ? "REFUND" : returnType,
-        refund_mode: returnType === "REFUND" ? refundMode : (isStoreCredit ? "STORE_CREDIT" : null),
-        reason_code: reasonCode,
-        reason,
-        note,
+        return_type: returnType,
+        refund_mode: refundMode,
+        reason_code: reasonCode || null,
+        reason: reason || null,
+        note: note || null,
         items,
       };
       await api.post("/returns/", payload);
@@ -105,6 +124,8 @@ export default function ReturnsScreen() {
       setInvoice(null);
       setInvoiceNumber("");
       setQty({});
+      setCondition({});
+      setReasonCode("");
       setReason("");
       setNote("");
     } catch (err) {
@@ -165,6 +186,19 @@ export default function ReturnsScreen() {
                     </View>
                     <Text style={styles.meta}>Sold: {item.quantity} · {fmt(item.amount)}</Text>
                     <Text style={styles.meta}>Available: {Number(item.returnable_qty ?? item.quantity ?? 0)}</Text>
+                    <View style={[styles.chipRow, { marginTop: 6 }]}>
+                      {(isHotel ? ["GOOD", "BAD"] : ["GOOD", "DAMAGED"]).map((c) => (
+                        <Pressable
+                          key={c}
+                          style={[styles.condChip, (condition[item.item_id] || "GOOD") === c && styles.condChipActive]}
+                          onPress={() => setCondition((p) => ({ ...p, [item.item_id]: c }))}
+                        >
+                          <Text style={[styles.condChipText, (condition[item.item_id] || "GOOD") === c && styles.condChipTextActive]}>
+                            {c === "GOOD" ? "Good" : c === "BAD" ? "Bad" : "Damaged"}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
                   </View>
                   <TextInput
                     style={styles.qtyInput}
@@ -200,22 +234,20 @@ export default function ReturnsScreen() {
                 ))}
               </View>
 
-              {returnType === "REFUND" && (
-                <>
-                  <Text style={styles.sectionTitle}>Refund Mode</Text>
-                  <View style={styles.chipRow}>
-                    {REFUND_MODES.map((m) => (
-                      <Pressable
-                        key={m}
-                        style={[styles.chip, refundMode === m && styles.chipActive]}
-                        onPress={() => setRefundMode(m)}
-                      >
-                        <Text style={[styles.chipText, refundMode === m && styles.chipTextActive]}>{m}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </>
-              )}
+              <Text style={styles.sectionTitle}>Refund Mode</Text>
+              <View style={styles.chipRow}>
+                {REFUND_MODES.map((m) => (
+                  <Pressable
+                    key={m}
+                    style={[styles.chip, refundMode === m && styles.chipActive]}
+                    onPress={() => setRefundMode(m)}
+                  >
+                    <Text style={[styles.chipText, refundMode === m && styles.chipTextActive]}>
+                      {m === "STORE_CREDIT" ? "STORE CREDIT" : m}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
               <Text style={styles.sectionTitle}>Reason Code</Text>
               <View style={styles.chipRow}>
@@ -327,6 +359,13 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
   chipText: { color: "#4b5563", fontSize: 12, fontWeight: "700" },
   chipTextActive: { color: "#fff" },
+  condChip: {
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 4, backgroundColor: "#ffffff",
+  },
+  condChipActive: { backgroundColor: "#f59e0b", borderColor: "#f59e0b" },
+  condChipText: { color: "#4b5563", fontSize: 11, fontWeight: "700" },
+  condChipTextActive: { color: "#fff" },
   submitBtn: {
     backgroundColor: "#ef4444", borderRadius: 14, paddingVertical: 14, alignItems: "center",
     shadowColor: "#ef4444", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,

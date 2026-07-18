@@ -60,9 +60,9 @@ export default function OrderLiveScreen() {
       const visibleRows = list.filter((row) => {
         const orderType = String(row?.order_type || "").trim().toUpperCase();
         const status = String(row?.status || "").trim().toUpperCase();
-        const isHandedOverTakeaway = orderType === "TAKEAWAY" && status === "SERVED";
-        const isMovedToTable = status === "MOVED_TO_TABLE";
-        return !(isHandedOverTakeaway || isMovedToTable);
+        const isHandedOverTakeaway =
+          orderType === "TAKEAWAY" && (status === "SERVED" || status === "MOVED_TO_TABLE");
+        return !isHandedOverTakeaway;
       });
       setRows(visibleRows);
     } catch (err) {
@@ -88,7 +88,7 @@ export default function OrderLiveScreen() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(() => load(true), 30000); // Auto-refresh every 30s
+    const interval = setInterval(() => load(true), 5000); // Auto-refresh every 5s (matches web)
     return () => clearInterval(interval);
   }, [load]);
 

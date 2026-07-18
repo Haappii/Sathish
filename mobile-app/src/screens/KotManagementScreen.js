@@ -54,7 +54,7 @@ export default function KotManagementScreen() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(() => load(true), 30000); // Auto-refresh every 30s
+    const interval = setInterval(() => load(true), 5000); // Auto-refresh every 5s (matches web)
     return () => clearInterval(interval);
   }, [load]);
 

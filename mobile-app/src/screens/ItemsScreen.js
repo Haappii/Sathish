@@ -25,7 +25,7 @@ const BLANK = {
 
 export default function ItemsScreen() {
   const { session } = useAuth();
-  const isHotel = session?.is_hotel;
+  const isAdmin = String(session?.role_name || session?.role || "").toLowerCase() === "admin";
 
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -38,14 +38,44 @@ export default function ItemsScreen() {
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async (isRefresh) => {
+  const [isHotel, setIsHotel] = useState(false);
+  const [branchWise, setBranchWise] = useState(false);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+
+  const branchHeaders = (branchWise && selectedBranchId) ? { "x-branch-id": String(selectedBranchId) } : {};
+
+  const load = useCallback(async (isRefresh, branchIdOverride) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [itemsRes, catRes, supRes] = await Promise.all([
-        api.get("/items/"),
+      const [shopRes, branchRes, catRes, supRes] = await Promise.all([
+        api.get("/shop/details").catch(() => ({ data: {} })),
+        api.get("/branch/active").catch(() => ({ data: [] })),
         api.get("/category/").catch(() => ({ data: [] })),
         api.get("/suppliers/").catch(() => ({ data: [] })),
       ]);
+      const shopData = shopRes?.data || {};
+      setIsHotel(String(shopData?.billing_type || shopData?.shop_type || "").toLowerCase() === "hotel");
+      const isBW = !!shopData.items_branch_wise;
+      setBranchWise(isBW);
+      const branchList = Array.isArray(branchRes?.data) ? branchRes.data : [];
+      setBranches(branchList);
+
+      let bid = branchIdOverride;
+      if (bid === undefined) {
+        if (isBW) {
+          bid = isAdmin
+            ? (branchList[0]?.branch_id ? String(branchList[0].branch_id) : "")
+            : String(session?.branch_id || "");
+          setSelectedBranchId(bid);
+        } else {
+          bid = "";
+          setSelectedBranchId("");
+        }
+      }
+
+      const headers = (isBW && bid) ? { "x-branch-id": String(bid) } : {};
+      const itemsRes = await api.get("/items/", { headers });
       setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
       setCategories(Array.isArray(catRes.data) ? catRes.data : []);
       setSuppliers(Array.isArray(supRes.data) ? supRes.data : []);
@@ -55,7 +85,7 @@ export default function ItemsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isAdmin, session?.branch_id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -74,26 +104,48 @@ export default function ItemsScreen() {
   };
 
   const save = async () => {
-    if (!form.item_name.trim() || !form.price) return Alert.alert("Validation", "Item name and price are required");
+    if (!form.item_name.trim()) return Alert.alert("Validation", "Enter item name");
+    if (form.is_raw_material) {
+      if (!form.supplier_id) return Alert.alert("Validation", "Select a supplier for raw material");
+    } else {
+      if (!isHotel) {
+        if (!Number(form.buy_price)) return Alert.alert("Validation", "Buy price is required");
+        if (!Number(form.mrp_price)) return Alert.alert("Validation", "MRP is required");
+      }
+      if (!Number(form.price)) return Alert.alert("Validation", "Selling price is required");
+    }
     setSaving(true);
     try {
-      const payload = {
-        item_name: form.item_name.trim(),
-        category_id: form.category_id ? Number(form.category_id) : null,
-        supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
-        price: Number(form.price),
-        buy_price: form.buy_price ? Number(form.buy_price) : 0,
-        mrp_price: form.mrp_price ? Number(form.mrp_price) : 0,
-        min_stock: form.min_stock ? Number(form.min_stock) : 0,
-        unit: form.unit,
-        is_raw_material: form.is_raw_material,
-        sold_by_weight: form.sold_by_weight,
-        item_status: form.item_status,
-      };
-      if (editingId) await api.put(`/items/${editingId}`, payload);
-      else await api.post("/items/", payload);
+      const payload = form.is_raw_material
+        ? {
+            item_name: form.item_name.trim(),
+            is_raw_material: true,
+            supplier_id: Number(form.supplier_id),
+            category_id: null,
+            price: 0,
+            buy_price: 0,
+            mrp_price: 0,
+            min_stock: form.min_stock ? Number(form.min_stock) : 0,
+            unit: form.unit || null,
+            item_status: form.item_status,
+            sold_by_weight: false,
+          }
+        : {
+            item_name: form.item_name.trim(),
+            category_id: form.category_id ? Number(form.category_id) : null,
+            is_raw_material: false,
+            supplier_id: null,
+            price: Number(form.price) || 0,
+            buy_price: isHotel ? 0 : (form.buy_price ? Number(form.buy_price) : 0),
+            mrp_price: isHotel ? 0 : (form.mrp_price ? Number(form.mrp_price) : 0),
+            min_stock: form.min_stock ? Number(form.min_stock) : 0,
+            item_status: form.item_status,
+            sold_by_weight: form.sold_by_weight,
+          };
+      if (editingId) await api.put(`/items/${editingId}`, payload, { headers: branchHeaders });
+      else await api.post("/items/", payload, { headers: branchHeaders });
       setModalOpen(false);
-      load();
+      load(false, selectedBranchId);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to save item");
     } finally {
@@ -103,11 +155,16 @@ export default function ItemsScreen() {
 
   const toggleStatus = async (it) => {
     try {
-      await api.put(`/items/${it.item_id}`, { item_status: !it.item_status });
-      load();
+      await api.put(`/items/${it.item_id}`, { item_status: !it.item_status }, { headers: branchHeaders });
+      load(false, selectedBranchId);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to update");
     }
+  };
+
+  const switchBranch = (bid) => {
+    setSelectedBranchId(bid);
+    load(false, bid);
   };
 
   const renderItem = ({ item }) => (
@@ -126,6 +183,28 @@ export default function ItemsScreen() {
         <TextInput style={st.searchInput} placeholder="Search item..." placeholderTextColor="#94a3b8" value={search} onChangeText={setSearch} />
       </View>
 
+      {branchWise && (
+        isAdmin ? (
+          branches.length > 0 && (
+            <View style={st.chipRow}>
+              {branches.map((b) => (
+                <Pressable key={b.branch_id} style={[st.chip, String(selectedBranchId) === String(b.branch_id) && st.chipActive]} onPress={() => switchBranch(String(b.branch_id))}>
+                  <Text style={[st.chipText, String(selectedBranchId) === String(b.branch_id) && st.chipTextActive]}>{b.branch_name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )
+        ) : (
+          <View style={st.chipRow}>
+            <View style={[st.chip, st.chipActive]}>
+              <Text style={[st.chipText, st.chipTextActive]}>
+                {branches.find((b) => String(b.branch_id) === String(session?.branch_id))?.branch_name || "My Branch"}
+              </Text>
+            </View>
+          </View>
+        )
+      )}
+
       {loading ? (
         <View style={st.center}><ActivityIndicator size="large" color="#6366f1" /></View>
       ) : (
@@ -134,7 +213,7 @@ export default function ItemsScreen() {
           keyExtractor={(r, i) => String(r.item_id || i)}
           renderItem={renderItem}
           contentContainerStyle={st.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true, selectedBranchId)} />}
           ListEmptyComponent={<View style={st.emptyWrap}><Text style={st.emptyIcon}>📦</Text><Text style={st.emptyTitle}>No items yet</Text></View>}
         />
       )}
@@ -167,7 +246,18 @@ export default function ItemsScreen() {
                 )}
                 <View style={st.toggleRow}>
                   <Text style={st.toggleLabel}>Raw Material</Text>
-                  <Switch value={form.is_raw_material} onValueChange={(v) => setForm((p) => ({ ...p, is_raw_material: v }))} trackColor={{ true: "#6366f1" }} />
+                  <Switch
+                    value={form.is_raw_material}
+                    onValueChange={(v) => setForm((p) => ({
+                      ...p,
+                      is_raw_material: v,
+                      sold_by_weight: v ? false : p.sold_by_weight,
+                      price: "", buy_price: "", mrp_price: "",
+                      category_id: v ? "" : p.category_id,
+                      supplier_id: v ? p.supplier_id : "",
+                    }))}
+                    trackColor={{ true: "#6366f1" }}
+                  />
                 </View>
                 {form.is_raw_material && suppliers.length > 0 && (
                   <>

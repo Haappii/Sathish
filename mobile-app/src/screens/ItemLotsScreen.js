@@ -27,6 +27,8 @@ export default function ItemLotsScreen() {
 
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState(session?.branch_id ? String(session.branch_id) : "");
+  const [items, setItems] = useState([]);
+  const [itemId, setItemId] = useState("");
   const [batchSearch, setBatchSearch] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,7 @@ export default function ItemLotsScreen() {
     try {
       const params = {};
       if (branchId) params.branch_id = branchId;
+      if (itemId) params.item_id = itemId;
       if (batchSearch.trim()) params.batch_no = batchSearch.trim();
       const res = await api.get("/item-lots/", { params });
       setRows(Array.isArray(res.data) ? res.data : []);
@@ -46,12 +49,13 @@ export default function ItemLotsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [branchId, batchSearch]);
+  }, [branchId, itemId, batchSearch]);
 
   useEffect(() => {
     if (isAdmin) {
       api.get("/branch/active").then((r) => setBranches(Array.isArray(r.data) ? r.data : [])).catch(() => {});
     }
+    api.get("/items/").then((r) => setItems((Array.isArray(r.data) ? r.data : []).filter((it) => !it?.is_raw_material))).catch(() => {});
   }, [isAdmin]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -69,6 +73,12 @@ export default function ItemLotsScreen() {
               Expiry: {fmtDate(item.expiry_date)}{isExpired ? " (Expired)" : ""}
             </Text>
           )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={st.meta}>
+            Source: {item.source_type || "—"}{item.source_ref ? ` (${item.source_ref})` : ""}
+          </Text>
+          {item.created_at ? <Text style={st.meta}>Created: {item.created_at}</Text> : null}
         </View>
         <View style={{ alignItems: "flex-end" }}>
           <Text style={st.qty}>{item.quantity}</Text>
@@ -102,6 +112,24 @@ export default function ItemLotsScreen() {
               >
                 <Text style={[st.chipText, String(branchId) === String(b.branch_id) && st.chipTextActive]}>
                   {b.branch_name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {items.length > 0 && (
+          <View style={st.chipRow}>
+            <Pressable style={[st.chip, !itemId && st.chipActive]} onPress={() => setItemId("")}>
+              <Text style={[st.chipText, !itemId && st.chipTextActive]}>All Items</Text>
+            </Pressable>
+            {items.map((it) => (
+              <Pressable
+                key={it.item_id}
+                style={[st.chip, String(itemId) === String(it.item_id) && st.chipActive]}
+                onPress={() => setItemId(String(it.item_id))}
+              >
+                <Text style={[st.chipText, String(itemId) === String(it.item_id) && st.chipTextActive]}>
+                  {it.item_name}
                 </Text>
               </Pressable>
             ))}

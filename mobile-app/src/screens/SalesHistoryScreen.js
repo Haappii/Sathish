@@ -50,6 +50,22 @@ function displayDate(v) {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function paymentModeLabel(r = {}) {
+  const mode = String(r.payment_mode || "cash");
+  if (mode === "split") {
+    const sp = r.payment_split || {};
+    const parts = [
+      Number(sp.cash || 0) > 0 && "Cash",
+      Number(sp.card || 0) > 0 && "Card",
+      Number(sp.upi || 0) > 0 && "UPI",
+      Number(sp.wallet_amount || sp.wallet || 0) > 0 && "Wallet",
+      Number(sp.gift_card_amount || sp.gift_card || 0) > 0 && "Gift Card",
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" + ") : "Split";
+  }
+  return mode.toUpperCase();
+}
+
 function getServiceChargeValue(inv = {}) {
   const split = (inv?.payment_split && typeof inv.payment_split === "object") ? inv.payment_split : {};
   const candidates = [
@@ -70,11 +86,14 @@ function getServiceChargeValue(inv = {}) {
 export default function SalesHistoryScreen() {
   const { theme } = useTheme();
   const { session } = useAuth();
+  const isCashier = String(session?.role_name || session?.role || "").toLowerCase().includes("cashier");
   const [range, setRange] = useState("today");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [businessDate, setBusinessDate] = useState(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [printing, setPrinting] = useState(false);
   const [shopDetails, setShopDetails] = useState({});
   const [branchDetails, setBranchDetails] = useState({});
@@ -84,6 +103,8 @@ export default function SalesHistoryScreen() {
   const [items, setItems] = useState([]);    // editable items when editing
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editCustomerMobile, setEditCustomerMobile] = useState("");
   const [editDiscount, setEditDiscount] = useState("0");
@@ -108,8 +129,12 @@ export default function SalesHistoryScreen() {
         setShopDetails(shopRes?.data || {});
         setBranchDetails(branchRes?.data || {});
       }
-      const params = getRange(range, activeBusinessDate);
-      const res = await api.get("/invoice/list", { params });
+      const preset = getRange(range, activeBusinessDate);
+      const from = fromDate || preset.from_date;
+      const to = toDate || preset.to_date;
+      if (!fromDate) setFromDate(preset.from_date);
+      if (!toDate) setToDate(preset.to_date);
+      const res = await api.get("/invoice/list", { params: { from_date: from, to_date: to } });
       setRows(res?.data || []);
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to load invoices";
@@ -123,6 +148,10 @@ export default function SalesHistoryScreen() {
   useEffect(() => {
     loadRows(true);
   }, [range, businessDate]);
+
+  useEffect(() => {
+    if (fromDate && toDate) loadRows(false);
+  }, [fromDate, toDate]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -143,6 +172,8 @@ export default function SalesHistoryScreen() {
       setEditCustomerMobile(String(inv?.mobile || ""));
       setEditDiscount(String(Number(inv?.discounted_amt || 0)));
       setEditPaymentMode(String(inv?.payment_mode || "cash"));
+      setConfirmDelete(false);
+      setDeleteReason("");
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to load invoice details";
       Alert.alert("Error", String(msg));
@@ -150,6 +181,7 @@ export default function SalesHistoryScreen() {
   };
 
   const isBusinessDateInvoice =
+    !isCashier &&
     !!activeInvoice &&
     !!businessDate &&
     String(activeInvoice?.created_time || "").slice(0, 10) === String(businessDate).slice(0, 10);
@@ -212,6 +244,10 @@ export default function SalesHistoryScreen() {
 
   const deleteInvoice = async () => {
     if (!activeInvoice?.invoice_id) return;
+    if (!deleteReason.trim()) {
+      Alert.alert("Validation", "Delete reason is required");
+      return;
+    }
     Alert.alert("Delete Invoice", `Delete ${activeInvoice.invoice_number}?`, [
       { text: "No", style: "cancel" },
       {
@@ -220,9 +256,13 @@ export default function SalesHistoryScreen() {
         onPress: async () => {
           setDeleting(true);
           try {
-            await api.delete(`/invoice/${activeInvoice.invoice_id}`);
+            await api.delete(`/invoice/${activeInvoice.invoice_id}`, {
+              data: { delete_reason: deleteReason.trim() },
+            });
             Alert.alert("Deleted", "Invoice deleted successfully.");
             setActiveInvoice(null);
+            setConfirmDelete(false);
+            setDeleteReason("");
             await loadRows(false);
           } catch (err) {
             Alert.alert("Error", err?.response?.data?.detail || "Failed to delete invoice");
@@ -280,13 +320,41 @@ export default function SalesHistoryScreen() {
               <Pressable
                 key={r.key}
                 style={[styles.rangeBtn, range === r.key && styles.rangeBtnActive]}
-                onPress={() => setRange(r.key)}
+                onPress={() => {
+                  setRange(r.key);
+                  const preset = getRange(r.key, businessDate);
+                  setFromDate(preset.from_date);
+                  setToDate(preset.to_date);
+                }}
               >
                 <Text style={[styles.rangeTxt, range === r.key && styles.rangeTxtActive]}>
                   {r.label}
                 </Text>
               </Pressable>
             ))}
+          </View>
+
+          <View style={styles.dateRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dateLabel}>From</Text>
+              <TextInput
+                style={styles.dateInput}
+                value={fromDate}
+                onChangeText={setFromDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#94a3b8"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dateLabel}>To</Text>
+              <TextInput
+                style={styles.dateInput}
+                value={toDate}
+                onChangeText={setToDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#94a3b8"
+              />
+            </View>
           </View>
 
           <TextInput
@@ -316,6 +384,9 @@ export default function SalesHistoryScreen() {
                 <Text style={styles.sub}>
                   {r.customer_name || "Walk-in"} | {r.mobile || "-"}
                 </Text>
+                <View style={styles.paymentPill}>
+                  <Text style={styles.paymentPillText}>{paymentModeLabel(r)}</Text>
+                </View>
               </View>
               <Text style={styles.amount}>{fmtMoney(Number(r.total_amount || 0) - Number(r.discounted_amt || 0))}</Text>
             </Pressable>
@@ -452,14 +523,43 @@ export default function SalesHistoryScreen() {
                     >
                       <Text style={styles.removeScBtnText}>Remove Service Charge</Text>
                     </Pressable>
-                    <Pressable
-                      style={[styles.deleteBtn, deleting && styles.printBtnDisabled]}
-                      onPress={deleteInvoice}
-                      disabled={deleting}
-                    >
-                      <Text style={styles.deleteBtnText}>{deleting ? "Deleting..." : "Delete"}</Text>
-                    </Pressable>
+                    {!confirmDelete ? (
+                      <Pressable
+                        style={styles.deleteBtn}
+                        onPress={() => setConfirmDelete(true)}
+                      >
+                        <Text style={styles.deleteBtnText}>Delete</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
+
+                  {confirmDelete ? (
+                    <View style={{ gap: 8 }}>
+                      <TextInput
+                        style={[styles.input, { minHeight: 60, textAlignVertical: "top" }]}
+                        value={deleteReason}
+                        onChangeText={setDeleteReason}
+                        placeholder="Reason for delete (required)"
+                        placeholderTextColor="#94a3b8"
+                        multiline
+                      />
+                      <View style={styles.editActions}>
+                        <Pressable
+                          style={[styles.deleteBtn, deleting && styles.printBtnDisabled]}
+                          onPress={deleteInvoice}
+                          disabled={deleting}
+                        >
+                          <Text style={styles.deleteBtnText}>{deleting ? "Deleting..." : "Confirm Delete"}</Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.cancelDeleteBtn}
+                          onPress={() => { setConfirmDelete(false); setDeleteReason(""); }}
+                        >
+                          <Text style={styles.cancelDeleteText}>Cancel</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
             </ScrollView>
@@ -511,6 +611,37 @@ const styles = StyleSheet.create({
   rangeBtnActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
   rangeTxt: { fontSize: 12, fontWeight: "700", color: "#4b5563" },
   rangeTxtActive: { color: "#fff" },
+  dateRow: { flexDirection: "row", gap: 10 },
+  dateLabel: { fontSize: 11, fontWeight: "700", color: "#6b7280", marginBottom: 4 },
+  dateInput: {
+    borderWidth: 1.5,
+    borderColor: "#e4e9f2",
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    backgroundColor: "#f8f9fd",
+    color: "#0a0f1e",
+    fontSize: 13,
+  },
+  paymentPill: {
+    marginTop: 5,
+    alignSelf: "flex-start",
+    backgroundColor: "#eef2ff",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  paymentPillText: { fontSize: 10, fontWeight: "700", color: "#4338ca" },
+  cancelDeleteBtn: {
+    flex: 1,
+    backgroundColor: "#f8f9fd",
+    borderWidth: 1.5,
+    borderColor: "#e4e9f2",
+    borderRadius: 11,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  cancelDeleteText: { color: "#4b5563", fontWeight: "700", fontSize: 13 },
   refreshBtn: {
     alignSelf: "flex-start",
     paddingHorizontal: 14,

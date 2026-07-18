@@ -33,6 +33,8 @@ export default function StockAuditScreen() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [counts, setCounts] = useState({});
+  const [reasons, setReasons] = useState({});
+  const [lineSearch, setLineSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
 
@@ -77,8 +79,14 @@ export default function StockAuditScreen() {
       const res = await api.get(`/stock-audits/${audit.audit_id}`);
       setDetail(res.data);
       const initCounts = {};
-      (res.data?.lines || []).forEach((l) => { initCounts[l.item_id] = l.counted_qty != null ? String(l.counted_qty) : ""; });
+      const initReasons = {};
+      (res.data?.lines || []).forEach((l) => {
+        initCounts[l.item_id] = l.counted_qty != null ? String(l.counted_qty) : "";
+        initReasons[l.item_id] = l.reason || "";
+      });
       setCounts(initCounts);
+      setReasons(initReasons);
+      setLineSearch("");
       setDetailOpen(true);
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to load audit");
@@ -88,11 +96,14 @@ export default function StockAuditScreen() {
   const saveCounts = async () => {
     setSaving(true);
     try {
-      const lines = (detail?.lines || []).map((l) => ({
-        item_id: l.item_id,
-        counted_qty: counts[l.item_id] !== "" ? Number(counts[l.item_id]) : l.system_qty,
-      }));
-      await api.put(`/stock-audits/${detail.audit_id}/count`, { lines });
+      const payload = (detail?.lines || [])
+        .filter((l) => counts[l.item_id] !== "" && counts[l.item_id] !== undefined && counts[l.item_id] !== null)
+        .map((l) => ({
+          item_id: l.item_id,
+          counted_qty: Number(counts[l.item_id] || 0),
+          reason: reasons[l.item_id] || undefined,
+        }));
+      await api.put(`/stock-audits/${detail.audit_id}/count`, payload);
       Alert.alert("Saved", "Counts saved");
       openAudit(detail);
     } catch (err) {
@@ -137,22 +148,38 @@ export default function StockAuditScreen() {
     </Pressable>
   );
 
+  const filteredLines = (detail?.lines || []).filter((l) =>
+    !lineSearch.trim() || String(l.item_name || "").toLowerCase().includes(lineSearch.trim().toLowerCase())
+  );
+
+  const isDraft = detail?.status === "DRAFT";
+
   const renderLine = ({ item }) => {
     const diff = counts[item.item_id] !== "" && counts[item.item_id] !== undefined
       ? Number(counts[item.item_id]) - Number(item.system_qty)
       : null;
     return (
       <View style={st.lineRow}>
-        <Text style={st.lineName} numberOfLines={1}>{item.item_name}</Text>
-        <Text style={st.lineSystem}>Sys: {item.system_qty}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={st.lineName} numberOfLines={1}>{item.item_name}</Text>
+          <Text style={st.lineSystem}>Sys: {item.system_qty}</Text>
+        </View>
         <TextInput
           style={st.lineInput}
           keyboardType="numeric"
           placeholder="Count"
           placeholderTextColor="#94a3b8"
-          editable={detail?.status !== "COMPLETED"}
+          editable={isDraft}
           value={counts[item.item_id] ?? ""}
           onChangeText={(v) => setCounts((p) => ({ ...p, [item.item_id]: v }))}
+        />
+        <TextInput
+          style={st.reasonInput}
+          placeholder="Reason"
+          placeholderTextColor="#94a3b8"
+          editable={isDraft}
+          value={reasons[item.item_id] ?? ""}
+          onChangeText={(v) => setReasons((p) => ({ ...p, [item.item_id]: v }))}
         />
         {diff !== null && diff !== 0 && (
           <Text style={diff > 0 ? st.diffPos : st.diffNeg}>{diff > 0 ? `+${diff}` : diff}</Text>
@@ -200,14 +227,23 @@ export default function StockAuditScreen() {
             <Pressable onPress={() => setDetailOpen(false)}><Text style={st.backLink}>‹ Back</Text></Pressable>
             <Text style={st.detailTitle}>{detail?.audit_number}</Text>
           </View>
+          <View style={st.searchWrap}>
+            <TextInput
+              style={st.input}
+              placeholder="Search item…"
+              placeholderTextColor="#94a3b8"
+              value={lineSearch}
+              onChangeText={setLineSearch}
+            />
+          </View>
           <FlatList
-            data={detail?.lines || []}
+            data={filteredLines}
             keyExtractor={(l, i) => String(l.item_id || i)}
             renderItem={renderLine}
             contentContainerStyle={st.lineList}
-            ListHeaderComponent={<View style={st.lineHead}><Text style={st.lineHeadText}>Item</Text><Text style={st.lineHeadText}>System / Count</Text></View>}
+            ListHeaderComponent={<View style={st.lineHead}><Text style={st.lineHeadText}>Item</Text><Text style={st.lineHeadText}>Count / Reason</Text></View>}
           />
-          {detail?.status !== "COMPLETED" && (
+          {isDraft && (
             <View style={st.detailActions}>
               <Pressable style={st.saveCountsBtn} disabled={saving} onPress={saveCounts}>
                 {saving ? <ActivityIndicator color="#6366f1" size="small" /> : <Text style={st.saveCountsBtnText}>Save Counts</Text>}
@@ -252,11 +288,13 @@ const st = StyleSheet.create({
   detailTitle: { fontSize: 16, fontWeight: "800", color: "#0a0f1e" },
   lineHead: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, paddingBottom: 6 },
   lineHeadText: { fontSize: 10, fontWeight: "800", color: "#9ca3af", textTransform: "uppercase" },
+  searchWrap: { paddingHorizontal: 14, paddingBottom: 8 },
   lineList: { paddingHorizontal: 14, paddingBottom: 100, gap: 8 },
   lineRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fff", borderRadius: 12, borderWidth: 1.5, borderColor: "#e4e9f2", padding: 10 },
-  lineName: { flex: 1, fontSize: 12, color: "#374151", fontWeight: "600" },
-  lineSystem: { fontSize: 11, color: "#9ca3af", width: 60 },
-  lineInput: { width: 60, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12, textAlign: "center" },
+  lineName: { fontSize: 12, color: "#374151", fontWeight: "600" },
+  lineSystem: { fontSize: 11, color: "#9ca3af" },
+  lineInput: { width: 56, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 6, fontSize: 12, textAlign: "center" },
+  reasonInput: { width: 80, borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 6, fontSize: 11 },
   diffPos: { color: "#059669", fontWeight: "800", fontSize: 11, width: 34, textAlign: "right" },
   diffNeg: { color: "#dc2626", fontWeight: "800", fontSize: 11, width: 34, textAlign: "right" },
   detailActions: { flexDirection: "row", gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: "#e4e9f2" },

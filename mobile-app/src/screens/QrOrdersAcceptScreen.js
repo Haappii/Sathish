@@ -58,25 +58,43 @@ export default function QrOrdersAcceptScreen({ navigation }) {
 
   useEffect(() => {
     load();
+    // Auto-refresh every 5s to match web QrOrders polling cadence.
+    const id = setInterval(() => load(false), 5000);
+    return () => clearInterval(id);
   }, [load]);
 
-  const action = async (row, type) => {
+  const kotRequired = branchDetails?.kot_required !== false;
+
+  // Group pending orders by table (matches web's table-grouped layout).
+  const grouped = (() => {
+    const by = {};
+    for (const r of rows) {
+      const key = String(r.table_id || "0");
+      if (!by[key]) by[key] = [];
+      by[key].push(r);
+    }
+    return Object.values(by).sort((a, b) =>
+      String(a[0]?.table_name || "").localeCompare(String(b[0]?.table_name || ""))
+    );
+  })();
+
+  const doAccept = async (row) => {
     const id = row?.qr_order_id;
     if (!id) return;
-
-    setBusy((prev) => ({ ...prev, [id]: type }));
+    setBusy((prev) => ({ ...prev, [id]: "accept" }));
     try {
-      if (type === "accept") {
-        const res = await api.post(`/qr-orders/${id}/accept`);
-        const orderId = res?.data?.order_id;
+      const res = await api.post(`/qr-orders/${id}/accept`);
+      const orderId = res?.data?.order_id;
 
-        // Print KOT on accept
-        if (orderId && (row.items || []).length > 0) {
-          try {
+      if (orderId && kotRequired) {
+        try {
+          const kotRes = await api.post(`/kot/create/${orderId}`);
+          const kotItems = Array.isArray(kotRes?.data?.items) ? kotRes.data.items : (row.items || []);
+          if (kotItems.length > 0) {
             await printKotTokenSlip(
               {
                 tokenNumber: String(orderId),
-                items: (row.items || []).map((it) => ({
+                items: kotItems.map((it) => ({
                   item_name: it.item_name || `Item ${it.item_id}`,
                   quantity: it.quantity,
                 })),
@@ -84,28 +102,49 @@ export default function QrOrdersAcceptScreen({ navigation }) {
               },
               { shop: shopDetails, branch: branchDetails, shopName: shopDetails?.shop_name || "Haappii Billing" }
             );
-          } catch {
-            // ignore print errors
           }
+        } catch {
+          // ignore KOT/print errors, order was already accepted
         }
-
-        if (orderId) {
-          navigation.navigate("TableOrder", {
-            table: {
-              table_id: row.table_id,
-              table_name: row.table_name,
-            },
-          });
-        }
-      } else {
-        await api.post(`/qr-orders/${id}/reject`);
       }
+
       await load(true);
     } catch (err) {
-      Alert.alert("Error", err?.response?.data?.detail || `Failed to ${type} QR order`);
+      Alert.alert("Error", err?.response?.data?.detail || "Failed to accept QR order");
     } finally {
       setBusy((prev) => ({ ...prev, [id]: "" }));
     }
+  };
+
+  const doReject = async (row) => {
+    const id = row?.qr_order_id;
+    if (!id) return;
+    setBusy((prev) => ({ ...prev, [id]: "reject" }));
+    try {
+      await api.post(`/qr-orders/${id}/reject`);
+      await load(true);
+    } catch (err) {
+      Alert.alert("Error", err?.response?.data?.detail || "Failed to reject QR order");
+    } finally {
+      setBusy((prev) => ({ ...prev, [id]: "" }));
+    }
+  };
+
+  const action = (row, type) => {
+    if (type === "reject") {
+      Alert.alert("Reject Order", "Reject this order?", [
+        { text: "No", style: "cancel" },
+        { text: "Yes, Reject", style: "destructive", onPress: () => doReject(row) },
+      ]);
+      return;
+    }
+    doAccept(row);
+  };
+
+  const openTable = (tableId, tableName) => {
+    navigation.navigate("TableOrder", {
+      table: { table_id: tableId, table_name: tableName },
+    });
   };
 
   if (loading) {
@@ -126,39 +165,59 @@ export default function QrOrdersAcceptScreen({ navigation }) {
 
         {rows.length === 0 ? <Text style={styles.empty}>No pending QR orders.</Text> : null}
 
-        {rows.map((row) => (
-          <View key={String(row.qr_order_id)} style={styles.card}>
-            <Text style={styles.title}>#{row.qr_order_id} • Table {row.table_name || row.table_id}</Text>
-            <Text style={styles.meta}>{row.customer_name || "Walk-in"} • {row.mobile || "-"}</Text>
-            <Text style={styles.meta}>Created: {dt(row.created_at)}</Text>
+        {grouped.map((list) => {
+          const tableId = list[0]?.table_id;
+          const tableName = list[0]?.table_name;
+          return (
+            <View key={String(tableId)} style={styles.tableGroup}>
+              <View style={styles.tableGroupHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tableGroupTitle}>{tableName ? `Table ${tableName}` : `Table #${tableId}`}</Text>
+                  <Text style={styles.tableGroupSub}>{list.length} pending {list.length === 1 ? "order" : "orders"}</Text>
+                </View>
+                <Pressable style={styles.openTableBtn} onPress={() => openTable(tableId, tableName)}>
+                  <Text style={styles.openTableBtnText}>Open Table</Text>
+                </Pressable>
+              </View>
 
-            <View style={styles.itemBox}>
-              {(row.items || []).map((it, idx) => (
-                <View key={`${row.qr_order_id}-${idx}`} style={styles.itemRow}>
-                  <Text style={styles.itemName}>{it.item_name || `Item ${it.item_id}`}</Text>
-                  <Text style={styles.itemQty}>x{it.quantity}</Text>
+              {list.map((row) => (
+                <View key={String(row.qr_order_id)} style={styles.card}>
+                  <Text style={styles.title}>#{row.qr_order_id} • Table {row.table_name || row.table_id}</Text>
+                  <Text style={styles.meta}>{row.customer_name || "Walk-in"} • {row.mobile || "-"}</Text>
+                  <Text style={styles.meta}>Created: {dt(row.created_at)}</Text>
+
+                  <View style={styles.itemBox}>
+                    {(row.items || []).map((it, idx) => (
+                      <View key={`${row.qr_order_id}-${idx}`} style={styles.itemRow}>
+                        <Text style={styles.itemName}>{it.item_name || `Item ${it.item_id}`}</Text>
+                        <Text style={styles.itemQty}>x{it.quantity}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.btnRow}>
+                    <Pressable
+                      style={[styles.btn, styles.rejectBtn]}
+                      onPress={() => action(row, "reject")}
+                      disabled={Boolean(busy[row.qr_order_id])}
+                    >
+                      <Text style={styles.btnText}>{busy[row.qr_order_id] === "reject" ? "Rejecting..." : "Reject"}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.btn, styles.acceptBtn]}
+                      onPress={() => action(row, "accept")}
+                      disabled={Boolean(busy[row.qr_order_id])}
+                    >
+                      <Text style={styles.btnText}>
+                        {busy[row.qr_order_id] === "accept" ? "Accepting..." : kotRequired ? "Accept + KOT" : "Accept"}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
             </View>
-
-            <View style={styles.btnRow}>
-              <Pressable
-                style={[styles.btn, styles.rejectBtn]}
-                onPress={() => action(row, "reject")}
-                disabled={Boolean(busy[row.qr_order_id])}
-              >
-                <Text style={styles.btnText}>{busy[row.qr_order_id] === "reject" ? "Rejecting..." : "Reject"}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.btn, styles.acceptBtn]}
-                onPress={() => action(row, "accept")}
-                disabled={Boolean(busy[row.qr_order_id])}
-              >
-                <Text style={styles.btnText}>{busy[row.qr_order_id] === "accept" ? "Accepting..." : "Accept"}</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -170,6 +229,19 @@ const styles = StyleSheet.create({
   container: { padding: 14, gap: 12, paddingBottom: 24 },
   header: { fontWeight: "900", fontSize: 17, color: "#0a0f1e", letterSpacing: -0.2 },
   empty: { color: "#9ca3af", fontSize: 14, fontWeight: "600" },
+  tableGroup: { gap: 10 },
+  tableGroupHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  tableGroupTitle: { fontWeight: "900", fontSize: 15, color: "#0a0f1e" },
+  tableGroupSub: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
+  openTableBtn: {
+    borderWidth: 1,
+    borderColor: "#e4e9f2",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#ffffff",
+  },
+  openTableBtnText: { color: "#334155", fontWeight: "700", fontSize: 12 },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 18,

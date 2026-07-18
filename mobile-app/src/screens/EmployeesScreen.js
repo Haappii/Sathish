@@ -22,13 +22,19 @@ const WAGE_TYPES = ["DAILY", "MONTHLY", "ON_DEMAND"];
 const PAYMENT_MODES = ["CASH", "UPI", "BANK", "CARD", "OTHER"];
 const fmt = (n) => `₹${Number(n || 0).toFixed(2)}`;
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 const EMPTY_FORM = {
+  employee_code: "",
   employee_name: "",
   mobile: "",
   designation: "",
   wage_type: "DAILY",
   daily_wage: "",
   monthly_wage: "",
+  join_date: todayIso(),
+  notes: "",
+  active: true,
 };
 
 export default function EmployeesScreen({ route, navigation }) {
@@ -53,6 +59,10 @@ export default function EmployeesScreen({ route, navigation }) {
 
   const [asOfDate, setAsOfDate] = useState(session?.app_date || new Date().toISOString().slice(0, 10));
   const [dueRows, setDueRows] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const isAdmin = role === "admin";
+  const [branchId, setBranchId] = useState(session?.branch_id || null);
+  const [wageSummary, setWageSummary] = useState({ employee_count: 0, earned_till_as_of: 0, paid_till_as_of: 0, due_till_as_of: 0 });
   const [settleLoading, setSettleLoading] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState(null);
   const [settlementSummary, setSettlementSummary] = useState(null);
@@ -90,6 +100,24 @@ export default function EmployeesScreen({ route, navigation }) {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get("/branch/active").then((res) => setBranches(res?.data || [])).catch(() => setBranches([]));
+  }, [isAdmin]);
+
+  const loadWageSummary = useCallback(async () => {
+    try {
+      const res = await api.get("/employees/wages/summary", {
+        params: { branch_id: isAdmin ? (branchId || undefined) : undefined, as_of_date: asOfDate },
+      });
+      setWageSummary(res?.data || { employee_count: 0, earned_till_as_of: 0, paid_till_as_of: 0, due_till_as_of: 0 });
+    } catch {
+      setWageSummary({ employee_count: 0, earned_till_as_of: 0, paid_till_as_of: 0, due_till_as_of: 0 });
+    }
+  }, [isAdmin, branchId, asOfDate]);
+
+  useEffect(() => { loadWageSummary(); }, [loadWageSummary]);
+
   const loadSettlements = useCallback(async () => {
     setSettleLoading(true);
     try {
@@ -122,12 +150,16 @@ export default function EmployeesScreen({ route, navigation }) {
   const openEdit = (emp) => {
     setEditingId(emp?.employee_id || null);
     setForm({
+      employee_code: String(emp?.employee_code || ""),
       employee_name: String(emp?.employee_name || ""),
       mobile: String(emp?.mobile || ""),
       designation: String(emp?.designation || ""),
       wage_type: String(emp?.wage_type || "DAILY"),
       daily_wage: String(emp?.daily_wage || ""),
       monthly_wage: String(emp?.monthly_wage || ""),
+      join_date: String(emp?.join_date || todayIso()),
+      notes: String(emp?.notes || ""),
+      active: emp?.active !== false,
     });
     setShowForm(true);
   };
@@ -137,19 +169,25 @@ export default function EmployeesScreen({ route, navigation }) {
     setSaving(true);
     try {
       const payload = {
+        employee_code: form.employee_code.trim() || null,
         employee_name: form.employee_name.trim(),
         mobile: form.mobile.trim() || null,
         designation: form.designation.trim() || null,
         wage_type: form.wage_type,
         daily_wage: Number(form.daily_wage || 0),
         monthly_wage: Number(form.monthly_wage || 0),
+        join_date: form.join_date || null,
+        notes: form.notes.trim() || null,
+        active: Boolean(form.active),
       };
+      if (isAdmin && branchId) payload.branch_id = branchId;
       if (editingId) await api.put(`/employees/${editingId}`, payload);
       else await api.post("/employees", payload);
       setShowForm(false);
       setEditingId(null);
       setForm(EMPTY_FORM);
       await load(true);
+      await loadWageSummary();
       Alert.alert("Saved", editingId ? "Employee updated successfully." : "Employee added successfully.");
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to save employee");
@@ -174,6 +212,7 @@ export default function EmployeesScreen({ route, navigation }) {
               if (isActive) await api.delete(`/employees/${emp.employee_id}`);
               else await api.post(`/employees/${emp.employee_id}/restore`);
               await load(true);
+              await loadWageSummary();
               if (activeTab === "settlements") await loadSettlements();
             } catch (err) {
               Alert.alert("Error", err?.response?.data?.detail || "Failed to update employee status");
@@ -298,6 +337,41 @@ export default function EmployeesScreen({ route, navigation }) {
         </Pressable>
       </View>
 
+      {activeTab === "employees" && (
+        <View style={styles.kpiRow}>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>Active</Text>
+            <Text style={styles.kpiValue}>{employees.filter((e) => e.active !== false).length}</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>Total Due</Text>
+            <Text style={[styles.kpiValue, { color: "#dc2626" }]}>{fmt(wageSummary.due_till_as_of)}</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>Total Earned</Text>
+            <Text style={styles.kpiValue}>{fmt(wageSummary.earned_till_as_of)}</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>Total Paid</Text>
+            <Text style={styles.kpiValue}>{fmt(wageSummary.paid_till_as_of)}</Text>
+          </View>
+        </View>
+      )}
+
+      {isAdmin && branches.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingLeft: 14 }} contentContainerStyle={{ gap: 8, paddingRight: 14 }}>
+          {branches.map((b) => (
+            <Pressable
+              key={b.branch_id}
+              style={[styles.chip, branchId === b.branch_id && styles.chipActive]}
+              onPress={() => setBranchId(b.branch_id)}
+            >
+              <Text style={[styles.chipText, branchId === b.branch_id && styles.chipTextActive]}>{b.branch_name}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       <View style={styles.headerBar}>
         {activeTab === "settlements" ? (
           <TextInput
@@ -386,6 +460,7 @@ export default function EmployeesScreen({ route, navigation }) {
             <Text style={styles.modalTitle}>{editingId ? "Edit Employee" : "Add Employee"}</Text>
 
             {[
+              { key: "employee_code", label: "Employee Code", placeholder: "e.g. EMP001" },
               { key: "employee_name", label: "Full Name *", placeholder: "Employee name" },
               { key: "mobile", label: "Mobile", placeholder: "10-digit mobile", keyboardType: "phone-pad" },
               { key: "designation", label: "Designation", placeholder: "e.g. Cashier" },
@@ -442,6 +517,29 @@ export default function EmployeesScreen({ route, navigation }) {
                 />
               </>
             )}
+
+            <Text style={styles.label}>Join Date</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#94a3b8"
+              value={form.join_date}
+              onChangeText={(v) => setForm((p) => ({ ...p, join_date: v }))}
+            />
+            <Text style={styles.label}>Notes</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Optional"
+              placeholderTextColor="#94a3b8"
+              value={form.notes}
+              onChangeText={(v) => setForm((p) => ({ ...p, notes: v }))}
+            />
+            <Pressable style={styles.activeRow} onPress={() => setForm((p) => ({ ...p, active: !p.active }))}>
+              <Text style={styles.activeLabel}>Active</Text>
+              <View style={[styles.toggleTrack, form.active && styles.toggleTrackOn]}>
+                <View style={[styles.toggleThumb, form.active && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
 
             <View style={styles.modalBtns}>
               <Pressable style={styles.cancelBtn} onPress={() => setShowForm(false)}>
@@ -545,6 +643,16 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: "#6366f1", borderColor: "#2563eb" },
   tabTxt: { color: "#4b5563", fontSize: 12, fontWeight: "700" },
   tabTxtActive: { color: "#fff" },
+  kpiRow: { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingTop: 10, flexWrap: "wrap" },
+  kpiCard: { flexGrow: 1, minWidth: "22%", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1.5, borderColor: "#e4e9f2", paddingVertical: 10, paddingHorizontal: 8, alignItems: "center" },
+  kpiLabel: { fontSize: 9, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", textAlign: "center" },
+  kpiValue: { fontSize: 14, fontWeight: "900", color: "#0a0f1e", marginTop: 2 },
+  activeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginTop: 4 },
+  activeLabel: { fontSize: 13, fontWeight: "600", color: "#0a0f1e" },
+  toggleTrack: { width: 40, height: 22, borderRadius: 11, backgroundColor: "#e2e8f0", padding: 2, justifyContent: "center" },
+  toggleTrackOn: { backgroundColor: "#6366f1" },
+  toggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#fff" },
+  toggleThumbOn: { transform: [{ translateX: 18 }] },
   headerBar: { paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row", gap: 8, alignItems: "center" },
   dateInput: {
     borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,

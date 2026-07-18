@@ -19,7 +19,7 @@ import { formatBusinessDateLabel, toBusinessYmd } from "../utils/businessDate";
 import { useTheme } from "../context/ThemeContext";
 
 
-const CATEGORIES = ["Food", "Maintenance", "Salary", "Utilities", "Rent", "Other"];
+const PAYMENT_MODES = ["cash", "upi", "card", "bank"];
 
 export default function ExpensesScreen() {
   const { theme } = useTheme();
@@ -29,17 +29,26 @@ export default function ExpensesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [addModal, setAddModal]   = useState(false);
   const [saving, setSaving]       = useState(false);
-  const [form, setForm] = useState({ category: "Other", description: "", amount: "" });
+  const [form, setForm] = useState({ category: "", description: "", amount: "", payment_mode: "cash" });
   const [businessDate, setBusinessDate] = useState(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const shopRes = await api.get("/shop/details");
-      const appDate = shopRes?.data?.app_date || null;
-      setBusinessDate(appDate);
-      const ymd = toBusinessYmd(appDate);
-      const res = await api.get("/expenses/list", { params: { from_date: ymd, to_date: ymd } });
+      let ymd = toBusinessYmd(businessDate);
+      if (!businessDate) {
+        const shopRes = await api.get("/shop/details");
+        const appDate = shopRes?.data?.app_date || null;
+        setBusinessDate(appDate);
+        ymd = toBusinessYmd(appDate);
+      }
+      const from = fromDate || ymd;
+      const to = toDate || ymd;
+      if (!fromDate) setFromDate(from);
+      if (!toDate) setToDate(to);
+      const res = await api.get("/expenses/list", { params: { from_date: from, to_date: to } });
       const list = res.data?.expenses ?? res.data ?? [];
       setExpenses(list);
       setTotal(list.reduce((s, e) => s + Number(e.amount || 0), 0));
@@ -49,24 +58,26 @@ export default function ExpensesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [businessDate, fromDate, toDate]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, []);
+  useEffect(() => { if (fromDate && toDate) load(); }, [fromDate, toDate]);
 
   const saveExpense = async () => {
     const amount = parseFloat(form.amount);
-    if (!form.description.trim()) return Alert.alert("Validation", "Description is required");
+    if (!form.category.trim()) return Alert.alert("Validation", "Category is required");
     if (isNaN(amount) || amount <= 0) return Alert.alert("Validation", "Enter a valid amount");
     setSaving(true);
     try {
       await api.post("/expenses/", {
-        category: form.category,
-        note: form.description.trim(),
+        category: form.category.trim(),
+        note: form.description.trim() || null,
         amount,
+        payment_mode: form.payment_mode,
         expense_date: toBusinessYmd(businessDate),
       });
       setAddModal(false);
-      setForm({ category: "Other", description: "", amount: "" });
+      setForm({ category: "", description: "", amount: "", payment_mode: "cash" });
       load();
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.detail || "Failed to save expense");
@@ -89,6 +100,29 @@ export default function ExpensesScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.dateFilterRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.dateLabel}>From</Text>
+          <TextInput
+            style={styles.dateInput}
+            value={fromDate}
+            onChangeText={setFromDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#94a3b8"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.dateLabel}>To</Text>
+          <TextInput
+            style={styles.dateInput}
+            value={toDate}
+            onChangeText={setToDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#94a3b8"
+          />
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" /></View>
       ) : (
@@ -108,8 +142,10 @@ export default function ExpensesScreen() {
                     <Text style={styles.catText}>{exp.category || "Other"}</Text>
                   </View>
                   <View>
-                    <Text style={styles.description} numberOfLines={2}>{exp.note || exp.description}</Text>
-                    <Text style={styles.meta}>{exp.expense_date || toBusinessYmd(businessDate)}</Text>
+                    <Text style={styles.description} numberOfLines={2}>{exp.note || exp.description || "—"}</Text>
+                    <Text style={styles.meta}>
+                      {String(exp.expense_date || toBusinessYmd(businessDate)).slice(0, 10)} · {String(exp.payment_mode || "cash").toUpperCase()}
+                    </Text>
                   </View>
                 </View>
                 <Text style={styles.amount}>₹{fmt(exp.amount)}</Text>
@@ -126,31 +162,6 @@ export default function ExpensesScreen() {
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Add Expense</Text>
 
-            {/* Category Selector */}
-            <Text style={styles.fieldLabel}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {CATEGORIES.map((cat) => (
-                <Pressable
-                  key={cat}
-                  style={[styles.catChip, form.category === cat && styles.catChipActive]}
-                  onPress={() => setForm((f) => ({ ...f, category: cat }))}
-                >
-                  <Text style={[styles.catChipText, form.category === cat && styles.catChipTextActive]}>
-                    {cat}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <Text style={styles.fieldLabel}>Description *</Text>
-            <TextInput
-              style={styles.input}
-              value={form.description}
-              onChangeText={(t) => setForm((f) => ({ ...f, description: t }))}
-              placeholder="e.g. Vegetable purchase"
-              placeholderTextColor="#94a3b8"
-            />
-
             <Text style={styles.fieldLabel}>Amount (₹) *</Text>
             <TextInput
               style={styles.input}
@@ -158,6 +169,39 @@ export default function ExpensesScreen() {
               onChangeText={(t) => setForm((f) => ({ ...f, amount: t }))}
               keyboardType="decimal-pad"
               placeholder="0.00"
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.fieldLabel}>Category *</Text>
+            <TextInput
+              style={styles.input}
+              value={form.category}
+              onChangeText={(t) => setForm((f) => ({ ...f, category: t }))}
+              placeholder="e.g. Tea, Fuel, Rent"
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.fieldLabel}>Payment Mode</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {PAYMENT_MODES.map((m) => (
+                <Pressable
+                  key={m}
+                  style={[styles.catChip, form.payment_mode === m && styles.catChipActive]}
+                  onPress={() => setForm((f) => ({ ...f, payment_mode: m }))}
+                >
+                  <Text style={[styles.catChipText, form.payment_mode === m && styles.catChipTextActive]}>
+                    {m.toUpperCase()}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Note (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={form.description}
+              onChangeText={(t) => setForm((f) => ({ ...f, description: t }))}
+              placeholder="Optional note..."
               placeholderTextColor="#94a3b8"
             />
 
@@ -195,6 +239,13 @@ const styles = StyleSheet.create({
     shadowColor: "#6366f1", shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 5,
   },
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  dateFilterRow: { flexDirection: "row", gap: 10, paddingHorizontal: 14, paddingTop: 12 },
+  dateLabel: { fontSize: 11, fontWeight: "700", color: "#6b7280", marginBottom: 4 },
+  dateInput: {
+    borderWidth: 1.5, borderColor: "#e4e9f2", borderRadius: 12,
+    paddingHorizontal: 13, paddingVertical: 10, backgroundColor: "#ffffff",
+    color: "#0a0f1e", fontSize: 13,
+  },
   card: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     backgroundColor: "#ffffff", borderRadius: 18, padding: 14,
