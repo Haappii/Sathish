@@ -70,16 +70,20 @@ function applyConfig(cfg) {
     });
 
     // Hero
+    const isLegacySlug = getPortfolioSlug() === 'sathish_kumar_lakshman';
+    const displayName = cfg.hero_name || (!isLegacySlug ? cfg.hero_title_line1 : '') || '';
     const nameEl = document.querySelector('.hero-name');
     if (nameEl) {
-        if (cfg.hero_name) {
-            nameEl.textContent = cfg.hero_name;
-        } else if (getPortfolioSlug() !== 'sathish_kumar_lakshman') {
+        if (displayName) {
+            nameEl.textContent = displayName;
+        } else if (!isLegacySlug) {
             // Don't leak the default hardcoded name onto someone else's portfolio.
             nameEl.textContent = '';
         }
     }
-    document.title = cfg.hero_name ? `${cfg.hero_name} | Software Engineer` : document.title;
+    if (displayName) {
+        document.title = `${displayName} | Software Engineer`;
+    }
     const badge = document.querySelector('.hero-badge');
     if (badge && cfg.hero_badge) {
         badge.childNodes[badge.childNodes.length - 1].textContent = " " + cfg.hero_badge;

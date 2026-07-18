@@ -318,15 +318,15 @@ export default function About() {
 
         /* ---- TEAM / CONTACT (dark bg) ---- */
         .ab-section--team{background:linear-gradient(180deg,#0f172a,#1a0a2e)}
-        .ab-team-grid{column-count:3;column-gap:24px}
-        .ab-team-card{break-inside:avoid;margin-bottom:24px;border-radius:20px;overflow:hidden;display:grid;grid-template-columns:minmax(110px,.4fr) 1fr;border:1px solid rgba(255,255,255,.08)}
-        .ab-team-img{position:relative;overflow:hidden;min-height:180px;background:linear-gradient(135deg,#1e1145,#0f172a)}
+        .ab-team-grid{column-count:2;column-gap:28px}
+        .ab-team-card{break-inside:avoid;margin-bottom:28px;border-radius:24px;overflow:hidden;display:grid;grid-template-columns:minmax(160px,.45fr) 1fr;border:1px solid rgba(255,255,255,.08)}
+        .ab-team-img{position:relative;overflow:hidden;min-height:260px;background:linear-gradient(135deg,#1e1145,#0f172a)}
         .ab-team-img img{width:100%;height:100%;object-fit:cover;display:block}
-        .ab-team-img-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:180px;font-size:48px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--accent),#ff9a56)}
-        .ab-team-info{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;gap:8px}
-        .ab-team-role{display:inline-flex;padding:4px 10px;border-radius:999px;background:rgba(243,109,79,.16);color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:fit-content}
-        .ab-team-name{font-family:Fraunces,serif;font-size:clamp(1.1rem,1.6vw,1.4rem);font-weight:800;letter-spacing:-.02em;line-height:1.1;color:#fff}
-        .ab-team-bio{color:rgba(255,255,255,.55);font-size:13px;line-height:1.6;margin:0}
+        .ab-team-img-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:260px;font-size:64px;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--accent),#ff9a56)}
+        .ab-team-info{padding:28px 30px;display:flex;flex-direction:column;justify-content:center;gap:12px}
+        .ab-team-role{display:inline-flex;padding:5px 12px;border-radius:999px;background:rgba(243,109,79,.16);color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:fit-content}
+        .ab-team-name{font-family:Fraunces,serif;font-size:clamp(1.4rem,2.2vw,1.9rem);font-weight:800;letter-spacing:-.02em;line-height:1.1;color:#fff}
+        .ab-team-bio{color:rgba(255,255,255,.55);font-size:14px;line-height:1.65;margin:0}
         .ab-team-contact-line{font-size:12px;color:rgba(255,255,255,.5)}
         .ab-team-contact-line a{color:rgba(255,255,255,.7);text-decoration:underline;text-decoration-color:rgba(255,255,255,.25)}
         .ab-team-contact-line a:hover{color:#fff;text-decoration-color:rgba(255,255,255,.5)}
@@ -357,7 +357,7 @@ export default function About() {
         /* ---- RESPONSIVE ---- */
         @media (max-width:1080px){
           .ab-features,.ab-dl-grid{grid-template-columns:1fr}
-          .ab-team-grid{column-count:2}
+          .ab-team-grid{column-count:1}
           .ab-contact-card{grid-template-columns:1fr}
           .ab-cta{flex-direction:column;align-items:flex-start}
           .ab-stats{grid-template-columns:repeat(2,1fr)}
@@ -371,9 +371,8 @@ export default function About() {
           .ab-stat{border-right:none;border-bottom:1px solid rgba(255,255,255,.06)}
           .ab-stat:last-child{border-bottom:none}
           .ab-section{padding:60px 0}
-          .ab-team-grid{column-count:1}
           .ab-team-card{grid-template-columns:1fr}
-          .ab-team-img{min-height:160px}
+          .ab-team-img{min-height:200px}
           .ab-team-info{padding:20px}
           .ab-contact-list{grid-template-columns:1fr;padding:24px 20px}
           .ab-cta{padding:36px 28px}
