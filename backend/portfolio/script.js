@@ -13,6 +13,7 @@ async function loadPortfolioConfig() {
     try {
         const slug = getPortfolioSlug();
         const res = await fetch(`${API_BASE}/platform/public/portfolios/${encodeURIComponent(slug)}`);
+        if (res.status === 404) return { __notFound: true };
         if (!res.ok) return null;
         const cfg = await res.json();
 
@@ -51,6 +52,24 @@ function getInitials(name) {
     if (!parts.length) return 'SK';
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// This static shell is reused for every portfolio slug — if the slug
+// doesn't exist, don't silently leave Sathish's hardcoded fallback
+// content on screen; show that the page genuinely isn't there.
+function showPortfolioNotFound() {
+    document.title = 'Portfolio Not Found';
+    document.body.innerHTML = `
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:'Inter',sans-serif;background:#0a0a0f;color:#fff;">
+            <div style="font-size:56px;margin-bottom:16px;">🔍</div>
+            <h1 style="font-size:26px;font-weight:800;margin:0 0 8px;">Portfolio Not Found</h1>
+            <p style="color:#9ca3af;font-size:15px;max-width:420px;margin:0 0 24px;line-height:1.6;">
+                This portfolio doesn't exist or may have been removed.
+            </p>
+            <a href="https://haappiibilling.in" style="padding:12px 26px;border-radius:12px;background:linear-gradient(135deg,#6c63ff,#4834d4);color:#fff;text-decoration:none;font-weight:700;font-size:14px;">
+                Go to Haappii Billing
+            </a>
+        </div>`;
 }
 
 function applyConfig(cfg) {
@@ -363,6 +382,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load dynamic config from API (non-blocking — uses defaults if API unavailable)
     const cfg = await loadPortfolioConfig();
+
+    if (cfg && cfg.__notFound) {
+        loader.classList.add('hidden');
+        showPortfolioNotFound();
+        return;
+    }
+
     applyConfig(cfg);
 
     // Init animations after content is applied
