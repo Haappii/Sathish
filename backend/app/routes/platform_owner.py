@@ -1933,7 +1933,10 @@ def _get_or_migrate_legacy_portfolio(db: Session, slug: str) -> PlatformPortfoli
     if slug != LEGACY_PORTFOLIO_SLUG:
         return None
     raw = _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, PORTFOLIO_PARAM_KEY)
-    row = PlatformPortfolio(slug=LEGACY_PORTFOLIO_SLUG, config_json=raw or "{}", is_active=True)
+    if not raw:
+        # Nothing to migrate (either never set, or explicitly cleared by a delete).
+        return None
+    row = PlatformPortfolio(slug=LEGACY_PORTFOLIO_SLUG, config_json=raw, is_active=True)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -2085,6 +2088,9 @@ def delete_portfolio(
     if not row:
         raise HTTPException(404, "Portfolio not found")
     db.delete(row)
+    if slug == LEGACY_PORTFOLIO_SLUG:
+        # Clear the source it would otherwise be re-migrated from on next list/get.
+        _set_param_value(db, PLATFORM_SETTINGS_SHOP_ID, PORTFOLIO_PARAM_KEY, "")
     db.commit()
     return {"success": True, "slug": slug}
 

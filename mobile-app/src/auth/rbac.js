@@ -149,6 +149,14 @@ export const mobileMenuCatalog = [
     fallbackRoles: new Set(["admin", "manager"]),
   },
   {
+    key: "reports",
+    title: "Reports",
+    icon: "📊",
+    route: "Reports",
+    perm: { module: "reports", action: "read" },
+    fallbackRoles: new Set(["admin", "manager"]),
+  },
+  {
     key: "advance_orders",
     title: "Advance Orders",
     icon: "📋",
