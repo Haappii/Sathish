@@ -52,6 +52,20 @@ const TILE_COLORS = {
   deleted_invoices:  { bg: "#fef2f2", accent: "#ef4444", icon: "🗑️" },
   dashboard:         { bg: "#eef2ff", accent: "#6366f1", icon: "📊" },
   settings:          { bg: "#f8fafc", accent: "#64748b", icon: "⚙️" },
+  coupons:           { bg: "#fdf2f8", accent: "#ec4899", icon: "🏷️" },
+  gift_cards:        { bg: "#fdf2f8", accent: "#ec4899", icon: "🎁" },
+  stock_audit:       { bg: "#ecfdf5", accent: "#10b981", icon: "📋" },
+  stock_transfers:   { bg: "#eef2ff", accent: "#6366f1", icon: "🚚" },
+  item_lots:         { bg: "#ecfdf5", accent: "#10b981", icon: "🏷️" },
+  recipes:           { bg: "#fff7ed", accent: "#f97316", icon: "🍳" },
+  kitchen_display:   { bg: "#f0fdfa", accent: "#14b8a6", icon: "🍳" },
+  delivery_management: { bg: "#ecfdf5", accent: "#10b981", icon: "🛵" },
+  reservations:      { bg: "#eef2ff", accent: "#6366f1", icon: "📅" },
+  labels:            { bg: "#fdf2f8", accent: "#ec4899", icon: "🏷️" },
+  alerts:            { bg: "#fef2f2", accent: "#ef4444", icon: "🔔" },
+  support_tickets:   { bg: "#eff6ff", accent: "#0ea5e9", icon: "🎫" },
+  feedback_review:   { bg: "#fdf2f8", accent: "#ec4899", icon: "💬" },
+  trends:            { bg: "#fff7ed", accent: "#f97316", icon: "📈" },
 };
 
 const formatBizDate = (dateStr) => {

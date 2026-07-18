@@ -35,6 +35,20 @@ import AdvanceOrdersScreen      from "../screens/AdvanceOrdersScreen";
 import SettingsScreen           from "../screens/SettingsScreen";
 import UnlockScreen             from "../screens/UnlockScreen";
 import DeletedInvoicesScreen    from "../screens/DeletedInvoicesScreen";
+import AlertsScreen             from "../screens/AlertsScreen";
+import FeedbackReviewScreen     from "../screens/FeedbackReviewScreen";
+import ItemLotsScreen           from "../screens/ItemLotsScreen";
+import CouponsScreen            from "../screens/CouponsScreen";
+import GiftCardsScreen          from "../screens/GiftCardsScreen";
+import SupportTicketsScreen     from "../screens/SupportTicketsScreen";
+import StockAuditScreen         from "../screens/StockAuditScreen";
+import StockTransfersScreen     from "../screens/StockTransfersScreen";
+import RecipesScreen            from "../screens/RecipesScreen";
+import KitchenDisplayScreen     from "../screens/KitchenDisplayScreen";
+import DeliveryManagementScreen from "../screens/DeliveryManagementScreen";
+import ReservationsScreen       from "../screens/ReservationsScreen";
+import LabelsScreen             from "../screens/LabelsScreen";
+import TrendsScreen             from "../screens/TrendsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -220,6 +234,20 @@ export default function AppNavigator() {
               component={NativeModuleScreen}
               options={({ route }) => ({ title: route?.params?.title || "Module" })}
             />
+            <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: "Alerts" }} />
+            <Stack.Screen name="FeedbackReview" component={FeedbackReviewScreen} options={{ title: "Feedback" }} />
+            <Stack.Screen name="ItemLots" component={ItemLotsScreen} options={{ title: "Item Lots" }} />
+            <Stack.Screen name="Coupons" component={CouponsScreen} options={{ title: "Coupons" }} />
+            <Stack.Screen name="GiftCards" component={GiftCardsScreen} options={{ title: "Gift Cards" }} />
+            <Stack.Screen name="SupportTickets" component={SupportTicketsScreen} options={{ title: "Support Tickets" }} />
+            <Stack.Screen name="StockAudit" component={StockAuditScreen} options={{ title: "Stock Audit" }} />
+            <Stack.Screen name="StockTransfers" component={StockTransfersScreen} options={{ title: "Stock Transfers" }} />
+            <Stack.Screen name="Recipes" component={RecipesScreen} options={{ title: "Recipes" }} />
+            <Stack.Screen name="KitchenDisplay" component={KitchenDisplayScreen} options={{ title: "Kitchen Display" }} />
+            <Stack.Screen name="DeliveryManagement" component={DeliveryManagementScreen} options={{ title: "Delivery Management" }} />
+            <Stack.Screen name="Reservations" component={ReservationsScreen} options={{ title: "Reservations" }} />
+            <Stack.Screen name="Labels" component={LabelsScreen} options={{ title: "Labels" }} />
+            <Stack.Screen name="Trends" component={TrendsScreen} options={{ title: "Trends" }} />
         </>
       )}
     </Stack.Navigator>
