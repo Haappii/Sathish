@@ -2054,16 +2054,18 @@ def update_portfolio_meta(
     row = _get_or_migrate_legacy_portfolio(db, slug)
     if not row:
         raise HTTPException(404, "Portfolio not found")
-    if payload.profile_id is not None:
-        if payload.profile_id:
-            profile = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == payload.profile_id).first()
+    fields = payload.dict(exclude_unset=True)
+    if "profile_id" in fields:
+        pid = fields["profile_id"]
+        if pid:
+            profile = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == pid).first()
             if not profile:
                 raise HTTPException(404, "Team profile not found")
-            row.profile_id = payload.profile_id
+            row.profile_id = pid
         else:
             row.profile_id = None
-    if payload.is_active is not None:
-        row.is_active = payload.is_active
+    if "is_active" in fields:
+        row.is_active = fields["is_active"]
     db.commit()
     db.refresh(row)
     profile_name = None
