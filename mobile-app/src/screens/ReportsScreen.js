@@ -18,8 +18,8 @@ import * as Sharing from "expo-sharing";
 import * as XLSX from "xlsx";
 
 import api from "../api/client";
+import { API_BASE } from "../config/api";
 import { useAuth } from "../context/AuthContext";
-import { getReceiptLogoUrl } from "../utils/printInvoice";
 
 /* =====================================================
    REPORT DEFINITIONS — mirrors frontend/src/pages/reports/Reports.jsx
@@ -161,6 +161,67 @@ const escapeHtml = (s) => String(s ?? "")
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const safeFilename = (s) => String(s || "Report").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "Report";
+
+const isAbsoluteUrl = (v) => /^https?:\/\//i.test(String(v || ""));
+const resolveApiUrl = (path) => {
+  const value = String(path || "").trim();
+  if (!value || isAbsoluteUrl(value) || value.startsWith("data:")) return value;
+  const base = API_BASE.endsWith("/") ? API_BASE : `${API_BASE}/`;
+  return isAbsoluteUrl(base) ? new URL(value, base).toString() : `${base}${value}`;
+};
+const mimeFromUrl = (url) => {
+  const ext = String(url || "").split("?")[0].split(".").pop().toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  return "image/png";
+};
+
+// expo-print's PDF renderer needs an embedded data URI for images (remote
+// URLs aren't reliably reachable from its sandbox). FileSystem's
+// downloadAsync + readAsStringAsync is the robust way to get one in RN —
+// more reliable here than fetch()+FileReader, which can silently produce
+// a broken/empty result for this exact use case on some Android builds.
+async function urlToDataUri(url) {
+  if (!url) return "";
+  let localUri = null;
+  try {
+    const dest = `${FileSystem.cacheDirectory}report_logo_${Date.now()}.tmp`;
+    const result = await FileSystem.downloadAsync(url, dest);
+    if (result.status !== 200) return "";
+    localUri = result.uri;
+    const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: FileSystem.EncodingType.Base64 });
+    if (!base64) return "";
+    return `data:${mimeFromUrl(url)};base64,${base64}`;
+  } catch {
+    return "";
+  } finally {
+    if (localUri) FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => {});
+  }
+}
+
+const _reportLogoCache = new Map();
+
+async function resolveReportLogoDataUri({ shop = {}, branch = {} } = {}) {
+  const cacheKey = `${shop?.shop_id ?? ""}:${branch?.branch_id ?? ""}`;
+  if (_reportLogoCache.has(cacheKey)) return _reportLogoCache.get(cacheKey);
+
+  const candidates = [
+    branch?.print_logo_url || branch?.logo_url,
+    shop?.logo_url,
+  ].map((v) => resolveApiUrl(v)).filter(Boolean);
+
+  for (const url of candidates) {
+    const dataUri = await urlToDataUri(url);
+    if (dataUri) {
+      _reportLogoCache.set(cacheKey, dataUri);
+      return dataUri;
+    }
+  }
+  // No shop/branch logo configured — omit rather than risk a broken image.
+  _reportLogoCache.set(cacheKey, "");
+  return "";
+}
 
 // Mirrors buildHeaderLines() in frontend/src/pages/reports/Reports.jsx so
 // exported reports carry the same shop/branch header as web and desktop.
@@ -397,7 +458,7 @@ export default function ReportsScreen() {
     setExporting("pdf");
     try {
       const headerLines = buildReportHeaderLines({ shop, branch });
-      const logoDataUri = await getReceiptLogoUrl({ shop, branch });
+      const logoDataUri = await resolveReportLogoDataUri({ shop, branch });
       const cols = Object.keys(data[0]);
       const headHtml = cols.map((c) =>
         `<th style="padding:6px 8px;border:1px solid #ddd;background:#f3f4f6;font-size:10px;text-transform:uppercase;text-align:left;">${escapeHtml(titleCase(c))}</th>`
@@ -406,18 +467,18 @@ export default function ReportsScreen() {
         `<tr>${cols.map((c) => `<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">${escapeHtml(cellText(row[c]))}</td>`).join("")}</tr>`
       ).join("");
       const headerLinesHtml = headerLines.map((line, i) =>
-        `<div style="font-size:${i === 0 ? 14 : 10}px;font-weight:${i === 0 ? 700 : 400};margin:${i === 0 ? "0 0 2px" : "0 0 1px"};">${escapeHtml(line)}</div>`
+        `<div style="font-size:${i === 0 ? 15 : 10}px;font-weight:${i === 0 ? 700 : 400};color:${i === 0 ? "#111827" : "#4b5563"};margin:${i === 0 ? "0 0 3px" : "0 0 1px"};">${escapeHtml(line)}</div>`
       ).join("");
       const html = `
         <html><head><meta charset="utf-8" /></head>
         <body style="font-family:-apple-system,Roboto,sans-serif;padding:16px;">
-          <div style="display:flex;align-items:center;justify-content:center;gap:10px;text-align:center;flex-direction:column;">
-            ${logoDataUri ? `<img src="${logoDataUri}" style="width:44px;height:44px;object-fit:contain;" />` : ""}
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;flex-direction:column;">
+            ${logoDataUri ? `<img src="${logoDataUri}" style="width:48px;height:48px;object-fit:contain;" />` : ""}
             <div>${headerLinesHtml}</div>
           </div>
           <hr style="border:none;border-top:1px solid #ccc;margin:10px 0;" />
-          <h3 style="margin:0 0 4px;text-align:center;">${escapeHtml(activeReport.label)}</h3>
-          <p style="margin:0 0 14px;color:#6b7280;font-size:11px;text-align:center;">${escapeHtml(rangeLabel)}</p>
+          <p style="margin:0 0 2px;text-align:center;font-size:13px;font-weight:700;color:#111827;">${escapeHtml(activeReport.label)}</p>
+          <p style="margin:0 0 14px;color:#6b7280;font-size:10px;text-align:center;">${escapeHtml(rangeLabel)}</p>
           <table style="border-collapse:collapse;width:100%;">
             <thead><tr>${headHtml}</tr></thead>
             <tbody>${rowsHtml}</tbody>
