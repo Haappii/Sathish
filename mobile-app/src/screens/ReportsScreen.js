@@ -169,6 +169,20 @@ const resolveApiUrl = (path) => {
   const base = API_BASE.endsWith("/") ? API_BASE : `${API_BASE}/`;
   return isAbsoluteUrl(base) ? new URL(value, base).toString() : `${base}${value}`;
 };
+const slugifyShopName = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]+/g, "").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "shop";
+// Mirrors frontend/src/utils/shopLogo.js's getShopLogoUrl() — shop.logo_url
+// is stored as a bare filename (e.g. "logo_shop_1.png?v=123"), it needs the
+// shop-logos/ prefix; a bare filename without it 404s (which is why the
+// mobile PDF logo showed nothing before this).
+const getShopLogoUrl = (shop) => {
+  const logoUrl = String(shop?.logo_url || "").trim();
+  if (logoUrl) {
+    if (isAbsoluteUrl(logoUrl) || logoUrl.startsWith("data:")) return logoUrl;
+    return resolveApiUrl(logoUrl.includes("/") ? logoUrl : `shop-logos/${logoUrl}`);
+  }
+  if (!shop?.shop_id || !shop?.shop_name) return "";
+  return resolveApiUrl(`shop-logos/logo_${slugifyShopName(shop.shop_name)}_${shop.shop_id}.png`);
+};
 const mimeFromUrl = (url) => {
   const ext = String(url || "").split("?")[0].split(".").pop().toLowerCase();
   if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
@@ -206,10 +220,11 @@ async function resolveReportLogoDataUri({ shop = {}, branch = {} } = {}) {
   const cacheKey = `${shop?.shop_id ?? ""}:${branch?.branch_id ?? ""}`;
   if (_reportLogoCache.has(cacheKey)) return _reportLogoCache.get(cacheKey);
 
+  const branchLogo = String(branch?.print_logo_url || branch?.logo_url || "").trim();
   const candidates = [
-    branch?.print_logo_url || branch?.logo_url,
-    shop?.logo_url,
-  ].map((v) => resolveApiUrl(v)).filter(Boolean);
+    branchLogo ? resolveApiUrl(branchLogo) : "",
+    getShopLogoUrl(shop),
+  ].filter(Boolean);
 
   for (const url of candidates) {
     const dataUri = await urlToDataUri(url);
@@ -461,24 +476,24 @@ export default function ReportsScreen() {
       const logoDataUri = await resolveReportLogoDataUri({ shop, branch });
       const cols = Object.keys(data[0]);
       const headHtml = cols.map((c) =>
-        `<th style="padding:6px 8px;border:1px solid #ddd;background:#f3f4f6;font-size:10px;text-transform:uppercase;text-align:left;">${escapeHtml(titleCase(c))}</th>`
+        `<th style="padding:10px 12px;background:#0B3C8C;color:#fff;font-size:11px;text-transform:uppercase;text-align:left;">${escapeHtml(titleCase(c))}</th>`
       ).join("");
-      const rowsHtml = data.map((row) =>
-        `<tr>${cols.map((c) => `<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">${escapeHtml(cellText(row[c]))}</td>`).join("")}</tr>`
+      const rowsHtml = data.map((row, i) =>
+        `<tr style="background:${i % 2 === 1 ? "#f8f9fd" : "#fff"};">${cols.map((c) => `<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:11px;">${escapeHtml(cellText(row[c]))}</td>`).join("")}</tr>`
       ).join("");
       const headerLinesHtml = headerLines.map((line, i) =>
-        `<div style="font-size:${i === 0 ? 15 : 10}px;font-weight:${i === 0 ? 700 : 400};color:${i === 0 ? "#111827" : "#4b5563"};margin:${i === 0 ? "0 0 3px" : "0 0 1px"};">${escapeHtml(line)}</div>`
+        `<div style="font-size:${i === 0 ? 20 : 12}px;font-weight:${i === 0 ? 700 : 400};color:${i === 0 ? "#111827" : "#4b5563"};margin:${i === 0 ? "0 0 4px" : "0 0 2px"};">${escapeHtml(line)}</div>`
       ).join("");
       const html = `
         <html><head><meta charset="utf-8" /></head>
-        <body style="font-family:-apple-system,Roboto,sans-serif;padding:16px;">
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;flex-direction:column;">
-            ${logoDataUri ? `<img src="${logoDataUri}" style="width:48px;height:48px;object-fit:contain;" />` : ""}
+        <body style="font-family:-apple-system,Roboto,sans-serif;padding:24px;">
+          <div style="display:flex;align-items:center;justify-content:center;gap:20px;text-align:center;">
+            ${logoDataUri ? `<img src="${logoDataUri}" style="width:80px;height:80px;object-fit:contain;flex-shrink:0;" />` : ""}
             <div>${headerLinesHtml}</div>
           </div>
-          <hr style="border:none;border-top:1px solid #ccc;margin:10px 0;" />
-          <p style="margin:0 0 2px;text-align:center;font-size:13px;font-weight:700;color:#111827;">${escapeHtml(activeReport.label)}</p>
-          <p style="margin:0 0 14px;color:#6b7280;font-size:10px;text-align:center;">${escapeHtml(rangeLabel)}</p>
+          <hr style="border:none;border-top:1px solid #ccc;margin:18px 0;" />
+          <p style="margin:0 0 3px;text-align:center;font-size:16px;font-weight:700;color:#111827;">${escapeHtml(activeReport.label)}</p>
+          <p style="margin:0 0 20px;color:#6b7280;font-size:12px;text-align:center;">${escapeHtml(rangeLabel)}</p>
           <table style="border-collapse:collapse;width:100%;">
             <thead><tr>${headHtml}</tr></thead>
             <tbody>${rowsHtml}</tbody>

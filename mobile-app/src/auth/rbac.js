@@ -113,6 +113,22 @@ export const mobileMenuCatalog = [
     perm: { module: "loyalty", action: "read" },
     fallbackRoles: ALL_ROLES,
   },
+  {
+    key: "cash_drawer",
+    title: "Cash Drawer",
+    icon: "🏧",
+    route: "CashDrawer",
+    perm: { module: "cash_drawer", action: "read" },
+    fallbackRoles: ALL_ROLES,
+  },
+  {
+    key: "online_orders",
+    title: "Online Orders",
+    icon: "🛒",
+    route: "OnlineOrders",
+    perm: { module: "online_orders", action: "read" },
+    fallbackRoles: ALL_ROLES,
+  },
   // ── Management (admin / manager only) ─────────────────────────────
   {
     key: "employees",
@@ -154,6 +170,14 @@ export const mobileMenuCatalog = [
     icon: "📊",
     route: "Reports",
     perm: { module: "reports", action: "read" },
+    fallbackRoles: new Set(["admin", "manager"]),
+  },
+  {
+    key: "day_close",
+    title: "Day Close",
+    icon: "🌙",
+    route: "DayClose",
+    perm: { module: "day_close", action: "write" },
     fallbackRoles: new Set(["admin", "manager"]),
   },
   {
