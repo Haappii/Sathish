@@ -66,6 +66,16 @@ const TILE_COLORS = {
   support_tickets:   { bg: "#eff6ff", accent: "#0ea5e9", icon: "🎫" },
   feedback_review:   { bg: "#fdf2f8", accent: "#ec4899", icon: "💬" },
   trends:            { bg: "#fff7ed", accent: "#f97316", icon: "📈" },
+  categories:        { bg: "#f0fdfa", accent: "#14b8a6", icon: "🗂️" },
+  setup_items:       { bg: "#ecfdf5", accent: "#10b981", icon: "📦" },
+  setup_suppliers:   { bg: "#eef2ff", accent: "#6366f1", icon: "🚚" },
+  purchase_orders:   { bg: "#eff6ff", accent: "#0ea5e9", icon: "📑" },
+  setup_users:       { bg: "#f5f3ff", accent: "#8b5cf6", icon: "👤" },
+  setup_permissions: { bg: "#fef2f2", accent: "#ef4444", icon: "🔐" },
+  branches:          { bg: "#eef2ff", accent: "#6366f1", icon: "🏬" },
+  shop_settings:     { bg: "#f8fafc", accent: "#64748b", icon: "⚙️" },
+  mail_scheduler:    { bg: "#eff6ff", accent: "#0ea5e9", icon: "📧" },
+  cash_denominations: { bg: "#fffbeb", accent: "#f59e0b", icon: "💵" },
 };
 
 const formatBizDate = (dateStr) => {

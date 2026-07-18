@@ -49,6 +49,16 @@ import DeliveryManagementScreen from "../screens/DeliveryManagementScreen";
 import ReservationsScreen       from "../screens/ReservationsScreen";
 import LabelsScreen             from "../screens/LabelsScreen";
 import TrendsScreen             from "../screens/TrendsScreen";
+import CategoriesScreen         from "../screens/CategoriesScreen";
+import SuppliersScreen          from "../screens/SuppliersScreen";
+import MailSchedulerScreen      from "../screens/MailSchedulerScreen";
+import CashDenominationsScreen  from "../screens/CashDenominationsScreen";
+import UsersScreen              from "../screens/UsersScreen";
+import PermissionsScreen        from "../screens/PermissionsScreen";
+import ItemsScreen              from "../screens/ItemsScreen";
+import ShopSettingsScreen       from "../screens/ShopSettingsScreen";
+import BranchesScreen           from "../screens/BranchesScreen";
+import PurchaseOrdersScreen     from "../screens/PurchaseOrdersScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -248,6 +258,16 @@ export default function AppNavigator() {
             <Stack.Screen name="Reservations" component={ReservationsScreen} options={{ title: "Reservations" }} />
             <Stack.Screen name="Labels" component={LabelsScreen} options={{ title: "Labels" }} />
             <Stack.Screen name="Trends" component={TrendsScreen} options={{ title: "Trends" }} />
+            <Stack.Screen name="Categories" component={CategoriesScreen} options={{ title: "Categories" }} />
+            <Stack.Screen name="Suppliers" component={SuppliersScreen} options={{ title: "Suppliers" }} />
+            <Stack.Screen name="MailScheduler" component={MailSchedulerScreen} options={{ title: "Mail Scheduler" }} />
+            <Stack.Screen name="CashDenominations" component={CashDenominationsScreen} options={{ title: "Cash Denominations" }} />
+            <Stack.Screen name="Users" component={UsersScreen} options={{ title: "Users" }} />
+            <Stack.Screen name="Permissions" component={PermissionsScreen} options={{ title: "Permissions" }} />
+            <Stack.Screen name="Items" component={ItemsScreen} options={{ title: "Items" }} />
+            <Stack.Screen name="ShopSettings" component={ShopSettingsScreen} options={{ title: "Shop Settings" }} />
+            <Stack.Screen name="Branches" component={BranchesScreen} options={{ title: "Branches" }} />
+            <Stack.Screen name="PurchaseOrders" component={PurchaseOrdersScreen} options={{ title: "Purchase Orders" }} />
         </>
       )}
     </Stack.Navigator>
