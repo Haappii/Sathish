@@ -12,6 +12,11 @@ import {
   View,
 } from "react-native";
 
+import * as FileSystem from "expo-file-system";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import * as XLSX from "xlsx";
+
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
@@ -151,6 +156,10 @@ const cellText = (v) => {
   if (typeof v === "number") return String(v);
   return String(v);
 };
+const escapeHtml = (s) => String(s ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+const safeFilename = (s) => String(s || "Report").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "Report";
 
 export default function ReportsScreen() {
   const { session } = useAuth();
@@ -330,6 +339,68 @@ export default function ReportsScreen() {
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
 
+  const rangeLabel = requiresDateRange && fromDate && toDate
+    ? `${fromDate} to ${toDate}`
+    : `As of ${toDate || bizDate}`;
+
+  const [exporting, setExporting] = useState(null);
+
+  const shareFile = async (uri, mimeType, dialogTitle) => {
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, { mimeType, dialogTitle });
+    } else {
+      Alert.alert("Saved", `File saved to:\n${uri}`);
+    }
+  };
+
+  const exportPDF = async () => {
+    if (!data.length || !activeReport) return;
+    setExporting("pdf");
+    try {
+      const cols = Object.keys(data[0]);
+      const headHtml = cols.map((c) =>
+        `<th style="padding:6px 8px;border:1px solid #ddd;background:#f3f4f6;font-size:10px;text-transform:uppercase;text-align:left;">${escapeHtml(titleCase(c))}</th>`
+      ).join("");
+      const rowsHtml = data.map((row) =>
+        `<tr>${cols.map((c) => `<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">${escapeHtml(cellText(row[c]))}</td>`).join("")}</tr>`
+      ).join("");
+      const html = `
+        <html><head><meta charset="utf-8" /></head>
+        <body style="font-family:-apple-system,Roboto,sans-serif;padding:16px;">
+          <h3 style="margin:0 0 4px;">${escapeHtml(activeReport.label)}</h3>
+          <p style="margin:0 0 14px;color:#6b7280;font-size:11px;">${escapeHtml(rangeLabel)}</p>
+          <table style="border-collapse:collapse;width:100%;">
+            <thead><tr>${headHtml}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </body></html>`;
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await shareFile(uri, "application/pdf", `${activeReport.label} PDF`);
+    } catch (err) {
+      Alert.alert("Export failed", err?.message || "Could not generate PDF");
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const exportExcel = async () => {
+    if (!data.length || !activeReport) return;
+    setExporting("excel");
+    try {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+      const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+      const fileUri = `${FileSystem.cacheDirectory}${safeFilename(activeReport.label)}.xlsx`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await shareFile(fileUri, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", `${activeReport.label} Excel`);
+    } catch (err) {
+      Alert.alert("Export failed", err?.message || "Could not generate Excel file");
+    } finally {
+      setExporting(null);
+    }
+  };
+
   /* ============= PICKER (report catalog) ============= */
   if (!activeReport) {
     return (
@@ -434,24 +505,46 @@ export default function ReportsScreen() {
               <Text style={st.emptyTitle}>No data for this selection</Text>
             </View>
           ) : (
-            <View style={st.tableCard}>
-              <ScrollView horizontal showsHorizontalScrollIndicator>
-                <View>
-                  <View style={st.tRowHeader}>
-                    {columns.map((c) => (
-                      <Text key={c} style={st.tHeadCell}>{titleCase(c)}</Text>
-                    ))}
-                  </View>
-                  {data.map((row, i) => (
-                    <View key={i} style={[st.tRow, i % 2 === 1 && st.tRowAlt]}>
+            <>
+              <View style={st.exportRow}>
+                <Pressable
+                  style={[st.exportBtn, exporting && st.btnDisabled]}
+                  disabled={!!exporting}
+                  onPress={exportPDF}
+                >
+                  {exporting === "pdf"
+                    ? <ActivityIndicator color="#dc2626" size="small" />
+                    : <Text style={st.exportBtnText}>⬇ PDF</Text>}
+                </Pressable>
+                <Pressable
+                  style={[st.exportBtn, st.exportBtnExcel, exporting && st.btnDisabled]}
+                  disabled={!!exporting}
+                  onPress={exportExcel}
+                >
+                  {exporting === "excel"
+                    ? <ActivityIndicator color="#059669" size="small" />
+                    : <Text style={[st.exportBtnText, st.exportBtnTextExcel]}>⬇ Excel</Text>}
+                </Pressable>
+              </View>
+              <View style={st.tableCard}>
+                <ScrollView horizontal showsHorizontalScrollIndicator>
+                  <View>
+                    <View style={st.tRowHeader}>
                       {columns.map((c) => (
-                        <Text key={c} style={st.tCell}>{cellText(row[c])}</Text>
+                        <Text key={c} style={st.tHeadCell}>{titleCase(c)}</Text>
                       ))}
                     </View>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
+                    {data.map((row, i) => (
+                      <View key={i} style={[st.tRow, i % 2 === 1 && st.tRowAlt]}>
+                        {columns.map((c) => (
+                          <Text key={c} style={st.tCell}>{cellText(row[c])}</Text>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            </>
           )
         )}
       </ScrollView>
@@ -536,6 +629,16 @@ const st = StyleSheet.create({
   emptyWrap: { alignItems: "center", paddingTop: 50, gap: 10 },
   emptyIcon: { fontSize: 44 },
   emptyTitle: { color: "#9ca3af", fontSize: 15, fontWeight: "700" },
+
+  exportRow: { flexDirection: "row", gap: 10, marginHorizontal: 14, marginTop: 14 },
+  exportBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    borderRadius: 12, paddingVertical: 10, borderWidth: 1.5,
+    borderColor: "#fecaca", backgroundColor: "#fef2f2",
+  },
+  exportBtnExcel: { borderColor: "#a7f3d0", backgroundColor: "#ecfdf5" },
+  exportBtnText: { color: "#dc2626", fontWeight: "800", fontSize: 13 },
+  exportBtnTextExcel: { color: "#059669" },
 
   tableCard: {
     backgroundColor: "#ffffff", marginHorizontal: 14, marginTop: 14, borderRadius: 16,
