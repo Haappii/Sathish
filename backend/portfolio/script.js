@@ -70,6 +70,16 @@ function applyConfig(cfg) {
     });
 
     // Hero
+    const nameEl = document.querySelector('.hero-name');
+    if (nameEl) {
+        if (cfg.hero_name) {
+            nameEl.textContent = cfg.hero_name;
+        } else if (getPortfolioSlug() !== 'sathish_kumar_lakshman') {
+            // Don't leak the default hardcoded name onto someone else's portfolio.
+            nameEl.textContent = '';
+        }
+    }
+    document.title = cfg.hero_name ? `${cfg.hero_name} | Software Engineer` : document.title;
     const badge = document.querySelector('.hero-badge');
     if (badge && cfg.hero_badge) {
         badge.childNodes[badge.childNodes.length - 1].textContent = " " + cfg.hero_badge;

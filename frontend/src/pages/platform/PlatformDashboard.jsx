@@ -70,6 +70,7 @@ export default function PlatformDashboard() {
       hero: true, stats: true, tech_marquee: true, about: true,
       experience: true, projects: true, education: true, certification: true, contact: true,
     },
+    hero_name: "",
     hero_badge: "Available for opportunities",
     hero_title_line1: "More Than Just",
     hero_title_line2: "Queries & Code",
@@ -206,6 +207,18 @@ export default function PlatformDashboard() {
       showToast("Deleted", "success");
     } catch (e) {
       showToast(e?.response?.data?.detail || "Delete failed", "error");
+    }
+  };
+
+  const unlinkPortfolio = async (slug) => {
+    if (!window.confirm("Remove this portfolio from the profile? The name will no longer be clickable on the About page. The portfolio itself is kept.")) return;
+    try {
+      const res = await platformAxios.patch(`/platform/portfolios/${slug}`, { profile_id: null });
+      setPortfolios((prev) => prev.map((p) => (p.slug === slug ? res.data : p)));
+      setTeamProfiles((prev) => prev.map((p) => (p.portfolio_slug === slug ? { ...p, portfolio_slug: null } : p)));
+      showToast("Portfolio unlinked from profile", "success");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to unlink", "error");
     }
   };
 
@@ -1270,14 +1283,23 @@ export default function PlatformDashboard() {
                         </span>
                         <div className="flex gap-1.5">
                           {p.portfolio_slug ? (
-                            <a
-                              href={`/portfolio/${p.portfolio_slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition"
-                            >
-                              🎨 Portfolio
-                            </a>
+                            <>
+                              <a
+                                href={`/portfolio/${p.portfolio_slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition"
+                              >
+                                🎨 Portfolio
+                              </a>
+                              <button
+                                title="Remove portfolio from this profile"
+                                className="px-2.5 py-1 rounded-lg text-[11px] bg-white/8 hover:bg-red-500/20 text-slate-400 hover:text-red-300 transition"
+                                onClick={() => unlinkPortfolio(p.portfolio_slug)}
+                              >
+                                Unlink
+                              </button>
+                            </>
                           ) : (
                             <button
                               className="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition"
@@ -1666,11 +1688,14 @@ export default function PlatformDashboard() {
                       <div key={p.slug} className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-2">
                         <div className="text-sm font-semibold text-white truncate">{p.profile_name || p.slug}</div>
                         <div className="text-[11px] text-purple-300 truncate">/portfolio/{p.slug}</div>
+                        {p.profile_name && (
+                          <div className="text-[11px] text-slate-500 truncate">Linked to profile: {p.profile_name}</div>
+                        )}
                         <div className="flex items-center justify-between pt-1">
                           <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${p.is_active ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30" : "text-slate-400 bg-slate-500/15 border-slate-500/30"}`}>
                             {p.is_active ? "Active" : "Hidden"}
                           </span>
-                          <div className="flex gap-1.5">
+                          <div className="flex flex-wrap justify-end gap-1.5">
                             <a
                               href={`/portfolio/${p.slug}`}
                               target="_blank"
@@ -1685,6 +1710,15 @@ export default function PlatformDashboard() {
                             >
                               Edit
                             </button>
+                            {p.profile_id && (
+                              <button
+                                title="Remove portfolio from its linked profile"
+                                className="px-2.5 py-1 rounded-lg text-[11px] bg-white/8 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 transition"
+                                onClick={() => unlinkPortfolio(p.slug)}
+                              >
+                                Unlink
+                              </button>
+                            )}
                             <button
                               className="px-2.5 py-1 rounded-lg text-[11px] bg-red-500/20 hover:bg-red-500/30 text-red-300 transition"
                               onClick={() => deletePortfolio(p.slug)}
@@ -1806,6 +1840,11 @@ export default function PlatformDashboard() {
               <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 space-y-5">
                 <h3 className="text-base font-semibold text-white">Hero Section</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Full Name (shown above the headline)</label>
+                    <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={portfolio.hero_name} onChange={(e) => pf("hero_name", e.target.value)} placeholder="Nidra Vijay Kumar" />
+                  </div>
                   <div>
                     <label className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Badge Text</label>
                     <input className="mt-1 w-full rounded-xl px-3 py-2.5 bg-slate-900/80 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
@@ -1855,6 +1894,7 @@ export default function PlatformDashboard() {
                 {/* Live preview */}
                 <div className="border border-white/10 rounded-xl p-6 bg-slate-950/60">
                   <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Preview</p>
+                  {portfolio.hero_name && <p className="text-sm font-semibold text-slate-300 mb-1">{portfolio.hero_name}</p>}
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-slate-400 mb-3">
                     <span className="w-2 h-2 bg-emerald-400 rounded-full" /> {portfolio.hero_badge || "Badge text"}
                   </div>

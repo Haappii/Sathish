@@ -2001,8 +2001,9 @@ def create_portfolio(
         if not profile:
             raise HTTPException(404, "Team profile not found")
         config = {
-            "hero_title_line1": profile.name,
-            "hero_title_line2": profile.role_title or "",
+            "hero_name": profile.name,
+            "hero_title_line1": profile.role_title or "",
+            "hero_title_line2": "",
             "photo_url": profile.photo_url or "",
         }
 
