@@ -1367,9 +1367,18 @@ def portfolio_index():
     return RedirectResponse(url="/sathish_kumar_lakshman_portfolio", status_code=301)
 
 
-@app.get("/portfolio/{file_path:path}", include_in_schema=False)
-def portfolio_assets(file_path: str):
+# Shared static assets (style.css / script.js) used by every per-person
+# portfolio page — the shell is the same, only the JSON content differs.
+@app.get("/portfolio-assets/{file_path:path}", include_in_schema=False)
+def portfolio_shared_assets(file_path: str):
     return _serve_portfolio_asset(file_path)
+
+
+# Per-person portfolios: /portfolio/{slug} serves the same static shell;
+# script.js reads the slug from the URL and fetches its JSON config.
+@app.get("/portfolio/{slug}", include_in_schema=False)
+def portfolio_by_slug(slug: str):
+    return _serve_portfolio_index()
 
 
 @app.get("/")

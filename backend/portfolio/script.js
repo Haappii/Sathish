@@ -1,8 +1,18 @@
 const API_BASE = "https://haappiibilling.in/api";
 
+function getPortfolioSlug() {
+    const path = window.location.pathname;
+    let m = path.match(/^\/portfolio\/([^/]+)/);
+    if (m) return decodeURIComponent(m[1]);
+    m = path.match(/^\/([a-zA-Z0-9_-]+)_portfolio/);
+    if (m) return m[1];
+    return "sathish_kumar_lakshman";
+}
+
 async function loadPortfolioConfig() {
     try {
-        const res = await fetch(`${API_BASE}/platform/public/portfolio`);
+        const slug = getPortfolioSlug();
+        const res = await fetch(`${API_BASE}/platform/public/portfolios/${encodeURIComponent(slug)}`);
         if (!res.ok) return null;
         const cfg = await res.json();
 

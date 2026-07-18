@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from datetime import date, datetime
 from email.message import EmailMessage
@@ -25,6 +26,7 @@ from app.models.branch import Branch
 from app.models.platform_onboard_request import PlatformOnboardRequest
 from app.models.platform_payment import PlatformPayment
 from app.models.platform_team_profile import PlatformTeamProfile
+from app.models.platform_portfolio import PlatformPortfolio
 from app.models.platform_user import PlatformUser
 from app.models.roles import Role
 from app.models.shop_details import ShopDetails
@@ -1673,7 +1675,7 @@ TEAM_UPLOADS_DIR = Path("uploads") / "team"
 TEAM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _profile_row(p: PlatformTeamProfile) -> dict:
+def _profile_row(p: PlatformTeamProfile, portfolio_slug: str | None = None) -> dict:
     return {
         "profile_id": p.profile_id,
         "name": p.name,
@@ -1683,7 +1685,17 @@ def _profile_row(p: PlatformTeamProfile) -> dict:
         "display_order": p.display_order,
         "is_active": p.is_active,
         "created_at": str(p.created_at) if p.created_at else None,
+        "portfolio_slug": portfolio_slug,
     }
+
+
+def _portfolio_slug_map(db: Session, profile_ids: list[int], active_only: bool) -> dict[int, str]:
+    if not profile_ids:
+        return {}
+    q = db.query(PlatformPortfolio).filter(PlatformPortfolio.profile_id.in_(profile_ids))
+    if active_only:
+        q = q.filter(PlatformPortfolio.is_active == True)  # noqa: E712
+    return {row.profile_id: row.slug for row in q.all() if row.profile_id is not None}
 
 
 @router.get("/public/team-profiles")
@@ -1694,7 +1706,8 @@ def public_team_profiles(db: Session = Depends(get_db)):
         .order_by(PlatformTeamProfile.display_order.asc(), PlatformTeamProfile.profile_id.asc())
         .all()
     )
-    return [_profile_row(p) for p in rows]
+    slug_map = _portfolio_slug_map(db, [p.profile_id for p in rows], active_only=True)
+    return [_profile_row(p, slug_map.get(p.profile_id)) for p in rows]
 
 
 @router.get("/team-profiles")
@@ -1707,7 +1720,8 @@ def list_team_profiles(
         .order_by(PlatformTeamProfile.display_order.asc(), PlatformTeamProfile.profile_id.asc())
         .all()
     )
-    return [_profile_row(p) for p in rows]
+    slug_map = _portfolio_slug_map(db, [p.profile_id for p in rows], active_only=False)
+    return [_profile_row(p, slug_map.get(p.profile_id)) for p in rows]
 
 
 @router.post("/team-profiles")
@@ -1860,6 +1874,227 @@ def upload_portfolio_photo(
 ):
     ext = Path(photo.filename).suffix.lower() if photo.filename else ".jpg"
     filename = generate_filename("portfolio_photo", ext)
+    destination = f"platform/{filename}"
+    photo_url = upload_file(photo.file, destination, photo.content_type or "image/jpeg")
+    return {"success": True, "photo_url": photo_url}
+
+
+# ── Portfolios (multi) ──────────────────────────────────────────────────────
+# Each portfolio is a standalone slug + JSON config, optionally linked to a
+# team profile so its name becomes clickable on the public About page.
+
+LEGACY_PORTFOLIO_SLUG = "sathish_kumar_lakshman"
+
+
+def _slugify(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
+    return s or "portfolio"
+
+
+def _unique_portfolio_slug(db: Session, base_slug: str, exclude_id: int | None = None) -> str:
+    slug = base_slug
+    i = 2
+    while True:
+        q = db.query(PlatformPortfolio).filter(PlatformPortfolio.slug == slug)
+        if exclude_id is not None:
+            q = q.filter(PlatformPortfolio.portfolio_id != exclude_id)
+        if not q.first():
+            return slug
+        slug = f"{base_slug}-{i}"
+        i += 1
+
+
+def _portfolio_config_dict(row: PlatformPortfolio) -> dict:
+    try:
+        return json.loads(row.config_json) if row.config_json else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _portfolio_summary(row: PlatformPortfolio, profile_name: str | None = None) -> dict:
+    return {
+        "portfolio_id": row.portfolio_id,
+        "slug": row.slug,
+        "profile_id": row.profile_id,
+        "profile_name": profile_name,
+        "is_active": row.is_active,
+        "created_at": str(row.created_at) if row.created_at else None,
+        "updated_at": str(row.updated_at) if row.updated_at else None,
+    }
+
+
+def _get_or_migrate_legacy_portfolio(db: Session, slug: str) -> PlatformPortfolio | None:
+    """Look up a portfolio row by slug; for the legacy default slug, lazily
+    migrate the old single-config value (portfolio_config system param) into
+    the new table on first access so existing content isn't lost."""
+    row = db.query(PlatformPortfolio).filter(PlatformPortfolio.slug == slug).first()
+    if row:
+        return row
+    if slug != LEGACY_PORTFOLIO_SLUG:
+        return None
+    raw = _get_param_value(db, PLATFORM_SETTINGS_SHOP_ID, PORTFOLIO_PARAM_KEY)
+    row = PlatformPortfolio(slug=LEGACY_PORTFOLIO_SLUG, config_json=raw or "{}", is_active=True)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.get("/public/portfolios/{slug}")
+def public_get_portfolio_by_slug(slug: str, db: Session = Depends(get_db)):
+    row = _get_or_migrate_legacy_portfolio(db, slug)
+    if not row or not row.is_active:
+        raise HTTPException(404, "Portfolio not found")
+    return _portfolio_config_dict(row)
+
+
+@router.get("/portfolios")
+def list_portfolios(
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    _get_or_migrate_legacy_portfolio(db, LEGACY_PORTFOLIO_SLUG)
+    rows = db.query(PlatformPortfolio).order_by(PlatformPortfolio.created_at.asc()).all()
+    profile_ids = [r.profile_id for r in rows if r.profile_id is not None]
+    names = {}
+    if profile_ids:
+        for p in db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id.in_(profile_ids)).all():
+            names[p.profile_id] = p.name
+    return [_portfolio_summary(r, names.get(r.profile_id)) for r in rows]
+
+
+@router.get("/portfolios/{slug}")
+def get_portfolio_by_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = _get_or_migrate_legacy_portfolio(db, slug)
+    if not row:
+        raise HTTPException(404, "Portfolio not found")
+    return _portfolio_config_dict(row)
+
+
+class PortfolioCreateRequest(BaseModel):
+    slug: str | None = None
+    name: str | None = None
+    profile_id: int | None = None
+
+
+@router.post("/portfolios")
+def create_portfolio(
+    payload: PortfolioCreateRequest,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    base = payload.slug or payload.name
+    if payload.profile_id and not base:
+        profile = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == payload.profile_id).first()
+        if profile:
+            base = profile.name
+    base_slug = _slugify(base or "portfolio")
+    slug = _unique_portfolio_slug(db, base_slug)
+
+    config = {}
+    if payload.profile_id:
+        profile = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == payload.profile_id).first()
+        if not profile:
+            raise HTTPException(404, "Team profile not found")
+        config = {
+            "hero_title_line1": profile.name,
+            "hero_title_line2": profile.role_title or "",
+            "photo_url": profile.photo_url or "",
+        }
+
+    row = PlatformPortfolio(
+        slug=slug,
+        profile_id=payload.profile_id,
+        config_json=json.dumps(config, ensure_ascii=False),
+        is_active=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    profile_name = None
+    if row.profile_id:
+        p = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == row.profile_id).first()
+        profile_name = p.name if p else None
+    return _portfolio_summary(row, profile_name)
+
+
+@router.put("/portfolios/{slug}")
+def upsert_portfolio_content(
+    slug: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = _get_or_migrate_legacy_portfolio(db, slug)
+    if not row:
+        row = PlatformPortfolio(slug=slug, config_json="{}", is_active=True)
+        db.add(row)
+    row.config_json = json.dumps(payload, ensure_ascii=False)
+    db.commit()
+    return {"success": True}
+
+
+class PortfolioMetaUpdate(BaseModel):
+    profile_id: int | None = None
+    is_active: bool | None = None
+
+
+@router.patch("/portfolios/{slug}")
+def update_portfolio_meta(
+    slug: str,
+    payload: PortfolioMetaUpdate,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = _get_or_migrate_legacy_portfolio(db, slug)
+    if not row:
+        raise HTTPException(404, "Portfolio not found")
+    if payload.profile_id is not None:
+        if payload.profile_id:
+            profile = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == payload.profile_id).first()
+            if not profile:
+                raise HTTPException(404, "Team profile not found")
+            row.profile_id = payload.profile_id
+        else:
+            row.profile_id = None
+    if payload.is_active is not None:
+        row.is_active = payload.is_active
+    db.commit()
+    db.refresh(row)
+    profile_name = None
+    if row.profile_id:
+        p = db.query(PlatformTeamProfile).filter(PlatformTeamProfile.profile_id == row.profile_id).first()
+        profile_name = p.name if p else None
+    return _portfolio_summary(row, profile_name)
+
+
+@router.delete("/portfolios/{slug}")
+def delete_portfolio(
+    slug: str,
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    row = db.query(PlatformPortfolio).filter(PlatformPortfolio.slug == slug).first()
+    if not row:
+        raise HTTPException(404, "Portfolio not found")
+    db.delete(row)
+    db.commit()
+    return {"success": True, "slug": slug}
+
+
+@router.post("/portfolios/{slug}/photo")
+def upload_portfolio_photo_by_slug(
+    slug: str,
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    owner=Depends(PlatformOwnerOnly),
+):
+    ext = Path(photo.filename).suffix.lower() if photo.filename else ".jpg"
+    filename = generate_filename("portfolio", ext)
     destination = f"platform/{filename}"
     photo_url = upload_file(photo.file, destination, photo.content_type or "image/jpeg")
     return {"success": True, "photo_url": photo_url}

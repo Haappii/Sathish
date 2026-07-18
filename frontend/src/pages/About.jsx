@@ -567,8 +567,8 @@ export default function About() {
                   <div className="ab-team-info">
                     {p.role_title && <span className="ab-team-role">{p.role_title}</span>}
                     <h3 className="ab-team-name">
-                      {String(p.role_title || "").toLowerCase().includes("founder") ? (
-                        <a href="/sathish_kumar_lakshman_portfolio" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
+                      {p.portfolio_slug ? (
+                        <a href={`/portfolio/${p.portfolio_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
                           {p.name}
                         </a>
                       ) : p.name}

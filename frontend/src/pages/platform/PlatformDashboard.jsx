@@ -149,12 +149,71 @@ export default function PlatformDashboard() {
   const [portfolioBusy, setPortfolioBusy] = useState(false);
   const [portfolioSection, setPortfolioSection] = useState("hero");
 
+  const [portfolios, setPortfolios] = useState([]);
+  const [activePortfolioSlug, setActivePortfolioSlug] = useState(null);
+  const [portfolioListBusy, setPortfolioListBusy] = useState(false);
+  const [newPortfolioName, setNewPortfolioName] = useState("");
+  const [newPortfolioProfileId, setNewPortfolioProfileId] = useState("");
+
   const pf = (field, val) => setPortfolio((p) => ({ ...p, [field]: val }));
 
+  const openPortfolio = async (slug) => {
+    setActivePortfolioSlug(slug);
+    setPortfolioSection("hero");
+    try {
+      const res = await platformAxios.get(`/platform/portfolios/${slug}`);
+      setPortfolio({ ...BLANK_PORTFOLIO, ...(res.data || {}) });
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to load portfolio", "error");
+    }
+  };
+
+  const backToPortfolioList = () => {
+    setActivePortfolioSlug(null);
+    setPortfolio(BLANK_PORTFOLIO);
+  };
+
+  const createPortfolio = async ({ name, profileId } = {}) => {
+    const nm = name !== undefined ? name : newPortfolioName;
+    const pid = profileId !== undefined ? profileId : (newPortfolioProfileId ? Number(newPortfolioProfileId) : null);
+    if (!nm?.trim() && !pid) { showToast("Enter a name or pick a team profile", "error"); return; }
+    setPortfolioListBusy(true);
+    try {
+      const res = await platformAxios.post("/platform/portfolios", {
+        name: nm?.trim() || undefined,
+        profile_id: pid || null,
+      });
+      setPortfolios((prev) => [...prev, res.data]);
+      setNewPortfolioName("");
+      setNewPortfolioProfileId("");
+      showToast("Portfolio created", "success");
+      await openPortfolio(res.data.slug);
+      setTab("PORTFOLIO");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Failed to create portfolio", "error");
+    } finally {
+      setPortfolioListBusy(false);
+    }
+  };
+
+  const deletePortfolio = async (slug) => {
+    if (!window.confirm(`Delete portfolio "${slug}"? This cannot be undone.`)) return;
+    try {
+      await platformAxios.delete(`/platform/portfolios/${slug}`);
+      setPortfolios((prev) => prev.filter((p) => p.slug !== slug));
+      if (activePortfolioSlug === slug) backToPortfolioList();
+      setTeamProfiles((prev) => prev.map((p) => (p.portfolio_slug === slug ? { ...p, portfolio_slug: null } : p)));
+      showToast("Deleted", "success");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || "Delete failed", "error");
+    }
+  };
+
   const savePortfolio = async () => {
+    if (!activePortfolioSlug) return;
     setPortfolioBusy(true);
     try {
-      await platformAxios.put("/platform/portfolio", portfolio);
+      await platformAxios.put(`/platform/portfolios/${activePortfolioSlug}`, portfolio);
       showToast("Portfolio saved", "success");
     } catch (e) {
       showToast(e?.response?.data?.detail || "Failed to save portfolio", "error");
@@ -245,8 +304,8 @@ export default function PlatformDashboard() {
         // optional — ignore if not yet deployed
       }
       try {
-        const pfRes = await platformAxios.get("/platform/portfolio");
-        if (pfRes?.data) setPortfolio((prev) => ({ ...prev, ...pfRes.data }));
+        const listRes = await platformAxios.get("/platform/portfolios");
+        setPortfolios(Array.isArray(listRes.data) ? listRes.data : []);
       } catch {
         // optional — use defaults if not deployed
       }
@@ -1210,6 +1269,23 @@ export default function PlatformDashboard() {
                           {p.is_active ? "Active" : "Hidden"}
                         </span>
                         <div className="flex gap-1.5">
+                          {p.portfolio_slug ? (
+                            <a
+                              href={`/portfolio/${p.portfolio_slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition"
+                            >
+                              🎨 Portfolio
+                            </a>
+                          ) : (
+                            <button
+                              className="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition"
+                              onClick={() => createPortfolio({ name: p.name, profileId: p.profile_id })}
+                            >
+                              + Portfolio
+                            </button>
+                          )}
                           <button className="px-2.5 py-1 rounded-lg text-[11px] bg-white/8 hover:bg-white/15 text-blue-300 transition"
                             onClick={() => { setEditingProfileId(p.profile_id); setProfileForm({ name: p.name, role_title: p.role_title, bio: p.bio || "", display_order: p.display_order, is_active: p.is_active }); setProfilePhoto(null); }}>
                             Edit
@@ -1551,6 +1627,90 @@ export default function PlatformDashboard() {
           </div>
         ) : tab === "PORTFOLIO" ? (
           <div className="space-y-6">
+            {!activePortfolioSlug ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">New Portfolio</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                      className="rounded-xl px-3 py-2 bg-slate-800 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      placeholder="Slug / name (e.g. Nidra Vijay Kumar)"
+                      value={newPortfolioName}
+                      onChange={(e) => setNewPortfolioName(e.target.value)}
+                    />
+                    <select
+                      className="rounded-xl px-3 py-2 bg-slate-800 border border-white/10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      value={newPortfolioProfileId}
+                      onChange={(e) => setNewPortfolioProfileId(e.target.value)}
+                    >
+                      <option value="">Link to team profile (optional)</option>
+                      {teamProfiles.filter((p) => !p.portfolio_slug).map((p) => (
+                        <option key={p.profile_id} value={p.profile_id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      disabled={portfolioListBusy}
+                      onClick={() => createPortfolio()}
+                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-semibold transition"
+                    >
+                      {portfolioListBusy ? "Creating…" : "+ Create Portfolio"}
+                    </button>
+                  </div>
+                </div>
+
+                {portfolios.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-3">No portfolios yet. Create one above.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {portfolios.map((p) => (
+                      <div key={p.slug} className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-2">
+                        <div className="text-sm font-semibold text-white truncate">{p.profile_name || p.slug}</div>
+                        <div className="text-[11px] text-purple-300 truncate">/portfolio/{p.slug}</div>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${p.is_active ? "text-emerald-300 bg-emerald-500/15 border-emerald-500/30" : "text-slate-400 bg-slate-500/15 border-slate-500/30"}`}>
+                            {p.is_active ? "Active" : "Hidden"}
+                          </span>
+                          <div className="flex gap-1.5">
+                            <a
+                              href={`/portfolio/${p.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded-lg text-[11px] bg-white/8 hover:bg-white/15 text-slate-300 transition"
+                            >
+                              View
+                            </a>
+                            <button
+                              className="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition"
+                              onClick={() => openPortfolio(p.slug)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-2.5 py-1 rounded-lg text-[11px] bg-red-500/20 hover:bg-red-500/30 text-red-300 transition"
+                              onClick={() => deletePortfolio(p.slug)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+            <>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={backToPortfolioList}
+                className="px-3 py-1.5 rounded-xl text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 transition"
+              >
+                ← All Portfolios
+              </button>
+              <span className="text-sm text-slate-300">
+                Editing: <span className="font-semibold text-white">{activePortfolioSlug}</span>
+              </span>
+            </div>
             {/* Portfolio sub-nav + actions */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
@@ -1665,7 +1825,7 @@ export default function PlatformDashboard() {
                           const fd = new FormData();
                           fd.append("photo", file);
                           try {
-                            const res = await platformAxios.post("/platform/portfolio/photo", fd);
+                            const res = await platformAxios.post(`/platform/portfolios/${activePortfolioSlug}/photo`, fd);
                             if (res.data?.photo_url) pf("photo_url", res.data.photo_url);
                             showToast("Photo uploaded", "success");
                           } catch (err) {
@@ -1985,6 +2145,8 @@ export default function PlatformDashboard() {
                   </div>
                 </div>
               </div>
+            )}
+            </>
             )}
           </div>
         ) : (
