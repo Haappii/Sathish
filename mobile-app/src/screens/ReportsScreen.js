@@ -19,6 +19,7 @@ import * as XLSX from "xlsx";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { getReceiptLogoUrl } from "../utils/printInvoice";
 
 /* =====================================================
    REPORT DEFINITIONS — mirrors frontend/src/pages/reports/Reports.jsx
@@ -161,11 +162,42 @@ const escapeHtml = (s) => String(s ?? "")
   .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const safeFilename = (s) => String(s || "Report").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "Report";
 
+// Mirrors buildHeaderLines() in frontend/src/pages/reports/Reports.jsx so
+// exported reports carry the same shop/branch header as web and desktop.
+const buildReportHeaderLines = ({ shop = {}, branch = {} } = {}) => {
+  const lines = [];
+  const hasBranch = Boolean(branch?.branch_name);
+  const shopName = shop?.shop_name || "Shop Name";
+  lines.push(hasBranch ? `${shopName} - ${branch.branch_name}` : shopName);
+
+  const hasBranchAddress = [
+    branch?.address_line1, branch?.address_line2, branch?.city, branch?.state, branch?.pincode,
+  ].some((v) => String(v || "").trim());
+  const addrSrc = hasBranchAddress ? branch : shop;
+
+  const address = [addrSrc?.address_line1, addrSrc?.address_line2, addrSrc?.address_line3]
+    .filter(Boolean).join(", ");
+  if (address) lines.push(address);
+
+  const city = [addrSrc?.city, addrSrc?.state, addrSrc?.pincode].filter(Boolean).join(" ");
+  if (city) lines.push(city);
+
+  const contact = [];
+  if (shop?.mobile) contact.push(`Ph: ${shop.mobile}`);
+  if (shop?.gst_number) contact.push(`GSTIN: ${shop.gst_number}`);
+  if (contact.length) lines.push(contact.join(" | "));
+
+  if (!hasBranch) lines.push("Branch: All");
+  return lines;
+};
+
 export default function ReportsScreen() {
   const { session } = useAuth();
   const bizDate = session?.app_date || todayStr();
 
   const [isHotel, setIsHotel] = useState(false);
+  const [shop, setShop] = useState({});
+  const [branch, setBranch] = useState({});
   const [users, setUsers] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
   const [expandedGroup, setExpandedGroup] = useState(null);
@@ -186,14 +218,21 @@ export default function ReportsScreen() {
     api.get("/shop/details").then((r) => {
       if (!alive) return;
       const sd = r?.data || {};
+      setShop(sd);
       setIsHotel(String(sd.billing_type || sd.shop_type || "").toLowerCase() === "hotel");
     }).catch(() => {});
     api.get("/users/").then((r) => {
       if (!alive) return;
       setUsers(Array.isArray(r.data) ? r.data : []);
     }).catch(() => {});
+    if (session?.branch_id) {
+      api.get(`/branch/${session.branch_id}`).then((r) => {
+        if (!alive) return;
+        setBranch(r?.data || {});
+      }).catch(() => {});
+    }
     return () => { alive = false; };
-  }, []);
+  }, [session?.branch_id]);
 
   const reportOptions = useMemo(
     () => REPORTS.filter((r) => isHotel || !r.hotelOnly),
@@ -357,6 +396,8 @@ export default function ReportsScreen() {
     if (!data.length || !activeReport) return;
     setExporting("pdf");
     try {
+      const headerLines = buildReportHeaderLines({ shop, branch });
+      const logoDataUri = await getReceiptLogoUrl({ shop, branch });
       const cols = Object.keys(data[0]);
       const headHtml = cols.map((c) =>
         `<th style="padding:6px 8px;border:1px solid #ddd;background:#f3f4f6;font-size:10px;text-transform:uppercase;text-align:left;">${escapeHtml(titleCase(c))}</th>`
@@ -364,11 +405,19 @@ export default function ReportsScreen() {
       const rowsHtml = data.map((row) =>
         `<tr>${cols.map((c) => `<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">${escapeHtml(cellText(row[c]))}</td>`).join("")}</tr>`
       ).join("");
+      const headerLinesHtml = headerLines.map((line, i) =>
+        `<div style="font-size:${i === 0 ? 14 : 10}px;font-weight:${i === 0 ? 700 : 400};margin:${i === 0 ? "0 0 2px" : "0 0 1px"};">${escapeHtml(line)}</div>`
+      ).join("");
       const html = `
         <html><head><meta charset="utf-8" /></head>
         <body style="font-family:-apple-system,Roboto,sans-serif;padding:16px;">
-          <h3 style="margin:0 0 4px;">${escapeHtml(activeReport.label)}</h3>
-          <p style="margin:0 0 14px;color:#6b7280;font-size:11px;">${escapeHtml(rangeLabel)}</p>
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;text-align:center;flex-direction:column;">
+            ${logoDataUri ? `<img src="${logoDataUri}" style="width:44px;height:44px;object-fit:contain;" />` : ""}
+            <div>${headerLinesHtml}</div>
+          </div>
+          <hr style="border:none;border-top:1px solid #ccc;margin:10px 0;" />
+          <h3 style="margin:0 0 4px;text-align:center;">${escapeHtml(activeReport.label)}</h3>
+          <p style="margin:0 0 14px;color:#6b7280;font-size:11px;text-align:center;">${escapeHtml(rangeLabel)}</p>
           <table style="border-collapse:collapse;width:100%;">
             <thead><tr>${headHtml}</tr></thead>
             <tbody>${rowsHtml}</tbody>
@@ -387,7 +436,15 @@ export default function ReportsScreen() {
     if (!data.length || !activeReport) return;
     setExporting("excel");
     try {
-      const ws = XLSX.utils.json_to_sheet(data);
+      const headerLines = buildReportHeaderLines({ shop, branch });
+      const cols = Object.keys(data[0]);
+      const ws = XLSX.utils.json_to_sheet([]);
+      ws["!merges"] = ws["!merges"] || [];
+      headerLines.forEach((line, i) => {
+        ws[`A${i + 1}`] = { v: line };
+        ws["!merges"].push({ s: { r: i, c: 0 }, e: { r: i, c: cols.length - 1 } });
+      });
+      XLSX.utils.sheet_add_json(ws, data, { origin: `A${headerLines.length + 2}` });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Report");
       const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });

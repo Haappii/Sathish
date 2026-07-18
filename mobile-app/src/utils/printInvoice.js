@@ -215,7 +215,7 @@ function slugifyShopName(value) {
 // result per shop/branch instead of redoing this work on every receipt.
 const _logoDataUriCache = new Map();
 
-async function getReceiptLogoUrl({ shop = {}, branch = {} } = {}) {
+export async function getReceiptLogoUrl({ shop = {}, branch = {} } = {}) {
   const cacheKey = `${shop?.shop_id ?? ""}:${branch?.branch_id ?? ""}`;
   if (_logoDataUriCache.has(cacheKey)) return _logoDataUriCache.get(cacheKey);
 
