@@ -2,7 +2,7 @@
   "expo": {
     "name": "Haappii Billing",
     "slug": "haappii-billing-mobile",
-    "version": "2.6.0",
+    "version": "2.7.0",
     "icon": "./assets/app_icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.haappii.billing",
-      "versionCode": 11,
+      "versionCode": 12,
       "adaptiveIcon": {
         "foregroundImage": "./assets/app_icon.png",
         "backgroundColor": "#050810"
