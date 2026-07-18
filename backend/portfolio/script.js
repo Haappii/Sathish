@@ -73,7 +73,11 @@ function showPortfolioNotFound() {
 }
 
 function applyConfig(cfg) {
-    if (!cfg || Object.keys(cfg).length === 0) return;
+    // Note: an empty-but-valid {} config (a portfolio that exists but has
+    // nothing filled in yet) must still run through here — that's what
+    // blanks the hero name and keeps the data-driven sections hidden,
+    // instead of silently leaving the raw hardcoded shell content visible.
+    if (!cfg) return;
 
     // Section visibility
     const vis = cfg.visible_sections || {};
@@ -85,7 +89,6 @@ function applyConfig(cfg) {
         experience: '.experience',
         projects: '.projects',
         education: '.education',
-        certification: '.certification',
         contact: '.contact',
     };
     Object.entries(sectionMap).forEach(([key, selector]) => {
@@ -140,14 +143,16 @@ function applyConfig(cfg) {
             placeholder.classList.add('has-photo');
             const img = document.createElement('img');
             img.src = cfg.photo_url;
-            img.alt = 'Sathish Kumar Lakshman';
+            img.alt = displayName || 'Profile photo';
             img.loading = 'eager';
             placeholder.appendChild(img);
         }
     }
 
-    // Stats
-    if (cfg.stats?.length) {
+    // Stats (section is hidden by default in the shell — only show it
+    // once there's actually data, and only if the admin hasn't hidden it)
+    if (cfg.stats?.length && vis.stats !== false) {
+        const section = document.querySelector('.stats');
         const grid = document.querySelector('.stats-grid');
         if (grid) {
             grid.innerHTML = cfg.stats.map((s, i) =>
@@ -158,10 +163,12 @@ function applyConfig(cfg) {
                 </div>`
             ).join('');
         }
+        if (section) section.style.display = '';
     }
 
-    // Tech marquee
-    if (cfg.tech_stack?.length) {
+    // Tech marquee (same hidden-until-populated pattern)
+    if (cfg.tech_stack?.length && vis.tech_marquee !== false) {
+        const section = document.querySelector('.tech-marquee');
         const content = document.querySelector('.marquee-content');
         if (content) {
             const items = cfg.tech_stack.map(t =>
@@ -169,23 +176,25 @@ function applyConfig(cfg) {
             ).join('');
             content.innerHTML = items + items;
         }
+        if (section) section.style.display = '';
     }
 
     // About
     const aboutText = document.querySelector('.about-text');
+    let hasAboutText = false;
     if (aboutText) {
         const parts = [];
         if (cfg.profile_summary) parts.push(`<p class="about-lead">${escapeHtml(cfg.profile_summary)}</p>`);
         if (cfg.profile_detail_1) parts.push(`<p>${escapeHtml(cfg.profile_detail_1)}</p>`);
         if (cfg.profile_detail_2) parts.push(`<p>${escapeHtml(cfg.profile_detail_2)}</p>`);
         if (parts.length) {
-            const highlights = aboutText.querySelector('.about-highlights');
-            const highlightsHtml = highlights ? highlights.outerHTML : '';
-            aboutText.innerHTML = parts.join('') + highlightsHtml;
+            aboutText.innerHTML = parts.join('');
+            hasAboutText = true;
         }
     }
 
     // Skills
+    let hasSkills = false;
     if (cfg.skill_categories?.length) {
         const skillsEl = document.querySelector('.about-skills');
         if (skillsEl) {
@@ -195,11 +204,20 @@ function applyConfig(cfg) {
                     <div class="skill-tags">${cat.tags.map(t => `<span class="skill-tag">${escapeHtml(t)}</span>`).join('')}</div>
                 </div>`
             ).join('');
+            skillsEl.style.display = '';
+            hasSkills = true;
         }
     }
+    // Nothing to show in About at all — hide the whole section rather
+    // than leaving an empty heading with nothing underneath it.
+    if (!hasAboutText && !hasSkills) {
+        const aboutSection = document.querySelector('.about');
+        if (aboutSection && vis.about !== false) aboutSection.style.display = 'none';
+    }
 
-    // Experience
-    if (cfg.experiences?.length) {
+    // Experience (hidden by default in the shell — show once populated)
+    if (cfg.experiences?.length && vis.experience !== false) {
+        const section = document.querySelector('.experience');
         const timeline = document.querySelector('.timeline');
         if (timeline) {
             timeline.innerHTML = cfg.experiences.map((exp, i) =>
@@ -224,10 +242,12 @@ function applyConfig(cfg) {
                 </div>`
             ).join('');
         }
+        if (section) section.style.display = '';
     }
 
-    // Projects
-    if (cfg.projects?.length) {
+    // Projects (hidden by default in the shell — show once populated)
+    if (cfg.projects?.length && vis.projects !== false) {
+        const section = document.querySelector('.projects');
         const grid = document.querySelector('.projects-grid');
         if (grid) {
             const icons = {
@@ -253,10 +273,12 @@ function applyConfig(cfg) {
                 </div>`
             ).join('');
         }
+        if (section) section.style.display = '';
     }
 
-    // Education
-    if (cfg.education?.length) {
+    // Education (hidden by default in the shell — show once populated)
+    if (cfg.education?.length && vis.education !== false) {
+        const section = document.querySelector('.education');
         const grid = document.querySelector('.education-grid');
         if (grid) {
             grid.innerHTML = cfg.education.map(edu =>
@@ -268,38 +290,63 @@ function applyConfig(cfg) {
                 </div>`
             ).join('');
         }
+        if (section) section.style.display = '';
     }
 
-    // Contact
+    // Contact — every item here is hidden by default in the shell (no
+    // config value = don't show/leak it), and only revealed once cfg
+    // actually supplies it.
     if (cfg.email) {
-        document.querySelectorAll('a[href^="mailto:"]').forEach(el => {
-            el.href = `mailto:${cfg.email}`;
-            if (el.classList.contains('contact-value')) el.textContent = cfg.email;
-        });
+        const item = document.getElementById('contactEmailItem');
+        const link = item?.querySelector('.contact-value');
+        if (link) { link.href = `mailto:${cfg.email}`; link.textContent = cfg.email; }
+        if (item) item.style.display = '';
+
+        const socialEmail = document.getElementById('socialEmail');
+        if (socialEmail) { socialEmail.href = `mailto:${cfg.email}`; socialEmail.style.display = ''; }
+        const footerEmail = document.getElementById('footerEmail');
+        if (footerEmail) { footerEmail.href = `mailto:${cfg.email}`; footerEmail.style.display = ''; }
     }
     if (cfg.phone) {
-        const phoneLink = document.querySelector('.contact-details a[href^="tel:"]');
-        if (phoneLink) { phoneLink.href = `tel:${cfg.phone.replace(/\s/g, '')}`; phoneLink.textContent = cfg.phone; }
+        const item = document.getElementById('contactPhoneItem');
+        const link = item?.querySelector('.contact-value');
+        if (link) { link.href = `tel:${cfg.phone.replace(/\s/g, '')}`; link.textContent = cfg.phone; }
+        if (item) item.style.display = '';
     }
     if (cfg.location) {
-        document.querySelectorAll('.contact-item').forEach(item => {
-            const label = item.querySelector('.contact-label');
-            if (label?.textContent === 'Location') {
-                const val = item.querySelector('.contact-value');
-                if (val) val.textContent = cfg.location;
-            }
-        });
+        const item = document.getElementById('contactLocationItem');
+        const val = item?.querySelector('.contact-value');
+        if (val) val.textContent = cfg.location;
+        if (item) item.style.display = '';
     }
     if (cfg.linkedin_url) {
-        document.querySelectorAll('a[href*="linkedin"], a[aria-label="LinkedIn"]').forEach(el => {
-            el.href = cfg.linkedin_url;
-        });
+        const social = document.getElementById('socialLinkedin');
+        if (social) { social.href = cfg.linkedin_url; social.style.display = ''; }
+        const footerLink = document.getElementById('footerLinkedin');
+        if (footerLink) { footerLink.href = cfg.linkedin_url; footerLink.style.display = ''; }
     }
     if (cfg.github_url) {
-        document.querySelectorAll('a[href*="github"], a[aria-label="GitHub"]').forEach(el => {
-            el.href = cfg.github_url;
-        });
+        const social = document.getElementById('socialGithub');
+        if (social) { social.href = cfg.github_url; social.style.display = ''; }
+        const footerLink = document.getElementById('footerGithub');
+        if (footerLink) { footerLink.href = cfg.github_url; footerLink.style.display = ''; }
     }
+    const footerConnectCol = document.getElementById('footerConnectCol');
+    if (footerConnectCol && (cfg.linkedin_url || cfg.github_url || cfg.email)) {
+        footerConnectCol.style.display = '';
+    }
+
+    // Footer branding
+    if (displayName) {
+        const footerText = document.querySelector('.footer-text');
+        if (footerText) footerText.textContent = `${displayName}'s portfolio.`;
+        const copyright = document.getElementById('footerCopyright');
+        if (copyright) copyright.innerHTML = `&copy; ${new Date().getFullYear()} ${escapeHtml(displayName)}. All rights reserved.`;
+    }
+    ['.footer-logo'].forEach((sel) => {
+        const el = document.querySelector(sel);
+        if (el) el.innerHTML = `${escapeHtml(initials)}<span class="dot">.</span>`;
+    });
 }
 
 function initAnimations() {

@@ -68,7 +68,7 @@ export default function PlatformDashboard() {
   const BLANK_PORTFOLIO = {
     visible_sections: {
       hero: true, stats: true, tech_marquee: true, about: true,
-      experience: true, projects: true, education: true, certification: true, contact: true,
+      experience: true, projects: true, education: true, contact: true,
     },
     hero_name: "",
     hero_badge: "Available for opportunities",
@@ -1803,7 +1803,6 @@ export default function PlatformDashboard() {
                     { key: "experience", label: "Work Experience", icon: "💼" },
                     { key: "projects", label: "Projects", icon: "🚀" },
                     { key: "education", label: "Education", icon: "🎓" },
-                    { key: "certification", label: "Certification", icon: "🏅" },
                     { key: "contact", label: "Contact Form", icon: "✉️" },
                   ].map((sec) => {
                     const vis = portfolio.visible_sections || {};
