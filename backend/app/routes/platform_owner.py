@@ -1956,7 +1956,10 @@ def list_portfolios(
     db: Session = Depends(get_db),
     owner=Depends(PlatformOwnerOnly),
 ):
-    _get_or_migrate_legacy_portfolio(db, LEGACY_PORTFOLIO_SLUG)
+    # Deliberately does NOT auto-migrate the legacy slug here — doing so
+    # on every list load meant a deleted legacy portfolio reappeared on
+    # the next dashboard refresh. It still migrates lazily (once) the
+    # first time someone opens it by slug, via _get_or_migrate_legacy_portfolio.
     rows = db.query(PlatformPortfolio).order_by(PlatformPortfolio.created_at.asc()).all()
     profile_ids = [r.profile_id for r in rows if r.profile_id is not None]
     names = {}

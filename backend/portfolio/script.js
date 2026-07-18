@@ -46,6 +46,13 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function getInitials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'SK';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function applyConfig(cfg) {
     if (!cfg || Object.keys(cfg).length === 0) return;
 
@@ -84,6 +91,16 @@ function applyConfig(cfg) {
     if (displayName) {
         document.title = `${displayName} | Software Engineer`;
     }
+    // Nav badge / loader / avatar fallback all hardcoded "SK" in the shell —
+    // this page is reused for every portfolio, so derive it from whoever's
+    // page is actually being viewed instead of always showing Sathish's.
+    const initials = getInitials(displayName);
+    ['.nav-logo', '.loader-text'].forEach((sel) => {
+        const el = document.querySelector(sel);
+        if (el) el.innerHTML = `${escapeHtml(initials)}<span class="dot">.</span>`;
+    });
+    const avatarInitials = document.querySelector('.hero-image-placeholder .initials');
+    if (avatarInitials) avatarInitials.textContent = initials;
     const badge = document.querySelector('.hero-badge');
     if (badge && cfg.hero_badge) {
         badge.childNodes[badge.childNodes.length - 1].textContent = " " + cfg.hero_badge;
